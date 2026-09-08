@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 SCHEMA_SQL = """
@@ -141,6 +141,49 @@ ON audit_events (entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS
 idx_audit_market_date
 ON audit_events (market_date);
+
+
+CREATE TABLE IF NOT EXISTS scheduled_jobs (
+    job_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    market_date TEXT NOT NULL,
+    checkpoint_name TEXT NOT NULL,
+
+    status TEXT NOT NULL,
+
+    scheduled_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+
+    calendar_truth TEXT NOT NULL,
+
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+
+    started_at TEXT,
+    finished_at TEXT,
+    last_error TEXT,
+
+    UNIQUE (
+        market_date,
+        checkpoint_name
+    )
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_scheduled_jobs_date_status
+ON scheduled_jobs (
+    market_date,
+    status
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_scheduled_jobs_checkpoint
+ON scheduled_jobs (
+    checkpoint_name
+);
+
 """
 
 

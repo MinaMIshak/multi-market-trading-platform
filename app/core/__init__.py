@@ -1,3 +1,6 @@
+from app.core.job_state import (
+    SchedulerJobStatus,
+)
 from app.core.orchestrator import (
     CheckpointWindow,
     MarketSessionOrchestrator,
@@ -19,5 +22,6 @@ __all__ = [
     "MarketSessionOrchestrator",
     "ScheduleEvaluation",
     "ScheduledCheckpoint",
+    "SchedulerJobStatus",
     "SessionPhase",
 ]

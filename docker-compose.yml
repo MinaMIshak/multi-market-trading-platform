@@ -33,3 +33,32 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: egx-platform-scheduler
+
+    restart: unless-stopped
+
+    command:
+      [
+        "python",
+        "-m",
+        "app.core.scheduler_worker"
+      ]
+
+    environment:
+      TZ: Africa/Cairo
+      EGX_DB_PATH: /app/data/platform.db
+      EGX_SCHEDULER_MODE: observe
+      EGX_SCHEDULER_POLL_SECONDS: "30"
+      EGX_CALENDAR_TRUTH: UNVERIFIED
+
+    volumes:
+      - ./data:/app/data
+
+    mem_limit: 128m
+    cpus: 0.25
