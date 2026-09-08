@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Runtime data
+data/*
+!data/.gitkeep
+
+logs/*
+!logs/.gitkeep
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Models / artifacts
+*.pkl
+*.joblib
+*.parquet
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary
+*.tmp
+*.bak
+*.swp
