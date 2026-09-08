@@ -1,0 +1,93 @@
+from enum import StrEnum
+
+
+class MarketSessionStatus(StrEnum):
+    PRE_MARKET = "PRE_MARKET"
+    OPEN = "OPEN"
+    FIRST15_COMPLETE = "FIRST15_COMPLETE"
+    CLOSED = "CLOSED"
+    DATA_PENDING = "DATA_PENDING"
+    VERIFIED = "VERIFIED"
+    HOLIDAY = "HOLIDAY"
+    UNKNOWN = "UNKNOWN"
+
+
+class MarketRegimeType(StrEnum):
+    RISK_ON = "RISK_ON"
+    NEUTRAL = "NEUTRAL"
+    RISK_OFF = "RISK_OFF"
+    UNKNOWN = "UNKNOWN"
+
+
+class CandidateSource(StrEnum):
+    SWING = "SWING"
+    PRE_SURGE = "PRE_SURGE"
+    FIRST15 = "FIRST15"
+    BREAKOUT = "BREAKOUT"
+    VWAP_PULLBACK = "VWAP_PULLBACK"
+    MOMENTUM = "MOMENTUM"
+    META_SELECTOR = "META_SELECTOR"
+
+
+class SignalDirection(StrEnum):
+    LONG = "LONG"
+    SHORT = "SHORT"
+
+
+class SignalStatus(StrEnum):
+    WATCH = "WATCH"
+    READY = "READY"
+    TRIGGERED = "TRIGGERED"
+    INVALIDATED = "INVALIDATED"
+    EXPIRED = "EXPIRED"
+
+
+class First15State(StrEnum):
+    CONTINUATION_CONFIRMED = "CONTINUATION_CONFIRMED"
+    REVERSAL_CONFIRMED = "REVERSAL_CONFIRMED"
+    HIGH_RISK = "HIGH_RISK"
+    NO_CONFIRMATION = "NO_CONFIRMATION"
+    REJECTED = "REJECTED"
+    WAITING_FOR_CALENDAR_VERIFICATION = (
+        "WAITING_FOR_CALENDAR_VERIFICATION"
+    )
+
+
+class TradeState(StrEnum):
+    SCANNING = "SCANNING"
+    WATCH = "WATCH"
+    SETUP_FOUND = "SETUP_FOUND"
+    READY = "READY"
+    ENTRY_TRIGGERED = "ENTRY_TRIGGERED"
+    IN_POSITION = "IN_POSITION"
+    T1_HIT = "T1_HIT"
+    TRAILING = "TRAILING"
+    EXITED = "EXITED"
+    STOPPED = "STOPPED"
+    INVALIDATED = "INVALIDATED"
+    EXPIRED = "EXPIRED"
+
+
+class RiskDecisionType(StrEnum):
+    APPROVE = "APPROVE"
+    REDUCE = "REDUCE"
+    BLOCK = "BLOCK"
+
+
+class ExitReason(StrEnum):
+    TARGET = "TARGET"
+    STOP = "STOP"
+    TRAILING_STOP = "TRAILING_STOP"
+    TIME_EXIT = "TIME_EXIT"
+    SESSION_END = "SESSION_END"
+    MANUAL = "MANUAL"
+    INVALIDATED = "INVALIDATED"
+
+
+class OutcomeStatus(StrEnum):
+    WIN = "WIN"
+    LOSS = "LOSS"
+    BREAKEVEN = "BREAKEVEN"
+    TIME_EXIT = "TIME_EXIT"
+    NO_FILL = "NO_FILL"
+    OPEN = "OPEN"
