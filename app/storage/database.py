@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 SCHEMA_SQL = """
@@ -263,6 +263,94 @@ CREATE INDEX IF NOT EXISTS
 idx_data_quality_code
 ON data_quality_issues (
     code
+);
+
+
+
+CREATE TABLE IF NOT EXISTS canonical_instruments (
+    instrument_id TEXT PRIMARY KEY,
+
+    instrument_type TEXT NOT NULL,
+
+    canonical_ticker TEXT NOT NULL,
+
+    name_en TEXT,
+    name_ar TEXT,
+
+    short_name_en TEXT,
+    short_name_ar TEXT,
+
+    source_provider TEXT NOT NULL,
+    source_symbol_code TEXT NOT NULL,
+
+    reuters_raw TEXT,
+    reuters_normalized TEXT,
+
+    source_sha256 TEXT NOT NULL,
+    source_market_date TEXT,
+
+    normalization_notes_json TEXT NOT NULL,
+
+    updated_at TEXT NOT NULL,
+
+    UNIQUE (
+        source_provider,
+        source_symbol_code
+    )
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_canonical_instruments_ticker
+ON canonical_instruments (
+    canonical_ticker
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_canonical_instruments_type
+ON canonical_instruments (
+    instrument_type
+);
+
+CREATE TABLE IF NOT EXISTS instrument_aliases (
+    alias_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    instrument_id TEXT NOT NULL,
+
+    provider TEXT NOT NULL,
+    alias_type TEXT NOT NULL,
+
+    alias_value TEXT NOT NULL,
+    normalized_value TEXT NOT NULL,
+
+    created_at TEXT NOT NULL,
+
+    FOREIGN KEY (
+        instrument_id
+    )
+    REFERENCES canonical_instruments (
+        instrument_id
+    )
+    ON DELETE CASCADE,
+
+    UNIQUE (
+        instrument_id,
+        provider,
+        alias_type,
+        normalized_value
+    )
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_instrument_alias_lookup
+ON instrument_aliases (
+    normalized_value
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_instrument_alias_provider
+ON instrument_aliases (
+    provider,
+    normalized_value
 );
 
 """

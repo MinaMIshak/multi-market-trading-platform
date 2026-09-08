@@ -15,3 +15,12 @@ __all__ = [
     "SchedulerRepository",
     "TradingRepository",
 ]
+
+
+from app.storage.security_master_repository import (
+    SecurityMasterRepository,
+)
+
+__all__ += [
+    "SecurityMasterRepository",
+]

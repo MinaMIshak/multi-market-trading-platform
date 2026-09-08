@@ -39,3 +39,18 @@ __all__ = [
     "QualitySeverity",
     "RawArtifactManifest",
 ]
+
+
+from app.data.security_master import (
+    CanonicalInstrument,
+    InstrumentType,
+    build_canonical_security_master,
+    normalize_reuters,
+)
+
+__all__ += [
+    "CanonicalInstrument",
+    "InstrumentType",
+    "build_canonical_security_master",
+    "normalize_reuters",
+]
