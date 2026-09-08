@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 SCHEMA_SQL = """
@@ -182,6 +182,87 @@ CREATE INDEX IF NOT EXISTS
 idx_scheduled_jobs_checkpoint
 ON scheduled_jobs (
     checkpoint_name
+);
+
+
+
+CREATE TABLE IF NOT EXISTS data_ingestions (
+    ingestion_id TEXT PRIMARY KEY,
+
+    provider TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    granularity TEXT,
+
+    symbol TEXT,
+    market_date TEXT,
+
+    raw_path TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    record_count INTEGER,
+
+    status TEXT NOT NULL,
+    source_uri TEXT,
+
+    received_at TEXT NOT NULL,
+    completed_at TEXT,
+
+    metadata_json TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_data_ingestions_raw_path
+ON data_ingestions (
+    raw_path
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_data_ingestions_provider_date
+ON data_ingestions (
+    provider,
+    market_date
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_data_ingestions_symbol_date
+ON data_ingestions (
+    symbol,
+    market_date
+);
+
+CREATE TABLE IF NOT EXISTS data_quality_issues (
+    issue_id TEXT PRIMARY KEY,
+
+    ingestion_id TEXT,
+
+    severity TEXT NOT NULL,
+    code TEXT NOT NULL,
+
+    symbol TEXT,
+    market_date TEXT,
+
+    message TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_data_quality_ingestion
+ON data_quality_issues (
+    ingestion_id
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_data_quality_severity
+ON data_quality_issues (
+    severity
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_data_quality_code
+ON data_quality_issues (
+    code
 );
 
 """

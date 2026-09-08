@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Any, Protocol
+
+from app.data.models import (
+    BarGranularity,
+)
+
+
+@dataclass(frozen=True)
+class ProviderResponse:
+    payload: bytes
+    filename: str
+
+    source_uri: str | None = None
+    record_count: int | None = None
+
+    metadata: dict[str, Any] = field(
+        default_factory=dict
+    )
+
+
+class MarketDataProvider(Protocol):
+    @property
+    def name(self) -> str:
+        ...
+
+    def fetch_daily_bars(
+        self,
+        *,
+        symbol: str,
+        start_date: date,
+        end_date: date,
+    ) -> ProviderResponse:
+        ...
+
+    def fetch_intraday_bars(
+        self,
+        *,
+        symbol: str,
+        start_date: date,
+        end_date: date,
+        granularity: BarGranularity,
+    ) -> ProviderResponse:
+        ...
+
+    def fetch_corporate_actions(
+        self,
+        *,
+        symbol: str,
+        start_date: date,
+        end_date: date,
+    ) -> ProviderResponse:
+        ...
