@@ -22,6 +22,20 @@ class ProviderResponse:
     )
 
 
+@dataclass(frozen=True)
+class ProviderBatchResponse:
+    responses: tuple[
+        ProviderResponse,
+        ...,
+    ]
+
+    record_count: int | None = None
+
+    metadata: dict[str, Any] = field(
+        default_factory=dict
+    )
+
+
 class MarketDataProvider(Protocol):
     @property
     def name(self) -> str:
@@ -53,4 +67,20 @@ class MarketDataProvider(Protocol):
         start_date: date,
         end_date: date,
     ) -> ProviderResponse:
+        ...
+
+
+class IndexDataProvider(Protocol):
+    @property
+    def name(self) -> str:
+        ...
+
+    def fetch_index_bars(
+        self,
+        *,
+        index_name: str,
+        start_date: date,
+        end_date: date,
+        page_size: int = 1000,
+    ) -> ProviderBatchResponse:
         ...
