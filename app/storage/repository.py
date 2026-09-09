@@ -73,6 +73,29 @@ class TradingRepository:
                 ),
             )
 
+    def get_market_session(
+        self,
+        market_date,
+    ) -> MarketSession | None:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT payload_json
+                FROM market_sessions
+                WHERE market_date = ?
+                """,
+                (
+                    market_date.isoformat(),
+                ),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return MarketSession.model_validate_json(
+            row["payload_json"]
+        )
+
     def save_candidate(
         self,
         candidate: Candidate,
