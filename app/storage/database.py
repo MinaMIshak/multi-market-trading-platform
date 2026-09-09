@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 SCHEMA_SQL = """
@@ -351,6 +351,140 @@ idx_instrument_alias_provider
 ON instrument_aliases (
     provider,
     normalized_value
+);
+
+
+CREATE TABLE IF NOT EXISTS canonical_data_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+
+    provider TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    granularity TEXT NOT NULL,
+
+    symbol TEXT NOT NULL,
+    source_snapshot_date TEXT NOT NULL,
+
+    canonical_path TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+
+    byte_size INTEGER NOT NULL,
+    record_count INTEGER NOT NULL,
+
+    oldest_market_date TEXT NOT NULL,
+    newest_market_date TEXT NOT NULL,
+
+    semantic_contract_version TEXT NOT NULL,
+    serialization_format TEXT NOT NULL,
+
+    full_ohlc_valid_count INTEGER NOT NULL,
+    legacy_close_reference_count INTEGER NOT NULL,
+    quarantined_anomaly_count INTEGER NOT NULL,
+
+    full_ohlc_usable_count INTEGER NOT NULL,
+    close_history_usable_count INTEGER NOT NULL,
+
+    status TEXT NOT NULL,
+
+    created_at TEXT NOT NULL,
+    validated_at TEXT,
+
+    metadata_json TEXT NOT NULL,
+
+    CHECK (byte_size >= 0),
+    CHECK (record_count >= 0),
+
+    CHECK (full_ohlc_valid_count >= 0),
+    CHECK (legacy_close_reference_count >= 0),
+    CHECK (quarantined_anomaly_count >= 0),
+
+    CHECK (full_ohlc_usable_count >= 0),
+    CHECK (close_history_usable_count >= 0),
+
+    CHECK (
+        full_ohlc_valid_count
+        + legacy_close_reference_count
+        + quarantined_anomaly_count
+        = record_count
+    ),
+
+    CHECK (
+        full_ohlc_usable_count
+        <= record_count
+    ),
+
+    CHECK (
+        close_history_usable_count
+        <= record_count
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_canonical_artifacts_path
+ON canonical_data_artifacts (
+    canonical_path
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_canonical_artifacts_snapshot_contract
+ON canonical_data_artifacts (
+    provider,
+    asset_type,
+    granularity,
+    symbol,
+    source_snapshot_date,
+    semantic_contract_version,
+    serialization_format
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_canonical_artifacts_symbol_date
+ON canonical_data_artifacts (
+    symbol,
+    source_snapshot_date
+);
+
+
+CREATE TABLE IF NOT EXISTS canonical_artifact_sources (
+    artifact_id TEXT NOT NULL,
+    ingestion_id TEXT NOT NULL,
+
+    source_ordinal INTEGER NOT NULL,
+
+    PRIMARY KEY (
+        artifact_id,
+        ingestion_id
+    ),
+
+    UNIQUE (
+        artifact_id,
+        source_ordinal
+    ),
+
+    CHECK (
+        source_ordinal >= 1
+    ),
+
+    FOREIGN KEY (
+        artifact_id
+    )
+    REFERENCES canonical_data_artifacts (
+        artifact_id
+    )
+    ON DELETE CASCADE,
+
+    FOREIGN KEY (
+        ingestion_id
+    )
+    REFERENCES data_ingestions (
+        ingestion_id
+    )
+    ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_canonical_artifact_sources_ingestion
+ON canonical_artifact_sources (
+    ingestion_id
 );
 
 """

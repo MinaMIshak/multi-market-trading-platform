@@ -24,3 +24,11 @@ from app.storage.security_master_repository import (
 __all__ += [
     "SecurityMasterRepository",
 ]
+
+from app.storage.canonical_artifact_repository import (
+    CanonicalArtifactRepository,
+)
+
+__all__ += [
+    "CanonicalArtifactRepository",
+]
