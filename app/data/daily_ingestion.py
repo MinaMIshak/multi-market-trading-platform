@@ -134,11 +134,13 @@ class DailyBarIngestor:
             "response": dict(response.metadata),
         }
 
-        self.repository.save_manifest(
-            manifest,
+        persisted_manifest = (
+            self.repository.save_manifest(
+                manifest,
             status=IngestionStatus.RECEIVED,
             source_uri=response.source_uri,
             metadata=metadata,
+            )
         )
 
         return DailyBarIngestionResult(
@@ -149,7 +151,7 @@ class DailyBarIngestor:
             snapshot_date=snapshot_date,
             requested_start_date=start_date,
             requested_end_date=end_date,
-            manifest=manifest,
+            manifest=persisted_manifest,
             record_count=response.record_count,
             response_metadata=dict(response.metadata),
         )

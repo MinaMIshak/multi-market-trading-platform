@@ -42,6 +42,8 @@ class FakeRepository:
             }
         )
 
+        return manifest
+
 
 class FakeIndexProvider:
     name = "egx_official_public"

@@ -29,7 +29,7 @@ class ManifestRepository(Protocol):
         ),
         source_uri: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> None:
+    ) -> RawArtifactManifest:
         ...
 
 
@@ -183,8 +183,9 @@ class IndexHistoryIngestor:
                 ),
             }
 
-            self.repository.save_manifest(
-                manifest,
+            persisted_manifest = (
+                self.repository.save_manifest(
+                    manifest,
                 status=(
                     IngestionStatus
                     .RECEIVED
@@ -193,10 +194,11 @@ class IndexHistoryIngestor:
                     response.source_uri
                 ),
                 metadata=ledger_metadata,
+                )
             )
 
             manifests.append(
-                manifest
+                persisted_manifest
             )
 
         return IndexIngestionResult(

@@ -53,6 +53,8 @@ class Repo:
             manifest, status, source_uri, metadata
         )
 
+        return manifest
+
 
 def test_identity_and_provenance_boundary():
     with TemporaryDirectory() as tmp:
