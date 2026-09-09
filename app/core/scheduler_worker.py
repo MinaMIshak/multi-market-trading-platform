@@ -15,8 +15,9 @@ from app.storage import Database
 from app.storage.scheduler_repository import (
     SchedulerRepository,
 )
-from app.core.runtime_secrets import (
-    read_runtime_secret,
+from app.core.scheduler_execution_context import (
+    SchedulerMode,
+    build_scheduler_execution_context,
 )
 
 
@@ -44,16 +45,12 @@ def main() -> None:
         _handle_stop,
     )
 
-    mode = os.getenv(
-        "EGX_SCHEDULER_MODE",
-        "observe",
-    ).strip().lower()
-
-    if mode != "observe":
-        raise RuntimeError(
-            "Only observe scheduler mode "
-            "is allowed at this stage"
-        )
+    mode = SchedulerMode(
+        os.getenv(
+            "EGX_SCHEDULER_MODE",
+            SchedulerMode.OBSERVE.value,
+        ).strip().lower()
+    )
 
     poll_seconds = int(
         os.getenv(
@@ -79,21 +76,29 @@ def main() -> None:
         "/run/secrets/eodhd_api_token",
     )
 
-    eodhd_api_token = read_runtime_secret(
-        secret_path
+    db_path = os.getenv(
+        "EGX_DB_PATH",
+        "/app/data/platform.db",
     )
 
     database = Database(
-        os.getenv(
-            "EGX_DB_PATH",
-            "/app/data/platform.db",
-        )
+        db_path
     )
 
     database.initialize()
 
     repository = SchedulerRepository(
         database
+    )
+
+    execution_context = (
+        build_scheduler_execution_context(
+            mode=mode,
+            database=database,
+            scheduler_repository=repository,
+            db_path=db_path,
+            secret_path=secret_path,
+        )
     )
 
     orchestrator = (
@@ -106,14 +111,13 @@ def main() -> None:
 
     print(
         "SCHEDULER_WORKER_STARTED "
-        f"mode={mode} "
+        f"mode={mode.value} "
         f"poll_seconds={poll_seconds} "
         f"calendar_truth={calendar_truth.value} "
-        "eodhd_secret=available",
+        "execution_enabled="
+        f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
     )
-
-    del eodhd_api_token
 
     last_signature: str | None = None
 
@@ -147,6 +151,50 @@ def main() -> None:
         repository.sync_evaluation(
             evaluation
         )
+
+        if execution_context.execution_enabled:
+            if (
+                execution_context.dispatcher is None
+                or execution_context.provider is None
+            ):
+                raise RuntimeError(
+                    "scheduler execution context "
+                    "is incomplete"
+                )
+
+            outcomes = (
+                execution_context.dispatcher
+                .dispatch(
+                    evaluation=evaluation,
+                    provider=(
+                        execution_context.provider
+                    ),
+                )
+            )
+
+            for outcome in outcomes:
+                event = {
+                    "checkpoint": (
+                        outcome
+                        .checkpoint_name
+                        .value
+                    ),
+                    "claimed": outcome.claimed,
+                    "succeeded": outcome.succeeded,
+                    "item_count": outcome.item_count,
+                    "error_type": (
+                        outcome.error_type
+                    ),
+                }
+
+                print(
+                    "DAILY_REFRESH_DISPATCH "
+                    + json.dumps(
+                        event,
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
 
         summary = (
             repository.status_summary(
