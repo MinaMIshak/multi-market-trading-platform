@@ -56,9 +56,11 @@ services:
       EGX_SCHEDULER_MODE: observe
       EGX_SCHEDULER_POLL_SECONDS: "30"
       EGX_CALENDAR_TRUTH: UNVERIFIED
+      EODHD_API_TOKEN_FILE: /run/secrets/eodhd_api_token
 
     volumes:
       - ./data:/app/data
+      - /opt/egx-runtime-secrets/eodhd_api_token:/run/secrets/eodhd_api_token:ro
 
     mem_limit: 128m
     cpus: 0.25

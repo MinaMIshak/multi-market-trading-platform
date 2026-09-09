@@ -15,6 +15,9 @@ from app.storage import Database
 from app.storage.scheduler_repository import (
     SchedulerRepository,
 )
+from app.core.runtime_secrets import (
+    read_runtime_secret,
+)
 
 
 stop_event = threading.Event()
@@ -71,6 +74,15 @@ def main() -> None:
         )
     )
 
+    secret_path = os.getenv(
+        "EODHD_API_TOKEN_FILE",
+        "/run/secrets/eodhd_api_token",
+    )
+
+    eodhd_api_token = read_runtime_secret(
+        secret_path
+    )
+
     database = Database(
         os.getenv(
             "EGX_DB_PATH",
@@ -96,9 +108,12 @@ def main() -> None:
         "SCHEDULER_WORKER_STARTED "
         f"mode={mode} "
         f"poll_seconds={poll_seconds} "
-        f"calendar_truth={calendar_truth.value}",
+        f"calendar_truth={calendar_truth.value} "
+        "eodhd_secret=available",
         flush=True,
     )
+
+    del eodhd_api_token
 
     last_signature: str | None = None
 
