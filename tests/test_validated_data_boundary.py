@@ -11,6 +11,7 @@ APPROVED_CANONICAL_METADATA = {
     Path("app/data/validated_index_repository.py"),
     Path("app/storage/database.py"),
     Path("app/storage/canonical_artifact_repository.py"),
+    Path("app/storage/daily_canonical_artifact_repository.py"),
 }
 
 APPROVED_CANONICAL_IO = {
