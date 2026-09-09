@@ -202,6 +202,8 @@ class ImmutableRawStore:
                     f"{relative}"
                 )
 
+            os.chmod(target, 0o660)
+
             return RawArtifactManifest(
                 provider=provider_token,
                 asset_type=asset_type,
@@ -229,6 +231,10 @@ class ImmutableRawStore:
             with temp.open("xb") as handle:
                 handle.write(payload)
                 handle.flush()
+                os.fchmod(
+                    handle.fileno(),
+                    0o660,
+                )
                 os.fsync(
                     handle.fileno()
                 )
@@ -255,6 +261,11 @@ class ImmutableRawStore:
                         "conflict after race: "
                         f"{relative}"
                     )
+
+                os.chmod(
+                    target,
+                    0o660,
+                )
 
         finally:
             temp.unlink(

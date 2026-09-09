@@ -109,3 +109,39 @@ def test_verified_read_rejects_path_traversal(
         match="unsafe raw artifact path",
     ):
         store.read_verified(unsafe)
+
+
+def test_raw_store_enforces_file_mode_0660(
+    tmp_path,
+):
+    store, manifest, payload = stored(
+        tmp_path
+    )
+
+    target = (
+        store.root
+        / manifest.raw_path
+    )
+
+    assert (
+        target.stat().st_mode & 0o777
+    ) == 0o660
+
+    target.chmod(0o644)
+
+    replay = store.store_bytes(
+        provider=manifest.provider,
+        asset_type=manifest.asset_type,
+        payload=payload,
+        filename=target.name,
+        market_date=manifest.market_date,
+        symbol=manifest.symbol,
+        granularity=manifest.granularity,
+        record_count=manifest.record_count,
+    )
+
+    assert replay.sha256 == manifest.sha256
+
+    assert (
+        target.stat().st_mode & 0o777
+    ) == 0o660
