@@ -73,7 +73,8 @@ class SchedulerRepository:
                             WHEN scheduled_jobs.status
                                  IN (
                                      'RUNNING',
-                                     'SUCCEEDED'
+                                     'SUCCEEDED',
+                                     'FAILED'
                                  )
                             THEN scheduled_jobs.status
                             ELSE excluded.status

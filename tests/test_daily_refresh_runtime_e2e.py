@@ -1,4 +1,6 @@
 import json
+
+import pytest
 from datetime import (
     date,
     datetime,
@@ -18,6 +20,7 @@ from app.core.schedule import (
     CheckpointName,
 )
 from app.data.daily_refresh_job import (
+    DailyRefreshJobError,
     DailyRefreshTarget,
 )
 from app.data.provider import ProviderResponse
@@ -52,27 +55,45 @@ class FakeEODHDProvider:
             )
         )
 
+        rows = []
+
+        first_date = (
+            end_date
+            - timedelta(days=259)
+        )
+
+        for index in range(260):
+            market_date = (
+                first_date
+                + timedelta(days=index)
+            )
+
+            base = (
+                75.0
+                + index / 100
+            )
+
+            rows.append(
+                {
+                    "date": (
+                        market_date
+                        .isoformat()
+                    ),
+                    "open": base,
+                    "high": base + 2.0,
+                    "low": base - 1.0,
+                    "close": base + 1.0,
+                    "adjusted_close": (
+                        base + 1.0
+                    ),
+                    "volume": (
+                        1000000 + index
+                    ),
+                }
+            )
+
         payload = json.dumps(
-            [
-                {
-                    "date": "2026-09-09",
-                    "open": 75.0,
-                    "high": 77.0,
-                    "low": 74.5,
-                    "close": 76.5,
-                    "adjusted_close": 76.5,
-                    "volume": 1000000,
-                },
-                {
-                    "date": "2026-09-10",
-                    "open": 76.5,
-                    "high": 78.0,
-                    "low": 76.0,
-                    "close": 77.5,
-                    "adjusted_close": 77.5,
-                    "volume": 1200000,
-                },
-            ],
+            rows,
             separators=(",", ":"),
         ).encode("utf-8")
 
@@ -88,7 +109,7 @@ class FakeEODHDProvider:
                 "https://example.test/api/eod/"
                 + symbol
             ),
-            record_count=2,
+            record_count=len(rows),
             metadata={
                 "endpoint": "eod",
                 "symbol": symbol,
@@ -289,8 +310,16 @@ def test_runtime_executes_real_pipeline_offline(
         == instrument_id
     )
     assert artifact["status"] == "VALIDATED"
-    assert artifact["record_count"] == 2
-    assert artifact["valid_bar_count"] == 2
+    assert artifact["record_count"] == 260
+    assert artifact["valid_bar_count"] == 260
+    assert (
+        artifact["quarantined_bar_count"]
+        == 0
+    )
+    assert (
+        artifact["newest_market_date"]
+        == MARKET_DATE.isoformat()
+    )
 
     assert source_count == 1
 
@@ -313,3 +342,324 @@ def test_runtime_executes_real_pipeline_offline(
 
     assert raw_path.is_file()
     assert canonical_path.is_file()
+
+
+
+class DelayedEODHDProvider(
+    FakeEODHDProvider
+):
+    def __init__(self):
+        super().__init__()
+        self.return_stale = True
+
+    def fetch_daily_bars(
+        self,
+        *,
+        symbol,
+        start_date,
+        end_date,
+    ):
+        effective_end = (
+            end_date
+            - timedelta(days=1)
+            if self.return_stale
+            else end_date
+        )
+
+        return super().fetch_daily_bars(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=effective_end,
+        )
+
+
+def _regular_files(root):
+    if not root.exists():
+        return []
+
+    return [
+        item
+        for item in root.rglob("*")
+        if item.is_file()
+    ]
+
+
+def test_stale_primary_then_fresh_fallback(
+    tmp_path,
+):
+    database = Database(
+        tmp_path / "platform.db"
+    )
+    database.initialize()
+
+    seed_comi(database)
+
+    repository = SchedulerRepository(
+        database
+    )
+
+    orchestrator = (
+        MarketSessionOrchestrator()
+    )
+
+    primary_evaluation = (
+        orchestrator.evaluate(
+            now=datetime(
+                2026,
+                9,
+                10,
+                16,
+                15,
+                tzinfo=CAIRO,
+            ),
+            market_date=MARKET_DATE,
+            calendar_truth=(
+                CalendarTruth
+                .VERIFIED_TRADING_DAY
+            ),
+            completed_jobs=set(),
+        )
+    )
+
+    repository.sync_evaluation(
+        primary_evaluation
+    )
+
+    provider = DelayedEODHDProvider()
+
+    data_root = tmp_path / "data"
+
+    runtime = build_daily_refresh_runtime(
+        database=database,
+        scheduler_repository=repository,
+        data_root=data_root,
+        provider=provider,
+        targets=(
+            DailyRefreshTarget(
+                "COMI",
+                "COMI.EGX",
+            ),
+        ),
+        lookback_days=400,
+        minimum_valid_bars=260,
+    )
+
+    with pytest.raises(
+        DailyRefreshJobError
+    ) as captured:
+        runtime.execution_adapter.execute(
+            market_date=MARKET_DATE,
+            checkpoint_name=(
+                CheckpointName
+                .AFTER_SESSION_PRIMARY
+            ),
+            provider=runtime.provider,
+        )
+
+    assert (
+        captured.value.cause_type
+        == "DailyRefreshAdmissionError"
+    )
+
+    with database.connect() as con:
+        primary = con.execute(
+            """
+            SELECT
+                status,
+                attempt_count,
+                last_error
+            FROM scheduled_jobs
+            WHERE market_date = ?
+              AND checkpoint_name = ?
+            """,
+            (
+                MARKET_DATE.isoformat(),
+                CheckpointName
+                .AFTER_SESSION_PRIMARY
+                .value,
+            ),
+        ).fetchone()
+
+        ingestion_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM data_ingestions
+            """
+        ).fetchone()[0]
+
+        artifact_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM daily_canonical_artifacts
+            """
+        ).fetchone()[0]
+
+    assert primary["status"] == "FAILED"
+    assert primary["attempt_count"] == 1
+
+    assert (
+        "DailyRefreshAdmissionError"
+        in primary["last_error"]
+    )
+
+    assert ingestion_count == 0
+    assert artifact_count == 0
+
+    assert (
+        _regular_files(
+            data_root / "raw"
+        )
+        == []
+    )
+
+    assert (
+        _regular_files(
+            data_root / "canonical"
+        )
+        == []
+    )
+
+    provider.return_stale = False
+
+    completed = (
+        repository
+        .successful_checkpoints(
+            MARKET_DATE
+        )
+    )
+
+    assert (
+        CheckpointName
+        .AFTER_SESSION_PRIMARY
+        not in completed
+    )
+
+    fallback_evaluation = (
+        orchestrator.evaluate(
+            now=datetime(
+                2026,
+                9,
+                10,
+                18,
+                15,
+                tzinfo=CAIRO,
+            ),
+            market_date=MARKET_DATE,
+            calendar_truth=(
+                CalendarTruth
+                .VERIFIED_TRADING_DAY
+            ),
+            completed_jobs=completed,
+        )
+    )
+
+    repository.sync_evaluation(
+        fallback_evaluation
+    )
+
+    fallback = (
+        runtime
+        .execution_adapter
+        .execute(
+            market_date=MARKET_DATE,
+            checkpoint_name=(
+                CheckpointName
+                .AFTER_SESSION_FALLBACK
+            ),
+            provider=runtime.provider,
+        )
+    )
+
+    assert fallback.claimed is True
+    assert fallback.succeeded is True
+    assert fallback.item_count == 1
+
+    with database.connect() as con:
+        primary = con.execute(
+            """
+            SELECT
+                status,
+                attempt_count
+            FROM scheduled_jobs
+            WHERE market_date = ?
+              AND checkpoint_name = ?
+            """,
+            (
+                MARKET_DATE.isoformat(),
+                CheckpointName
+                .AFTER_SESSION_PRIMARY
+                .value,
+            ),
+        ).fetchone()
+
+        fallback_job = con.execute(
+            """
+            SELECT
+                status,
+                attempt_count
+            FROM scheduled_jobs
+            WHERE market_date = ?
+              AND checkpoint_name = ?
+            """,
+            (
+                MARKET_DATE.isoformat(),
+                CheckpointName
+                .AFTER_SESSION_FALLBACK
+                .value,
+            ),
+        ).fetchone()
+
+        ingestion_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM data_ingestions
+            """
+        ).fetchone()[0]
+
+        artifact_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM daily_canonical_artifacts
+            """
+        ).fetchone()[0]
+
+        source_count = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM daily_canonical_sources
+            """
+        ).fetchone()[0]
+
+        integrity = con.execute(
+            "PRAGMA quick_check"
+        ).fetchone()[0]
+
+    assert primary["status"] == "FAILED"
+    assert primary["attempt_count"] == 1
+
+    assert fallback_job["status"] == "SUCCEEDED"
+    assert fallback_job["attempt_count"] == 1
+
+    assert ingestion_count == 1
+    assert artifact_count == 1
+    assert source_count == 1
+
+    assert (
+        len(
+            _regular_files(
+                data_root / "raw"
+            )
+        )
+        == 1
+    )
+
+    assert (
+        len(
+            _regular_files(
+                data_root / "canonical"
+            )
+        )
+        == 1
+    )
+
+    assert integrity == "ok"

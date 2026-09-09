@@ -57,10 +57,12 @@ class DailyBarIngestor:
         raw_store: ImmutableRawStore,
         repository: ManifestRepository,
         resolver: SymbolResolver,
+        admission_policy: Any | None = None,
     ) -> None:
         self.raw_store = raw_store
         self.repository = repository
         self.resolver = resolver
+        self.admission_policy = admission_policy
 
     def ingest(
         self,
@@ -98,6 +100,10 @@ class DailyBarIngestor:
                 "resolved canonical ticker mismatch"
             )
 
+        instrument_id = str(
+            instrument["instrument_id"]
+        )
+
         response = provider.fetch_daily_bars(
             symbol=provider_symbol,
             start_date=start_date,
@@ -109,6 +115,17 @@ class DailyBarIngestor:
                 "daily provider record_count is required"
             )
 
+        if self.admission_policy is not None:
+            self.admission_policy.validate_provider_response(
+                response,
+                instrument_id=instrument_id,
+                canonical_symbol=canonical_symbol,
+                provider_symbol=provider_symbol,
+                provider=provider.name,
+                snapshot_date=snapshot_date,
+                expected_market_date=end_date,
+            )
+
         manifest = self.raw_store.store_bytes(
             provider=provider.name,
             asset_type=DataAssetType.DAILY_BARS,
@@ -118,10 +135,6 @@ class DailyBarIngestor:
             symbol=canonical_symbol,
             granularity=BarGranularity.D1,
             record_count=response.record_count,
-        )
-
-        instrument_id = str(
-            instrument["instrument_id"]
         )
 
         metadata = {

@@ -19,6 +19,9 @@ from app.data.daily_refresh_job import (
     DailyRefreshJob,
     DailyRefreshTarget,
 )
+from app.data.daily_refresh_admission import (
+    DailyRefreshAdmissionPolicy,
+)
 from app.data.ingestion_repository import (
     DataIngestionRepository,
 )
@@ -66,6 +69,7 @@ DEFAULT_EODHD_TARGETS = (
 @dataclass(frozen=True)
 class DailyRefreshRuntime:
     provider: MarketDataProvider
+    admission_policy: DailyRefreshAdmissionPolicy
     refresh_job: DailyRefreshJob
     execution_adapter: (
         DailyRefreshExecutionAdapter
@@ -88,6 +92,7 @@ def build_daily_refresh_runtime(
         ...,
     ] = DEFAULT_EODHD_TARGETS,
     lookback_days: int = 400,
+    minimum_valid_bars: int = 260,
 ) -> DailyRefreshRuntime:
     """
     Compose the production daily-refresh
@@ -124,6 +129,14 @@ def build_daily_refresh_runtime(
         root / "raw"
     )
 
+    admission_policy = (
+        DailyRefreshAdmissionPolicy(
+            minimum_valid_bars=(
+                minimum_valid_bars
+            )
+        )
+    )
+
     resolver = SecurityMasterRepository(
         database
     )
@@ -136,6 +149,9 @@ def build_daily_refresh_runtime(
             )
         ),
         resolver=resolver,
+        admission_policy=(
+            admission_policy
+        ),
     )
 
     refresh_job = DailyRefreshJob(
@@ -168,6 +184,9 @@ def build_daily_refresh_runtime(
 
     return DailyRefreshRuntime(
         provider=selected_provider,
+        admission_policy=(
+            admission_policy
+        ),
         refresh_job=refresh_job,
         execution_adapter=(
             execution_adapter

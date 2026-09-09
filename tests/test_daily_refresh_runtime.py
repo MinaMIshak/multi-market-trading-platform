@@ -220,3 +220,36 @@ def test_production_build_has_no_network_side_effect(
     )
 
     assert runtime.provider.fetch_daily_bars
+
+
+def test_runtime_wires_admission_policy(
+    tmp_path,
+):
+    database = make_database(tmp_path)
+
+    repository = SchedulerRepository(
+        database
+    )
+
+    runtime = build_daily_refresh_runtime(
+        database=database,
+        scheduler_repository=repository,
+        data_root=tmp_path / "data",
+        provider=FakeProvider(),
+        minimum_valid_bars=275,
+    )
+
+    assert (
+        runtime
+        .admission_policy
+        .minimum_valid_bars
+        == 275
+    )
+
+    assert (
+        runtime
+        .refresh_job
+        .ingestor
+        .admission_policy
+        is runtime.admission_policy
+    )
