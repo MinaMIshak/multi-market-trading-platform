@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 SCHEMA_SQL = """
@@ -484,6 +484,107 @@ CREATE TABLE IF NOT EXISTS canonical_artifact_sources (
 CREATE INDEX IF NOT EXISTS
 idx_canonical_artifact_sources_ingestion
 ON canonical_artifact_sources (
+    ingestion_id
+);
+
+
+CREATE TABLE IF NOT EXISTS daily_canonical_artifacts (
+    artifact_id TEXT PRIMARY KEY,
+
+    instrument_id TEXT NOT NULL,
+    canonical_symbol TEXT NOT NULL,
+
+    provider TEXT NOT NULL,
+    provider_symbol TEXT NOT NULL,
+
+    source_snapshot_date TEXT NOT NULL,
+
+    canonical_path TEXT NOT NULL UNIQUE,
+    sha256 TEXT NOT NULL,
+
+    byte_size INTEGER NOT NULL,
+    record_count INTEGER NOT NULL,
+
+    oldest_market_date TEXT NOT NULL,
+    newest_market_date TEXT NOT NULL,
+
+    valid_bar_count INTEGER NOT NULL,
+    quarantined_bar_count INTEGER NOT NULL,
+
+    semantic_contract_version TEXT NOT NULL,
+    serialization_format TEXT NOT NULL,
+
+    status TEXT NOT NULL,
+
+    created_at TEXT NOT NULL,
+    validated_at TEXT,
+
+    metadata_json TEXT NOT NULL,
+
+    FOREIGN KEY (instrument_id)
+    REFERENCES canonical_instruments (instrument_id)
+    ON DELETE RESTRICT,
+
+    CHECK (byte_size >= 0),
+    CHECK (record_count >= 0),
+    CHECK (valid_bar_count >= 0),
+    CHECK (quarantined_bar_count >= 0),
+
+    CHECK (
+        valid_bar_count
+        + quarantined_bar_count
+        = record_count
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_daily_canonical_snapshot_contract
+ON daily_canonical_artifacts (
+    provider,
+    instrument_id,
+    provider_symbol,
+    source_snapshot_date,
+    semantic_contract_version,
+    serialization_format
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_daily_canonical_symbol_date
+ON daily_canonical_artifacts (
+    canonical_symbol,
+    source_snapshot_date
+);
+
+
+CREATE TABLE IF NOT EXISTS daily_canonical_sources (
+    artifact_id TEXT NOT NULL,
+    ingestion_id TEXT NOT NULL,
+    source_ordinal INTEGER NOT NULL,
+
+    PRIMARY KEY (
+        artifact_id,
+        ingestion_id
+    ),
+
+    UNIQUE (
+        artifact_id,
+        source_ordinal
+    ),
+
+    CHECK (source_ordinal >= 1),
+
+    FOREIGN KEY (artifact_id)
+    REFERENCES daily_canonical_artifacts (artifact_id)
+    ON DELETE CASCADE,
+
+    FOREIGN KEY (ingestion_id)
+    REFERENCES data_ingestions (ingestion_id)
+    ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_daily_canonical_sources_ingestion
+ON daily_canonical_sources (
     ingestion_id
 );
 
