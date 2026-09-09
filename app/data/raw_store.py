@@ -82,6 +82,52 @@ class ImmutableRawStore:
     ) -> None:
         self.root = Path(root)
 
+    def read_verified(
+        self,
+        manifest: RawArtifactManifest,
+    ) -> bytes:
+        relative = Path(
+            manifest.raw_path
+        )
+
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+        ):
+            raise ValueError(
+                "unsafe raw artifact path"
+            )
+
+        root = self.root.resolve()
+        target = (
+            self.root / relative
+        ).resolve()
+
+        if target != root and root not in target.parents:
+            raise ValueError(
+                "raw artifact escapes store root"
+            )
+
+        if not target.is_file():
+            raise FileNotFoundError(
+                f"raw artifact missing: {relative}"
+            )
+
+        payload = target.read_bytes()
+
+        if len(payload) != manifest.byte_size:
+            raise RuntimeError(
+                "raw artifact byte_size mismatch"
+            )
+
+        if _sha256_bytes(payload) != manifest.sha256:
+            raise RuntimeError(
+                "raw artifact sha256 mismatch"
+            )
+
+        return payload
+
+
     def store_bytes(
         self,
         *,
