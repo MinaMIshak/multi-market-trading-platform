@@ -14,8 +14,8 @@ def test_holiday_evidence_schema_exists(
     )
     database.initialize()
 
-    assert SCHEMA_VERSION == 8
-    assert database.schema_version() == 8
+    assert SCHEMA_VERSION == 9
+    assert database.schema_version() == 9
 
     with database.connect() as connection:
         columns = {
@@ -161,7 +161,7 @@ def test_v6_style_database_upgrades_additively(
         allow_upgrade=True
     )
 
-    assert database.schema_version() == 8
+    assert database.schema_version() == 9
 
     with database.connect() as connection:
         row = connection.execute(

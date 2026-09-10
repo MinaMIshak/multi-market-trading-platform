@@ -191,7 +191,7 @@ def test_v7_upgrade_requires_permission_and_preserves_data(db):
         db.initialize()
     assert db.schema_version() == 7
     db.initialize(allow_upgrade=True)
-    assert db.schema_version() == 8
+    assert db.schema_version() == 9
     assert usage(db) == 0
     with db.connect() as con:
         assert con.execute("SELECT status FROM market_sessions").fetchone()[0] == 'UNKNOWN'

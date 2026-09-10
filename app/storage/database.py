@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 SCHEMA_SQL = """
@@ -12,6 +12,33 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reference_artifacts (
+    ingestion_id TEXT PRIMARY KEY REFERENCES data_ingestions(ingestion_id) ON DELETE RESTRICT,
+    contract TEXT NOT NULL CHECK (contract IN (
+        'egx-universe-v1', 'egx-actions-v1', 'egx-source-review-v1'
+    )),
+    effective_date TEXT,
+    instrument_id TEXT,
+    coverage_start TEXT,
+    coverage_end TEXT,
+    subject_ingestion_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reference_date
+ON reference_artifacts(contract, effective_date);
+CREATE INDEX IF NOT EXISTS idx_reference_instrument
+ON reference_artifacts(contract, instrument_id, coverage_start, coverage_end);
+CREATE INDEX IF NOT EXISTS idx_reference_subject
+ON reference_artifacts(contract, subject_ingestion_id);
+
+CREATE TRIGGER IF NOT EXISTS reference_artifacts_no_update
+BEFORE UPDATE ON reference_artifacts BEGIN
+    SELECT RAISE(ABORT, 'immutable reference artifact');
+END;
+CREATE TRIGGER IF NOT EXISTS reference_artifacts_no_delete
+BEFORE DELETE ON reference_artifacts BEGIN
+    SELECT RAISE(ABORT, 'immutable reference artifact');
+END;
 
 CREATE TABLE IF NOT EXISTS automatic_quota (
     id INTEGER PRIMARY KEY CHECK (id = 1),

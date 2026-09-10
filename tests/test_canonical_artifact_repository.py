@@ -176,7 +176,7 @@ def artifact_manifest(
     )
 
 
-def test_schema_version_eight_and_tables_exist(
+def test_current_schema_version_and_tables_exist(
     tmp_path,
 ):
     database = make_database(
@@ -185,7 +185,7 @@ def test_schema_version_eight_and_tables_exist(
 
     assert (
         database.schema_version()
-        == 8
+        == 9
     )
 
     with database.connect() as connection:
