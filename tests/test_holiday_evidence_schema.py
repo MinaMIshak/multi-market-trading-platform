@@ -157,7 +157,9 @@ def test_v6_style_database_upgrades_additively(
         connection.close()
 
     database = Database(path)
-    database.initialize()
+    database.initialize(
+        allow_upgrade=True
+    )
 
     assert database.schema_version() == 7
 

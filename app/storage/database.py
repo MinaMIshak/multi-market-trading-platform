@@ -660,7 +660,11 @@ class Database:
 
         return connection
 
-    def initialize(self) -> None:
+    def initialize(
+        self,
+        *,
+        allow_upgrade: bool = False,
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 "PRAGMA journal_mode = WAL"
@@ -670,26 +674,97 @@ class Database:
                 "PRAGMA synchronous = NORMAL"
             )
 
+            tables = {
+                row["name"]
+                for row in connection.execute(
+                    """
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table'
+                      AND name NOT LIKE 'sqlite_%'
+                    """
+                ).fetchall()
+            }
+
+            if "schema_meta" not in tables:
+                if tables:
+                    raise RuntimeError(
+                        "database schema metadata missing"
+                    )
+
+                connection.executescript(
+                    SCHEMA_SQL
+                )
+
+                connection.execute(
+                    """
+                    INSERT INTO schema_meta (
+                        key,
+                        value
+                    )
+                    VALUES (
+                        'schema_version',
+                        ?
+                    )
+                    """,
+                    (str(SCHEMA_VERSION),),
+                )
+
+                return
+
+            row = connection.execute(
+                """
+                SELECT value
+                FROM schema_meta
+                WHERE key = 'schema_version'
+                """
+            ).fetchone()
+
+            if row is None:
+                raise RuntimeError(
+                    "database schema version missing"
+                )
+
+            try:
+                existing_version = int(
+                    row["value"]
+                )
+            except (TypeError, ValueError) as exc:
+                raise RuntimeError(
+                    "invalid database schema version"
+                ) from exc
+
+            if existing_version > SCHEMA_VERSION:
+                raise RuntimeError(
+                    "database schema is newer than "
+                    "application schema: "
+                    f"{existing_version} > "
+                    f"{SCHEMA_VERSION}"
+                )
+
+            if (
+                existing_version < SCHEMA_VERSION
+                and not allow_upgrade
+            ):
+                raise RuntimeError(
+                    "database schema upgrade required: "
+                    f"{existing_version} -> "
+                    f"{SCHEMA_VERSION}"
+                )
+
             connection.executescript(
                 SCHEMA_SQL
             )
 
-            connection.execute(
-                """
-                INSERT INTO schema_meta (
-                    key,
-                    value
+            if existing_version < SCHEMA_VERSION:
+                connection.execute(
+                    """
+                    UPDATE schema_meta
+                    SET value = ?
+                    WHERE key = 'schema_version'
+                    """,
+                    (str(SCHEMA_VERSION),),
                 )
-                VALUES (
-                    'schema_version',
-                    ?
-                )
-                ON CONFLICT(key)
-                DO UPDATE SET
-                    value = excluded.value
-                """,
-                (str(SCHEMA_VERSION),),
-            )
 
     def schema_version(self) -> int:
         with self.connect() as connection:
