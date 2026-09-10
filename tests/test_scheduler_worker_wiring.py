@@ -7,6 +7,14 @@ import pytest
 from app.core import scheduler_worker
 from app.core.schedule import CheckpointName
 from app.data.providers import eodhd
+from app.domain import MarketSession
+from app.domain.enums import (
+    MarketSessionStatus,
+)
+from app.storage import (
+    Database,
+    TradingRepository,
+)
 
 
 CAIRO = ZoneInfo("Africa/Cairo")
@@ -113,9 +121,10 @@ def test_paper_unverified_no_network(
         "EGX_SCHEDULER_MODE",
         "paper_refresh",
     )
+    # Legacy env cannot promote the day.
     monkeypatch.setenv(
         "EGX_CALENDAR_TRUTH",
-        "UNVERIFIED",
+        "VERIFIED_TRADING_DAY",
     )
     monkeypatch.setenv(
         "EGX_DB_PATH",
@@ -139,6 +148,26 @@ def test_verified_calls_dispatcher_once(
     tmp_path, monkeypatch, capsys
 ):
     prepare(monkeypatch)
+
+    db = tmp_path / "platform.db"
+
+    database = Database(db)
+    database.initialize()
+
+    TradingRepository(
+        database
+    ).save_market_session(
+        MarketSession(
+            market_date=RealDateTime(
+                2026,
+                9,
+                10,
+            ).date(),
+            status=(
+                MarketSessionStatus.VERIFIED
+            ),
+        )
+    )
 
     provider = object()
     calls = []
@@ -181,7 +210,7 @@ def test_verified_calls_dispatcher_once(
     )
     monkeypatch.setenv(
         "EGX_DB_PATH",
-        str(tmp_path / "platform.db"),
+        str(db),
     )
 
     scheduler_worker.main()

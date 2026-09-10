@@ -8,10 +8,15 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.core import (
-    CalendarTruth,
     MarketSessionOrchestrator,
 )
-from app.storage import Database
+from app.core.calendar_truth import (
+    CalendarTruthResolver,
+)
+from app.storage import (
+    Database,
+    TradingRepository,
+)
 from app.storage.scheduler_repository import (
     SchedulerRepository,
 )
@@ -64,12 +69,6 @@ def main() -> None:
         poll_seconds,
     )
 
-    calendar_truth = CalendarTruth(
-        os.getenv(
-            "EGX_CALENDAR_TRUTH",
-            CalendarTruth.UNVERIFIED.value,
-        )
-    )
 
     secret_path = os.getenv(
         "EODHD_API_TOKEN_FILE",
@@ -89,6 +88,16 @@ def main() -> None:
 
     repository = SchedulerRepository(
         database
+    )
+
+    trading_repository = TradingRepository(
+        database
+    )
+
+    calendar_truth_resolver = (
+        CalendarTruthResolver(
+            trading_repository
+        )
     )
 
     execution_context = (
@@ -113,7 +122,7 @@ def main() -> None:
         "SCHEDULER_WORKER_STARTED "
         f"mode={mode.value} "
         f"poll_seconds={poll_seconds} "
-        f"calendar_truth={calendar_truth.value} "
+        "calendar_truth_source=market_sessions "
         "execution_enabled="
         f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
@@ -124,6 +133,12 @@ def main() -> None:
     while not stop_event.is_set():
         now = datetime.now(timezone)
         market_date = now.date()
+
+        calendar_truth = (
+            calendar_truth_resolver.resolve(
+                market_date
+            )
+        )
 
         recovered = (
             repository
