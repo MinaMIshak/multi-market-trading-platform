@@ -24,6 +24,7 @@ from app.data.daily_refresh_job import (
     DailyRefreshTarget,
 )
 from app.data.provider import ProviderResponse
+from app.data.quota import VerifiedQuotaCost
 from app.storage import Database
 from app.storage.scheduler_repository import (
     SchedulerRepository,
@@ -226,6 +227,7 @@ def test_runtime_executes_real_pipeline_offline(
         ),
         data_root=data_root,
         provider=provider,
+        quota_cost_contract=lambda **kw: VerifiedQuotaCost(2, "offline fake contract"),
         targets=(
             DailyRefreshTarget(
                 "COMI",
@@ -434,6 +436,7 @@ def test_stale_primary_then_fresh_fallback(
         scheduler_repository=repository,
         data_root=data_root,
         provider=provider,
+        quota_cost_contract=lambda **kw: VerifiedQuotaCost(2, "offline fake contract"),
         targets=(
             DailyRefreshTarget(
                 "COMI",
@@ -663,3 +666,40 @@ def test_stale_primary_then_fresh_fallback(
     )
 
     assert integrity == "ok"
+
+
+@pytest.mark.parametrize("declared_units", [None, 16])
+def test_paper_refresh_rejection_never_reaches_provider(tmp_path, declared_units):
+    from app.core.daily_refresh_dispatcher import DailyRefreshDispatcher
+
+    database = Database(tmp_path / "isolated.db")
+    database.initialize()
+    seed_comi(database)
+    repository = SchedulerRepository(database)
+    evaluation = MarketSessionOrchestrator().evaluate(
+        now=datetime(2026, 9, 10, 16, 15, tzinfo=CAIRO),
+        market_date=MARKET_DATE,
+        calendar_truth=CalendarTruth.VERIFIED_TRADING_DAY,
+        completed_jobs=set(),
+    )
+    repository.sync_evaluation(evaluation)
+    fake = FakeEODHDProvider()
+    runtime = build_daily_refresh_runtime(
+        database=database, scheduler_repository=repository,
+        data_root=tmp_path / "data", provider=fake,
+        targets=(DailyRefreshTarget("COMI", "COMI.EGX"),),
+        quota_cost_contract=(None if declared_units is None else
+                             lambda **kw: VerifiedQuotaCost(declared_units, "fake contract")),
+    )
+    dispatcher = DailyRefreshDispatcher(
+        scheduler_repository=repository, execution_adapter=runtime.execution_adapter,
+    )
+    outcomes = dispatcher.dispatch(evaluation=evaluation, provider=runtime.provider)
+    assert len(outcomes) == 1
+    assert outcomes[0].succeeded is False
+    for _ in range(3):
+        repository.sync_evaluation(evaluation)
+        assert dispatcher.dispatch(evaluation=evaluation, provider=runtime.provider) == ()
+    assert fake.calls == []
+    with database.connect() as con:
+        assert con.execute("SELECT used_units FROM automatic_quota").fetchone()[0] == 0

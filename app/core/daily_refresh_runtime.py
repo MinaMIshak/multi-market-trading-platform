@@ -26,6 +26,7 @@ from app.data.ingestion_repository import (
     DataIngestionRepository,
 )
 from app.data.provider import MarketDataProvider
+from app.data.quota import QuotaGuard, QuotaPolicy, QuotaLimitedDailyProvider
 from app.data.providers.eodhd import (
     EODHDProvider,
 )
@@ -93,6 +94,8 @@ def build_daily_refresh_runtime(
     ] = DEFAULT_EODHD_TARGETS,
     lookback_days: int = 400,
     minimum_valid_bars: int = 260,
+    quota_policy: QuotaPolicy = QuotaPolicy(),
+    quota_cost_contract=None,
 ) -> DailyRefreshRuntime:
     """
     Compose the production daily-refresh
@@ -124,6 +127,11 @@ def build_daily_refresh_runtime(
 
     else:
         selected_provider = provider
+
+    selected_provider = QuotaLimitedDailyProvider(
+        selected_provider, QuotaGuard(database, policy=quota_policy),
+        quota_cost_contract,
+    )
 
     raw_store = ImmutableRawStore(
         root / "raw"

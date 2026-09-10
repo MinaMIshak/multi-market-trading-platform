@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 SCHEMA_SQL = """
@@ -12,6 +12,15 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS automatic_quota (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    quota_day TEXT NOT NULL,
+    used_units INTEGER NOT NULL CHECK (typeof(used_units) = 'integer' AND used_units >= 0)
+);
+
+INSERT OR IGNORE INTO automatic_quota (id, quota_day, used_units)
+VALUES (1, '0001-01-01', 0);
 
 CREATE TABLE IF NOT EXISTS market_sessions (
     market_date TEXT PRIMARY KEY,

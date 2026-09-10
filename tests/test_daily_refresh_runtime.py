@@ -104,7 +104,7 @@ def test_injected_provider_requires_no_token(
         DailyRefreshRuntime,
     )
 
-    assert runtime.provider is provider
+    assert runtime.provider._provider is provider
 
     assert runtime.refresh_job.targets == (
         DEFAULT_EODHD_TARGETS
@@ -198,7 +198,7 @@ def test_production_build_has_no_network_side_effect(
     )
 
     assert isinstance(
-        runtime.provider,
+        runtime.provider._provider,
         EODHDProvider,
     )
 
@@ -215,7 +215,7 @@ def test_production_build_has_no_network_side_effect(
     # Provider needs the credential only
     # for future request execution.
     assert (
-        runtime.provider.api_token
+        runtime.provider._provider.api_token
         == secret
     )
 

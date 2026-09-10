@@ -102,7 +102,7 @@ def test_explicit_upgrade_is_additive(
     assert (
         database.schema_version()
         == SCHEMA_VERSION
-        == 7
+        == 8
     )
 
     assert table_exists(
@@ -115,7 +115,7 @@ def test_newer_schema_is_never_downgraded(
     tmp_path,
 ):
     path = tmp_path / "platform.db"
-    seed_version(path, 8)
+    seed_version(path, 9)
 
     database = Database(path)
 
@@ -127,7 +127,7 @@ def test_newer_schema_is_never_downgraded(
             allow_upgrade=True
         )
 
-    assert database.schema_version() == 8
+    assert database.schema_version() == 9
 
 
 def test_unknown_existing_database_fails_closed(
