@@ -1,3 +1,4 @@
+import json
 from datetime import datetime as RealDateTime
 from zoneinfo import ZoneInfo
 
@@ -189,3 +190,49 @@ def test_unknown_calendar_mode_fails_closed(
         scheduler_worker.main()
 
     assert not db_path.exists()
+
+
+def test_local_observe_two_polls_keep_conservative_truth(
+    tmp_path, monkeypatch, capsys
+):
+    prepare(monkeypatch)
+
+    class TwoCycleEvent(OneCycleEvent):
+        def is_set(self):
+            self.n += 1
+            return self.n > 2
+
+    monkeypatch.setattr(
+        scheduler_worker, "stop_event", TwoCycleEvent()
+    )
+    db_path = tmp_path / "platform.db"
+    monkeypatch.setenv("EGX_DB_PATH", str(db_path))
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_CALENDAR_MAINTENANCE_MODE", "local")
+    monkeypatch.setenv(
+        "EODHD_API_TOKEN_FILE", str(tmp_path / "missing")
+    )
+
+    scheduler_worker.main()
+
+    out = capsys.readouterr().out
+    snapshots = [
+        json.loads(line.removeprefix("SCHEDULER_STATE "))
+        for line in out.splitlines()
+        if line.startswith("SCHEDULER_STATE ")
+    ]
+    assert [item["calendar_truth"] for item in snapshots] == [
+        "UNVERIFIED",
+        "VERIFIED_NON_TRADING_DAY",
+    ]
+    assert out.count("CALENDAR_MAINTENANCE_DISPATCH ") == 1
+    assert "execution_enabled=no" in out
+    assert "DAILY_REFRESH_DISPATCH" not in out
+
+    row = SchedulerRepository(Database(db_path)).get_job(
+        market_date=RealDateTime(2026, 9, 11).date(),
+        checkpoint_name=CheckpointName.CALENDAR_MAINTENANCE,
+    )
+    assert row is not None
+    assert row["status"] == "SUCCEEDED"
+    assert row["attempt_count"] == 1
