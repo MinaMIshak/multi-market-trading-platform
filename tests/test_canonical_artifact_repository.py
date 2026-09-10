@@ -176,7 +176,7 @@ def artifact_manifest(
     )
 
 
-def test_schema_version_six_and_tables_exist(
+def test_schema_version_seven_and_tables_exist(
     tmp_path,
 ):
     database = make_database(
@@ -185,7 +185,7 @@ def test_schema_version_six_and_tables_exist(
 
     assert (
         database.schema_version()
-        == 6
+        == 7
     )
 
     with database.connect() as connection:
@@ -207,6 +207,11 @@ def test_schema_version_six_and_tables_exist(
 
     assert (
         "canonical_artifact_sources"
+        in tables
+    )
+
+    assert (
+        "holiday_evidence"
         in tables
     )
 

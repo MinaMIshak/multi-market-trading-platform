@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 SCHEMA_SQL = """
@@ -586,6 +586,48 @@ CREATE INDEX IF NOT EXISTS
 idx_daily_canonical_sources_ingestion
 ON daily_canonical_sources (
     ingestion_id
+);
+
+
+CREATE TABLE IF NOT EXISTS holiday_evidence (
+    evidence_id TEXT PRIMARY KEY,
+
+    authority TEXT NOT NULL,
+    observed_date TEXT NOT NULL,
+    nominal_date TEXT,
+
+    market_closed INTEGER NOT NULL,
+
+    source_uri TEXT NOT NULL,
+    source_published_at TEXT,
+
+    content_hash TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
+
+    CHECK (
+        market_closed IN (0, 1)
+    ),
+
+    UNIQUE (
+        authority,
+        observed_date,
+        source_uri,
+        content_hash
+    )
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_holiday_evidence_observed_date
+ON holiday_evidence (
+    observed_date
+);
+
+CREATE INDEX IF NOT EXISTS
+idx_holiday_evidence_authority_date
+ON holiday_evidence (
+    authority,
+    observed_date
 );
 
 """
