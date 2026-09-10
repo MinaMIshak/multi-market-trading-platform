@@ -9,15 +9,20 @@ from app.domain import MarketSession
 from app.domain.enums import (
     MarketSessionStatus,
 )
+from app.storage.market_session_transition_repository import (
+    MarketSessionTransitionRepository,
+    MarketSessionTransitionResult,
+)
 
 
 class BaseCalendarSessionService:
     """
-    Persist deterministic WEEKEND sessions only
-    when no market-session evidence already exists.
+    Persist deterministic WEEKEND sessions through
+    an atomic create-only transition.
 
-    Existing rows are never overwritten by the
-    lower-authority weekly calendar.
+    The weekly calendar is lower authority than
+    explicit market-session evidence and therefore
+    never replaces an existing state.
     """
 
     def __init__(
@@ -25,11 +30,25 @@ class BaseCalendarSessionService:
         *,
         trading_repository,
         policy: BaseTradingCalendarPolicy,
+        transition_repository: (
+            MarketSessionTransitionRepository | None
+        ) = None,
     ) -> None:
         self.trading_repository = (
             trading_repository
         )
         self.policy = policy
+
+        if transition_repository is not None:
+            self.transition_repository = (
+                transition_repository
+            )
+        else:
+            self.transition_repository = (
+                MarketSessionTransitionRepository(
+                    trading_repository.database
+                )
+            )
 
     def apply(
         self,
@@ -42,21 +61,40 @@ class BaseCalendarSessionService:
         if status != MarketSessionStatus.WEEKEND:
             return status
 
-        existing = (
-            self.trading_repository
-            .get_market_session(
-                market_date
+        transition = (
+            self.transition_repository
+            .compare_and_promote(
+                MarketSession(
+                    market_date=market_date,
+                    status=MarketSessionStatus.WEEKEND,
+                ),
+                replaceable_statuses=frozenset(),
             )
         )
 
-        if existing is not None:
+        if transition in (
+            MarketSessionTransitionResult.CREATED,
+            MarketSessionTransitionResult.UNCHANGED,
+        ):
+            return MarketSessionStatus.WEEKEND
+
+        if (
+            transition
+            == MarketSessionTransitionResult.CONFLICT
+        ):
+            existing = (
+                self.trading_repository
+                .get_market_session(
+                    market_date
+                )
+            )
+
+            if existing is None:
+                return MarketSessionStatus.UNKNOWN
+
             return existing.status
 
-        self.trading_repository.save_market_session(
-            MarketSession(
-                market_date=market_date,
-                status=MarketSessionStatus.WEEKEND,
-            )
-        )
-
-        return MarketSessionStatus.WEEKEND
+        # REPLACED is impossible for a create-only
+        # transition. Fail closed if the repository
+        # contract is ever violated.
+        return MarketSessionStatus.UNKNOWN
