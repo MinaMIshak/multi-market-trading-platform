@@ -13,6 +13,9 @@ from app.core import (
 from app.core.calendar_truth import (
     CalendarTruthResolver,
 )
+from app.core.calendar_maintenance_runtime import (
+    build_calendar_maintenance_runtime,
+)
 from app.storage import (
     Database,
     TradingRepository,
@@ -69,6 +72,19 @@ def main() -> None:
         poll_seconds,
     )
 
+    calendar_maintenance_mode = os.getenv(
+        "EGX_CALENDAR_MAINTENANCE_MODE",
+        "disabled",
+    ).strip().lower()
+
+    if calendar_maintenance_mode not in {
+        "disabled",
+        "local",
+    }:
+        raise ValueError(
+            "unsupported calendar maintenance mode"
+        )
+
 
     secret_path = os.getenv(
         "EODHD_API_TOKEN_FILE",
@@ -100,6 +116,16 @@ def main() -> None:
         )
     )
 
+    calendar_maintenance_runtime = None
+
+    if calendar_maintenance_mode == "local":
+        calendar_maintenance_runtime = (
+            build_calendar_maintenance_runtime(
+                database=database,
+                scheduler_repository=repository,
+            )
+        )
+
     execution_context = (
         build_scheduler_execution_context(
             mode=mode,
@@ -123,6 +149,7 @@ def main() -> None:
         f"mode={mode.value} "
         f"poll_seconds={poll_seconds} "
         "calendar_truth_source=market_sessions "
+        f"calendar_maintenance={calendar_maintenance_mode} "
         "execution_enabled="
         f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
@@ -166,6 +193,46 @@ def main() -> None:
         repository.sync_evaluation(
             evaluation
         )
+
+        if calendar_maintenance_runtime is not None:
+            calendar_outcomes = (
+                calendar_maintenance_runtime
+                .dispatcher
+                .dispatch(
+                    evaluation=evaluation
+                )
+            )
+
+            for outcome in calendar_outcomes:
+                event = {
+                    "checkpoint": (
+                        outcome.checkpoint_name.value
+                    ),
+                    "claimed": outcome.claimed,
+                    "succeeded": outcome.succeeded,
+                    "calendar_truth": (
+                        outcome.calendar_truth.value
+                        if outcome.calendar_truth is not None
+                        else None
+                    ),
+                    "base_status": (
+                        outcome.base_status.value
+                        if outcome.base_status is not None
+                        else None
+                    ),
+                    "holiday_status": (
+                        outcome.holiday_status.value
+                        if outcome.holiday_status is not None
+                        else None
+                    ),
+                    "error_type": outcome.error_type,
+                }
+
+                print(
+                    "CALENDAR_MAINTENANCE_DISPATCH "
+                    + json.dumps(event, sort_keys=True),
+                    flush=True,
+                )
 
         if execution_context.execution_enabled:
             if (
