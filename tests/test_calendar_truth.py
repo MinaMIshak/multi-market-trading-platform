@@ -114,3 +114,25 @@ def test_non_authoritative_states_fail_closed(
     )
 
     assert truth == CalendarTruth.UNVERIFIED
+
+
+def test_weekend_maps_to_non_trading_day():
+    repository = FakeRepository(
+        SimpleNamespace(
+            status=(
+                MarketSessionStatus.WEEKEND
+            )
+        )
+    )
+
+    truth = CalendarTruthResolver(
+        repository
+    ).resolve(
+        MARKET_DATE
+    )
+
+    assert (
+        truth
+        == CalendarTruth
+        .VERIFIED_NON_TRADING_DAY
+    )

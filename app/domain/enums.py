@@ -9,6 +9,7 @@ class MarketSessionStatus(StrEnum):
     DATA_PENDING = "DATA_PENDING"
     VERIFIED = "VERIFIED"
     HOLIDAY = "HOLIDAY"
+    WEEKEND = "WEEKEND"
     UNKNOWN = "UNKNOWN"
 
 

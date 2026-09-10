@@ -14,9 +14,9 @@ class CalendarTruthResolver:
     Resolve scheduler calendar truth from
     persisted market-session evidence.
 
-    Only explicit VERIFIED or HOLIDAY states
-    are authoritative. Everything else remains
-    UNVERIFIED.
+    Only explicit VERIFIED, HOLIDAY, or WEEKEND
+    states are authoritative. Everything else
+    remains UNVERIFIED.
     """
 
     def __init__(
@@ -48,9 +48,9 @@ class CalendarTruthResolver:
                 .VERIFIED_TRADING_DAY
             )
 
-        if (
-            session.status
-            == MarketSessionStatus.HOLIDAY
+        if session.status in (
+            MarketSessionStatus.HOLIDAY,
+            MarketSessionStatus.WEEKEND,
         ):
             return (
                 CalendarTruth
