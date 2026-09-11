@@ -91,6 +91,8 @@ def test_repository_persists_trade_chain():
         repo.save_trade_plan(plan)
 
         risk = RiskDecision(
+            policy_version="test-v1",
+            policy_identity="test-policy",
             trade_plan_id=plan.trade_plan_id,
             decision=RiskDecisionType.APPROVE,
             account_equity=Decimal("70000"),

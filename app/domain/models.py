@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from pydantic import (
@@ -267,6 +267,12 @@ class TradePlan(DomainModel):
 
 
 class RiskDecision(DomainModel):
+    policy_version: str = Field(min_length=1)
+    policy_identity: str = Field(min_length=1)
+    quantity_caps: dict[
+        Annotated[str, Field(min_length=1, pattern=r"\S")],
+        Annotated[int, Field(strict=True, ge=0)],
+    ] = Field(default_factory=dict)
     risk_decision_id: UUID = Field(default_factory=uuid4)
     trade_plan_id: UUID
     decision: RiskDecisionType
@@ -304,13 +310,11 @@ class RiskDecision(DomainModel):
                     "blocked trade must have approved_risk=0"
                 )
 
-        if (
-            self.decision == RiskDecisionType.APPROVE
-            and self.quantity <= 0
-        ):
-            raise ValueError(
-                "approved trade requires positive quantity"
-            )
+        if self.decision in (RiskDecisionType.APPROVE, RiskDecisionType.REDUCE):
+            if self.quantity <= 0:
+                raise ValueError("approved or reduced trade requires positive quantity")
+            if self.approved_risk <= 0:
+                raise ValueError("approved or reduced trade requires positive approved_risk")
 
         return self
 

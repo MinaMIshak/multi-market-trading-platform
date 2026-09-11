@@ -1,104 +1,131 @@
-# M4 milestone status
+# M5 milestone status
 
-Result: **M4 PASS**
+Result: **M5 PASS**
 
-"Engineering complete" does not mean "strategy validated".
+Engineering complete for research/paper admission only. Policy values remain
+unvalidated. STOPPED BEFORE M6.
 
 ## Scope and HEAD
 
-- Starting HEAD: `48e087e940c2360ed1580567dbc5591c9b0b3ef1` (required `48e087e`).
-- Ending HEAD: `48e087e940c2360ed1580567dbc5591c9b0b3ef1`.
-- Branch: `agent/development`. No staging or commits performed.
-- AGENTS.md and EXECUTION_PLAN.md read completely and left unchanged.
-- M4 only. STOPPED before M5. No risk sizing or simulator implementation.
+- Starting HEAD: `78e648b6f6aef7b2020721f42fbd9ddfc017fd49` (required `78e648b`).
+- Ending HEAD: `78e648b6f6aef7b2020721f42fbd9ddfc017fd49`.
+- Branch: `agent/development`; hardening started with the existing uncommitted M5 candidate.
+- AGENTS.md and EXECUTION_PLAN.md unchanged; M5/M6 scope checked.
+- No git add or commit; index unchanged. M5 only.
 
-## Architecture and files changed
+## Files and architecture
 
-All seven files are new, uncommitted workspace files:
+Modified:
+- `app/risk/policy.py`: required explicit immutable strict policy, cross-field
+  validation, version and deterministic canonical SHA-256 configuration identity.
+- `app/risk/models.py`: required strict immutable portfolio snapshot, cash
+  reservations, pending commitments, open risk, symbol/group exposures and validation.
+- `app/risk/engine.py`: explicit inputs, TradePlan boundary, time/lifecycle gates,
+  preserved loss/RR/regime/short controls, independent whole-share quantity caps,
+  deterministic cap reasons and zero-capacity blocking.
+- `app/domain/models.py`: required RiskDecision policy version/identity and cap audit.
+- `tests/test_risk_engine.py`: original nine behavior tests retained with explicit
+  fixture policy/context and fixed decision timestamps.
+- `tests/test_domain.py`, `tests/test_storage.py`: explicit audit metadata in existing
+  decision fixtures; prior assertions retained.
+- `AGENT_STATUS.md`: this milestone report.
 
-- `app/strategies/contracts.py`: strict immutable versioned candidate boundary,
-  explicit config identity, evidence JSON, LONG/UNVALIDATED/execution-disabled outputs.
-- `app/data/intraday.py`: offline validated continuous-session bars, explicit sequence
-  origin, contiguous intervals, provenance consistency and point-in-time consumption.
-- `app/strategies/eod.py`: M3-only Swing EMA/breakout research baseline and
-  PreSurgeV7Engine LEGACY_V5_PARITY_SEED orchestration/ranking, without training.
-- `app/strategies/intraday.py`: First15, ORB, VWAP pullback and momentum research
-  engines with required typed configs; First15 contextual bias is also point-in-time.
-- `tests/test_m4_engines.py`: 102 synthetic acceptance cases, including real isolated
-  M3 repository integration for Swing and future-data replay tests.
-- `docs/M4_TRADING_ENGINES.md`: parity facts, authorized contracts, assumptions,
-  parameter limits and M8 requirements.
-- `AGENT_STATUS.md`: this report.
+New:
+- `tests/test_m5_risk_portfolio.py`: 128 acceptance cases; 17 additional domain boundary cases in tests/test_domain.py.
+- `docs/M5_RISK_PORTFOLIO.md`: API semantics, formulas, audit, upstream obligations,
+  compatibility limits and unvalidated assumptions.
 
-Existing architecture, scheduler, quota, calendar, provider, storage and risk code
-remain unchanged. No engine is wired to any operational job or execution path.
-
-## Hardening changes
-
-Candidate identifiers require non-empty strings; optional entry/stop/target
-references must be positive. candidate() requires an explicit strategy_version:
-Swing and all four intraday engines pass 1; PRE_SURGE passes 7. Evidence serialization
-accepts ISO dates/datetimes and fails closed on unknown objects; no default=str.
-First15 qualification has no hidden positive-return rule. Present traded_value
-must be zero exactly when volume is zero; VWAP-required paths still reject missing
-value. Swing retains decision_time as its actual M3 as_of cutoff, documented as a
-knowledge/query cutoff rather than a fabricated source timestamp.
+Architecture is preserved: pure risk admission remains in app/risk with existing
+TradePlan/RiskDecision domain contracts. No Candidate conversion, operational wiring,
+Position/TradeOutcome creation or lifecycle transition in the risk engine.
 
 ## Schema impact
 
-None. No schema code or production migration. Swing retains the existing M3
-repository's audit/DQ behavior; integration tests use pytest temporary databases
-and raw artifacts only. Engines create no trades or fills.
+None. No SQL/schema/storage changes or migration. The existing payload_json field
+can serialize new decision metadata. Existing storage tests use isolated test data.
+Older decision payloads lacking required policy metadata are not silently assigned
+fabricated policy provenance and are not migrated by M5.
 
-## Validation
+## Exact validation results
 
-- Focused command: `.venv/bin/python -m pytest -q tests/test_m4_engines.py`
-  Final exact result: **102 passed in 1.02s**.
-- Full command: `.venv/bin/python -m pytest -q`
-  Final exact result: **522 passed in 15.57s** (420 existing + 102 M4).
-- This hardening review's focused and full runs both passed on the first run.
-- Added regressions for non-empty candidate identifiers, positive optional references,
-  execution rejection, required explicit versions for every engine, deterministic ISO
-  date/datetime evidence and rejection of unknown objects, explicit First15 return
-  gates, traded-value consistency, and non-VWAP missing-value acceptance.
-- Swing integration observes repository.load(as_of=decision_time) and asserts the
-  candidate cutoff equals that query cutoff. Existing future receipt, future bar,
-  future bias, training leakage and future cohort protections continue to pass.
-- `git diff --check`: clean. New untracked files additionally checked with
-  `git diff --no-index --check` against an empty workspace file; no whitespace errors.
+Focused final command:
+`.venv/bin/python -m pytest -q tests/test_risk_engine.py tests/test_m5_risk_portfolio.py tests/test_domain.py tests/test_storage.py`
 
-- Reviewed implementation and tests; tracked `git diff` is empty because additions
-  remain untracked as requested. Protected-file diff and HEAD checks are clean.
-- Existing autouse network prohibition remains unchanged; every test runs with
-  socket connection functions blocked. No network failures occurred.
+Final result: **160 passed in 0.57s**.
+
+Full final command: `.venv/bin/python -m pytest -q`
+
+Final result: **667 passed in 15.76s** (643 candidate tests plus 24 boundary regressions).
+
+Earlier candidate verification runs (recorded before this hardening):
+- Existing risk/domain/storage: **15 passed in 0.30s**.
+- Initial expanded focused run: **134 passed, 1 warning in 0.50s**. The warning
+  was the deliberate invalid-model-copy serializer case; it is now explicitly
+  asserted with pytest.warns. No warning or failure is hidden.
+- Expanded focused run: **136 passed in 0.49s**.
+- First full run: **643 passed in 15.32s**.
+- Final runs followed retention of the defensive risk-per-share guard and policy
+  identity canonicalization cleanup.
+- No test failures. An initial shell edit command used unavailable `python` and
+  exited 127; it was rerun with `.venv/bin/python` successfully before testing.
+
+Final boundary hardening changed only `app/domain/models.py`, `app/risk/policy.py`,
+`tests/test_domain.py`, `tests/test_m5_risk_portfolio.py` and this report relative to
+the starting uncommitted candidate. APPROVE/REDUCE now require positive quantity
+and approved risk; BLOCK zero constraints and the risk budget bound are retained.
+Quantity caps require nonblank string keys and strict nonnegative integer values.
+Policy versions strip surrounding whitespace, reject blank versions and use the
+canonical version in deterministic identity. Sizing calculations are unchanged.
+All 24 new regressions passed, including canonical identity and serialization replay.
+
+Coverage includes every required policy argument, strict/range/cross-field rejects,
+required context/time/state, aware time and exact validity boundaries, all lifecycle
+states, open plus pending concurrency, reserved/insufficient cash, portfolio open
+risk/symbol/group reduce and block, missing group context, simultaneous independent
+caps, original loss/RR/regime/liquidity behavior, shorts, zero capacity, budget bounds,
+Candidate/dict rejection, model-copy revalidation, immutability and deterministic
+replay. BLOCK results have zero quantity, risk and position value.
+
+`git diff --check`: passed after the final full regression. New files additionally
+checked with `git diff --no-index --check` against /dev/null (exit 1 denotes new-file
+differences; no whitespace diagnostics). Tracked implementation/test diffs and new
+file contents reviewed. Protected-file diff for AGENTS.md, EXECUTION_PLAN.md,
+storage, data, strategies and tests/conftest.py is empty. Index remains unchanged.
 
 ## Safety accounting
 
-Network / external provider / EODHD / production / secrets / Docker attempts = **0**.
-No sudo, paid API, API keys, deployment, production database, broker calls,
-operational paper_refresh, model training, or live-money execution.
-No AGENTS.md/EXECUTION_PLAN.md changes. No git add/commit.
+- Network/external API/EODHD/paid market-data calls: **0**.
+- Production/forbidden path/secret access, Docker, sudo, deploy, broker actions: **0**.
+- No API key, billing or credit usage configured.
+- No schema migration, production DB write, live execution, simulator or fill
+  implementation; no operational paper_refresh invocation or enablement.
+- Existing full-regression fixtures exercise mocked scheduler/refresh paths and
+  temporary database behavior; this does not enable operational jobs.
+- Existing autouse test guard blocks socket.connect, connect_ex and
+  create_connection. No network-guard failures occurred. M5 imports only local
+  domain/contracts, Pydantic and standard-library calculation/identity utilities.
+- No new reservation write, Position, TradeOutcome, fill or state transition from
+  risk admission. Tests assert unchanged input plan/state and forbid execution
+  artifact construction during admission.
+- No git staging, commit, production access or M6 work.
 
 ## Unvalidated assumptions and remaining risks
 
-- All results remain research/paper candidates: UNVALIDATED and execution_allowed=False.
-  No positive expectancy or operational-readiness claim is made.
-- Swing uses only the minimal explicit EMA and optional breakout configuration;
-  RSI/ADX/liquidity/volatility/reward-risk gates are not enabled or guessed.
-  Its D-close reference is planning-only for NEXT_ELIGIBLE_SESSION; verified calendar
-  resolution and executable pricing belong to later consumers. No next-open is read.
-- Historical V5 parity facts come from the mission specification, not a newly
-  authenticated historical artifact. Risk penalty is explicitly supplied.
-  V7 is orchestration, not a newly trained model or executable-profitability model.
-- Intraday origin, source identity, traded-value semantics and contextual bias are
-  trusted offline importer attestations. This work does not establish real provider
-  authority, complete real datasets, or an operational ingestion adapter.
-- Continuous data gaps reject conservatively. First15 requires exact coverage and
-  cannot split a bar across the window boundary. No exchange hours are assumed.
-- Pattern definitions, all configured thresholds and candidate ranking remain
-  unvalidated. M8 requires executable labels, costs/slippage, purged walk-forward,
-  frozen holdout, regimes, uncertainty and out-of-sample expectancy/drawdown analysis.
-- No engineering blocker remains within the authorized M4 scope.
+- All operational thresholds/scales remain caller-supplied unvalidated research/paper
+  choices. Tests use synthetic arithmetic fixtures, not trading evidence.
+- Caller must supply accurate contemporaneous equity, cash, daily R, exposure,
+  open risk and pending commitments for the correct account/symbol/group/day.
+  Context has no independent freshness or completeness authority.
+- Exposure/open risk must include outstanding commitments; caller must serialize
+  admission and update commitments. Evaluation does not atomically reserve funds.
+- Correlation groups are trusted upstream single-group context, not statistical
+  correlation estimates or overlapping-group portfolio analysis.
+- Entry reference is planning-only. Short allowance does not implement margin,
+  borrow or sale proceeds. Fees, slippage, fills and executable pricing are deferred.
+- Old decision payload provenance needs an explicit future compatibility decision
+  if historical objects are rehydrated. No silent migration occurs.
+- No engineering blocker remains within authorized M5 scope. No claim of validated
+  profitability or live readiness is made.
 
-Recommended next milestone: human review of M4, then separately authorized
-**M5 – Risk and Portfolio Engine**. M5 has not been started.
+Recommended next milestone: review M5, then separately authorize M6 Paper Execution
+Simulator. M6 has not been started.

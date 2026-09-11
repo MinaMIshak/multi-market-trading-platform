@@ -7,6 +7,7 @@ from app.domain import (
     MarketRegimeType,
     RiskDecisionType,
     TradePlan,
+    TradeState,
 )
 from app.risk import (
     RiskContext,
@@ -24,7 +25,7 @@ def make_plan(
     stop: str = "9",
     target: str = "12",
 ) -> TradePlan:
-    now = datetime.now(CAIRO)
+    now = datetime(2026, 9, 10, 10, tzinfo=CAIRO)
 
     entry_decimal = Decimal(entry)
 
@@ -42,9 +43,12 @@ def make_plan(
 
 
 def test_risk_on_approves_normal_trade():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        context=make_context(),
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
@@ -57,9 +61,12 @@ def test_risk_on_approves_normal_trade():
 
 
 def test_neutral_reduces_risk():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        context=make_context(),
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.NEUTRAL,
@@ -71,9 +78,12 @@ def test_neutral_reduces_risk():
 
 
 def test_risk_off_blocks_trade():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        context=make_context(),
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_OFF,
@@ -85,13 +95,15 @@ def test_risk_off_blocks_trade():
 
 
 def test_daily_loss_kill_switch():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
-        context=RiskContext(
+        context=make_context(
             daily_realized_r=Decimal("-2.0"),
         ),
     )
@@ -101,13 +113,15 @@ def test_daily_loss_kill_switch():
 
 
 def test_max_open_positions_blocks():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
-        context=RiskContext(
+        context=make_context(
             open_positions=3,
         ),
     )
@@ -117,9 +131,12 @@ def test_max_open_positions_blocks():
 
 
 def test_low_reward_risk_blocks():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        context=make_context(),
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(
             entry="10",
             stop="9",
@@ -134,13 +151,15 @@ def test_low_reward_risk_blocks():
 
 
 def test_liquidity_cap_reduces_quantity():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
-        context=RiskContext(
+        context=make_context(
             liquidity_cap_value=Decimal("2000"),
         ),
     )
@@ -151,13 +170,15 @@ def test_liquidity_cap_reduces_quantity():
 
 
 def test_portfolio_exposure_reduces_quantity():
-    engine = RiskEngine()
+    engine = RiskEngine(make_policy())
 
     result = engine.evaluate(
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
-        context=RiskContext(
+        context=make_context(
             current_exposure_value=Decimal("40000"),
         ),
     )
@@ -171,7 +192,7 @@ def test_portfolio_exposure_reduces_quantity():
 
 
 def test_custom_policy_works():
-    policy = RiskPolicy(
+    policy = make_policy(
         risk_per_trade_pct=Decimal("0.005"),
         max_position_pct=Decimal("0.20"),
         max_portfolio_exposure_pct=Decimal("0.50"),
@@ -181,6 +202,9 @@ def test_custom_policy_works():
     engine = RiskEngine(policy)
 
     result = engine.evaluate(
+        context=make_context(),
+        decision_time=datetime(2026, 9, 10, 11, tzinfo=CAIRO),
+        trade_state=TradeState.READY,
         plan=make_plan(),
         account_equity=Decimal("70000"),
         market_regime=MarketRegimeType.RISK_ON,
@@ -188,3 +212,26 @@ def test_custom_policy_works():
 
     assert result.risk_budget == Decimal("350.000")
     assert result.quantity == 350
+
+
+def make_policy(**overrides):
+    values = dict(
+        policy_version="research-v1", risk_per_trade_pct=Decimal("0.01"),
+        max_position_pct=Decimal("0.25"), max_portfolio_exposure_pct=Decimal("0.60"),
+        max_portfolio_open_risk_pct=Decimal("0.03"), max_symbol_exposure_pct=Decimal("0.25"),
+        max_correlation_group_exposure_pct=None, max_open_positions=3,
+        daily_loss_limit_r=Decimal("2"), min_target1_r=Decimal("1.80"),
+        risk_on_scale=Decimal("1"), neutral_scale=Decimal("0.50"),
+        risk_off_scale=Decimal("0"), allow_short=False,
+    )
+    values.update(overrides)
+    return RiskPolicy(**values)
+
+
+def make_context(**overrides):
+    values = dict(open_positions=0, pending_entries=0,
+                  current_exposure_value=Decimal("0"), daily_realized_r=Decimal("0"),
+                  cash_balance=Decimal("70000"), reserved_cash=Decimal("0"),
+                  current_open_risk_value=Decimal("0"), symbol_exposure_value=Decimal("0"))
+    values.update(overrides)
+    return RiskContext(**values)
