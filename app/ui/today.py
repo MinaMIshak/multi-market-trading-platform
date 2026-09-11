@@ -170,7 +170,7 @@ header{{padding:26px 34px;border-bottom:1px solid #1d2b38;background:#0b1620}}
 h1{{margin:0;font-size:25px}} .sub{{color:#8395a5;margin-top:7px}}
 .badge{{padding:8px 12px;border:1px solid #2b4557;border-radius:20px;color:#8bd5b0;font-size:12px}}
 nav{{display:flex;gap:8px;padding:14px 34px;background:#0b1620;border-bottom:1px solid #1d2b38;overflow:auto}}
-.tab{{padding:9px 13px;color:#748696;font-size:12px;white-space:nowrap}}
+.tab{{padding:9px 13px;color:#748696;font-size:12px;white-space:nowrap;text-decoration:none}}
 .active{{color:white;background:#173147;border-radius:7px}}
 main{{padding:28px 34px;max-width:1500px;margin:auto}}
 .grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}}
@@ -205,7 +205,7 @@ th{{color:#758a9a;font-weight:600}}
   <div class="tab">LIVE</div>
   <div class="tab">PRE-SURGE</div>
   <div class="tab">SWING</div>
-  <div class="tab">PERFORMANCE</div>
+  <a class="tab" href="/performance">PERFORMANCE</a>
   <div class="tab">RESEARCH</div>
   <div class="tab">SYSTEM</div>
 </nav>

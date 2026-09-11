@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
+from app.ui.performance import render_performance_dashboard
 from app.ui.today import (
     load_today_state,
     render_today_dashboard,
@@ -30,6 +31,13 @@ def root() -> HTMLResponse:
 @app.get("/api/today")
 def today() -> dict:
     return load_today_state()
+
+
+@app.get("/performance", response_class=HTMLResponse)
+def performance() -> HTMLResponse:
+    return HTMLResponse(
+        render_performance_dashboard()
+    )
 
 
 @app.get("/health")
