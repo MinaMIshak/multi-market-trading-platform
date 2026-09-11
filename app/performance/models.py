@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from .extensions import PeriodicReturnSeries, RiskAdjustedSummary
+
 from app.domain.enums import MarketRegimeType
 from app.paper.models import PaperSimulationInput, PaperSimulationResult
 from app.strategies.contracts import Contract
@@ -65,10 +67,41 @@ class PerformanceObservation(Contract):
         return self
 
 
+class SlippageScenario(Contract):
+    schema_version: Literal["slippage-scenario-v1"]
+    scenario_id: str = Field(min_length=1, pattern=r"^\S(?:.*\S)?$")
+    observations: tuple[PerformanceObservation, ...]
+
+    @field_validator("observations", mode="before")
+    @classmethod
+    def canonical_observations(cls, value):
+        return PerformanceAnalysisInput.canonical_observations(value)
+
+
 class PerformanceAnalysisInput(Contract):
     schema_version: Literal["performance-analysis-v1"]
     config: PerformanceConfig
     observations: tuple[PerformanceObservation, ...]
+
+    periodic_returns: PeriodicReturnSeries | None = None
+    slippage_scenarios: tuple[SlippageScenario, ...] = ()
+    baseline_scenario_id: str | None = None
+
+    @field_validator("periodic_returns", mode="before")
+    @classmethod
+    def canonical_periodic(cls, value):
+        if value is None:
+            return None
+        if not isinstance(value, PeriodicReturnSeries):
+            raise ValueError("canonical PeriodicReturnSeries required")
+        return PeriodicReturnSeries(**{n: getattr(value, n) for n in PeriodicReturnSeries.model_fields})
+
+    @field_validator("slippage_scenarios", mode="before")
+    @classmethod
+    def canonical_scenarios(cls, value):
+        if not isinstance(value, tuple) or any(not isinstance(s, SlippageScenario) for s in value):
+            raise ValueError("tuple of canonical SlippageScenario required")
+        return tuple(SlippageScenario(**{n: getattr(s, n) for n in SlippageScenario.model_fields}) for s in value)
 
     @field_validator("config", mode="before")
     @classmethod
@@ -155,6 +188,18 @@ class RegimePerformance(Contract):
     summary: EconomicSummary
 
 
+class SlippageSensitivityResult(Contract):
+    scenario: SlippageScenario
+    completed_count: int
+    total_net_pnl: Decimal
+    net_expectancy: Decimal | None
+    profit_factor: Decimal | None
+    max_drawdown_amount: Decimal
+    max_drawdown_pct: Decimal
+    delta_total_net_pnl: Decimal | None = None
+    delta_net_expectancy: Decimal | None = None
+
+
 class PerformanceReport(Contract):
     schema_version: Literal["performance-report-v1"] = "performance-report-v1"
     summary: EconomicSummary
@@ -162,3 +207,6 @@ class PerformanceReport(Contract):
     months: tuple[MonthlyPerformance, ...]
     monthly_consistency: MonthlyConsistency
     regimes: tuple[RegimePerformance, ...]
+    risk_adjusted: RiskAdjustedSummary = Field(default_factory=RiskAdjustedSummary)
+    slippage_sensitivity: tuple[SlippageSensitivityResult, ...] = ()
+    baseline_scenario_id: str | None = None

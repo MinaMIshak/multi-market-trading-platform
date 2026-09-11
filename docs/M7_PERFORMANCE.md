@@ -2,20 +2,10 @@
 
 ## Status
 
-M7 is in progress.
-
-The approved M7A core implements deterministic, offline, in-memory
-performance aggregation over canonical M6 paper-simulation artifacts.
-
-M7A does NOT implement the full M7 milestone yet.
-
-Still pending in the M7 continuation:
-- equal-period return boundary
-- Sharpe
-- Sortino
-- slippage sensitivity
-- PERFORMANCE user surface completion
-- final M7 integration verification
+M7 implements deterministic, offline, in-memory performance aggregation over
+canonical M6 paper-simulation artifacts. The approved M7A core and M7B UI
+foundation are preserved, with optional periodic-return and explicit
+slippage-sensitivity boundaries and their presentation added.
 
 This module does not establish profitability, alpha, strategy validity,
 robustness, or real-money readiness.
@@ -349,114 +339,114 @@ state is used by the performance analyzer.
 
 ---
 
-## 15. Sharpe and Sortino - pending M7 continuation
+## 15. Periodic-return Sharpe and Sortino
 
-Sharpe and Sortino are intentionally not implemented in M7A.
+`PeriodicReturnSeries` requires canonical `periodic-return-v1`, an explicit
+`series_id`, positive integer `period_seconds`, ordered UTC `period_ends`,
+and a matching tuple of finite Decimal `returns`. Each return describes the
+fixed-duration interval ending at its corresponding timestamp. Adjacent ends
+must differ by exactly `period_seconds`; duplicate, reversed, gapped, naive,
+non-UTC, or conflicting chronology is rejected before aggregation. No sorting
+repairs input. This boundary supports fixed elapsed durations only, not variable
+calendar months or exchange-session calendars.
 
-They must NOT be calculated from irregular individual trade P&Ls.
+The caller supplies fractional simple periodic returns, an explicit constant
+per-period `risk_free_return`, an explicit constant `sortino_target`, and an
+integer `minimum_samples >= 2`. No returns are derived from irregular trades.
+The series is caller-attested input, retained in the report for audit; M7 does
+not infer its derivation or establish that it represents the trade equity curve.
 
-The M7 continuation must add an explicit equal-period return boundary.
+Let n be the observation count, r_i the periodic returns, f the supplied
+per-period risk-free return, and t the supplied minimum acceptable return.
 
-That boundary must make explicit:
+- Sharpe: `mean(r_i - f) / sqrt(sum(((r_i - f) - mean(r_i - f))^2)/(n-1))`.
+  The denominator is the **sample** standard deviation of excess returns.
+- Sortino: `mean(r_i - t) / sqrt(sum(min(r_i - t, 0)^2)/n)`.
+  The denominator is the root mean squared negative deviation from the target,
+  using **all n periods**, including zero contributions for non-downside periods.
 
-- period chronology
-- per-period returns
-- per-period risk-free return for Sharpe
-- Sortino target/minimum acceptable return
-- minimum sample requirement
-- annualization factor, if annualization is requested
+Both calculations use the analyzer's private Decimal context, precision 34,
+including `Decimal.sqrt()`. Rounding follows that context (ROUND_HALF_EVEN).
+If an explicit finite positive `annualization_factor` A is supplied, the
+per-period ratio is multiplied by `sqrt(A)`. Otherwise the ratio remains
+per-period. The caller owns the appropriateness of A; no 252, 12, 365, frequency,
+benchmark, zero risk-free rate, or annualization assumption is invented.
 
-M7 must not invent:
+`PerformanceReport.risk_adjusted` always exists. Reasons are:
 
-- 252 trading days
-- 12 months
-- 365 days
-- zero risk-free rate
-- return frequency
-- benchmark
-- annualization factor
+- `NO_PERIODIC_SERIES`: no series supplied; both ratios null.
+- `INSUFFICIENT_SAMPLES`: n below the caller's minimum; both ratios null.
+- `ZERO_DISPERSION`: zero Sharpe denominator; Sharpe null.
+- `ZERO_DOWNSIDE_DEVIATION`: zero Sortino denominator; Sortino null.
+- Otherwise the corresponding reason is null and the ratio is a finite Decimal.
 
-When a valid periodic series is absent, Sharpe and Sortino must be reported as
-unavailable/null with an explicit reason.
+Malformed input raises an error, rather than returning an apparently usable
+report. Canonical instances are reconstructed at the analysis boundary, including
+model-copy inputs. Strict types and finite Decimal constraints reject unsafe
+coercion and non-finite numbers. Extreme values exceeding the Decimal context
+range also fail closed; no infinite ratios are emitted.
 
-Zero dispersion must not produce infinite Sharpe.
+## 16. Explicit slippage sensitivity
 
-Zero downside deviation must not produce infinite Sortino.
+`PerformanceAnalysisInput.slippage_scenarios` defaults to an empty tuple: no
+hidden scenarios or grid. Every `SlippageScenario` requires version
+`slippage-scenario-v1`, a nonblank canonical `scenario_id`, and a tuple of
+canonical `PerformanceObservation` objects. Each embeds its explicit M6
+`PaperExecutionConfig` and replay-verified result. Output retains the complete
+scenario for audit.
 
----
+Every scenario must contain exactly the original trade-plan ID set, with no
+duplicates. Tuple ordering may differ; alignment is by trade-plan ID. Each
+observation must preserve strategy ID/version and regime. All M6 input fields
+must match exactly, including bars, TradePlan, RiskDecision (including sizing),
+admission time, market date, session, source and provenance. Only these explicit
+config fields may differ:
 
-## 16. Slippage sensitivity - pending M7 continuation
+- `entry_slippage_bps`
+- `stop_slippage_bps`
+- `target_slippage_bps`
+- `scheduled_exit_slippage_bps`
 
-Slippage sensitivity is intentionally not implemented in M7A.
+All other execution settings, including costs, volume participation and exit
+boundaries, must match. Cost **assumptions** cannot change; cost amounts may
+change when unchanged percentage fees apply to slipped notionals. M6 continues
+to reject invalid/non-finite/negative slippage and impossible slipped prices.
+No M6 object is mutated. Noncanonical or mismatched M6 results fail replay
+verification. Duplicate scenario IDs, altered observation sets, unauthorized
+changes, or a baseline ID absent from the supplied scenarios raise errors.
 
-Scenarios must be explicit caller-supplied scenarios.
+Each scenario reports completed count, total net P&L, net expectancy, profit
+factor, realized max drawdown amount and fraction, using the unchanged M7A
+completed-only conventions and the same explicit starting equity. Noncompleted
+states never enter economics. Output is sorted by scenario ID.
 
-M7 must not invent arbitrary slippage grids.
+If `baseline_scenario_id` explicitly identifies a supplied scenario, deltas are
+`scenario - baseline` for total net P&L and net expectancy. Expectancy delta is
+null if either expectation is undefined. Without a baseline both deltas are
+null. An empty observation set has zero completed count, zero net P&L and
+zero drawdown, with null expectancy and profit factor. This is descriptive
+sensitivity, not strategy optimization or evidence of robustness.
 
-Sensitivity comparisons must preserve the same underlying canonical:
+## 17. PERFORMANCE UI
 
-- TradePlan
-- RiskDecision
-- bars
-- admission time
-- session identity
-- market date
-- source identity
-- provenance identity
-- strategy identity
-- regime identity
+The approved `/performance` HTML route, pure
+`render_performance_dashboard(...)`, full target navigation, and TODAY link
+are preserved. No route or JSON endpoint is added. The route still has no data
+source attached and renders the explicit unavailable state, without fabricated
+trades, profits, ratios or recommendations.
 
-Only explicitly authorized execution-slippage assumptions may differ.
+When supplied an in-memory report, the pure presenter displays the existing
+summary and realized drawdown plus state counts, MAE/MFE in R, monthly and regime
+economics, periodic ratios or explicit unavailable reasons, periodic assumptions,
+and supplied sensitivity metrics/deltas and baseline identity. Externally
+supplied displayed identities are HTML escaped. Drawdown percentage values use
+the documented fractional convention (0.1 means 10%).
 
-A sensitivity result is descriptive paper analysis only.
-
-A small scenario grid must not be labelled as proof of robustness.
-
----
-
-## 17. PERFORMANCE UI - partial implementation
-
-A minimal truthful PERFORMANCE surface is implemented.
-
-Current behavior includes:
-
-- `/performance` HTML route
-- pure `render_performance_dashboard(...)` presenter
-- complete target navigation
-- TODAY -> PERFORMANCE navigation link
-- explicit PAPER / Observation Mode labeling
-- truthful empty state when no real M7 report is available
-- no synthetic trades or recommendations
-- display of currently implemented M7A summary and realized drawdown fields
-  when a real `PerformanceReport` is supplied
-- explicit disclaimer that paper measurements are not profitability,
-  strategy-validation, robustness, alpha, or real-money-readiness evidence
-
-The route intentionally has no fake or demo performance dataset attached.
-Without a real report it renders the unavailable state.
-
-The presenter consumes already-computed M7 report models.
-
-It does not independently recompute:
-
-- fills
-- trade outcomes
-- expectancy
-- drawdown
-- strategy logic
-
-The remaining M7 continuation must extend the surface after the corresponding
-report fields exist to truthfully show:
-
-- full state counts where useful
-- monthly consistency
-- regime consistency
-- Sharpe value or unavailable reason
-- Sortino value or unavailable reason
-- slippage sensitivity
-
-Those additions must continue to consume canonical M7 report objects rather
-than duplicating analytics inside the HTML layer.
+The presenter only formats precomputed models; it never calculates fills,
+expectancy, drawdown or strategy performance. PAPER / Observation Mode and the
+no-strategy-validation disclaimer remain visible. Unbacked navigation tabs do
+not manufacture results. TODAY is unchanged: validated data, read-only DB access,
+fail-closed empty state, NO SETUP ENGINE, and trader-safe warning are preserved.
 
 ## 18. Safety boundary
 

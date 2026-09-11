@@ -6,6 +6,8 @@ from decimal import Context, Decimal, localcontext
 
 from app.domain.enums import MarketRegimeType
 
+from .extensions import risk_adjusted
+
 from .models import (
     DrawdownSummary,
     EconomicSummary,
@@ -15,6 +17,7 @@ from .models import (
     PerformanceObservation,
     PerformanceReport,
     RegimePerformance,
+    SlippageSensitivityResult,
 )
 
 D = Decimal
@@ -55,6 +58,9 @@ def analyze_performance(
             months=months,
             monthly_consistency=consistency,
             regimes=regimes,
+            risk_adjusted=risk_adjusted(request.periodic_returns),
+            slippage_sensitivity=_sensitivity(request),
+            baseline_scenario_id=request.baseline_scenario_id,
         )
 
 
@@ -279,3 +285,47 @@ def _regimes(observations):
             key=lambda value: value.value,
         )
     )
+
+
+def _sensitivity(request):
+    allowed = {'entry_slippage_bps', 'stop_slippage_bps', 'target_slippage_bps',
+               'scheduled_exit_slippage_bps'}
+    originals = {o.paper_input.trade_plan.trade_plan_id: o for o in request.observations}
+    results = {}
+    for scenario in request.slippage_scenarios:
+        if scenario.scenario_id in results:
+            raise ValueError('duplicate scenario_id')
+        rows = {o.paper_input.trade_plan.trade_plan_id: o for o in scenario.observations}
+        if len(rows) != len(scenario.observations) or rows.keys() != originals.keys():
+            raise ValueError('scenario observation set mismatch')
+        for key, row in rows.items():
+            original = originals[key]
+            if any(getattr(row, name) != getattr(original, name)
+                   for name in ('schema_version', 'strategy_id', 'strategy_version', 'market_regime')):
+                raise ValueError('scenario identity mismatch')
+            for name in type(row.paper_input).model_fields:
+                if name != 'config' and getattr(row.paper_input, name) != getattr(original.paper_input, name):
+                    raise ValueError('scenario underlying input mismatch')
+            for name in type(row.paper_input.config).model_fields:
+                if name not in allowed and getattr(row.paper_input.config, name) != getattr(original.paper_input.config, name):
+                    raise ValueError('unauthorized scenario config change')
+        summary = _summary(scenario.observations)
+        drawdown = _drawdown(scenario.observations, request.config.starting_equity)
+        results[scenario.scenario_id] = SlippageSensitivityResult(
+            scenario=scenario, completed_count=summary.completed_count,
+            total_net_pnl=summary.total_net_pnl, net_expectancy=summary.net_expectancy,
+            profit_factor=summary.profit_factor,
+            max_drawdown_amount=drawdown.max_drawdown_amount,
+            max_drawdown_pct=drawdown.max_drawdown_pct,
+        )
+    baseline = request.baseline_scenario_id
+    if baseline is not None:
+        if baseline not in results:
+            raise ValueError('baseline scenario missing')
+        base = results[baseline]
+        results = {key: row.model_copy(update={
+            'delta_total_net_pnl': row.total_net_pnl - base.total_net_pnl,
+            'delta_net_expectancy': (row.net_expectancy - base.net_expectancy
+                                     if row.net_expectancy is not None and base.net_expectancy is not None else None),
+        }) for key, row in results.items()}
+    return tuple(results[key] for key in sorted(results))

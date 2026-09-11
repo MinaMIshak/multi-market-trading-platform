@@ -10,6 +10,10 @@ from .models import (
     PerformanceObservation,
     PerformanceReport,
     RegimePerformance,
+    PeriodicReturnSeries,
+    RiskAdjustedSummary,
+    SlippageScenario,
+    SlippageSensitivityResult,
 )
 
 __all__ = [
@@ -22,5 +26,9 @@ __all__ = [
     "PerformanceObservation",
     "PerformanceReport",
     "RegimePerformance",
+    "PeriodicReturnSeries",
+    "RiskAdjustedSummary",
+    "SlippageScenario",
+    "SlippageSensitivityResult",
     "analyze_performance",
 ]

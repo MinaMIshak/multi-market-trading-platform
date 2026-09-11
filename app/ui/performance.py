@@ -103,9 +103,60 @@ def render_performance_dashboard(
           <p>Starting equity: {_decimal(drawdown.starting_equity)}</p>
           <p>Ending equity: {_decimal(drawdown.ending_equity)}</p>
           <p>Peak equity: {_decimal(drawdown.peak_equity)}</p>
-          <p>Max drawdown %: {_decimal(drawdown.max_drawdown_pct)}</p>
+          <p>Max drawdown % (fraction): {_decimal(drawdown.max_drawdown_pct)}</p>
         </section>
         """
+
+    if report is not None:
+        def table(title, headers, rows):
+            headings = "".join(f"<th>{html.escape(h)}</th>" for h in headers)
+            body = "".join("<tr>" + "".join(
+                f"<td>{html.escape(str(v))}</td>" for v in row
+            ) + "</tr>" for row in rows)
+            return (f'<section class="panel"><h2>{title}</h2><table><thead><tr>{headings}'
+                    f'</tr></thead><tbody>{body}</tbody></table></section>')
+
+        content += table("Observation states", ("State", "Count"), (
+            (name, getattr(report.summary, name.lower() + "_count"))
+            for name in ("Completed", "Rejected", "No_fill", "Open", "Incomplete")
+        ))
+        c = report.monthly_consistency
+        content += f'<section class="panel"><h2>Monthly consistency</h2><p>Evaluated: {c.evaluated_months}; positive: {c.positive_months}; negative: {c.negative_months}; flat: {c.flat_months}</p></section>'
+        content += table("Monthly economics", ("Month", "Completed", "Net P&L", "Net expectancy"), (
+            (m.month, m.summary.completed_count, _decimal(m.summary.total_net_pnl), _decimal(m.summary.net_expectancy))
+            for m in report.months
+        ))
+        content += table("Regime consistency", ("Regime", "Observations", "Completed", "Net P&L", "Net expectancy"), (
+            (r.market_regime.value, r.summary.total_observations, r.summary.completed_count,
+             _decimal(r.summary.total_net_pnl), _decimal(r.summary.net_expectancy)) for r in report.regimes
+        ))
+        risk = report.risk_adjusted
+        content += table("Periodic-return ratios", ("Metric", "Value", "Unavailable reason"), (
+            ("Sharpe", _decimal(risk.sharpe), risk.sharpe_reason or ""),
+            ("Sortino", _decimal(risk.sortino), risk.sortino_reason or ""),
+        ))
+        if risk.series is not None:
+            series = risk.series
+            content += table("Periodic basis", ("Series", "Seconds per period", "Risk-free per period", "Target per period", "Minimum samples", "Annualization factor"), (
+                (series.series_id, series.period_seconds, series.risk_free_return,
+                 series.sortino_target, series.minimum_samples,
+                 series.annualization_factor if series.annualization_factor is not None else "None (per-period)"),
+            ))
+        content += table("MAE/MFE in R", ("Average MAE R", "Average MFE R"), (
+            (_decimal(report.summary.average_mae_r), _decimal(report.summary.average_mfe_r)),
+        ))
+        if report.slippage_sensitivity:
+            content += table("Slippage sensitivity (descriptive PAPER)",
+                ("Scenario", "Completed", "Net P&L", "Expectancy", "Profit factor", "Drawdown", "Drawdown fraction", "Delta P&L", "Delta expectancy"), (
+                    (r.scenario.scenario_id, r.completed_count, _decimal(r.total_net_pnl),
+                     _decimal(r.net_expectancy), _decimal(r.profit_factor),
+                     _decimal(r.max_drawdown_amount), _decimal(r.max_drawdown_pct),
+                     _decimal(r.delta_total_net_pnl), _decimal(r.delta_net_expectancy))
+                    for r in report.slippage_sensitivity
+                ))
+            content += f'<p>Baseline scenario: {html.escape(report.baseline_scenario_id or "UNAVAILABLE")}</p>'
+        else:
+            content += '<section class="panel">Slippage sensitivity UNAVAILABLE: no explicit scenarios supplied.</section>'
 
     return f"""<!doctype html>
 <html>
