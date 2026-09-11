@@ -1,5 +1,6 @@
 """Offline daily research engines; no next-open reads or model training."""
 from datetime import date, datetime
+from math import isfinite
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -31,6 +32,97 @@ def ema(values, window):
     return value
 
 
+class SwingSeriesEvaluation(Contract):
+    """Pure daily swing-math result; no market repository or execution semantics."""
+
+    state: Literal['WATCH', 'NO_CONFIRMATION']
+    fast_ema: float
+    slow_ema: float
+    breakout_reference: float | None = None
+
+
+def evaluate_swing_series(
+    *,
+    closes: tuple[float, ...],
+    highs: tuple[float, ...],
+    config: SwingConfig,
+) -> SwingSeriesEvaluation:
+    """Evaluate identical Swing math over already-admitted daily research values."""
+
+    if not isinstance(config, SwingConfig):
+        raise ValueError('explicit SwingConfig required')
+
+    config = SwingConfig.model_validate(
+        {
+            name: getattr(config, name)
+            for name in SwingConfig.model_fields
+        },
+        strict=True,
+    )
+
+    if type(closes) is not tuple or type(highs) is not tuple:
+        raise ValueError('canonical swing series tuples required')
+
+    if len(closes) != len(highs):
+        raise ValueError('swing close/high length mismatch')
+
+    if len(closes) < config.minimum_history:
+        raise ValueError('validated minimum history required')
+
+    for name, values in (
+        ('closes', closes),
+        ('highs', highs),
+    ):
+        if any(
+            type(value) is not float
+            or not isfinite(value)
+            or value <= 0
+            for value in values
+        ):
+            raise ValueError(
+                f'positive finite float {name} required'
+            )
+
+    fast = ema(
+        closes,
+        config.fast_ema_window,
+    )
+    slow = ema(
+        closes,
+        config.slow_ema_window,
+    )
+
+    breakout = (
+        None
+        if config.breakout_lookback is None
+        else max(
+            highs[
+                -config.breakout_lookback - 1:
+                -1
+            ]
+        )
+    )
+
+    qualifies = (
+        closes[-1] > fast > slow
+        and (
+            breakout is None
+            or closes[-1] > breakout
+        )
+    )
+
+    return SwingSeriesEvaluation(
+        state=(
+            'WATCH'
+            if qualifies
+            else 'NO_CONFIRMATION'
+        ),
+        fast_ema=fast,
+        slow_ema=slow,
+        breakout_reference=breakout,
+    )
+
+
 class SwingEngine:
     def __init__(self, repository, config):
         if not isinstance(repository, PointInTimeDailyRepository):
@@ -46,18 +138,29 @@ class SwingEngine:
         c = self.config
         if data.dq_status != 'VALIDATED' or len(data.rows) < c.minimum_history:
             raise ValueError('validated minimum history required')
-        closes = [float(b.close) for b in data.split_adjusted]
-        fast, slow = ema(closes, c.fast_ema_window), ema(closes, c.slow_ema_window)
-        breakout = (None if c.breakout_lookback is None else
-                    max(float(b.high) for b in data.split_adjusted[-c.breakout_lookback-1:-1]))
-        qualifies = closes[-1] > fast > slow and (breakout is None or closes[-1] > breakout)
+
+        evaluation = evaluate_swing_series(
+            closes=tuple(
+                float(b.close)
+                for b in data.split_adjusted
+            ),
+            highs=tuple(
+                float(b.high)
+                for b in data.split_adjusted
+            ),
+            config=c,
+        )
+
+        qualifies = evaluation.state == 'WATCH'
+
         return candidate('SWING', c, data.rows[-1].canonical_symbol, decision_time,
-                         decision_time, 'WATCH' if qualifies else 'NO_CONFIRMATION',
+                         decision_time, evaluation.state,
                          float(data.rows[-1].close) if qualifies else None,
                          strategy_version='1', timing='NEXT_ELIGIBLE_SESSION', after_market_date=signal_date,
                          reference_kind='D_CLOSE_PLANNING_REFERENCE_ONLY',
                          source_audit_id=data.audit_id, provenance_ids=data.provenance_ids,
-                         fast_ema=fast, slow_ema=slow, breakout_reference=breakout)
+                         fast_ema=evaluation.fast_ema, slow_ema=evaluation.slow_ema,
+                         breakout_reference=evaluation.breakout_reference)
 
 
 class PreSurgeConfig(StrategyConfig):
