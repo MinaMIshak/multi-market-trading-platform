@@ -1,9 +1,10 @@
-# M8 research validation — M8A boundary
+# M8 research validation — M8A partitions and M8B evidence
 
 ## Status and scope
 
 M8A implements offline, in-memory executable observations, explicit purged rolling
-walk-forward contracts, and a frozen future holdout boundary. It stops before M8B.
+walk-forward contracts, and a frozen future holdout boundary. M8B adds the separate
+evaluation and evidence contracts documented below.
 M0–M7 semantics, routes, UI, dependencies and operational wiring are unchanged.
 
 **M8A alone establishes no profitability, alpha, robustness, statistical
@@ -157,10 +158,10 @@ partition result for audit; UUIDs alone are not content-addressed evidence.
 
 ## Deferred work and limitations
 
-M8B will own OOS aggregation/reporting, regime-analysis integration,
-bootstrap/confidence analysis, and a separate explicit actual holdout evaluation
-and final research report. None is implemented here. M8A computes no profitability
-metrics, confidence intervals or significance tests.
+M8B now implements OOS aggregation/reporting, regime-analysis integration,
+bootstrap/confidence analysis, a separate explicit holdout evaluation and a final
+research report. The approved M8A partition function itself still computes no
+profitability metrics, confidence intervals or significance tests.
 
 Parameter search, hyperparameter tuning, strategy optimization, candidate ranking,
 ML, robustness/alpha claims and readiness decisions are absent. There is no RESEARCH
@@ -181,3 +182,206 @@ lookup forbidden. Test data are explicitly engineering fixtures, not research ev
 
 Focused verification includes M8A and relevant M6/M7 regression. The full regression
 and tracked/untracked whitespace checks are required before human review.
+
+
+## M8B status: engine versus market evidence
+
+**M8 VALIDATION ENGINE COMPLETE - REAL MARKET VALIDATION NOT YET EXECUTED.**
+
+A. The offline validation engine is implemented and tested with deterministic
+engineering fixtures. B. Actual historical market validation has **not** been
+executed. Fixture economics must never be cited as market evidence. This is not
+completion of M8 strategy validation or a recommendation for real-money readiness.
+
+A real run still requires an authentic canonical `ResearchDataset` for one fixed
+strategy ID/version: point-in-time admissions and universe/strategy provenance,
+canonical M6 inputs and replay-consistent results with executable bars, explicit
+costs/slippage and risk sizing, and truthful supplied regime metadata. It also
+requires a predeclared rolling plan with untouched future holdout, starting equity,
+bootstrap assumptions, and criteria. This implementation acquires no dataset and
+certifies neither historical authenticity nor absence of upstream look-ahead.
+
+## M8B public API and protocol
+
+The added exports from `app.research` are:
+
+- `BootstrapConfig`, `ResearchEvidenceCriteria`, `FrozenResearchProtocol`.
+- `ConfidenceInterval`, `BootstrapReport`, `CriterionCheck`, `EvidenceStatus`.
+- `FoldOOSReport`, `DevelopmentOOSReport`, `HoldoutEvidenceReport`,
+  `ResearchEvidenceReport`.
+- `evaluate_development_oos(dataset, partition, protocol)`.
+- `evaluate_frozen_holdout(dataset, protocol)`.
+- `build_research_evidence(dataset, partition, protocol, development, holdout)`.
+
+All models are strict, frozen, finite-valued Pydantic contracts. Config/protocol
+versions are required; report schema versions have literal v1 defaults. The
+protocol binds an explicit nonblank protocol ID, strategy ID/version, exact M8A
+`WalkForwardPlan` (including `FrozenHoldout`), M7 `PerformanceConfig` with positive
+starting equity, bootstrap config, and evidence criteria. Canonical nested settings
+are reconstructed on construction and at evaluation boundaries. Dictionaries are
+not substitutes for these canonical input contracts.
+
+Freezing is **not cryptographic proof of preregistration**. It cannot prevent a
+human creating another protocol after inspecting outcomes, or enforce a single
+holdout use across processes. One protocol and one strategy identity/version are
+evaluated at a time. There is no ranking, optimizer, search, threshold adaptation,
+strategy selection, or readiness automation. Changing a strategy after inspecting
+holdout requires a new research cycle and new untouched future evidence; the old
+holdout cannot be represented as untouched validation for that change.
+
+## Development membership, performance and regimes
+
+The callable reconstructs the canonical dataset and protocol, checks strategy
+identity/version, recursively checks supplied partition contracts, recomputes
+`partition_development(dataset, protocol.plan)`, and requires exact equality with
+the supplied partition. It resolves **only each fold's `test_ids`** to canonical
+research observations. Duplicate dataset/OOS identities, missing IDs, forged
+partitions, changed plans, malformed model-copy/model-construct objects, and
+inconsistent M6 replay fail closed. No missing or malformed row is dropped.
+Training, purged and unavailable-training IDs never serve as OOS economic evidence
+by virtue of training membership. A row independently admitted as a test by M8A
+may also be a training candidate for another fold, preserving M8A semantics.
+
+Every admitted test observation remains counted regardless of completion, late
+label availability, regime or economic result. Each fold embeds a canonical M7
+`PerformanceReport`, as does the overall union of nonoverlapping test IDs. Reports
+include observation IDs in M8A decision-time/string-UUID order, fold count, and
+positive/negative/flat fold counts by completed net P&L. Folds with no completed
+trades appear in `undefined_fold_ids` and never count as flat economic folds.
+
+Embedded M7 reports preserve exactly:
+
+- total observation, completed, rejected, no-fill, open and incomplete counts;
+- economic net win/loss/breakeven counts, gross P&L, costs and net P&L;
+- completed-only net expectancy, R expectancy, profit factor, average win/loss,
+  and economic win rate (not an evidence objective);
+- realized max drawdown amount and fraction (`max_drawdown_pct` is a fraction,
+  not percentage points), starting/ending/peak equity;
+- average MAE/MFE and MAE/MFE in R;
+- monthly economics by M7 admission `market_date` year/month, with completed-only
+  positive/negative/flat monthly consistency;
+- explicit supplied regime buckets, sorted by enum value, including `UNKNOWN`
+  when present. Every bucket retains noncompleted counts and completed-only
+  economics. Regimes are never inferred, recomputed, selected or filtered.
+
+Each fold and the overall union starts at the same declared M7 starting equity.
+Overall drawdown is recomputed by M7 over the union, never summed across folds.
+M7 empty totals/drawdown remain zero; undefined expectancies/profit factor remain
+null. A zero empty drawdown is bookkeeping, not evidence of controlled risk.
+All-win or all-flat profit factor is null, never infinity. No periodic-return
+series is invented: embedded Sharpe/Sortino remain unavailable, and no new
+slippage scenarios are run. Existing M6 cost/slippage outcomes are retained.
+
+## Bootstrap configuration, sampling and confidence intervals
+
+Every statistical setting is required: `config_version='research-bootstrap-v1'`,
+`seed` (exact Python integer, including negative integers), `replications` (strict
+positive integer), `confidence_level` (finite Decimal strictly between 0 and 1),
+and `block_size` (strict positive integer). Booleans, integer-like strings/floats
+and nonfinite values are rejected. There is no implicit seed, confidence level,
+replication count, block size or IID assumption.
+
+Only completed **development OOS** outcomes enter bootstrap. Noncompleted states
+are not zero-return samples. The order reuses M7's exact `_exit_key`:
+`(exit.known_at, exit.interval_start, str(trade_plan_id))`. The bootstrap report
+records that ordered ID sequence and sample count. Already-canonical net P&Ls are
+extracted as immutable Decimal primitives; no M6 resimulation, Pydantic rebuilding,
+or M7 analyzer invocation occurs inside a replication. Ordinary reports and public
+boundary validation continue through canonical M7/M8A, outside the replicate loop.
+
+A local `random.Random(seed)` chooses starts uniformly from `0..n-block_size`.
+Blocks **do not wrap**. Each contiguous block is appended until at least n outcomes
+have been selected, and the final sequence is truncated to exactly n. Block size 1
+is explicitly IID by completed trade. Larger sizes preserve within-block chronology
+but not dependence across block joins. The caller owns whether the choice is
+statistically appropriate; this is not a calendar-time or portfolio block model.
+A block equal to n repeats the original sequence and may yield degenerate intervals;
+that does not establish certainty. Source rows and global random state are untouched.
+
+Primitive arithmetic uses the same independent precision-34 Decimal context as M7.
+Replicates produce total net P&L, mean net P&L (net expectancy), and realized maximum
+drawdown amount using declared starting equity, running equity and running peak.
+Bootstrap deliberately omits profit factor and drawdown-fraction intervals; their
+ordinary point estimates remain in M7 reports. No infinity or undefined-replicate
+substitution is used.
+
+The central percentile interval uses tail probability `(1-confidence_level)/2`.
+For B sorted replicates and probability p, the quantile linearly interpolates at
+index `(B-1)*p` between floor and ceiling indices. No bias correction, studentization,
+normality assumption or library quantile defaults are introduced. Each metric
+records actual-sample estimate, lower/upper bounds, valid replication count, and
+unavailable reason; shared seed/count/confidence/block settings are in
+`BootstrapReport.config`. An empirical interval need not contain its point estimate;
+only lower <= upper is guaranteed. Small replication counts (including one) are
+accepted as explicitly requested and can produce coarse/degenerate intervals.
+
+## Insufficient evidence and declared criteria
+
+Bootstrap reason precedence is `ZERO_COMPLETED`, then `ONE_COMPLETED`, then
+`BLOCK_EXCEEDS_SAMPLE`. Each returns null bounds and zero valid replications.
+For zero completed trades, estimates are also null; for one or an oversized block,
+observed point estimates remain available but no confidence interval is fabricated.
+The block is never silently reduced. A single realized trade may have an observed
+M7 drawdown but cannot support this contract's drawdown uncertainty estimate.
+Missing bootstrap evidence makes development status insufficient even when no
+lower-bound criterion was enabled.
+
+`ResearchEvidenceCriteria` explicitly requires:
+
+- `config_version='research-evidence-criteria-v1'`;
+- `minimum_completed_development_trades` and `minimum_completed_holdout_trades`,
+  each a strict integer >= 2 (the engine's minimum evidence floor);
+- finite Decimal `minimum_net_expectancy` and nonnegative finite Decimal
+  `maximum_drawdown_fraction`;
+- `minimum_profit_factor`: nonnegative finite Decimal or explicit `None`;
+- `minimum_net_expectancy_lower_bound`: finite Decimal or explicit `None`.
+
+There are no default economic thresholds. Minimums use inclusive >=; drawdown uses
+inclusive <=. Net expectancy, drawdown and optional profit factor thresholds apply
+to **both** development overall OOS and holdout separately. The optional lower
+confidence bound is explicitly **development-only**, because bootstrap samples only
+development OOS, never holdout. Fold and regime metrics are descriptive; no hidden
+per-fold/per-regime pass requirements or hindsight exclusions exist.
+
+Each criterion records actual, threshold, comparison, passed (true/false/null) and
+unavailable reason. Below the declared completed-trade minimum, all checks are
+unevaluable (`BELOW_DECLARED_SAMPLE_MINIMUM`), rather than treating undersampling as
+economic failure. Otherwise an undefined required metric is `UNDEFINED_METRIC`.
+Status is `INSUFFICIENT_EVIDENCE` when required evidence is unavailable, then
+`FAILS_DECLARED_CRITERIA` if any evaluable required criterion fails, and only
+`MEETS_DECLARED_CRITERIA` if every required criterion is evaluable and passes.
+Missing evidence takes precedence over failures. Bootstrap unavailability is also
+explicitly recorded in the development bootstrap report, outside criterion checks.
+
+## Separate holdout and final reporting
+
+Development evaluation never invokes the holdout evaluator. The explicit holdout
+API uses only `holdout.start <= decision_at < holdout.end`, sorted by decision time
+and string UUID. Neither completion, economic outcome, regime nor label availability
+controls admission. Noncompleted holdout counts remain visible; economics are M7
+completed-only. It uses the exact canonical frozen protocol, including declared
+starting equity and criteria, and neither bootstraps holdout nor changes settings.
+Canonical integrity is still checked for the entire supplied dataset in either API.
+
+The final builder accepts separately produced development/holdout reports, or
+explicit `None` for missing evidence. It revalidates report descendants and audits
+supplied reports by exact recomputation against the canonical dataset, partition
+and protocol, rejecting tampering, changed inputs and settings. A supplied holdout
+report triggers a repeat of that explicit holdout evaluation for integrity checking;
+an absent report stays absent and does not trigger holdout evaluation. No missing
+evidence is manufactured. Retain the canonical dataset for this audit.
+
+The final report embeds the complete protocol, separate evidence and their checks,
+status and limitations. Missing either report or insufficient status in either
+report yields insufficient final evidence; otherwise any failed criterion fails
+the final status. Every required check must pass for a meeting status. This is
+never a readiness approval, guaranteed profitability, proven alpha or guaranteed
+robustness; human review and further operational validation remain necessary.
+
+Isolation tests change development-only observations while retaining identical
+holdout evidence, and replace holdout outcomes while retaining equal development
+partition/report and unchanged protocol. Tests also cover strict configurations,
+M7 arithmetic equivalence, noncompleted counts, explicit UNKNOWN regimes, late
+labels, exit ordering, deterministic block/quantile behavior, ambient random and
+Decimal independence, corruption rejection, missing evidence and network denial.
+A replay-call-count test proves replication growth does not grow M6 replay calls.
