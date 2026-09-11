@@ -176,14 +176,19 @@ def _require_exact_utc(
 class USSessionRecord(USContractModel):
     """Explicit US market-session truth.
 
-    Times are evidence inputs.  This model intentionally does not infer
-    regular hours, holidays, weekends, DST offsets, or early-close times.
+    Times are evidence inputs. ``calendar_mic`` scopes the historical
+    calendar fact to an explicit exchange/calendar MIC.  This model
+    intentionally does not infer regular hours, holidays, weekends, DST
+    offsets, or early-close times.
     """
 
     contract: Literal["us-session-v1"] = "us-session-v1"
     market: Literal["US"] = "US"
 
     market_date: date
+    calendar_mic: str = Field(
+        pattern=_MIC_PATTERN,
+    )
     timezone_name: Literal["America/New_York"] = (
         US_MARKET_TIMEZONE
     )

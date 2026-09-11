@@ -57,7 +57,8 @@ the `(listing_mic, canonical_symbol)` pair rather than ticker alone.
 
 The canonical US timezone is `America/New_York`.
 
-`USSessionRecord` represents explicit historical session facts:
+`USSessionRecord` represents explicit historical session facts scoped
+to an explicit calendar MIC such as `XNAS` or `XNYS`:
 
 - `REGULAR`;
 - `EARLY_CLOSE`;

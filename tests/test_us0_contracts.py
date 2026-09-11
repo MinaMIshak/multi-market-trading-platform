@@ -162,6 +162,7 @@ def test_same_symbol_on_different_mics_is_not_silently_collapsed():
 def test_closed_session_contains_no_synthetic_hours():
     session = USSessionRecord(
         market_date=date(2024, 1, 1),
+        calendar_mic="XNAS",
         state=USSessionState.CLOSED,
     )
 
@@ -176,6 +177,7 @@ def test_closed_session_rejects_hours():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 1),
+            calendar_mic="XNAS",
             state=USSessionState.CLOSED,
             opens_at_utc=datetime(
                 2024, 1, 1, 14, 30,
@@ -195,6 +197,7 @@ def test_regular_session_requires_explicit_hours():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 2),
+            calendar_mic="XNAS",
             state=USSessionState.REGULAR,
         )
 
@@ -206,6 +209,7 @@ def test_session_requires_close_after_open():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 2),
+            calendar_mic="XNAS",
             state=USSessionState.REGULAR,
             opens_at_utc=datetime(
                 2024, 1, 2, 21, 0,
@@ -227,6 +231,7 @@ def test_session_requires_exact_utc_timestamps():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 2),
+            calendar_mic="XNAS",
             state=USSessionState.REGULAR,
             opens_at_utc=datetime(
                 2024, 1, 2, 9, 30,
@@ -246,6 +251,7 @@ def test_session_timestamps_must_resolve_to_market_date():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 3),
+            calendar_mic="XNAS",
             state=USSessionState.REGULAR,
             opens_at_utc=datetime(
                 2024, 1, 2, 14, 30,
@@ -261,6 +267,7 @@ def test_session_timestamps_must_resolve_to_market_date():
 def test_regular_session_accepts_explicit_winter_utc_times():
     session = USSessionRecord(
         market_date=date(2024, 1, 2),
+        calendar_mic="XNAS",
         state=USSessionState.REGULAR,
         opens_at_utc=datetime(
             2024, 1, 2, 14, 30,
@@ -278,6 +285,7 @@ def test_regular_session_accepts_explicit_winter_utc_times():
 def test_regular_session_accepts_explicit_summer_utc_times():
     session = USSessionRecord(
         market_date=date(2024, 7, 1),
+        calendar_mic="XNAS",
         state=USSessionState.REGULAR,
         opens_at_utc=datetime(
             2024, 7, 1, 13, 30,
@@ -295,6 +303,7 @@ def test_regular_session_accepts_explicit_summer_utc_times():
 def test_early_close_is_explicit_and_not_fixed_by_model():
     session = USSessionRecord(
         market_date=date(2024, 7, 3),
+        calendar_mic="XNAS",
         state=USSessionState.EARLY_CLOSE,
         opens_at_utc=datetime(
             2024, 7, 3, 13, 30,
@@ -487,6 +496,7 @@ def test_no_session_rule_is_inferred_from_weekday():
     # Sunday is allowed as an explicit CLOSED historical fact.
     session = USSessionRecord(
         market_date=date(2024, 1, 7),
+        calendar_mic="XNAS",
         state=USSessionState.CLOSED,
     )
 
@@ -502,6 +512,7 @@ def test_offset_zero_timezone_object_other_than_timezone_utc_is_rejected():
     ):
         USSessionRecord(
             market_date=date(2024, 1, 2),
+            calendar_mic="XNAS",
             state=USSessionState.REGULAR,
             opens_at_utc=datetime(
                 2024, 1, 2, 14, 30,
@@ -512,3 +523,53 @@ def test_offset_zero_timezone_object_other_than_timezone_utc_is_rejected():
                 tzinfo=zero_offset,
             ),
         )
+
+
+def test_session_requires_valid_calendar_mic():
+    with pytest.raises(ValidationError):
+        USSessionRecord(
+            market_date=date(2024, 1, 2),
+            calendar_mic="NASDAQ",
+            state=USSessionState.REGULAR,
+            opens_at_utc=datetime(
+                2024, 1, 2, 14, 30,
+                tzinfo=timezone.utc,
+            ),
+            closes_at_utc=datetime(
+                2024, 1, 2, 21, 0,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+
+def test_same_market_date_can_have_separate_calendar_mics():
+    xnas = USSessionRecord(
+        market_date=date(2024, 1, 2),
+        calendar_mic="XNAS",
+        state=USSessionState.REGULAR,
+        opens_at_utc=datetime(
+            2024, 1, 2, 14, 30,
+            tzinfo=timezone.utc,
+        ),
+        closes_at_utc=datetime(
+            2024, 1, 2, 21, 0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    xnys = USSessionRecord(
+        market_date=date(2024, 1, 2),
+        calendar_mic="XNYS",
+        state=USSessionState.REGULAR,
+        opens_at_utc=datetime(
+            2024, 1, 2, 14, 30,
+            tzinfo=timezone.utc,
+        ),
+        closes_at_utc=datetime(
+            2024, 1, 2, 21, 0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert xnas.calendar_mic == "XNAS"
+    assert xnys.calendar_mic == "XNYS"
