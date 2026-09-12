@@ -162,25 +162,27 @@ malformed-value test cases are software fixtures, not empirical observations.
 
 ## IBM dividend announcement scope
 
-The retained IBM Q2 10-Q, page 52, reports a July 25, 2022 announcement
-of a USD 1.65 quarterly dividend per common share, payable September 10, 2022
-to shareholders of record August 10, 2022. The offline audit binds this exact
-statement to the filing identity, archive locator and original-byte SHA256.
-It reports these three date roles separately and leaves ex-date and historical
-availability unknown. A payable date is not proof that payment occurred.
+Two official IBM newsroom pages are now retained as original HTML with receipt
+times and hashes. The April 26 notice reports a USD 1.65 dividend, June 10
+payable date, and May 10 record date. The July 25 notice reports the same amount,
+September 10 payable date, and August 10 record date. The retained Q2 10-Q
+independently reports the July announcement and terms. The audit binds each
+statement to its exact source locator and original-byte SHA256.
 
-The amount agrees with the August vendor marker, but the statement does not
-independently establish the vendor's August 9 ex-date. Neither record date nor
-payable date may be substituted for an effective ex-date. The July announcement
-also cannot supply pre-announcement knowledge. No current receipt is backdated.
+These amounts and sequences agree with Tiingo's May 9 and August 9 dividend
+markers, but none of the issuer artifacts states an ex-date. Record and payable
+dates cannot be substituted for effective ex-dates, and a payable date is not
+proof that payment occurred. Current 2026 receipt of pages dated in 2022 also
+does not prove their historical availability. No receipt is backdated.
 
-This is one reported action announcement, not a complete bounded action history
-for April 1 through November 4. It supplies neither negative evidence for other
-actions nor approval for canonical US4 coverage. Admission remains **NO-GO**.
-The next action probe should seek retained or free official dated issuer notices
-for both vendor-marked dividends, preserving announcement, ex-date, record and
-payment roles and checking their exact scope before any admission claim.
+Two positive issuer notices are not complete bounded action coverage for April 1
+through November 4. They provide no negative evidence for other action types or
+events. Canonical US4 and overall PIT admission therefore remain **NO-GO**.
+The next action probe should seek free official ex-date evidence and a source
+capable of establishing complete bounded coverage, while keeping each date role
+separate.
 
-Verification: 86 focused audit tests passed; the authentic retained bundle audit
-completed successfully with five verified public artifacts and PIT NO_GO. No
-external requests were made and no raw artifacts or frozen declarations changed.
+Verification: 89 focused audit tests passed; the authentic retained bundle audit
+completed successfully with seven verified public artifacts and PIT NO_GO. Two
+free official IBM pages were acquired; no paid or limited API was called, and
+the frozen declaration was unchanged.

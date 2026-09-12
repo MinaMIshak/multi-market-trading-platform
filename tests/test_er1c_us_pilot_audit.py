@@ -9,6 +9,7 @@ from tools.audit_er1c_us_pilot import (
     inspect_nyse_2022_calendar,
     inspect_ibm_submission,
     inspect_ibm_dividend_scope,
+    inspect_ibm_dividend_notice,
     inspect_ibm_2022q2_filing,
     inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
@@ -415,3 +416,47 @@ def test_ibm_dividend_rejects_changed_terms_or_issuer(old, new):
 def test_ibm_listing_statement_alone_cannot_prove_dividend():
     with pytest.raises(ValueError, match="dividend announcement terms"):
         inspect_ibm_dividend_scope(ibm_2022q2_filing())
+
+
+@pytest.mark.parametrize(
+    "filename,url,announcement,record,payable,statement",
+    [
+        (
+            "ibm_2022-04-26_dividend_notice.html",
+            "https://newsroom.ibm.com/2022-04-26-IBM-BOARD-APPROVES-INCREASE-IN-QUARTERLY-CASH-DIVIDEND-FOR-THE-27th-CONSECUTIVE-YEAR",
+            "2022-04-26", "2022-05-10", "2022-06-10",
+            "board of directors today declared an increase in the regular quarterly cash dividend to $1.65 per common share, payable June 10, 2022 to stockholders of record as of May 10, 2022",
+        ),
+        (
+            "ibm_2022-07-25_dividend_notice.html",
+            "https://newsroom.ibm.com/2022-07-25-IBM-BOARD-APPROVES-REGULAR-QUARTERLY-CASH-DIVIDEND",
+            "2022-07-25", "2022-08-10", "2022-09-10",
+            "board of directors today declared a regular quarterly cash dividend of $1.65 per common share, payable September 10, 2022 to stockholders of record August 10, 2022",
+        ),
+    ],
+)
+def test_ibm_dividend_notice_preserves_date_roles(
+    filename, url, announcement, record, payable, statement
+):
+    payload = f"<html><body>The IBM (NYSE: IBM ) {statement}</body></html>".encode()
+    result = inspect_ibm_dividend_notice(payload, filename, url)
+    assert result["reported_announcement_date"] == announcement
+    assert result["reported_record_date"] == record
+    assert result["reported_payable_date"] == payable
+    assert result["ex_date"] is None
+    assert result["historical_available_at"] is None
+    assert result["complete_bounded_action_coverage"] is False
+    assert result["canonical_us4_action_coverage"] == "NO_GO"
+
+
+def test_ibm_dividend_notice_rejects_locator_or_changed_terms():
+    filename = "ibm_2022-07-25_dividend_notice.html"
+    url = "https://newsroom.ibm.com/2022-07-25-IBM-BOARD-APPROVES-REGULAR-QUARTERLY-CASH-DIVIDEND"
+    statement = "board of directors today declared a regular quarterly cash dividend of $1.65 per common share, payable September 10, 2022 to stockholders of record August 10, 2022"
+    payload = f"<html>The IBM (NYSE: IBM ) {statement}</html>".encode()
+    with pytest.raises(ValueError, match="source locator mismatch"):
+        inspect_ibm_dividend_notice(payload, filename, url + "?changed=1")
+    with pytest.raises(ValueError, match="terms missing or changed"):
+        inspect_ibm_dividend_notice(
+            payload.replace(b"$1.65", b"$1.66"), filename, url
+        )

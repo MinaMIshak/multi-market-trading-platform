@@ -73,6 +73,24 @@ TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
 TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
 IBM_SUBMISSIONS_FILENAME = "sec_ibm_submissions.json"
 IBM_2022Q2_10Q_FILENAME = "sec_ibm_2022q2_10q.html"
+IBM_DIVIDEND_NOTICE_SPECS = {
+    "ibm_2022-04-26_dividend_notice.html": {
+        "source_url": "https://newsroom.ibm.com/2022-04-26-IBM-BOARD-APPROVES-INCREASE-IN-QUARTERLY-CASH-DIVIDEND-FOR-THE-27th-CONSECUTIVE-YEAR",
+        "announcement_date": "2022-04-26",
+        "amount": "1.65",
+        "record_date": "2022-05-10",
+        "payable_date": "2022-06-10",
+        "statement": "board of directors today declared an increase in the regular quarterly cash dividend to $1.65 per common share, payable June 10, 2022 to stockholders of record as of May 10, 2022",
+    },
+    "ibm_2022-07-25_dividend_notice.html": {
+        "source_url": "https://newsroom.ibm.com/2022-07-25-IBM-BOARD-APPROVES-REGULAR-QUARTERLY-CASH-DIVIDEND",
+        "announcement_date": "2022-07-25",
+        "amount": "1.65",
+        "record_date": "2022-08-10",
+        "payable_date": "2022-09-10",
+        "statement": "board of directors today declared a regular quarterly cash dividend of $1.65 per common share, payable September 10, 2022 to stockholders of record August 10, 2022",
+    },
+}
 IBM_2022Q2_10Q_URL = (
     "https://www.sec.gov/Archives/edgar/data/51143/"
     "000155837022010985/ibm-20220630x10q.htm"
@@ -275,6 +293,43 @@ def inspect_ibm_dividend_scope(payload: bytes) -> dict[str, Any]:
             "matching vendor amount does not independently corroborate its ex-date",
             "one announcement does not establish complete bounded actions or empty coverage",
             "artifact historical availability and approved human review bindings are absent",
+        ],
+    }
+
+
+def inspect_ibm_dividend_notice(
+    payload: bytes, filename: str, source_url: str
+) -> dict[str, Any]:
+    """Qualify one retained issuer notice without deriving an ex-date or coverage."""
+    if filename not in IBM_DIVIDEND_NOTICE_SPECS:
+        raise ValueError(f"unexpected IBM dividend notice filename: {filename}")
+    spec = IBM_DIVIDEND_NOTICE_SPECS[filename]
+    if source_url != spec["source_url"]:
+        raise ValueError(f"IBM dividend notice source locator mismatch: {filename}")
+    notice = normalized_html_text(payload, f"IBM dividend notice {filename}")
+    required = ["The IBM (NYSE: IBM )", spec["statement"]]
+    if any(anchor not in notice for anchor in required):
+        raise ValueError(f"IBM dividend notice terms missing or changed: {filename}")
+    return {
+        "symbol": "IBM",
+        "source_file": filename,
+        "source_locator": source_url,
+        "source_sha256": sha256_bytes(payload),
+        "statement_locator": f"press-release paragraph dated {spec['announcement_date']}",
+        "reported_announcement_date": spec["announcement_date"],
+        "reported_amount_usd_per_common_share": spec["amount"],
+        "reported_record_date": spec["record_date"],
+        "reported_payable_date": spec["payable_date"],
+        "ex_date": None,
+        "historical_available_at": None,
+        "complete_bounded_action_coverage": False,
+        "canonical_us4_action_coverage": "NO_GO",
+        "limitations": [
+            "current capture of a dated issuer page does not prove historical availability",
+            "record and payable dates do not establish an ex-date or actual payment",
+            "matching vendor amount does not independently corroborate its ex-date",
+            "two issuer notices do not establish complete bounded actions or empty coverage",
+            "approved human review bindings are absent",
         ],
     }
 
@@ -685,6 +740,15 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     identity_scope = inspect_pilot_identity_scope(
         set(results), twitter_event_scope, ibm_submission_scope, ibm_filing_scope
     )
+    missing_notices = sorted(set(IBM_DIVIDEND_NOTICE_SPECS).difference(evidence_payloads))
+    if missing_notices:
+        raise ValueError(f"retained IBM dividend notices are absent: {missing_notices}")
+    dividend_notices = [
+        inspect_ibm_dividend_notice(
+            evidence_payloads[filename], filename, evidence_source_urls[filename]
+        )
+        for filename in sorted(IBM_DIVIDEND_NOTICE_SPECS)
+    ]
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -703,6 +767,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "ibm_dividend_scope": inspect_ibm_dividend_scope(
             evidence_payloads[IBM_2022Q2_10Q_FILENAME]
         ),
+        "ibm_dividend_notice_scopes": dividend_notices,
         "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
