@@ -287,3 +287,21 @@ session's eligibility. A mechanically complete XNYS additions/removals ledger,
 canonical US5A, and overall PIT admission therefore remain **NO-GO**. The
 offline auditor preserves this classification and fails on altered editions,
 bytes, inventory, availability claims, or the known Twitter index row.
+
+## Twitter SEC submission probe
+
+The two indexed Twitter submissions were retained under
+`/home/egx-agent/research-data/er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z`.
+The April 18 Form 8-A12B registers **Preferred Stock Purchase Rights** on the
+New York Stock Exchange. It is not a common-stock listing event and cannot
+establish the first eligible date for Twitter common stock.
+
+The October 28 Form 25-NSE identifies Twitter CIK `0001418091`, common stock,
+and New York Stock Exchange LLC. Its exhibit distinguishes the October 27
+merger effective date, suspension before the October 28 market open, and
+removal from listing and registration at the November 8 opening. This supports
+the issue-specific rejection of Tiingo's zero-volume October 28 row as an
+executable bar. It does not establish a complete listing-change ledger or
+exact-date universe, and its current receipt does not prove historical
+pre-decision availability. Canonical US5A and overall PIT admission remain
+**NO-GO**.

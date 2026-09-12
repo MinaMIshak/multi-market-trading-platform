@@ -1,0 +1,38 @@
+"""Offline audit for the bounded ER1C Twitter SEC submission probe."""
+from __future__ import annotations
+import argparse, hashlib, html, json, re
+from pathlib import Path
+
+EXPECTED_FILES = {"twitter_20220418_8a12b_submission.txt", "twitter_20221028_25nse_submission.txt"}
+def _sha256(payload: bytes) -> str: return hashlib.sha256(payload).hexdigest()
+def _plain(payload: bytes) -> str: return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(payload.decode("latin-1")))).strip()
+
+def _load(root: Path) -> dict[str, bytes]:
+    raw = (root / "manifest.json").read_bytes()
+    if (root / "manifest.sha256").read_text(encoding="ascii").strip() != f"{_sha256(raw)}  manifest.json": raise ValueError("manifest SHA256 sidecar mismatch")
+    manifest = json.loads(raw)
+    if manifest.get("schema") != "er1c-sec-twitter-submission-probe-v1": raise ValueError("unexpected manifest schema")
+    if not isinstance(manifest.get("records"), list) or len(manifest["records"]) != len(EXPECTED_FILES): raise ValueError("unexpected manifest records")
+    if {item.name for item in root.iterdir() if item.is_file()} != EXPECTED_FILES | {"manifest.json", "manifest.sha256"}: raise ValueError("probe inventory does not match manifest scope")
+    expected_keys = {"bytes", "content_type", "filename", "historical_availability_proven", "http_status", "receipt_utc", "sha256", "source_locator"}; payloads = {}
+    for record in manifest["records"]:
+        if not isinstance(record, dict) or set(record) != expected_keys: raise ValueError("unexpected evidence-record schema")
+        filename = record["filename"]
+        if filename in payloads or filename not in EXPECTED_FILES: raise ValueError("unexpected or duplicate evidence filename")
+        if record["http_status"] != 200 or record["historical_availability_proven"] is not False: raise ValueError("invalid retrieval or availability classification")
+        payload = (root / filename).read_bytes()
+        if record["bytes"] != len(payload) or record["sha256"] != _sha256(payload): raise ValueError(f"artifact integrity mismatch: {filename}")
+        payloads[filename] = payload
+    return payloads
+
+def audit_probe(root: Path) -> dict:
+    payloads = _load(root); registration = _plain(payloads["twitter_20220418_8a12b_submission.txt"]); removal = _plain(payloads["twitter_20221028_25nse_submission.txt"])
+    if any(anchor not in registration for anchor in ("FORM TYPE: 8-A12B", "FILED AS OF DATE: 20220418", "Preferred Stock Purchase Rights", "New York Stock Exchange")): raise ValueError("Twitter 8-A12B scope mismatch")
+    removal_raw = payloads["twitter_20221028_25nse_submission.txt"].decode("latin-1")
+    anchors = ("FORM TYPE: 25-NSE", "FILED AS OF DATE: 20221028", "EFFECTIVENESS DATE: 20221028", "NEW YORK STOCK EXCHANGE LLC", "TWITTER, INC.", "opening of business on November 08, 2022", "merger between Twitter, Inc. and X Holdings II, Inc.", "became effective on October 27, 2022", "suspended from trading before market open on October 28, 2022")
+    if any(anchor not in removal for anchor in anchors) or "<descriptionClassSecurity>Common Stock</descriptionClassSecurity>" not in removal_raw: raise ValueError("Twitter 25-NSE scope mismatch")
+    return {"source_classification": "AUTHORITATIVE_WITHIN_EXACT_SEC_SUBMISSION_SCOPE", "registration_finding": {"filed_date": "2022-04-18", "security_class": "Preferred Stock Purchase Rights", "exchange": "New York Stock Exchange", "common_stock_listing_event": False}, "removal_finding": {"filed_date": "2022-10-28", "issuer_cik": "0001418091", "security_class": "Common Stock", "exchange": "New York Stock Exchange LLC", "merger_effective_date": "2022-10-27", "trading_suspended_before_open": "2022-10-28", "removal_from_listing_and_registration": "2022-11-08"}, "historical_xnys_universe": "NO_GO", "complete_xnys_listing_change_ledger": "NO_GO", "limitations": ["the 8-A12B registers preferred-stock purchase rights, not Twitter common stock", "the 25-NSE establishes this issue-specific removal and suspension only", "filing, merger, suspension, and removal dates have distinct meanings", "current receipt does not prove historical pre-decision availability"]}
+
+def main() -> None:
+    parser = argparse.ArgumentParser(); parser.add_argument("root", type=Path); args = parser.parse_args(); print(json.dumps(audit_probe(args.root), indent=2, sort_keys=True))
+if __name__ == "__main__": main()
