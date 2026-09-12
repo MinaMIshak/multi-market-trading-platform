@@ -39,6 +39,9 @@ def _canonical(value: dict) -> bytes:
 SESSION_FIELDS = {"market", "market_date", "calendar_mic", "state", "opens_at", "closes_at"}
 IDENTITY_FIELDS = {"instrument_id", "ticker", "listing_mic", "effective_from", "effective_through"}
 ACTION_FIELDS = {"instrument_id", "coverage_from", "coverage_through", "status", "actions"}
+TRADING_STATUS_FIELDS = {
+    "instrument_id", "listing_mic", "coverage_start", "coverage_end", "trading_status",
+}
 BAR_FIELDS = {
     "instrument_id", "ticker", "market_date", "sequence", "interval_start",
     "interval_end", "available_at", "is_final", "price_basis", "open", "high",
@@ -121,6 +124,27 @@ class ForwardActionCoverage(_FactModel):
         return self
 
 
+class ForwardTradingStatusFact(_FactModel):
+    """Affirmative issue-specific tradability coverage, independent of vendor rows."""
+    instrument_id: UUID
+    listing_mic: Literal["XCAI", "XNYS", "XNAS"]
+    coverage_start: datetime
+    coverage_end: datetime
+    trading_status: Literal["TRADABLE"]
+    evidence_package_id: str = Field(pattern=SHA256_PATTERN)
+
+    @field_validator("coverage_start", "coverage_end", mode="before")
+    @classmethod
+    def exact_times(cls, value):
+        return _utc(value)
+
+    @model_validator(mode="after")
+    def coherent(self):
+        if self.coverage_end <= self.coverage_start:
+            raise ValueError("trading status interval is reversed or empty")
+        return self
+
+
 class ForwardRawBar(_FactModel):
     instrument_id: UUID
     ticker: str = Field(pattern=r"^[A-Z0-9][A-Z0-9._-]{0,63}$")
@@ -161,13 +185,14 @@ class ForwardRawBar(_FactModel):
 
 
 class ForwardFactBundle(_FactModel):
-    schema_version: Literal["shadow-forward-facts-v1"] = "shadow-forward-facts-v1"
+    schema_version: Literal["shadow-forward-facts-v2"] = "shadow-forward-facts-v2"
     label: Literal["EXPERIMENTAL / PAPER ONLY"] = LABEL
     record_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
     candidate_id: str = Field(pattern=NONBLANK_PATTERN)
     session: ForwardSessionFact
     identity: ForwardIdentityFact
     action_coverage: ForwardActionCoverage
+    trading_status: ForwardTradingStatusFact
     bars: tuple[ForwardRawBar, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -181,6 +206,12 @@ class ForwardFactBundle(_FactModel):
                 or not self.action_coverage.coverage_from <= session.market_date
                 <= self.action_coverage.coverage_through):
             raise ValueError("action coverage does not cover session identity")
+        status = self.trading_status
+        if (status.instrument_id != identity.instrument_id
+                or status.listing_mic != identity.listing_mic
+                or status.coverage_start > self.bars[0].interval_start
+                or status.coverage_end < self.bars[-1].interval_end):
+            raise ValueError("issue-specific trading status does not cover bars and identity")
         previous = None
         for expected, bar in enumerate(self.bars, 1):
             if (bar.sequence != expected or bar.instrument_id != identity.instrument_id
@@ -226,7 +257,7 @@ def append_forward_fact_event(
         raise ValueError("facts are not yet observable")
     package_ids = {
         facts.session.evidence_package_id, facts.identity.evidence_package_id,
-        facts.action_coverage.evidence_package_id,
+        facts.action_coverage.evidence_package_id, facts.trading_status.evidence_package_id,
         *(bar.evidence_package_id for bar in facts.bars),
     }
     supplied = {}
@@ -242,6 +273,7 @@ def append_forward_fact_event(
     _require_fields(supplied[facts.session.evidence_package_id], SESSION_FIELDS)
     _require_fields(supplied[facts.identity.evidence_package_id], IDENTITY_FIELDS)
     _require_fields(supplied[facts.action_coverage.evidence_package_id], ACTION_FIELDS)
+    _require_fields(supplied[facts.trading_status.evidence_package_id], TRADING_STATUS_FIELDS)
     for bar in facts.bars:
         _require_fields(supplied[bar.evidence_package_id], BAR_FIELDS)
         availability = supplied[bar.evidence_package_id].evidence.availability
@@ -251,7 +283,7 @@ def append_forward_fact_event(
 
     facts_json = facts.model_dump(mode="json")
     basis = {
-        "schema_version": "shadow-forward-fact-event-v1", "label": LABEL,
+        "schema_version": "shadow-forward-fact-event-v2", "label": LABEL,
         "event_type": "FORWARD_FACTS_ADMITTED", "scoring": "NOT SCORED",
         "execution_status": "NO TRIGGER OR FILL INFERENCE",
         "candidate_event_id": candidate_event["event_id"],
@@ -293,7 +325,7 @@ def audit_forward_fact_event(
         raise ValueError("fact bundle does not bind candidate event")
     package_ids = {
         facts.session.evidence_package_id, facts.identity.evidence_package_id,
-        facts.action_coverage.evidence_package_id,
+        facts.action_coverage.evidence_package_id, facts.trading_status.evidence_package_id,
         *(bar.evidence_package_id for bar in facts.bars),
     }
     supplied = {package.identity: package for package in fact_packages
@@ -301,7 +333,7 @@ def audit_forward_fact_event(
     if len(supplied) != len(fact_packages) or set(supplied) != package_ids:
         raise ValueError("fact evidence packages must match references exactly")
     basis = {
-        "schema_version": "shadow-forward-fact-event-v1", "label": LABEL,
+        "schema_version": "shadow-forward-fact-event-v2", "label": LABEL,
         "event_type": "FORWARD_FACTS_ADMITTED", "scoring": "NOT SCORED",
         "execution_status": "NO TRIGGER OR FILL INFERENCE",
         "candidate_event_id": candidate_event["event_id"],
@@ -334,6 +366,7 @@ def audit_forward_fact_event(
     _require_fields(supplied[facts.session.evidence_package_id], SESSION_FIELDS)
     _require_fields(supplied[facts.identity.evidence_package_id], IDENTITY_FIELDS)
     _require_fields(supplied[facts.action_coverage.evidence_package_id], ACTION_FIELDS)
+    _require_fields(supplied[facts.trading_status.evidence_package_id], TRADING_STATUS_FIELDS)
     for bar in facts.bars:
         _require_fields(supplied[bar.evidence_package_id], BAR_FIELDS)
         availability = supplied[bar.evidence_package_id].evidence.availability

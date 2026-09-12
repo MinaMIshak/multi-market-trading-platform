@@ -136,7 +136,7 @@ position, P&L or NAV.
 ### Forward fact admission
 
 `app.paper.shadow_facts` adds the canonical fact boundary required before trigger
-evaluation. One `shadow-forward-facts-v1` bundle binds an exact known candidate
+evaluation. One `shadow-forward-facts-v2` bundle binds an exact known candidate
 event to its open session, stable listing identity, complete corporate-action
 coverage through the session, and one or more final `RAW_UNADJUSTED` bars. Bars
 must start at the authenticated session open, use gap-free sequence and time
@@ -161,3 +161,19 @@ condition fired, resolve price ordering within a bar, create a fill or position,
 or update P&L/NAV. Source review remains a trusted attestation rather than
 cryptographic proof of source truth. The next milestone is a separate trigger
 evaluation event with conservative gap and same-bar ambiguity handling.
+
+
+Issue-specific tradability is mandatory independently of the exchange calendar,
+corporate actions and vendor price rows. `ForwardTradingStatusFact` requires an
+exact stable instrument and listing MIC, explicit UTC coverage bounds spanning
+all supplied bar intervals, and affirmative `TRADABLE` status backed by a reviewed
+package covering every trading-status field. Missing, UNKNOWN, HALTED or SUSPENDED
+status fails admission; neither positive volume nor a vendor row overrides it.
+Partial-session status cannot authorize bars beyond its coverage. An absence of
+halt notices alone does not establish affirmative complete coverage: source
+review must attest the issue-specific scope and reconcile conflicting evidence.
+Original rejected source bytes remain retained outside the repository.
+
+The fact bundle and event schemas are now v2. Prior v1 records are not upgraded
+or inferred to contain tradability evidence; reaccreditation requires authentic
+status evidence and a new event. This change does not infer any trigger or fill.

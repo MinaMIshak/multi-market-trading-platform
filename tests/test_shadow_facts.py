@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.paper import shadow_collection, shadow_facts, shadow_freeze, shadow_ledger
 from app.paper.shadow_facts import (
-    ACTION_FIELDS, BAR_FIELDS, IDENTITY_FIELDS, SESSION_FIELDS, ForwardActionCoverage,
+    TRADING_STATUS_FIELDS, ForwardTradingStatusFact, ACTION_FIELDS, BAR_FIELDS, IDENTITY_FIELDS, SESSION_FIELDS, ForwardActionCoverage,
     ForwardFactBundle, ForwardIdentityFact, ForwardRawBar, ForwardSessionFact,
 )
 from app.paper.shadow_records import ShadowEvidenceReference
@@ -32,7 +32,7 @@ def prepared(tmp_path, monkeypatch):
         available_at=available,
     )
     fact_package = package("c", reference, tuple(
-        SESSION_FIELDS | IDENTITY_FIELDS | ACTION_FIELDS | BAR_FIELDS
+        SESSION_FIELDS | IDENTITY_FIELDS | ACTION_FIELDS | BAR_FIELDS | TRADING_STATUS_FIELDS
     ))
     facts = ForwardFactBundle(
         record_id=item.record_id, candidate_id=item.candidates[0].candidate_id,
@@ -50,6 +50,11 @@ def prepared(tmp_path, monkeypatch):
             instrument_id=item.candidates[0].instrument_id,
             coverage_from=item.session.market_date, coverage_through=item.session.market_date,
             status="COMPLETE", actions=(), evidence_package_id=fact_package.identity,
+        ),
+        trading_status=ForwardTradingStatusFact(
+            instrument_id=item.candidates[0].instrument_id, listing_mic="XNYS",
+            coverage_start=start, coverage_end=start + timedelta(minutes=5),
+            trading_status="TRADABLE", evidence_package_id=fact_package.identity,
         ),
         bars=(ForwardRawBar(
             instrument_id=item.candidates[0].instrument_id, ticker="IBM",
@@ -116,6 +121,7 @@ def test_rejects_authenticated_package_with_insufficient_semantic_scope(tmp_path
     )
     insufficient = package("d", reference)
     changed = facts.model_copy(update={
+        "trading_status": facts.trading_status.model_copy(update={"evidence_package_id": insufficient.identity}),
         "session": facts.session.model_copy(update={"evidence_package_id": insufficient.identity}),
         "identity": facts.identity.model_copy(update={"evidence_package_id": insufficient.identity}),
         "action_coverage": facts.action_coverage.model_copy(
@@ -165,3 +171,66 @@ def test_bundle_rejects_non_opening_origin_and_incomplete_actions(tmp_path, monk
         ForwardActionCoverage(**(facts.action_coverage.model_dump(mode="python") | {
             "status": "UNKNOWN",
         }))
+
+
+@pytest.mark.parametrize("status", ["SUSPENDED", "HALTED", "UNKNOWN"])
+def test_vendor_bar_cannot_override_issue_status(tmp_path, monkeypatch, status):
+    _, _, facts, _, _ = prepared(tmp_path, monkeypatch)
+    values = facts.model_dump(mode="python")
+    values["trading_status"]["trading_status"] = status
+    with pytest.raises(ValidationError, match="TRADABLE"):
+        ForwardFactBundle(**values)
+
+
+def test_missing_issue_status_is_not_inferred(tmp_path, monkeypatch):
+    _, _, facts, _, _ = prepared(tmp_path, monkeypatch)
+    values = facts.model_dump(mode="python")
+    del values["trading_status"]
+    with pytest.raises(ValidationError, match="Field required"):
+        ForwardFactBundle(**values)
+
+
+@pytest.mark.parametrize("change", [
+    {"listing_mic": "XNAS"},
+    {"instrument_id": "00000000-0000-0000-0000-000000000099"},
+    {"coverage_start": "late"},
+    {"coverage_end": "early"},
+])
+def test_issue_status_must_cover_exact_identity_and_bar_interval(tmp_path, monkeypatch, change):
+    _, _, facts, _, _ = prepared(tmp_path, monkeypatch)
+    if change.get("coverage_start") == "late":
+        change = {"coverage_start": facts.bars[0].interval_start + timedelta(seconds=1)}
+    if change.get("coverage_end") == "early":
+        change = {"coverage_end": facts.bars[0].interval_end - timedelta(seconds=1)}
+    values = facts.model_dump(mode="python")
+    values["trading_status"].update(change)
+    with pytest.raises(ValidationError, match="issue-specific trading status"):
+        ForwardFactBundle(**values)
+
+
+def test_status_scope_required_on_append_and_audit(tmp_path, monkeypatch):
+    item, packages, facts, _, available = prepared(tmp_path, monkeypatch)
+    reference = ShadowEvidenceReference(
+        evidence_id="d" * 64, source_authority="official fixture authority",
+        source_locator="fixture://no-issue-status", artifact_sha256="d" * 64,
+        available_at=available,
+    )
+    incomplete = package("d", reference, tuple(
+        SESSION_FIELDS | IDENTITY_FIELDS | ACTION_FIELDS | BAR_FIELDS
+    ))
+    values = facts.model_dump(mode="python")
+    for role in ("session", "identity", "action_coverage", "trading_status"):
+        values[role]["evidence_package_id"] = incomplete.identity
+    for bar in values["bars"]:
+        bar["evidence_package_id"] = incomplete.identity
+    changed = ForwardFactBundle(**values)
+    monkeypatch.setattr(shadow_facts, "_now", lambda: available + timedelta(minutes=1))
+    with pytest.raises(ValueError, match="required fact fields"):
+        shadow_facts.append_forward_fact_event(tmp_path, item, packages, changed, (incomplete,))
+    # Emulate an older writer that omitted the new scope gate; the reader must reject it.
+    original = shadow_facts._require_fields
+    monkeypatch.setattr(shadow_facts, "_require_fields", lambda *args: None)
+    shadow_facts.append_forward_fact_event(tmp_path, item, packages, changed, (incomplete,))
+    monkeypatch.setattr(shadow_facts, "_require_fields", original)
+    with pytest.raises(ValueError, match="required fact fields"):
+        shadow_facts.audit_forward_fact_event(tmp_path, item, packages, changed, (incomplete,))
