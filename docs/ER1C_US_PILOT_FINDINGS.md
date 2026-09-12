@@ -305,3 +305,12 @@ executable bar. It does not establish a complete listing-change ledger or
 exact-date universe, and its current receipt does not prove historical
 pre-decision availability. Canonical US5A and overall PIT admission remain
 **NO-GO**.
+
+The submission auditor now binds each artifact to its exact retained SEC
+accession URL and requires a valid explicit UTC receipt no later than audit
+time, plus the acquired plain-text content type. Rehashed manifests with wrong
+sources, malformed/naive/future receipts, or unexpected media types fail closed.
+These metadata checks do not authenticate a claimed retrieval independently or
+prove historical availability; the original bytes and independent source review
+remain necessary. The unchanged authentic probe passes; 23 focused and
+listing-index dependency tests pass. No new acquisition was performed.

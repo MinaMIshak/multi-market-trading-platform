@@ -2,8 +2,32 @@
 from __future__ import annotations
 import argparse, hashlib, html, json, re
 from pathlib import Path
+from datetime import datetime, timezone
 
-EXPECTED_FILES = {"twitter_20220418_8a12b_submission.txt", "twitter_20221028_25nse_submission.txt"}
+EXPECTED_SOURCES = {
+    "twitter_20220418_8a12b_submission.txt": "https://www.sec.gov/Archives/edgar/data/1418091/000119312522107480/0001193125-22-107480.txt?output=1",
+    "twitter_20221028_25nse_submission.txt": "https://www.sec.gov/Archives/edgar/data/1418091/000087666122000890/0000876661-22-000890.txt?output=1",
+}
+EXPECTED_FILES = set(EXPECTED_SOURCES)
+
+def _validate_provenance(record: dict) -> None:
+    # This bounded probe binds exact acquired locators, not arbitrary SEC pages.
+    if record["source_locator"] != EXPECTED_SOURCES[record["filename"]]:
+        raise ValueError("source locator mismatch")
+    receipt = record["receipt_utc"]
+    if not isinstance(receipt, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", receipt
+    ):
+        raise ValueError("receipt must be an explicit UTC timestamp")
+    try:
+        parsed = datetime.fromisoformat(receipt.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("invalid receipt timestamp") from exc
+    if parsed > datetime.now(timezone.utc):
+        raise ValueError("receipt timestamp is in the future")
+    if record["content_type"] != "text/plain":
+        raise ValueError("unexpected submission content type")
+
 def _sha256(payload: bytes) -> str: return hashlib.sha256(payload).hexdigest()
 def _plain(payload: bytes) -> str: return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(payload.decode("latin-1")))).strip()
 
@@ -20,6 +44,7 @@ def _load(root: Path) -> dict[str, bytes]:
         filename = record["filename"]
         if filename in payloads or filename not in EXPECTED_FILES: raise ValueError("unexpected or duplicate evidence filename")
         if record["http_status"] != 200 or record["historical_availability_proven"] is not False: raise ValueError("invalid retrieval or availability classification")
+        _validate_provenance(record)
         payload = (root / filename).read_bytes()
         if record["bytes"] != len(payload) or record["sha256"] != _sha256(payload): raise ValueError(f"artifact integrity mismatch: {filename}")
         payloads[filename] = payload
