@@ -175,14 +175,22 @@ dates cannot be substituted for effective ex-dates, and a payable date is not
 proof that payment occurred. Current 2026 receipt of pages dated in 2022 also
 does not prove their historical availability. No receipt is backdated.
 
-Two positive issuer notices are not complete bounded action coverage for April 1
-through November 4. They provide no negative evidence for other action types or
-events. Canonical US4 and overall PIT admission therefore remain **NO-GO**.
-The next action probe should seek free official ex-date evidence and a source
-capable of establishing complete bounded coverage, while keeping each date role
-separate.
+IBM's official cash-dividend history is also retained. It identifies dividends
+429 and 430 as actual USD 1.65 per-share payments, with the same record and
+payable dates. This resolves actual payment for those two distributions only;
+the page still provides no ex-date. A separate official IBM stock-history page
+states that IBM's last stock split occurred in 1999 and its last stock-dividend
+distribution occurred in 1967. That is issuer-level negative evidence for those
+two action categories during the pilot interval.
 
-Verification: 89 focused audit tests passed; the authentic retained bundle audit
-completed successfully with seven verified public artifacts and PIT NO_GO. Two
-free official IBM pages were acquired; no paid or limited API was called, and
-the frozen declaration was unchanged.
+The current pages do not prove their content was available at a historical
+decision cutoff. Cash-dividend and split histories also cannot establish that
+mergers, spinoffs, rights, symbol changes, delistings, or other action categories
+are empty. Canonical US4 and overall PIT admission therefore remain **NO-GO**.
+The next action probe should seek free official ex-date evidence and complete
+bounded coverage across every mandatory action type.
+
+Verification: 94 focused audit tests passed; the authentic retained bundle audit
+completed successfully with nine verified public artifacts and PIT NO_GO. Two
+additional free official IBM pages were acquired; no paid or limited API was
+called, and the frozen declaration was unchanged.

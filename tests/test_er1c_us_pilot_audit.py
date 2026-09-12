@@ -10,6 +10,8 @@ from tools.audit_er1c_us_pilot import (
     inspect_ibm_submission,
     inspect_ibm_dividend_scope,
     inspect_ibm_dividend_notice,
+    inspect_ibm_cash_dividend_history,
+    inspect_ibm_stock_split_history,
     inspect_ibm_2022q2_filing,
     inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
@@ -460,3 +462,76 @@ def test_ibm_dividend_notice_rejects_locator_or_changed_terms():
         inspect_ibm_dividend_notice(
             payload.replace(b"$1.65", b"$1.66"), filename, url
         )
+
+
+def ibm_cash_dividend_history():
+    return """<html><body>
+    Cash Dividends (2020 – present)
+    The cash dividend rate per share is the actual amount paid per share.
+    No adjustments were made for stock splits.
+    430 USD 1.65 09/10/22 08/10/22
+    429 USD 1.65 06/10/22 05/10/22
+    </body></html>""".encode()
+
+
+def ibm_stock_split_history():
+    return """<html><body>
+    The last IBM stock split occurred in 1999 and the last stock dividend
+    distribution occurred in 1967.
+    </body></html>""".encode()
+
+
+def test_ibm_payment_history_confirms_payments_but_not_ex_dates_or_us4():
+    result = inspect_ibm_cash_dividend_history(
+        ibm_cash_dividend_history(),
+        "https://www.ibm.com/investor/governance/ibm-cash-dividends",
+    )
+
+    assert [payment["dividend_number"] for payment in result["payments"]] == [429, 430]
+    assert result["actual_payment_history_corroborated"] is True
+    assert result["ex_dates_evidenced"] is False
+    assert result["canonical_us4_action_coverage"] == "NO_GO"
+
+
+@pytest.mark.parametrize(
+    "payload_value, url, message",
+    [
+        (
+            ibm_cash_dividend_history().replace(b"429 USD 1.65", b"429 USD 9.99"),
+            "https://www.ibm.com/investor/governance/ibm-cash-dividends",
+            "anchors missing",
+        ),
+        (
+            ibm_cash_dividend_history(),
+            "https://www.ibm.com/investor/governance/changed",
+            "source locator mismatch",
+        ),
+    ],
+)
+def test_ibm_payment_history_rejects_changed_terms_or_locator(
+    payload_value, url, message
+):
+    with pytest.raises(ValueError, match=message):
+        inspect_ibm_cash_dividend_history(payload_value, url)
+
+
+def test_ibm_split_history_scopes_negative_evidence_to_two_action_types():
+    result = inspect_ibm_stock_split_history(
+        ibm_stock_split_history(),
+        "https://www.ibm.com/investor/help/ibm-stock-splits-and-ibm-stock-dividends",
+    )
+
+    assert result["last_stock_split_year"] == 1999
+    assert result["last_stock_dividend_year"] == 1967
+    assert result["no_split_or_stock_dividend_during_pilot_corroborated"] is True
+    assert result["canonical_us4_action_coverage"] == "NO_GO"
+
+
+def test_ibm_split_history_rejects_changed_statement_or_locator():
+    url = "https://www.ibm.com/investor/help/ibm-stock-splits-and-ibm-stock-dividends"
+    with pytest.raises(ValueError, match="statement missing"):
+        inspect_ibm_stock_split_history(
+            ibm_stock_split_history().replace(b"1999", b"2000"), url
+        )
+    with pytest.raises(ValueError, match="source locator mismatch"):
+        inspect_ibm_stock_split_history(ibm_stock_split_history(), url + "?changed=1")

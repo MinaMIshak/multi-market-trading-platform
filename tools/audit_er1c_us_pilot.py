@@ -73,6 +73,14 @@ TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
 TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
 IBM_SUBMISSIONS_FILENAME = "sec_ibm_submissions.json"
 IBM_2022Q2_10Q_FILENAME = "sec_ibm_2022q2_10q.html"
+IBM_CASH_DIVIDEND_HISTORY_FILENAME = "ibm_cash_dividend_history.html"
+IBM_CASH_DIVIDEND_HISTORY_URL = (
+    "https://www.ibm.com/investor/governance/ibm-cash-dividends"
+)
+IBM_STOCK_SPLIT_HISTORY_FILENAME = "ibm_stock_split_history.html"
+IBM_STOCK_SPLIT_HISTORY_URL = (
+    "https://www.ibm.com/investor/help/ibm-stock-splits-and-ibm-stock-dividends"
+)
 IBM_DIVIDEND_NOTICE_SPECS = {
     "ibm_2022-04-26_dividend_notice.html": {
         "source_url": "https://newsroom.ibm.com/2022-04-26-IBM-BOARD-APPROVES-INCREASE-IN-QUARTERLY-CASH-DIVIDEND-FOR-THE-27th-CONSECUTIVE-YEAR",
@@ -329,6 +337,82 @@ def inspect_ibm_dividend_notice(
             "record and payable dates do not establish an ex-date or actual payment",
             "matching vendor amount does not independently corroborate its ex-date",
             "two issuer notices do not establish complete bounded actions or empty coverage",
+            "approved human review bindings are absent",
+        ],
+    }
+
+
+def inspect_ibm_cash_dividend_history(
+    payload: bytes, source_url: str
+) -> dict[str, Any]:
+    """Qualify IBM's current payment history without inventing ex-dates."""
+    if source_url != IBM_CASH_DIVIDEND_HISTORY_URL:
+        raise ValueError("IBM cash-dividend history source locator mismatch")
+    history = normalized_html_text(payload, "IBM cash-dividend history")
+    anchors = {
+        "Cash Dividends (2020 – present)",
+        "The cash dividend rate per share is the actual amount paid per share.",
+        "No adjustments were made for stock splits.",
+        "430 USD 1.65 09/10/22 08/10/22",
+        "429 USD 1.65 06/10/22 05/10/22",
+    }
+    missing = sorted(anchor for anchor in anchors if anchor not in history)
+    if missing:
+        raise ValueError(f"IBM cash-dividend history anchors missing: {missing}")
+    return {
+        "symbol": "IBM",
+        "source_file": IBM_CASH_DIVIDEND_HISTORY_FILENAME,
+        "source_locator": source_url,
+        "payments": [
+            {
+                "dividend_number": 429,
+                "actual_amount_usd_per_share": 1.65,
+                "payable_date": "2022-06-10",
+                "record_date": "2022-05-10",
+            },
+            {
+                "dividend_number": 430,
+                "actual_amount_usd_per_share": 1.65,
+                "payable_date": "2022-09-10",
+                "record_date": "2022-08-10",
+            },
+        ],
+        "actual_payment_history_corroborated": True,
+        "ex_dates_evidenced": False,
+        "complete_bounded_action_coverage": False,
+        "canonical_us4_action_coverage": "NO_GO",
+        "limitations": [
+            "the current page does not prove its content was historically available",
+            "the page states record and payable dates but not ex-dates",
+            "cash-dividend history does not cover every required corporate-action type",
+            "approved human review bindings are absent",
+        ],
+    }
+
+
+def inspect_ibm_stock_split_history(payload: bytes, source_url: str) -> dict[str, Any]:
+    """Qualify IBM's issuer statement about its last split and stock dividend."""
+    if source_url != IBM_STOCK_SPLIT_HISTORY_URL:
+        raise ValueError("IBM stock-split history source locator mismatch")
+    history = normalized_html_text(payload, "IBM stock-split history")
+    statement = (
+        "The last IBM stock split occurred in 1999 and the last stock dividend "
+        "distribution occurred in 1967."
+    )
+    if statement not in history:
+        raise ValueError("IBM stock-split history statement missing or changed")
+    return {
+        "symbol": "IBM",
+        "source_file": IBM_STOCK_SPLIT_HISTORY_FILENAME,
+        "source_locator": source_url,
+        "last_stock_split_year": 1999,
+        "last_stock_dividend_year": 1967,
+        "no_split_or_stock_dividend_during_pilot_corroborated": True,
+        "complete_bounded_action_coverage": False,
+        "canonical_us4_action_coverage": "NO_GO",
+        "limitations": [
+            "the current page does not prove its content was historically available",
+            "the issuer statement covers splits and stock dividends only",
             "approved human review bindings are absent",
         ],
     }
@@ -749,6 +833,18 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         )
         for filename in sorted(IBM_DIVIDEND_NOTICE_SPECS)
     ]
+    if IBM_CASH_DIVIDEND_HISTORY_FILENAME not in evidence_payloads:
+        raise ValueError("retained IBM cash-dividend history is absent")
+    cash_dividend_history = inspect_ibm_cash_dividend_history(
+        evidence_payloads[IBM_CASH_DIVIDEND_HISTORY_FILENAME],
+        evidence_source_urls[IBM_CASH_DIVIDEND_HISTORY_FILENAME],
+    )
+    if IBM_STOCK_SPLIT_HISTORY_FILENAME not in evidence_payloads:
+        raise ValueError("retained IBM stock-split history is absent")
+    stock_split_history = inspect_ibm_stock_split_history(
+        evidence_payloads[IBM_STOCK_SPLIT_HISTORY_FILENAME],
+        evidence_source_urls[IBM_STOCK_SPLIT_HISTORY_FILENAME],
+    )
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -768,6 +864,8 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
             evidence_payloads[IBM_2022Q2_10Q_FILENAME]
         ),
         "ibm_dividend_notice_scopes": dividend_notices,
+        "ibm_cash_dividend_history_scope": cash_dividend_history,
+        "ibm_stock_split_history_scope": stock_split_history,
         "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
