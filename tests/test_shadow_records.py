@@ -33,6 +33,7 @@ def candidate(**changes):
         identity_status="KNOWN", instrument_id=UUID(int=1), ticker="IBM",
         thesis="artificial fixture thesis", context=("fixture context",),
         technical_setup="fixture setup", entry_condition="fixture condition",
+        entry_rule="LONG_ENTRY_ZONE_TOUCH_V1",
         entry_low=Decimal("100"), entry_high=Decimal("101"), stop=Decimal("95"),
         targets=(Decimal("110"), Decimal("115")),
         expected_holding_window="NOT_YET_VALIDATED", confidence="EXPERIMENTAL",

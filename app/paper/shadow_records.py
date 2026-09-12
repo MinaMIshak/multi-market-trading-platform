@@ -79,6 +79,7 @@ class ShadowCandidate(ShadowRecordModel):
     context: tuple[str, ...]
     technical_setup: str = Field(pattern=NONBLANK_PATTERN)
     entry_condition: str = Field(pattern=NONBLANK_PATTERN)
+    entry_rule: Literal["LONG_ENTRY_ZONE_TOUCH_V1"]
     entry_low: Decimal | None = Field(default=None, gt=0)
     entry_high: Decimal | None = Field(default=None, gt=0)
     stop: Decimal | None = Field(default=None, gt=0)
@@ -131,7 +132,7 @@ class ShadowCandidate(ShadowRecordModel):
 
 
 class ShadowWatchlist(ShadowRecordModel):
-    schema_version: Literal["shadow-watchlist-v1"] = "shadow-watchlist-v1"
+    schema_version: Literal["shadow-watchlist-v2"] = "shadow-watchlist-v2"
     label: Literal["EXPERIMENTAL / PAPER ONLY"] = "EXPERIMENTAL / PAPER ONLY"
     record_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")
     generated_at: datetime

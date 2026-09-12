@@ -29,7 +29,7 @@ its existence alone never proves successful completion before the cutoff.
 
 ## Next admission milestone
 
-`app.paper.shadow_records` now supplies a strict `shadow-watchlist-v1` document
+`app.paper.shadow_records` now supplies a strict `shadow-watchlist-v2` document
 and `freeze_watchlist` collector boundary. It requires exact UTC generation,
 information and independently supplied session/cutoff clocks; canonical market
 and MIC pairing; original-artifact hashes, locators, authority and availability;
@@ -177,3 +177,31 @@ Original rejected source bytes remain retained outside the repository.
 The fact bundle and event schemas are now v2. Prior v1 records are not upgraded
 or inferred to contain tradability evidence; reaccreditation requires authentic
 status evidence and a new event. This change does not infer any trigger or fill.
+
+### Trigger evaluation
+
+`app.paper.shadow_triggers` consumes only an audited v2 forward-fact event and the
+exact completed watchlist and evidence packages that produced it. It evaluates
+the predeclared `LONG_ENTRY_ZONE_TOUCH_V1` rule in opening-origin final bars and
+appends a separate content-addressed `shadow-trigger-event-v1`. The event remains
+**EXPERIMENTAL / PAPER ONLY — NOT SCORED** and explicitly creates no fill or
+position. Earlier v1 watchlists lack a machine-readable entry rule and cannot be
+upgraded or used for trigger evaluation.
+
+An open at or below the stop before entry is `INVALIDATED_OPEN_GAP`; an open at
+or above target 1 before entry is `TARGET_PASSED_OPEN_GAP`. Neither can become a
+later trigger. A bar whose range does not touch the entry zone is
+`NOT_TRIGGERED`. A zone touch records only a reference price (open when inside
+the zone, otherwise the first zone boundary implied by the open), never an exact
+intrabar time or executable fill. If that bar also spans both stop and target 1,
+the event is `TRIGGERED_AMBIGUOUS_BAR`; the same applies when an open below the
+entry zone leaves stop-before-entry versus stop-after-entry unknowable. No
+favorable path ordering is chosen, and later bars cannot resolve that ambiguity.
+
+Append and audit recompute the deterministic evaluation, bind the exact upstream
+fact-event ID and bytes hash, enforce fact availability and local UTC ordering,
+and reject duplicate/unexpected fields or changed content. These mechanics do
+not authenticate arbitrary source semantics or establish queues, participation,
+spread, slippage, costs, fills, positions, P&L or strategy edge. The next
+milestone must add a separately authenticated simulated-fill boundary and must
+refuse ambiguous trigger events.
