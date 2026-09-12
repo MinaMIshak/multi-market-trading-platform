@@ -48,10 +48,21 @@ upstream candidate-generation evidence before it can support a no-trade result.
 
 ## Remaining admission work
 
-Add an operational command that accepts only authenticated source/session
-packages, publishes a separate completion receipt before the cutoff, and records
-durable MISSED / NOT SCORED sessions after a cutoff passes. A caller-supplied
-session clock and source description remain insufficient.
+`app.paper.shadow_collection` is the operational collection boundary. It accepts
+only exact `HistoricalEvidencePackage` objects admitted by the existing PIT
+availability and approved-review gate. Every watchlist evidence ID must equal the
+package identity and its source locator and artifact SHA256 must bind the raw
+receipt. It freezes the structured watchlist and publishes a separate atomic
+`shadow-completion-v1` receipt before the cutoff. The receipt remains **NOT
+SCORED**; authentication and timely completion are prerequisites, not strategy,
+candidate, liquidity, execution or performance validation.
+
+After the cutoff, `record_missed_session` can preserve `MISSED / NOT SCORED` only
+for an authenticated session and only when the corresponding watchlist path does
+not exist. It cannot run early or overwrite a receipt. A watchlist left behind
+without a completion receipt after a failure is not complete and remains
+unscored. These local receipts are auditable integrity records, not independent
+timestamp attestations.
 
 Target collection dates are EGX 2026-09-13 and US 2026-09-14, as requested;
 these dates are not assertions that exchange sessions have been verified. If a
@@ -59,7 +70,7 @@ session starts without a valid durably frozen watchlist, record MISSED / NOT
 SCORED and proceed to the next eligible session. Never reconstruct earlier picks.
 No authentic watchlist has been frozen by this software milestone.
 
-Then add an auditable candidate/trigger/fill/position/exit ledger, conservative
+Next add an auditable candidate/trigger/fill/position/exit ledger, conservative
 execution admission using the existing simulators, normalized shared paper NAV,
 cost/FX-aware reporting and a daily view. Unknown mandatory truth blocks the
 affected claim. A preserved candidate alone is never a fill. Daily-bar ambiguity
