@@ -180,3 +180,75 @@ def record_missed_session(
         result.unlink()
         raise ValueError("clock rollback during missed-session publication")
     return result
+
+
+def audit_completed_watchlist(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    evidence_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Bind a completed collection to exact caller-supplied records and packages.
+
+    This read-only boundary grants no scoring or execution eligibility. Local
+    timestamps and hashes are integrity checks, not external attestations.
+    """
+    if type(watchlist) is not ShadowWatchlist:
+        raise ValueError("exact ShadowWatchlist required")
+    watchlist = ShadowWatchlist.model_validate(watchlist.model_dump(mode="python"))
+    directory = Path(directory)
+    path = directory / "watchlists" / f"{watchlist.record_id}.json"
+    # Reject ambiguous JSON rather than silently choosing a duplicate key.
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate completion field")
+            result[key] = value
+        return result
+
+    receipt = json.loads(
+        (directory / "receipts" / f"{watchlist.record_id}.json").read_bytes(),
+        object_pairs_hook=unique_object,
+    )
+    expected = {
+        "schema_version", "label", "status", "scoring", "record_id", "market",
+        "market_date", "decision_cutoff", "completed_at", "watchlist_sha256",
+        "document_sha256", "evidence_package_ids",
+    }
+    if type(receipt) is not dict or set(receipt) != expected:
+        raise ValueError("unexpected completion fields")
+    envelope = shadow_freeze.audit_document(path)
+    completed_at = shadow_freeze._utc(datetime.fromisoformat(receipt["completed_at"]))
+    received_at = shadow_freeze._utc(datetime.fromisoformat(envelope["received_at"]))
+    if not watchlist.generated_at <= received_at <= completed_at < watchlist.session.decision_cutoff:
+        raise ValueError("invalid completion clock ordering")
+    if completed_at > _now():
+        raise ValueError("future completion timestamp")
+    # Re-run review/receipt timing at freeze receipt, never at today's audit time.
+    _admit_packages(watchlist, evidence_packages, built_at=received_at)
+    document = json.dumps(
+        watchlist.model_dump(mode="json"), sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True, allow_nan=False,
+    ).encode("utf-8")
+    if (
+        bytes.fromhex(envelope["document_hex"]) != document
+        or envelope["record_id"] != watchlist.record_id
+        or envelope["market"] != watchlist.session.market
+        or envelope["information_cutoff"] != watchlist.information_cutoff.isoformat()
+        or envelope["decision_cutoff"] != watchlist.session.decision_cutoff.isoformat()
+    ):
+        raise ValueError("frozen document does not bind watchlist")
+    bound = {
+        "schema_version": "shadow-completion-v1", "label": LABEL,
+        "status": "FROZEN", "scoring": "NOT SCORED",
+        "record_id": watchlist.record_id, "market": watchlist.session.market,
+        "market_date": watchlist.session.market_date.isoformat(),
+        "decision_cutoff": watchlist.session.decision_cutoff.isoformat(),
+        "completed_at": completed_at.isoformat(),
+        "watchlist_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "document_sha256": hashlib.sha256(document).hexdigest(),
+        "evidence_package_ids": sorted(package.identity for package in evidence_packages),
+    }
+    if receipt != bound:
+        raise ValueError("completion receipt does not bind frozen collection")
+    return receipt

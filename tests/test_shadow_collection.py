@@ -191,3 +191,75 @@ def test_collector_revalidates_copied_watchlist_before_io(tmp_path, monkeypatch)
     with pytest.raises(ValueError):
         complete_watchlist(tmp_path, item, packages)
     assert not list(tmp_path.iterdir())
+
+
+def completed_fixture(tmp_path, monkeypatch):
+    item, packages = authenticated_watchlist()
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT)
+    monkeypatch.setattr(shadow_freeze, "_now", lambda: AT)
+    path = complete_watchlist(tmp_path, item, packages)
+    return item, packages, path
+
+
+def test_audit_completion_remains_unscored_and_read_only(tmp_path, monkeypatch):
+    item, packages, path = completed_fixture(tmp_path, monkeypatch)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    receipt = shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
+    assert receipt == json.loads(path.read_bytes())
+    assert receipt["scoring"] == "NOT SCORED"
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "MISSED"), ("scoring", "SCORED"), ("label", "LIVE READY"),
+    ("record_id", "another"), ("market", "EGX"), ("market_date", "2000-01-01"),
+    ("watchlist_sha256", "0" * 64), ("document_sha256", "0" * 64),
+    ("evidence_package_ids", []), ("decision_cutoff", AT.isoformat()),
+    ("completed_at", (AT - timedelta(seconds=1)).isoformat()),
+    ("completed_at", (AT + timedelta(days=1)).isoformat()),
+    ("extra", True),
+])
+def test_audit_rejects_receipt_tampering(tmp_path, monkeypatch, field, value):
+    item, packages, path = completed_fixture(tmp_path, monkeypatch)
+    receipt = json.loads(path.read_bytes())
+    receipt[field] = value
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError):
+        shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
+
+
+def test_audit_requires_completion_and_exact_document(tmp_path, monkeypatch):
+    item, packages, path = completed_fixture(tmp_path, monkeypatch)
+    altered = item.model_copy(update={"candidates": (
+        item.candidates[0].model_copy(update={"thesis": "changed thesis"}),
+    )})
+    with pytest.raises(ValueError, match="does not bind watchlist"):
+        shadow_collection.audit_completed_watchlist(tmp_path, altered, packages)
+    with pytest.raises(ValueError, match="match watchlist"):
+        shadow_collection.audit_completed_watchlist(tmp_path, item, packages[:1])
+    path.unlink()
+    with pytest.raises(FileNotFoundError):
+        shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
+
+
+def test_audit_rejects_duplicate_completion_keys(tmp_path, monkeypatch):
+    item, packages, path = completed_fixture(tmp_path, monkeypatch)
+    original = path.read_text()
+    path.write_text('{"status":"MISSED",' + original[1:])
+    with pytest.raises(ValueError, match="duplicate completion field"):
+        shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
+
+
+def test_audit_rechecks_evidence_at_freeze_time(tmp_path, monkeypatch):
+    item, packages, path = completed_fixture(tmp_path, monkeypatch)
+    calls = []
+    original = shadow_collection._admit_packages
+
+    def capture(watchlist, evidence_packages, *, built_at):
+        calls.append(built_at)
+        return original(watchlist, evidence_packages, built_at=built_at)
+
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT + timedelta(days=10))
+    monkeypatch.setattr(shadow_collection, "_admit_packages", capture)
+    shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
+    assert calls == [AT]

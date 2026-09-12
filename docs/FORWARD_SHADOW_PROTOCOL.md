@@ -89,3 +89,24 @@ Missed-session reasons are runtime restricted to `NO_TIMELY_WATCHLIST` and
 `COLLECTION_FAILED`; a type annotation alone does not enforce that restriction.
 These checks do not establish semantic session/identity/price truth from arbitrary
 reviewed artifacts. Canonical fact admission and execution gates remain required.
+
+### Completion audit boundary
+
+`audit_completed_watchlist` requires the caller's exact structured watchlist and
+historical evidence packages, reads the corresponding completion receipt and
+frozen envelope, and revalidates their bindings. It checks exact serialized
+watchlist bytes, both hashes, record/market/date/cutoffs, package identities and
+receipt status. Duplicate receipt keys and unexpected fields fail closed.
+Generation must precede or equal freeze receipt, which must precede or equal
+completion; completion must be strictly before cutoff and not in the future.
+Package receipt/review availability is rechecked at freeze receipt time, not the
+later audit clock. Missing completion receipts cannot pass this boundary.
+
+The returned receipt remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED**. The
+reader performs no writes, candidate admission, fill inference or NAV update.
+Use a trusted local directory without concurrent mutation during audit. Hashes
+and local clocks cannot establish independent timestamp attestation or semantic
+truth, nor rule out deliberate coordinated rewriting. A process crash after
+receipt publication but before its final clock check remains an operational
+attestation limitation. Canonical facts and auditable timing controls are still
+required before scoring. The next milestone is the append-only candidate ledger.
