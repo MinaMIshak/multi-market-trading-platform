@@ -255,3 +255,35 @@ removed-name completeness, stable listing identity, or historical availability
 at a decision cutoff. Canonical US5A and overall PIT admission remain
 **NO-GO**. The bounded files may serve as independent activity corroboration,
 but they must not be promoted into universe snapshots or execution volume.
+
+## Official SEC listing-ledger probe
+
+Official SEC guidance and the complete Q2, Q3 and Q4 2022 EDGAR form indexes
+were retained under
+`/home/egx-agent/research-data/er1c-us-pilot/sec-listing-ledger-probe-20260912`.
+The indexes enumerate 344, 416 and 780 Form 25-NSE rows respectively, and 225,
+226 and 205 Form 8-A12B rows (plus 13, 34 and 26 amendments). The Q4 index
+contains Twitter CIK `1418091` as a Form 25-NSE filed on 2022-10-28, binding the
+already retained removal submission to the complete quarterly filing index.
+The Q2 index also contains a Twitter Form 8-A12B filed on 2022-04-18; its form
+type alone does not identify the registered security class.
+
+This establishes a reproducible SEC filing-discovery boundary, not a listing
+ledger. SEC states that exchange delistings have been filed through EDGAR on
+Form 25-NSE since April 24, 2006. A Form 25-NSE records removal from listing and
+registration; it does not enumerate all listed securities or establish the
+last trading session. Form 8-A12B records Section 12(b) registration but does
+not by itself establish initial trading, common-stock eligibility, or that the
+venue was XNYS. The form index also omits exchange and security-class fields,
+so each candidate filing needs submission-level inspection. SEC separately
+states that its periodically updated ticker/exchange association files have no
+guaranteed accuracy or scope, preventing their use as a historical roster.
+
+The retained quarterly indexes are authentic complete index editions within
+their stated dissemination scope, but their current 2026 receipt does not prove
+historical pre-decision availability. They cannot reconstruct the opening
+roster, daily changes, ticker reuse, transfers, trading suspensions, or every
+session's eligibility. A mechanically complete XNYS additions/removals ledger,
+canonical US5A, and overall PIT admission therefore remain **NO-GO**. The
+offline auditor preserves this classification and fails on altered editions,
+bytes, inventory, availability claims, or the known Twitter index row.
