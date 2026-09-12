@@ -29,14 +29,29 @@ its existence alone never proves successful completion before the cutoff.
 
 ## Next admission milestone
 
-Add a validated recommendation/session record and collector command. Each
-candidate must retain market, stable identity when known, symbol, generated and
-frozen clocks, information cutoff, BUY_CANDIDATE/WATCH/AVOID, thesis/context,
-technical setup, entry condition/zone, stop, targets, holding window,
-experimental confidence, liquidity checks, paper-risk size and source bindings.
-Unsupported probabilities and holding-time estimates remain UNKNOWN / NOT YET
-VALIDATED. Verify evidence availability before the information cutoff; prove
-session cutoffs independently. A caller-supplied session clock is insufficient.
+`app.paper.shadow_records` now supplies a strict `shadow-watchlist-v1` document
+and `freeze_watchlist` collector boundary. It requires exact UTC generation,
+information and independently supplied session/cutoff clocks; canonical market
+and MIC pairing; original-artifact hashes, locators, authority and availability;
+exact evidence use; explicit stable-identity status; and complete candidate
+context. BUY_CANDIDATE records require coherent long entry/stop/targets, passed
+liquidity, approved paper risk and a positive hypothetical quantity. WATCH and
+AVOID cannot reserve a quantity. Probability and holding window are fixed to
+`NOT_YET_VALIDATED`, and confidence remains `EXPERIMENTAL`.
+
+The structured collector validates and deterministically serializes the record,
+then delegates to the same immutable freeze primitive. It does not authenticate
+the asserted source or session evidence and cannot make a record scoreable by
+itself. Every resulting envelope remains **UNADMITTED / NOT SCORED**. An empty
+candidate tuple is retained as an explicit frozen watchlist, but needs authentic
+upstream candidate-generation evidence before it can support a no-trade result.
+
+## Remaining admission work
+
+Add an operational command that accepts only authenticated source/session
+packages, publishes a separate completion receipt before the cutoff, and records
+durable MISSED / NOT SCORED sessions after a cutoff passes. A caller-supplied
+session clock and source description remain insufficient.
 
 Target collection dates are EGX 2026-09-13 and US 2026-09-14, as requested;
 these dates are not assertions that exchange sessions have been verified. If a
