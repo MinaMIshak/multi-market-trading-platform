@@ -31,6 +31,26 @@ def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def verify_sha256_sidecar(payload: bytes, sidecar: bytes, filename: str) -> str:
+    """Verify a conventional SHA256 sidecar without trusting its label."""
+    try:
+        line = sidecar.decode("ascii").strip()
+    except UnicodeDecodeError as error:
+        raise ValueError(f"invalid SHA256 sidecar: {filename}") from error
+    fields = line.split()
+    digest = sha256_bytes(payload)
+    if len(fields) != 2 or fields[0] != digest:
+        raise ValueError(f"SHA256 sidecar mismatch: {filename}")
+    return digest
+
+
+def verify_predeclaration(payload: bytes, expected_sha256: str) -> str:
+    digest = sha256_bytes(payload)
+    if digest != expected_sha256:
+        raise ValueError("frozen predeclaration SHA256 mismatch")
+    return digest
+
+
 def market_date(value: str) -> date:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.time().isoformat() != "00:00:00":
@@ -89,9 +109,17 @@ def audit_rows(payload: bytes, start: date, end: date) -> dict[str, Any]:
     }
 
 
-def audit_bundle(bundle: Path) -> dict[str, Any]:
+def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     manifest_payload = (bundle / "manifest.json").read_bytes()
+    manifest_sha256 = verify_sha256_sidecar(
+        manifest_payload,
+        (bundle / "manifest.sha256").read_bytes(),
+        "manifest.sha256",
+    )
     manifest = json.loads(manifest_payload)
+    predeclaration_sha256 = verify_predeclaration(
+        predeclaration.read_bytes(), manifest["predeclaration_sha256"]
+    )
     results: dict[str, Any] = {}
     for request in manifest["requests"]:
         raw_path = bundle / request["raw_file"]
@@ -113,6 +141,11 @@ def audit_bundle(bundle: Path) -> dict[str, Any]:
 
     evidence_manifest_path = bundle / "evidence" / "evidence_manifest.json"
     evidence_manifest_payload = evidence_manifest_path.read_bytes()
+    evidence_manifest_sha256 = verify_sha256_sidecar(
+        evidence_manifest_payload,
+        (evidence_manifest_path.parent / "evidence_manifest.sha256").read_bytes(),
+        "evidence_manifest.sha256",
+    )
     evidence_manifest = json.loads(evidence_manifest_payload)
     evidence_results = []
     for record in evidence_manifest["records"]:
@@ -135,11 +168,12 @@ def audit_bundle(bundle: Path) -> dict[str, Any]:
     return {
         "schema_version": "er1c-offline-audit-v1",
         "bundle": str(bundle),
-        "manifest_sha256": sha256_bytes(manifest_payload),
+        "manifest_sha256": manifest_sha256,
         "predeclaration_commit": manifest["predeclaration_commit"],
-        "predeclaration_sha256": manifest["predeclaration_sha256"],
+        "predeclaration_sha256": predeclaration_sha256,
+        "frozen_predeclaration_verified": True,
         "prices": results,
-        "public_evidence_manifest_sha256": sha256_bytes(evidence_manifest_payload),
+        "public_evidence_manifest_sha256": evidence_manifest_sha256,
         "public_evidence": evidence_results,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
@@ -156,8 +190,18 @@ def audit_bundle(bundle: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("bundle", type=Path)
+    parser.add_argument(
+        "--predeclaration",
+        type=Path,
+        default=Path("docs/ER1C_US_PILOT_PREDECLARATION.md"),
+        help="frozen declaration whose bytes must match the acquisition manifest",
+    )
     args = parser.parse_args()
-    print(json.dumps(audit_bundle(args.bundle), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            audit_bundle(args.bundle, args.predeclaration), indent=2, sort_keys=True
+        )
+    )
 
 
 if __name__ == "__main__":
