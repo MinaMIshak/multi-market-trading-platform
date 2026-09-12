@@ -1,10 +1,12 @@
 import json
+import zlib
 from datetime import date
 
 import pytest
 
 from tools.audit_er1c_us_pilot import (
     audit_rows,
+    inspect_nyse_2022_calendar,
     sha256_bytes,
     validate_acquisition_manifest,
     validate_evidence_manifest,
@@ -75,6 +77,23 @@ def evidence_manifest():
     }
 
 
+def calendar_pdf(*, text=None):
+    content = text or "\n".join([
+        "2022 TRADING CALENDAR",
+        "Exchange Holiday  -  Market Closed",
+        "Early Market Close at 1pm eastern",
+        "Dates are correct as of Dec. 13 2021 but are subject to change.",
+    ])
+    operators = " ".join(f"({line}) Tj" for line in content.splitlines()).encode()
+    stream = zlib.compress(b"BT " + operators + b" ET")
+    return (
+        b"%PDF-1.7\n<</Type/Pages/Count 1>>\n"
+        b"<</CreationDate(D:20211213173946-05'00')>>\nstream\n"
+        + stream
+        + b"\nendstream\n%%EOF"
+    )
+
+
 def test_audit_reports_zero_volume_without_interpreting_market_state():
     result = audit_rows(
         payload(row(volume=0)), date(2022, 4, 1), date(2022, 11, 4)
@@ -136,6 +155,22 @@ def test_manifest_metadata_and_request_identity_are_validated():
     assert validate_acquisition_manifest(manifest) == manifest["requests"]
     evidence = evidence_manifest()
     assert validate_evidence_manifest(evidence) == evidence["records"]
+
+
+def test_nyse_calendar_is_scoped_as_corroboration_not_us2_session_evidence():
+    result = inspect_nyse_2022_calendar(calendar_pdf())
+
+    assert result["pdf_creation_date"] == "20211213173946-05'00'"
+    assert result["states_dates_subject_to_change"] is True
+    assert result["canonical_us2_session_evidence"] == "NO_GO"
+    assert "exact UTC open and close clocks" in result["limitations"][-1]
+
+
+def test_nyse_calendar_missing_scope_disclaimer_fails_closed():
+    incomplete = calendar_pdf(text="2022 TRADING CALENDAR")
+
+    with pytest.raises(ValueError, match="content anchors missing"):
+        inspect_nyse_2022_calendar(incomplete)
 
 
 @pytest.mark.parametrize(

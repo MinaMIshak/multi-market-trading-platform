@@ -68,6 +68,21 @@ this incomplete package. The next defensible acquisition step is to seek free,
 dated authoritative evidence for those missing boundaries without redownloading
 the unchanged retained artifacts.
 
+## NYSE calendar scope qualification
+
+The retained official NYSE PDF is a one-page `2022 TRADING CALENDAR`, created
+on 2021-12-13. Its legend identifies exchange holidays as market closed and
+identifies an early market close as 1 p.m. Eastern. The document also states
+that its dates were correct as of 2021-12-13 but subject to change.
+
+This artifact is useful official corroboration for the marked calendar events,
+but it is not a complete US2 package. It does not bind each calendar date to
+the declared XNYS MIC, state the regular session open, or supply exact UTC open
+and close clocks for each open date. Its own change disclaimer also prevents
+the retained edition from proving that no later revision applied. The audit
+therefore reports `canonical_us2_session_evidence: NO_GO` and continues to list
+every-calendar-date evidenced XNYS session records as an admission blocker.
+
 ## Reproduction
 
 Run the offline audit with the authorized shared environment:

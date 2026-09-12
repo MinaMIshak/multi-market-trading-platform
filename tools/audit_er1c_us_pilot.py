@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
+import zlib
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -62,6 +64,14 @@ EVIDENCE_RECORD_FIELDS = {
     "retrieval_started_at_utc",
     "sha256",
     "source_url",
+}
+
+NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
+NYSE_CALENDAR_TEXT_ANCHORS = {
+    "2022 TRADING CALENDAR",
+    "Exchange Holiday  -  Market Closed",
+    "Early Market Close at 1pm eastern",
+    "Dates are correct as of Dec. 13 2021 but are subject to change.",
 }
 
 
@@ -199,6 +209,56 @@ def validate_evidence_manifest(manifest: Any) -> list[dict[str, Any]]:
     return manifest["records"]
 
 
+def inspect_nyse_2022_calendar(payload: bytes) -> dict[str, Any]:
+    """Scope the retained NYSE calendar without treating it as US2 evidence."""
+    if not payload.startswith(b"%PDF-"):
+        raise ValueError("NYSE calendar is not a PDF")
+    page_count = re.search(rb"/Type/Pages/Count\s+(\d+)", payload)
+    creation = re.search(rb"/CreationDate\(D:(\d{14}[+-]\d{2}'\d{2}')\)", payload)
+    if page_count is None or int(page_count.group(1)) != 1 or creation is None:
+        raise ValueError("NYSE calendar PDF structure mismatch")
+
+    text_fragments: list[str] = []
+    for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", payload, re.DOTALL):
+        try:
+            stream = zlib.decompress(match.group(1))
+        except zlib.error:
+            continue
+        for block in re.findall(rb"BT(.*?)ET", stream, re.DOTALL):
+            strings = re.findall(rb"\((?:\\.|[^\\)])*\)", block)
+            if strings:
+                text_fragments.append(
+                    "".join(
+                        re.sub(rb"\\([()\\])", rb"\1", value[1:-1]).decode(
+                            "latin1", "replace"
+                        )
+                        for value in strings
+                    )
+                )
+    extracted_text = "\n".join(text_fragments)
+    missing = sorted(
+        anchor for anchor in NYSE_CALENDAR_TEXT_ANCHORS if anchor not in extracted_text
+    )
+    if missing:
+        raise ValueError(f"NYSE calendar content anchors missing: {missing}")
+
+    return {
+        "document_title": "2022 TRADING CALENDAR",
+        "pdf_page_count": 1,
+        "pdf_creation_date": creation.group(1).decode("ascii"),
+        "states_exchange_holidays_are_closed": True,
+        "states_early_close_is_1pm_eastern": True,
+        "states_dates_subject_to_change": True,
+        "canonical_us2_session_evidence": "NO_GO",
+        "limitations": [
+            "artifact says its dates are subject to change",
+            "calendar does not bind each date to the declared XNYS MIC",
+            "calendar does not state the regular session open",
+            "calendar does not supply exact UTC open and close clocks per open date",
+        ],
+    }
+
+
 def market_date(value: str) -> date:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.time().isoformat() != "00:00:00":
@@ -298,6 +358,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     evidence_manifest = json.loads(evidence_manifest_payload)
     evidence_records = validate_evidence_manifest(evidence_manifest)
     evidence_results = []
+    calendar_scope = None
     for record in evidence_records:
         payload = (evidence_manifest_path.parent / record["filename"]).read_bytes()
         if len(payload) != record["byte_size"]:
@@ -314,6 +375,11 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
                 ],
             }
         )
+        if record["filename"] == NYSE_CALENDAR_FILENAME:
+            calendar_scope = inspect_nyse_2022_calendar(payload)
+
+    if calendar_scope is None:
+        raise ValueError("retained NYSE 2022 calendar evidence is absent")
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -325,6 +391,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "prices": results,
         "public_evidence_manifest_sha256": evidence_manifest_sha256,
         "public_evidence": evidence_results,
+        "nyse_2022_calendar_scope": calendar_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
             "source historical availability is not proven",
