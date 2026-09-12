@@ -11,6 +11,11 @@ Bundle: `/home/egx-agent/research-data/er1c-us-pilot/20260912T152213Z`
 The audit verifies both retained manifest SHA256 sidecars, verifies the current
 frozen predeclaration bytes against the acquisition manifest, and recomputes
 every artifact byte size and SHA256 recorded in both manifests.
+It also validates the exact manifest schemas, safe local filenames, unique
+request and evidence identities, successful retrieval status, ordered UTC
+receipt clocks, explicit boolean availability claims, and Tiingo endpoint
+identity. Manifest metadata is therefore checked before it controls any local
+file read or market-row audit.
 IBM contains 151 ordered daily rows from 2022-04-01 through 2022-11-04. TWTR
 contains 146 ordered rows from 2022-04-01 through 2022-10-28. All raw OHLC
 values are positive and internally coherent, volume is nonnegative, and dates
