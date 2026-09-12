@@ -8,6 +8,7 @@ from tools.audit_er1c_us_pilot import (
     audit_rows,
     inspect_nyse_2022_calendar,
     inspect_ibm_submission,
+    inspect_ibm_2022q2_filing,
     inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
     sha256_bytes,
@@ -122,8 +123,21 @@ def ibm_submission():
         "name": "INTERNATIONAL BUSINESS MACHINES CORP",
         "tickers": ["IBM"],
         "exchanges": ["NYSE"],
-        "filings": {"recent": {"form": ["10-Q"], "filingDate": ["2022-10-25"]}},
+        "filings": {"recent": {
+            "form": ["10-Q"],
+            "filingDate": ["2022-07-25"],
+            "accessionNumber": ["0001558370-22-010985"],
+            "primaryDocument": ["ibm-20220630x10q.htm"],
+        }},
     }).encode()
+
+
+def ibm_2022q2_filing():
+    return """<html><body>
+    FORM 10-Q FOR THE QUARTER ENDED JUNE 30, 2022
+    INTERNATIONAL BUSINESS MACHINES CORPORATION 0000051143
+    Capital stock, par value $.20 per share IBM New York Stock Exchange
+    </body></html>""".encode()
 
 
 def test_audit_reports_zero_volume_without_interpreting_market_state():
@@ -226,10 +240,13 @@ def test_pilot_identity_scope_keeps_filing_corroboration_out_of_us1():
     event = inspect_twitter_corporate_event(*twitter_event_documents())
     ibm = inspect_ibm_submission(ibm_submission())
 
-    result = inspect_pilot_identity_scope({"TWTR", "IBM"}, event, ibm)
+    result = inspect_pilot_identity_scope(
+        {"TWTR", "IBM"}, event, ibm, inspect_ibm_2022q2_filing(ibm_2022q2_filing())
+    )
 
     assert result["twitter_filing_identity_corroborated"] is True
     assert result["ibm_issuer_identity_artifact_retained"] is True
+    assert result["ibm_dated_listing_statement_corroborated"] is True
     assert result["stable_instrument_ids_evidenced"] is False
     assert result["exact_date_identity_interval_evidenced"] is False
     assert result["canonical_us1_identity_evidence"] == "NO_GO"
@@ -240,7 +257,27 @@ def test_pilot_identity_scope_rejects_acquisition_cohort_drift():
     ibm = inspect_ibm_submission(ibm_submission())
 
     with pytest.raises(ValueError, match="does not match frozen pilot"):
-        inspect_pilot_identity_scope({"IBM"}, event, ibm)
+        inspect_pilot_identity_scope(
+            {"IBM"}, event, ibm, inspect_ibm_2022q2_filing(ibm_2022q2_filing())
+        )
+
+
+def test_ibm_2022q2_filing_is_dated_corroboration_not_interval_us1_evidence():
+    result = inspect_ibm_2022q2_filing(ibm_2022q2_filing())
+
+    assert result["period_end"] == "2022-06-30"
+    assert result["filing_date_from_sec_submission"] == "2022-07-25"
+    assert result["dated_listing_statement_corroborated"] is True
+    assert result["canonical_us1_identity_evidence"] == "NO_GO"
+
+
+def test_ibm_2022q2_filing_rejects_missing_listing_anchor():
+    incomplete = ibm_2022q2_filing().replace(
+        b"New York Stock Exchange", b"an unspecified exchange"
+    )
+
+    with pytest.raises(ValueError, match="10-Q anchors missing"):
+        inspect_ibm_2022q2_filing(incomplete)
 
 
 def test_ibm_submission_is_current_corroboration_not_dated_us1_evidence():
@@ -258,8 +295,8 @@ def test_ibm_submission_rejects_wrong_identity_or_missing_2022_anchor():
         inspect_ibm_submission(json.dumps(wrong).encode())
 
     missing = json.loads(ibm_submission())
-    missing["filings"]["recent"] = {"form": ["10-Q"], "filingDate": ["2023-01-01"]}
-    with pytest.raises(ValueError, match="lacks a 2022 periodic filing anchor"):
+    missing["filings"]["recent"]["accessionNumber"] = ["other-accession"]
+    with pytest.raises(ValueError, match="lacks the target 2022 Q2 filing anchor"):
         inspect_ibm_submission(json.dumps(missing).encode())
 
     unpaired = json.loads(ibm_submission())

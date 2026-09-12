@@ -71,6 +71,11 @@ NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
 TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
 TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
 IBM_SUBMISSIONS_FILENAME = "sec_ibm_submissions.json"
+IBM_2022Q2_10Q_FILENAME = "sec_ibm_2022q2_10q.html"
+IBM_2022Q2_10Q_URL = (
+    "https://www.sec.gov/Archives/edgar/data/51143/"
+    "000155837022010985/ibm-20220630x10q.htm"
+)
 PILOT_TICKERS = {"IBM", "TWTR"}
 NYSE_CALENDAR_TEXT_ANCHORS = {
     "2022 TRADING CALENDAR",
@@ -171,17 +176,31 @@ def inspect_ibm_submission(payload: bytes) -> dict[str, Any]:
     recent = submission.get("filings", {}).get("recent", {})
     forms = recent.get("form", [])
     filing_dates = recent.get("filingDate", [])
-    if len(forms) != len(filing_dates) or not any(
-        form in {"10-K", "10-Q"} and str(filing_date).startswith("2022-")
-        for form, filing_date in zip(forms, filing_dates, strict=True)
+    accessions = recent.get("accessionNumber", [])
+    primary_documents = recent.get("primaryDocument", [])
+    columns = (forms, filing_dates, accessions, primary_documents)
+    target_filing = (
+        "10-Q",
+        "2022-07-25",
+        "0001558370-22-010985",
+        "ibm-20220630x10q.htm",
+    )
+    if len({len(column) for column in columns}) != 1 or target_filing not in zip(
+        *columns, strict=True
     ):
-        raise ValueError("IBM SEC submission lacks a 2022 periodic filing anchor")
+        raise ValueError("IBM SEC submission lacks the target 2022 Q2 filing anchor")
     return {
         "issuer": expected["name"],
         "cik": expected["cik"],
         "symbol": expected["ticker"],
         "exchange": expected["exchange"],
         "current_submission_metadata_corroborated": True,
+        "target_filing": {
+            "form": target_filing[0],
+            "filing_date": target_filing[1],
+            "accession_number": target_filing[2],
+            "primary_document": target_filing[3],
+        },
         "canonical_us1_identity_evidence": "NO_GO",
         "limitations": [
             "the current SEC submission snapshot is not exact-date identity evidence",
@@ -191,10 +210,44 @@ def inspect_ibm_submission(payload: bytes) -> dict[str, Any]:
     }
 
 
+def inspect_ibm_2022q2_filing(payload: bytes) -> dict[str, Any]:
+    """Corroborate one dated IBM listing statement without inferring continuity."""
+    filing = normalized_html_text(payload, "IBM 2022 Q2 10-Q")
+    anchors = {
+        "FORM 10-Q",
+        "FOR THE QUARTER ENDED JUNE 30, 2022",
+        "INTERNATIONAL BUSINESS MACHINES CORPORATION",
+        "Capital stock, par value $.20 per share IBM New York Stock Exchange",
+        "0000051143",
+    }
+    missing = sorted(anchor for anchor in anchors if anchor not in filing)
+    if missing:
+        raise ValueError(f"IBM 2022 Q2 10-Q anchors missing: {missing}")
+    return {
+        "issuer": "INTERNATIONAL BUSINESS MACHINES CORPORATION",
+        "cik": "0000051143",
+        "form": "10-Q",
+        "period_end": "2022-06-30",
+        "filing_date_from_sec_submission": "2022-07-25",
+        "security": "Capital stock, par value $.20 per share",
+        "symbol": "IBM",
+        "exchange": "New York Stock Exchange",
+        "dated_listing_statement_corroborated": True,
+        "canonical_us1_identity_evidence": "NO_GO",
+        "limitations": [
+            "one filing statement does not prove identity continuity across the pilot interval",
+            "SEC CIK is an issuer identifier, not a stable listing or instrument identifier",
+            "the filing does not itself evidence the canonical XNYS MIC mapping",
+            "artifact historical availability and approved human review bindings are absent",
+        ],
+    }
+
+
 def inspect_pilot_identity_scope(
     acquisition_tickers: set[str],
     twitter_event_scope: dict[str, Any],
     ibm_submission_scope: dict[str, Any],
+    ibm_filing_scope: dict[str, Any],
 ) -> dict[str, Any]:
     """Enforce the frozen cohort and state the retained US1 identity limit."""
     if acquisition_tickers != PILOT_TICKERS:
@@ -210,6 +263,10 @@ def inspect_pilot_identity_scope(
         "cik"
     ) != "0000051143":
         raise ValueError("IBM submission identity does not match frozen pilot")
+    if ibm_filing_scope.get("symbol") != "IBM" or ibm_filing_scope.get(
+        "cik"
+    ) != "0000051143":
+        raise ValueError("IBM filing identity does not match frozen pilot")
 
     return {
         "frozen_acquisition_symbols": sorted(acquisition_tickers),
@@ -219,13 +276,14 @@ def inspect_pilot_identity_scope(
         "twitter_exchange_text": "New York Stock Exchange",
         "ibm_issuer_identity_artifact_retained": True,
         "ibm_current_submission_metadata_corroborated": True,
+        "ibm_dated_listing_statement_corroborated": True,
         "stable_instrument_ids_evidenced": False,
         "exact_date_identity_interval_evidenced": False,
         "listing_mic_evidenced": False,
         "canonical_us1_identity_evidence": "NO_GO",
         "limitations": [
             "the retained Twitter filing corroborates one issuer, symbol, security, and exchange representation",
-            "the retained IBM submission corroborates current issuer metadata, not exact-date listing identity",
+            "the retained IBM filing corroborates one dated listing statement, not interval continuity",
             "provider request symbols are mutable identifiers, not stable instrument IDs",
             "NYSE exchange text does not itself evidence the canonical XNYS MIC mapping",
             "no retained artifact proves exact-date identity on every required session date",
@@ -519,6 +577,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     evidence_results = []
     calendar_scope = None
     evidence_payloads: dict[str, bytes] = {}
+    evidence_source_urls: dict[str, str] = {}
     for record in evidence_records:
         payload = (evidence_manifest_path.parent / record["filename"]).read_bytes()
         if len(payload) != record["byte_size"]:
@@ -536,6 +595,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
             }
         )
         evidence_payloads[record["filename"]] = payload
+        evidence_source_urls[record["filename"]] = record["source_url"]
         if record["filename"] == NYSE_CALENDAR_FILENAME:
             calendar_scope = inspect_nyse_2022_calendar(payload)
 
@@ -557,8 +617,15 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     ibm_submission_scope = inspect_ibm_submission(
         evidence_payloads[IBM_SUBMISSIONS_FILENAME]
     )
+    if IBM_2022Q2_10Q_FILENAME not in evidence_payloads:
+        raise ValueError("retained IBM 2022 Q2 filing evidence is absent")
+    if evidence_source_urls[IBM_2022Q2_10Q_FILENAME] != IBM_2022Q2_10Q_URL:
+        raise ValueError("IBM 2022 Q2 filing source locator mismatch")
+    ibm_filing_scope = inspect_ibm_2022q2_filing(
+        evidence_payloads[IBM_2022Q2_10Q_FILENAME]
+    )
     identity_scope = inspect_pilot_identity_scope(
-        set(results), twitter_event_scope, ibm_submission_scope
+        set(results), twitter_event_scope, ibm_submission_scope, ibm_filing_scope
     )
 
     return {
@@ -574,6 +641,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "nyse_2022_calendar_scope": calendar_scope,
         "twitter_corporate_event_scope": twitter_event_scope,
         "ibm_submission_scope": ibm_submission_scope,
+        "ibm_2022q2_filing_scope": ibm_filing_scope,
         "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [

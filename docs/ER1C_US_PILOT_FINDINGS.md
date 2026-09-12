@@ -27,7 +27,8 @@ are unique, ordered, and within the requested bounds.
 | TWTR raw response | 32,451 | `da33bb8bbf1ec381aa829176730762619a33a2e996b5a39bbaf2aa22a546ddd5` |
 | Tiingo manifest | 1,841 | `8936272e0fcd855eed1e97d6a0361f4929211630e417e75ccbc2452e0885acd9` |
 | IBM SEC submissions response | 166,091 | `0d698f754c7aa7f9373bc90b65d73d801e018ad176b6ffb5e4ec0f6d18fa984f` |
-| Public evidence manifest | 2,104 | `3d6b5eccdba760dcf50a4e0cdb329978b4111e43d0c573ed49c9a404f9b55a27` |
+| IBM 2022 Q2 Form 10-Q | 6,700,677 | `3d2b1bed1ccf656b4aa7d158ee6af27c0147923e5f3b61238ee59ebfab0d68ec` |
+| Public evidence manifest | 2,618 | `9f732e617469daf1b81333830057dcb78fcee92e03321cfba2672b755cf88dd3` |
 
 The Tiingo rows mark IBM cash dividends of USD 1.65 on 2022-05-09 and
 2022-08-09. These are vendor markers, not proof of complete bounded corporate
@@ -95,14 +96,17 @@ The retained Twitter 8-K corroborates CIK `0001418091`, the `TWTR` symbol,
 common stock, and New York Stock Exchange representation at that filing. The
 retained SEC submissions response corroborates IBM CIK `0000051143`, issuer
 name, and the response's current `IBM`/`NYSE` metadata, and contains 2022
-periodic-filing entries. The audit validates these anchors before reporting
-them.
+periodic-filing entries. It also binds the 2022-07-25 Form 10-Q accession and
+primary-document name to the retained archive document. That document states
+IBM's capital stock symbol and New York Stock Exchange registration for the
+quarter ended 2022-06-30. The audit validates these anchors and the exact SEC
+archive locator before reporting them.
 
-The IBM response was received on 2026-09-12 and explicitly has historical
-availability unproven. It is a current submissions snapshot, SEC CIK identifies
-the issuer rather than a listing or instrument, and its 2022 filing list does
-not turn the current ticker/exchange arrays into exact-date 2022 identity.
-Likewise, the Twitter artifact supplies only a filing-level identity fact.
+The IBM response and filing were received on 2026-09-12 and explicitly have
+historical availability unproven. The filing is useful dated corroboration, but
+one quarterly filing does not prove listing identity on every pilot session.
+SEC CIK identifies the issuer rather than a listing or instrument. Likewise,
+the Twitter artifact supplies only a filing-level identity fact.
 Provider request symbols are not stable instrument IDs, the exchange name does
 not by itself prove the canonical `XNYS` MIC mapping, and no artifact establishes
 exact-date identity for every required session. The audit therefore still
@@ -111,9 +115,11 @@ reports `canonical_us1_identity_evidence: NO_GO` and does not construct a
 
 An earlier free direct capture of an official IBM 2022 SEC filing page was
 denied with HTTP 403. No bytes from that attempt were retained or represented
-as evidence. This cycle made one separate successful request to SEC's free
-`data.sec.gov` submissions endpoint and preserved those original bytes, source
-locator, receipt clocks, size, and SHA256 in the evidence manifest.
+as evidence. Later cycles made one successful request to SEC's free
+`data.sec.gov` submissions endpoint and one successful request for the exact
+archive document. Both original responses have source locators, receipt clocks,
+sizes, SHA256 values, and explicit historical-availability status in the
+evidence manifest.
 
 ## NYSE calendar scope qualification
 
