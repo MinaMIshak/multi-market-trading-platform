@@ -76,6 +76,12 @@ def _admit_packages(
         raise ValueError("evidence packages must match watchlist references exactly")
     for identity, package in admitted.items():
         reference = references[identity]
+        availability = package.evidence.availability
+        latest_available_at = (
+            availability.exact_at if availability.kind == "EXACT" else availability.end
+        )
+        if reference.available_at != latest_available_at:
+            raise ValueError("watchlist availability must bind package latest availability")
         if (
             reference.artifact_sha256 != package.raw_receipt.sha256
             or reference.source_locator != package.raw_receipt.source_locator
@@ -94,6 +100,7 @@ def complete_watchlist(
     """Freeze an authenticated watchlist and publish its completion receipt."""
     if type(watchlist) is not ShadowWatchlist:
         raise ValueError("exact ShadowWatchlist required")
+    watchlist = ShadowWatchlist.model_validate(watchlist.model_dump(mode="python"))
     started_at = _now()
     if not watchlist.generated_at <= started_at < watchlist.session.decision_cutoff:
         raise ValueError("future generation or missed decision cutoff")
@@ -137,6 +144,8 @@ def record_missed_session(
     """After cutoff, durably record a session that must never be reconstructed."""
     if type(session) is not ShadowSession or type(session_package) is not HistoricalEvidencePackage:
         raise ValueError("exact session and evidence package required")
+    if reason not in ("NO_TIMELY_WATCHLIST", "COLLECTION_FAILED"):
+        raise ValueError("unsupported missed-session reason")
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}", record_id) is None:
         raise ValueError("invalid record_id")
     session = ShadowSession.model_validate(session.model_dump(mode="python"))

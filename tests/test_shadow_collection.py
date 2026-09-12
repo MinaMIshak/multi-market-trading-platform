@@ -128,3 +128,66 @@ def test_missed_session_rejects_unsafe_record_identity(tmp_path, monkeypatch):
             session_package=packages[0], reason="NO_TIMELY_WATCHLIST",
         )
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("offset", [-1, 1])
+def test_reference_cannot_restate_package_availability(tmp_path, monkeypatch, offset):
+    item, packages = authenticated_watchlist()
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT)
+    reference = item.evidence[0]
+    changed = reference.model_copy(update={
+        "available_at": reference.available_at + timedelta(seconds=offset),
+    })
+    item = item.model_copy(update={"evidence": (changed, item.evidence[1])})
+    with pytest.raises(ValueError, match="package latest availability"):
+        complete_watchlist(tmp_path, item, packages)
+    assert not list(tmp_path.iterdir())
+
+
+def test_bounded_availability_requires_conservative_endpoint(tmp_path, monkeypatch):
+    item, packages = authenticated_watchlist()
+    original = packages[0]
+    end = item.evidence[0].available_at
+    evidence = original.evidence.model_copy(update={
+        "availability": HistoricalAvailability(
+            kind="BOUNDED_INTERVAL", start=end - timedelta(hours=1), end=end,
+        ),
+    })
+    review = original.review.model_copy(update={"availability_evidence_id": evidence.identity})
+    bounded = original.model_copy(update={"evidence": evidence, "review": review})
+    reference = item.evidence[0].model_copy(update={"evidence_id": bounded.identity})
+    item = item.model_copy(update={
+        "evidence": (reference, item.evidence[1]),
+        "session": item.session.model_copy(update={"evidence_ids": (bounded.identity,)}),
+    })
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT)
+    monkeypatch.setattr(shadow_freeze, "_now", lambda: AT)
+    early = item.model_copy(update={"evidence": (
+        reference.model_copy(update={"available_at": end - timedelta(hours=1)}),
+        item.evidence[1],
+    )})
+    with pytest.raises(ValueError, match="package latest availability"):
+        complete_watchlist(tmp_path, early, (bounded, packages[1]))
+    assert not list(tmp_path.iterdir())
+    assert complete_watchlist(tmp_path, item, (bounded, packages[1])).exists()
+
+
+@pytest.mark.parametrize("reason", ["VERIFIED", "", None])
+def test_missed_session_rejects_unsupported_reason(tmp_path, monkeypatch, reason):
+    item, packages = authenticated_watchlist()
+    monkeypatch.setattr(shadow_collection, "_now", lambda: item.session.decision_cutoff)
+    with pytest.raises(ValueError, match="unsupported missed-session reason"):
+        record_missed_session(
+            tmp_path, record_id=item.record_id, session=item.session,
+            session_package=packages[0], reason=reason,
+        )
+    assert not list(tmp_path.iterdir())
+
+
+def test_collector_revalidates_copied_watchlist_before_io(tmp_path, monkeypatch):
+    item, packages = authenticated_watchlist()
+    item = item.model_copy(update={"label": "LIVE READY"})
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT)
+    with pytest.raises(ValueError):
+        complete_watchlist(tmp_path, item, packages)
+    assert not list(tmp_path.iterdir())

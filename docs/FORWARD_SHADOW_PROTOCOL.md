@@ -77,3 +77,15 @@ affected claim. A preserved candidate alone is never a fill. Daily-bar ambiguity
 must not choose favorable stop/target ordering. Historical ER1C acquisition and
 admission remain open; forward infrastructure does not establish historical edge,
 paper validation or live readiness.
+
+### Collection metadata consistency
+
+Completion revalidates the entire structured watchlist before any publication.
+Each reference's `available_at` must equal its bound package's exact availability,
+or the inclusive latest endpoint for `BOUNDED_INTERVAL`. The bounded endpoint is
+conservative metadata, not a claim of exact publication time. An earlier asserted
+time cannot replace the package's proof, even when both precede the cutoff.
+Missed-session reasons are runtime restricted to `NO_TIMELY_WATCHLIST` and
+`COLLECTION_FAILED`; a type annotation alone does not enforce that restriction.
+These checks do not establish semantic session/identity/price truth from arbitrary
+reviewed artifacts. Canonical fact admission and execution gates remain required.
