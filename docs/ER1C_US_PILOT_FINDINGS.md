@@ -194,3 +194,23 @@ Verification: 94 focused audit tests passed; the authentic retained bundle audit
 completed successfully with nine verified public artifacts and PIT NO_GO. Two
 additional free official IBM pages were acquired; no paid or limited API was
 called, and the frozen declaration was unchanged.
+
+## Payment-table date-role integrity
+
+The IBM cash-payment qualifier now binds each target distribution to four
+separate cells under its own table's exact dividend-number, actual-amount,
+payable-date and record-date headings. Flattened text alone could previously
+pass even if headings were swapped or a conflicting target row coexisted with
+the expected row. Missing or swapped headings, duplicate/conflicting target
+rows, detached rows and rows in a separate headerless table now fail closed.
+The extractor is intentionally scoped to the retained IBM HTML table edition;
+changed layouts require requalification rather than inferred column meanings.
+
+Verification: 100 focused tests passed and the retained nine-artifact audit
+completed offline with PIT NO_GO. An initial test run found a fragment/whole-HTML
+validation mismatch (93 passed, one failed); that implementation defect was
+corrected before the final passing run. No raw artifact or frozen declaration
+changed. Two web discovery queries for official IBM May/August 2022 ex-date
+statements did not establish new authoritative evidence; no search result was
+admitted and no source was redownloaded. Ex-dates, full action coverage and all
+other mandatory PIT gaps remain unresolved.

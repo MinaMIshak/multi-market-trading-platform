@@ -469,8 +469,11 @@ def ibm_cash_dividend_history():
     Cash Dividends (2020 – present)
     The cash dividend rate per share is the actual amount paid per share.
     No adjustments were made for stock splits.
-    430 USD 1.65 09/10/22 08/10/22
-    429 USD 1.65 06/10/22 05/10/22
+    <table><tr><th>Dividend Number</th><th>Actual amount per share</th>
+    <th>Payable date</th><th>Record date</th></tr>
+    <tr><td>430</td><td>USD 1.65</td><td>09/10/22</td><td>08/10/22</td></tr>
+    <tr><td>429</td><td>USD 1.65</td><td>06/10/22</td><td>05/10/22</td></tr>
+    </table>
     </body></html>""".encode()
 
 
@@ -497,7 +500,7 @@ def test_ibm_payment_history_confirms_payments_but_not_ex_dates_or_us4():
     "payload_value, url, message",
     [
         (
-            ibm_cash_dividend_history().replace(b"429 USD 1.65", b"429 USD 9.99"),
+            ibm_cash_dividend_history().replace(b"429</td><td>USD 1.65", b"429</td><td>USD 9.99"),
             "https://www.ibm.com/investor/governance/ibm-cash-dividends",
             "anchors missing",
         ),
@@ -535,3 +538,23 @@ def test_ibm_split_history_rejects_changed_statement_or_locator():
         )
     with pytest.raises(ValueError, match="source locator mismatch"):
         inspect_ibm_stock_split_history(ibm_stock_split_history(), url + "?changed=1")
+
+
+@pytest.mark.parametrize("mutation", ["swapped_headings", "missing_heading", "duplicate", "conflict", "outside_table", "split_tables"])
+def test_ibm_payment_history_requires_unambiguous_table_date_roles(mutation):
+    source = ibm_cash_dividend_history()
+    target = b"<tr><td>429</td><td>USD 1.65</td><td>06/10/22</td><td>05/10/22</td></tr>"
+    if mutation == "swapped_headings":
+        source = source.replace(b"Payable date", b"TEMP").replace(b"Record date", b"Payable date").replace(b"TEMP", b"Record date")
+    elif mutation == "missing_heading":
+        source = source.replace(b"Payable date", b"Date")
+    elif mutation == "duplicate":
+        source = source.replace(b"</table>", target + b"</table>")
+    elif mutation == "conflict":
+        source = source.replace(b"</table>", target.replace(b"06/10/22", b"06/11/22") + b"</table>")
+    elif mutation == "outside_table":
+        source = source.replace(target, b"") + target
+    else:
+        source = source.replace(target, b"</table><table>" + target)
+    with pytest.raises(ValueError, match="IBM dividend table"):
+        inspect_ibm_cash_dividend_history(source, "https://www.ibm.com/investor/governance/ibm-cash-dividends")

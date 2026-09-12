@@ -359,6 +359,32 @@ def inspect_ibm_cash_dividend_history(
     missing = sorted(anchor for anchor in anchors if anchor not in history)
     if missing:
         raise ValueError(f"IBM cash-dividend history anchors missing: {missing}")
+    # Text anchors alone cannot bind date roles: verify cells and their own
+    # table's header, and reject duplicate/conflicting target distributions.
+    expected_header = [
+        "Dividend Number", "Actual amount per share", "Payable date", "Record date"
+    ]
+    expected_rows = {
+        "429": ["429", "USD 1.65", "06/10/22", "05/10/22"],
+        "430": ["430", "USD 1.65", "09/10/22", "08/10/22"],
+    }
+    seen: set[str] = set()
+    for table in re.findall(rb"<table\b[^>]*>(.*?)</table\s*>", payload, re.I | re.S):
+        rows = [
+            [normalized_html_text(b"<html>" + cell + b"</html>", "IBM dividend cell") for cell in
+             re.findall(rb"<t[dh]\b[^>]*>(.*?)</t[dh]\s*>", row, re.I | re.S)]
+            for row in re.findall(rb"<tr\b[^>]*>(.*?)</tr\s*>", table, re.I | re.S)
+        ]
+        for row in rows:
+            if not row or row[0] not in expected_rows:
+                continue
+            if rows[0] != expected_header:
+                raise ValueError("IBM dividend table date-role headings missing or changed")
+            if row[0] in seen or row != expected_rows[row[0]]:
+                raise ValueError("IBM dividend table target row duplicated or changed")
+            seen.add(row[0])
+    if seen != set(expected_rows):
+        raise ValueError("IBM dividend table target rows missing")
     return {
         "symbol": "IBM",
         "source_file": IBM_CASH_DIVIDEND_HISTORY_FILENAME,
