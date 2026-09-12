@@ -244,3 +244,29 @@ identities and optional fill. Publication cannot precede the trigger event.
 tampering, future clocks and backdating. Every event remains **EXPERIMENTAL /
 PAPER ONLY — NOT SCORED**. It explicitly creates no position event, exit, P&L or
 NAV. Position state and conservative exit processing are later boundaries.
+
+### Position-open provenance
+
+`app.paper.shadow_positions` consumes only a durable entry-fill event that passes
+`audit_fill_event` and its complete upstream watchlist/fact/trigger evidence chain.
+An insufficient-capacity event cannot open a position. Atomic create-if-absent
+publication under `position-open-events/`, keyed by the upstream fill ID, prevents
+that exact fill from opening multiple position records in the same ledger.
+The content-addressed event binds the exact fill bytes hash, stable identity,
+quantity, native currency, entry interval/availability, slipped price, notional,
+entry cost and original frozen stop/targets. It preserves the bar interval; it
+does not invent an exact intrabar fill timestamp.
+
+Append and audit enforce local UTC ordering after the fill and reject duplicate
+JSON fields, altered entries/exits, unexpected fields, future clocks and
+backdating. Audit recomputes the upstream chain without writing. The same trusted
+local storage and clock-attestation limitations described above apply.
+
+`POSITION_OPENED` means **SIMULATED OPEN AT ENTRY**, not a claim of current
+holdings after later bars. All output remains **EXPERIMENTAL / PAPER ONLY — NOT
+SCORED**, with **SHARED CAPITAL NOT ALLOCATED** and **NO MARK, EXIT, P&L OR NAV**.
+The boundary is a provenance prerequisite; alternate fact/policy evaluations are
+not yet reconciled into one portfolio position per candidate. Shared capital,
+candidate-level allocation/deduplication, conservative exits (including entry-bar
+stop/target uncertainty), marks, FX and performance require separate admission.
+No authentic position or performance result was created by this milestone.
