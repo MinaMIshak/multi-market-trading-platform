@@ -109,4 +109,28 @@ and local clocks cannot establish independent timestamp attestation or semantic
 truth, nor rule out deliberate coordinated rewriting. A process crash after
 receipt publication but before its final clock check remains an operational
 attestation limitation. Canonical facts and auditable timing controls are still
-required before scoring. The next milestone is the append-only candidate ledger.
+required before scoring.
+
+### Append-only candidate ledger
+
+`app.paper.shadow_ledger.append_candidate_event` accepts only an exact structured
+watchlist whose completion passes the audit boundary again. It publishes one
+immutable, content-addressed event per completed watchlist under
+`candidate-ledger/`. The event binds the exact candidate records, explicit count,
+market/session cutoffs, completion bytes hash, watchlist envelope hash and
+structured-document hash. An empty watchlist produces an explicit zero-candidate
+event; absence of an event is never interpreted as a no-trade decision.
+
+Candidate IDs never become paths. The event ID and filename are a SHA256 of the
+canonical bound content, and atomic create-if-absent publication prevents an
+existing event from being replaced. `audit_candidate_event` rejects duplicate or
+unexpected JSON fields, future/rollback clocks, altered status or candidate
+content, and performs no writes.
+
+Every event remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED** with `NO EXECUTION
+INFERENCE`. It is a candidate-preservation boundary only: it does not establish
+canonical session, identity, price, liquidity or risk truth beyond what the
+upstream records and packages actually prove, and it creates no trigger, fill,
+position, P&L or NAV. The next milestone is canonical fact admission before any
+trigger evaluation, followed by authenticated execution events and conservative
+fill logic.
