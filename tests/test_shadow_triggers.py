@@ -49,6 +49,16 @@ def test_appends_and_audits_trigger_without_fill(tmp_path, monkeypatch):
     ({"open": Decimal("96"), "high": Decimal("101"), "low": Decimal("94"),
       "close": Decimal("100")}, "TRIGGERED_AMBIGUOUS_BAR",
      "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN"),
+    ({"open": Decimal("105"), "high": Decimal("111"), "low": Decimal("100"),
+      "close": Decimal("101")}, "TRIGGERED_AMBIGUOUS_BAR",
+     "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN"),
+    ({"open": Decimal("105"), "high": Decimal("110"), "low": Decimal("100"),
+      "close": Decimal("101")}, "TRIGGERED_AMBIGUOUS_BAR",
+     "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN"),
+    ({"open": Decimal("105"), "high": Decimal("109"), "low": Decimal("100"),
+      "close": Decimal("101")}, "TRIGGERED", "ENTRY_ZONE_TOUCHED"),
+    ({"open": Decimal("100"), "high": Decimal("111"), "low": Decimal("99"),
+      "close": Decimal("101")}, "TRIGGERED", "ENTRY_ZONE_TOUCHED"),
 ])
 def test_conservative_trigger_outcomes(tmp_path, monkeypatch, changes, status, reason):
     item, packages, facts, fact_packages, _ = admitted(tmp_path, monkeypatch, changes)
@@ -101,3 +111,32 @@ def test_refuses_publication_before_authenticated_bar_availability(tmp_path, mon
             tmp_path, item, packages, facts, fact_packages,
         )
     assert not (tmp_path / "trigger-events").exists()
+
+
+def test_refuses_trigger_clock_between_bar_availability_and_fact_event(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, now = admitted(tmp_path, monkeypatch)
+    monkeypatch.setattr(shadow_triggers, "_now", lambda: now - timedelta(seconds=1))
+    with pytest.raises(ValueError, match="precedes fact event"):
+        shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    assert not (tmp_path / "trigger-events").exists()
+
+
+def test_audit_rejects_trigger_backdated_before_fact_event(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, now = admitted(tmp_path, monkeypatch)
+    path = shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    event = json.loads(path.read_bytes())
+    event["recorded_at"] = (now - timedelta(seconds=1)).isoformat()
+    path.write_text(json.dumps(event))
+    with pytest.raises(ValueError, match="invalid trigger-event clock ordering"):
+        shadow_triggers.audit_trigger_event(tmp_path, item, packages, facts, fact_packages)
+
+
+def test_ambiguous_target_order_is_preserved_in_audited_event(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, _ = admitted(tmp_path, monkeypatch, {
+        "open": Decimal("105"), "high": Decimal("111"),
+        "low": Decimal("100"), "close": Decimal("101"),
+    })
+    shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    event = shadow_triggers.audit_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    assert event["evaluation"]["status"] == "TRIGGERED_AMBIGUOUS_BAR"
+    assert event["execution_status"] == "NO FILL OR POSITION CREATED"

@@ -111,6 +111,7 @@ def evaluate_trigger(watchlist: ShadowWatchlist, facts: ForwardFactBundle) -> Tr
         path_ambiguous = (
             (bar.low <= candidate.stop and bar.high >= candidate.targets[0])
             or (bar.open < candidate.entry_low and bar.low <= candidate.stop)
+            or (bar.open > candidate.entry_high and bar.high >= candidate.targets[0])
         )
         if path_ambiguous:
             status = "TRIGGERED_AMBIGUOUS_BAR"
@@ -152,6 +153,8 @@ def append_trigger_event(
     recorded_at = _now()
     if not evaluation.evaluated_through_available_at <= recorded_at:
         raise ValueError("trigger evaluation precedes fact availability")
+    if recorded_at < _utc(datetime.fromisoformat(fact_event["recorded_at"])):
+        raise ValueError("trigger evaluation precedes fact event")
     basis = _basis(fact_event, evaluation)
     event_id = hashlib.sha256(_canonical(basis)).hexdigest()
     payload = basis | {"event_id": event_id, "recorded_at": recorded_at.isoformat()}
@@ -190,7 +193,8 @@ def audit_trigger_event(
     if type(event) is not dict or set(event) != set(basis) | {"event_id", "recorded_at"}:
         raise ValueError("unexpected trigger-event fields")
     recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
-    if not evaluation.evaluated_through_available_at <= recorded_at <= _now():
+    fact_recorded_at = _utc(datetime.fromisoformat(fact_event["recorded_at"]))
+    if not max(evaluation.evaluated_through_available_at, fact_recorded_at) <= recorded_at <= _now():
         raise ValueError("invalid trigger-event clock ordering")
     expected = basis | {"event_id": event_id, "recorded_at": recorded_at.isoformat()}
     if event != expected:

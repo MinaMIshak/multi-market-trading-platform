@@ -197,10 +197,18 @@ intrabar time or executable fill. If that bar also spans both stop and target 1,
 the event is `TRIGGERED_AMBIGUOUS_BAR`; the same applies when an open below the
 entry zone leaves stop-before-entry versus stop-after-entry unknowable. No
 favorable path ordering is chosen, and later bars cannot resolve that ambiguity.
+The symmetric case is also ambiguous: when the bar opens above the entry zone
+and reaches target 1, its range cannot establish whether the target preceded or
+followed entry. A high exactly equal to target 1 counts as a touch. An open
+inside the entry zone does not create this particular ambiguity; it still does
+not prove an executable fill.
 
 Append and audit recompute the deterministic evaluation, bind the exact upstream
 fact-event ID and bytes hash, enforce fact availability and local UTC ordering,
 and reject duplicate/unexpected fields or changed content. These mechanics do
+require the trigger recording time to be at or after the upstream fact-event
+recording time, during both publication and audit. Bar availability alone cannot
+authorize a trigger event backdated before the fact event it consumes. They do
 not authenticate arbitrary source semantics or establish queues, participation,
 spread, slippage, costs, fills, positions, P&L or strategy edge. The next
 milestone must add a separately authenticated simulated-fill boundary and must
