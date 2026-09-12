@@ -7,6 +7,7 @@ import pytest
 from tools.audit_er1c_us_pilot import (
     audit_rows,
     inspect_nyse_2022_calendar,
+    inspect_ibm_submission,
     inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
     sha256_bytes,
@@ -115,6 +116,16 @@ def twitter_event_documents():
     return filing, removal
 
 
+def ibm_submission():
+    return json.dumps({
+        "cik": "0000051143",
+        "name": "INTERNATIONAL BUSINESS MACHINES CORP",
+        "tickers": ["IBM"],
+        "exchanges": ["NYSE"],
+        "filings": {"recent": {"form": ["10-Q"], "filingDate": ["2022-10-25"]}},
+    }).encode()
+
+
 def test_audit_reports_zero_volume_without_interpreting_market_state():
     result = audit_rows(
         payload(row(volume=0)), date(2022, 4, 1), date(2022, 11, 4)
@@ -213,11 +224,12 @@ def test_twitter_event_missing_independent_cash_terms_fails_closed():
 
 def test_pilot_identity_scope_keeps_filing_corroboration_out_of_us1():
     event = inspect_twitter_corporate_event(*twitter_event_documents())
+    ibm = inspect_ibm_submission(ibm_submission())
 
-    result = inspect_pilot_identity_scope({"TWTR", "IBM"}, event)
+    result = inspect_pilot_identity_scope({"TWTR", "IBM"}, event, ibm)
 
     assert result["twitter_filing_identity_corroborated"] is True
-    assert result["ibm_issuer_identity_artifact_retained"] is False
+    assert result["ibm_issuer_identity_artifact_retained"] is True
     assert result["stable_instrument_ids_evidenced"] is False
     assert result["exact_date_identity_interval_evidenced"] is False
     assert result["canonical_us1_identity_evidence"] == "NO_GO"
@@ -225,9 +237,35 @@ def test_pilot_identity_scope_keeps_filing_corroboration_out_of_us1():
 
 def test_pilot_identity_scope_rejects_acquisition_cohort_drift():
     event = inspect_twitter_corporate_event(*twitter_event_documents())
+    ibm = inspect_ibm_submission(ibm_submission())
 
     with pytest.raises(ValueError, match="does not match frozen pilot"):
-        inspect_pilot_identity_scope({"IBM"}, event)
+        inspect_pilot_identity_scope({"IBM"}, event, ibm)
+
+
+def test_ibm_submission_is_current_corroboration_not_dated_us1_evidence():
+    result = inspect_ibm_submission(ibm_submission())
+
+    assert result["cik"] == "0000051143"
+    assert result["current_submission_metadata_corroborated"] is True
+    assert result["canonical_us1_identity_evidence"] == "NO_GO"
+
+
+def test_ibm_submission_rejects_wrong_identity_or_missing_2022_anchor():
+    wrong = json.loads(ibm_submission())
+    wrong["tickers"] = ["OTHER"]
+    with pytest.raises(ValueError, match="does not match frozen pilot"):
+        inspect_ibm_submission(json.dumps(wrong).encode())
+
+    missing = json.loads(ibm_submission())
+    missing["filings"]["recent"] = {"form": ["10-Q"], "filingDate": ["2023-01-01"]}
+    with pytest.raises(ValueError, match="lacks a 2022 periodic filing anchor"):
+        inspect_ibm_submission(json.dumps(missing).encode())
+
+    unpaired = json.loads(ibm_submission())
+    unpaired["exchanges"] = []
+    with pytest.raises(ValueError, match="ticker/exchange arrays are absent"):
+        inspect_ibm_submission(json.dumps(unpaired).encode())
 
 
 @pytest.mark.parametrize(

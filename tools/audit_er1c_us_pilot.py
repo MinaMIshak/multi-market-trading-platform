@@ -70,6 +70,7 @@ EVIDENCE_RECORD_FIELDS = {
 NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
 TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
 TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
+IBM_SUBMISSIONS_FILENAME = "sec_ibm_submissions.json"
 PILOT_TICKERS = {"IBM", "TWTR"}
 NYSE_CALENDAR_TEXT_ANCHORS = {
     "2022 TRADING CALENDAR",
@@ -141,8 +142,59 @@ def inspect_twitter_corporate_event(
     }
 
 
+def inspect_ibm_submission(payload: bytes) -> dict[str, Any]:
+    """Corroborate IBM issuer metadata without projecting a dated identity."""
+    try:
+        submission = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("IBM SEC submission is not valid UTF-8 JSON") from error
+    expected = {
+        "cik": "0000051143",
+        "name": "INTERNATIONAL BUSINESS MACHINES CORP",
+        "ticker": "IBM",
+        "exchange": "NYSE",
+    }
+    tickers = submission.get("tickers")
+    exchanges = submission.get("exchanges")
+    if (
+        not isinstance(tickers, list)
+        or not isinstance(exchanges, list)
+        or len(tickers) != len(exchanges)
+    ):
+        raise ValueError("IBM SEC submission ticker/exchange arrays are absent")
+    pairs = set(zip(tickers, exchanges, strict=False))
+    actual = {"cik": submission.get("cik"), "name": submission.get("name")}
+    if actual != {"cik": expected["cik"], "name": expected["name"]} or (
+        expected["ticker"], expected["exchange"]
+    ) not in pairs:
+        raise ValueError("IBM SEC submission identity does not match frozen pilot")
+    recent = submission.get("filings", {}).get("recent", {})
+    forms = recent.get("form", [])
+    filing_dates = recent.get("filingDate", [])
+    if len(forms) != len(filing_dates) or not any(
+        form in {"10-K", "10-Q"} and str(filing_date).startswith("2022-")
+        for form, filing_date in zip(forms, filing_dates, strict=True)
+    ):
+        raise ValueError("IBM SEC submission lacks a 2022 periodic filing anchor")
+    return {
+        "issuer": expected["name"],
+        "cik": expected["cik"],
+        "symbol": expected["ticker"],
+        "exchange": expected["exchange"],
+        "current_submission_metadata_corroborated": True,
+        "canonical_us1_identity_evidence": "NO_GO",
+        "limitations": [
+            "the current SEC submission snapshot is not exact-date identity evidence",
+            "SEC CIK is an issuer identifier, not a stable listing or instrument identifier",
+            "artifact historical availability and approved human review bindings are absent",
+        ],
+    }
+
+
 def inspect_pilot_identity_scope(
-    acquisition_tickers: set[str], twitter_event_scope: dict[str, Any]
+    acquisition_tickers: set[str],
+    twitter_event_scope: dict[str, Any],
+    ibm_submission_scope: dict[str, Any],
 ) -> dict[str, Any]:
     """Enforce the frozen cohort and state the retained US1 identity limit."""
     if acquisition_tickers != PILOT_TICKERS:
@@ -154,6 +206,10 @@ def inspect_pilot_identity_scope(
         "cik"
     ) != "0001418091":
         raise ValueError("Twitter filing identity does not match frozen pilot")
+    if ibm_submission_scope.get("symbol") != "IBM" or ibm_submission_scope.get(
+        "cik"
+    ) != "0000051143":
+        raise ValueError("IBM submission identity does not match frozen pilot")
 
     return {
         "frozen_acquisition_symbols": sorted(acquisition_tickers),
@@ -161,14 +217,15 @@ def inspect_pilot_identity_scope(
         "twitter_cik": "0001418091",
         "twitter_symbol": "TWTR",
         "twitter_exchange_text": "New York Stock Exchange",
-        "ibm_issuer_identity_artifact_retained": False,
+        "ibm_issuer_identity_artifact_retained": True,
+        "ibm_current_submission_metadata_corroborated": True,
         "stable_instrument_ids_evidenced": False,
         "exact_date_identity_interval_evidenced": False,
         "listing_mic_evidenced": False,
         "canonical_us1_identity_evidence": "NO_GO",
         "limitations": [
             "the retained Twitter filing corroborates one issuer, symbol, security, and exchange representation",
-            "no retained issuer artifact corroborates IBM identity",
+            "the retained IBM submission corroborates current issuer metadata, not exact-date listing identity",
             "provider request symbols are mutable identifiers, not stable instrument IDs",
             "NYSE exchange text does not itself evidence the canonical XNYS MIC mapping",
             "no retained artifact proves exact-date identity on every required session date",
@@ -495,7 +552,14 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         evidence_payloads[TWITTER_8K_FILENAME],
         evidence_payloads[TWITTER_REMOVAL_FILENAME],
     )
-    identity_scope = inspect_pilot_identity_scope(set(results), twitter_event_scope)
+    if IBM_SUBMISSIONS_FILENAME not in evidence_payloads:
+        raise ValueError("retained IBM SEC submission evidence is absent")
+    ibm_submission_scope = inspect_ibm_submission(
+        evidence_payloads[IBM_SUBMISSIONS_FILENAME]
+    )
+    identity_scope = inspect_pilot_identity_scope(
+        set(results), twitter_event_scope, ibm_submission_scope
+    )
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -509,6 +573,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "public_evidence": evidence_results,
         "nyse_2022_calendar_scope": calendar_scope,
         "twitter_corporate_event_scope": twitter_event_scope,
+        "ibm_submission_scope": ibm_submission_scope,
         "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [

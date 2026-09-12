@@ -26,7 +26,8 @@ are unique, ordered, and within the requested bounds.
 | IBM raw response | 39,306 | `7d943f73d068ab832c3eacf974e6224b78bdc3782bce7d4d2a491483b5332bd5` |
 | TWTR raw response | 32,451 | `da33bb8bbf1ec381aa829176730762619a33a2e996b5a39bbaf2aa22a546ddd5` |
 | Tiingo manifest | 1,841 | `8936272e0fcd855eed1e97d6a0361f4929211630e417e75ccbc2452e0885acd9` |
-| Public evidence manifest | 1,624 | `bba60b448873fbe010c6d477c70e41eb3d0387b964152bc87148cbbe3229fa4f` |
+| IBM SEC submissions response | 166,091 | `0d698f754c7aa7f9373bc90b65d73d801e018ad176b6ffb5e4ec0f6d18fa984f` |
+| Public evidence manifest | 2,104 | `3d6b5eccdba760dcf50a4e0cdb329978b4111e43d0c573ed49c9a404f9b55a27` |
 
 The Tiingo rows mark IBM cash dividends of USD 1.65 on 2022-05-09 and
 2022-08-09. These are vendor markers, not proof of complete bounded corporate
@@ -91,17 +92,28 @@ silently substituting, adding, or dropping a symbol while still claiming to be
 the predeclared pilot.
 
 The retained Twitter 8-K corroborates CIK `0001418091`, the `TWTR` symbol,
-common stock, and New York Stock Exchange representation at that filing. That
-is a filing-level identity fact only. No IBM issuer identity artifact is
-retained, provider request symbols are not stable instrument IDs, the exchange
-name does not by itself prove the canonical `XNYS` MIC mapping, and no artifact
-establishes exact-date identity for every required session. The audit therefore
+common stock, and New York Stock Exchange representation at that filing. The
+retained SEC submissions response corroborates IBM CIK `0000051143`, issuer
+name, and the response's current `IBM`/`NYSE` metadata, and contains 2022
+periodic-filing entries. The audit validates these anchors before reporting
+them.
+
+The IBM response was received on 2026-09-12 and explicitly has historical
+availability unproven. It is a current submissions snapshot, SEC CIK identifies
+the issuer rather than a listing or instrument, and its 2022 filing list does
+not turn the current ticker/exchange arrays into exact-date 2022 identity.
+Likewise, the Twitter artifact supplies only a filing-level identity fact.
+Provider request symbols are not stable instrument IDs, the exchange name does
+not by itself prove the canonical `XNYS` MIC mapping, and no artifact establishes
+exact-date identity for every required session. The audit therefore still
 reports `canonical_us1_identity_evidence: NO_GO` and does not construct a
 `USListingIdentity`.
 
-An attempted free direct capture of an official IBM 2022 SEC filing page was
-denied with HTTP 403. The failed staging directory was removed and no bytes from
-that attempt were retained or represented as evidence.
+An earlier free direct capture of an official IBM 2022 SEC filing page was
+denied with HTTP 403. No bytes from that attempt were retained or represented
+as evidence. This cycle made one separate successful request to SEC's free
+`data.sec.gov` submissions endpoint and preserved those original bytes, source
+locator, receipt clocks, size, and SHA256 in the evidence manifest.
 
 ## NYSE calendar scope qualification
 
