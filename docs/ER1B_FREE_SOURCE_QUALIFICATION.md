@@ -1,0 +1,50 @@
+# ER1B — free source qualification for authentic PIT pilots
+
+Status: desk qualification of a zero-cost acquisition path, not acquired evidence or permission to run an empirical study. [ER1A](ER1_DATA_ACQUISITION_SPEC.md) remains the admission specification. This milestone makes no external/API calls and does not establish historical coverage, source timing, licensing beyond the stated limits, or universe completeness.
+
+## Constraint and classifications
+
+Only sources usable at zero cost are candidates. No paid subscription, purchase-backed trial, paid fallback, or limited market-data API call is part of this milestone. `AUTHORITATIVE` means the source originates the stated fact within its stated scope; it does not mean its historical completeness or PIT availability is proven. `SECONDARY` can corroborate but cannot alone establish source authority. `DISCOVERY_ONLY` can identify records to verify elsewhere. `UNQUALIFIED` lacks the evidence needed for the proposed truth dimension. Classifications below are dimension-specific.
+
+## Source matrix
+
+| Market / truth dimension | Free candidate and classification | May prove, once original dated artifacts and ER1A evidence are acquired | May not prove from current qualification |
+| --- | --- | --- | --- |
+| US raw daily price and actions | Tiingo Starter — `SECONDARY` for market facts; `UNQUALIFIED` for complete action coverage | Its EOD response exposes raw and adjusted OHLCV and dividend/split fields for fetched symbols. Original rows may support those particular reported values and events after basis, edition, timing and provenance checks. | Full per-symbol history, all corporate-action types or explicit empty coverage, contemporaneous availability, complete historical universe, or execution fills. Adjusted values are audit references, not raw bars. |
+| US filing identity | SEC data.sec.gov — `AUTHORITATIVE` for SEC submission metadata | Current/former names and exchange/ticker metadata represented in a captured submission record; identity/provenance cross-checks. | A price feed, complete historical exchange membership, precise listing intervals solely from current metadata, or a complete dated universe. |
+| US listed-symbol discovery | Nasdaq Trader symbol directory — `AUTHORITATIVE` for its published directory edition; `DISCOVERY_ONLY` for history | Symbols in an acquired directory edition and its documented scope. | Prior-date membership, removed members absent from that edition, or a complete historical universe. Its public directory is current-day oriented. |
+| US historical universe | Open/community constituent lists — `DISCOVERY_ONLY`; currently `UNQUALIFIED` as universe authority | Leads to independently verifiable dated constituent records. | Exact-date complete rosters, delistings, timing, or survivorship safety without independent authoritative dated evidence. |
+| US calendar, intraday, costs and full action history | No qualified free source established — `UNQUALIFIED` | Nothing yet. Candidate artifacts require separate qualification against ER1A. | Session clocks, opening-origin execution bars, date-effective costs, or complete bounded action coverage. |
+| EGX index membership and public market artifacts | EGX official public website, index information/constituents and bulletin PDFs — `AUTHORITATIVE` within each official artifact's exact scope | Published index information, constituents or bulletin facts in retained original editions, subject to effective-date, receipt and availability review. | A complete all-listed historical universe, intervening-date membership, delistings, action coverage, or 2008/2020 depth merely because some pages/PDFs exist. |
+| EGX third-party mirrors | Free mirrors — `DISCOVERY_ONLY` | Leads and cross-checks for official original artifacts. | PIT prices, rosters, actions, timing or completeness unless provenance and ER1A requirements are independently established. |
+| EGX raw daily price, identity, calendar, actions, intraday and costs | No complete free bundle established — `UNQUALIFIED` | Individual official artifacts may be assessed in a later probe. | Complete canonical daily input, execution evidence, or economic validation. |
+
+Tiingo Starter is advertised at $0/month for individual internal use, with documented limits of 500 unique symbols/month, 50 requests/hour, 1,000/day and 1 GB/month. Its published history claims differ between pages (30+ versus 60+ years); historical depth must be checked per symbol during authorized acquisition. Whether the intended research use, retention, redistribution, team access or automation fits its terms is **UNKNOWN**; obtain and review applicable terms before use. SEC data.sec.gov needs no authentication or API key, and the Nasdaq Trader directory is publicly accessible; their detailed reuse/redistribution terms and any applicable access policies are **UNKNOWN** here. EGX public artifacts are accessible, but archive and reuse rights for the intended workflow are **UNKNOWN**. Public accessibility alone is not a licensing grant.
+
+## Minimum candidate bundles and missing proof
+
+**US daily PIT pilot:** Tiingo raw EOD rows for the predeclared cohort, SEC submission metadata for identity corroboration, Nasdaq Trader editions for symbol cross-checks, and independently authoritative dated evidence for the declared MIC's complete exact-date universe, listing changes/removals, session records and bounded action coverage. Original editions, row locators, hashes, receipt clocks, source-availability evidence and human review bindings are mandatory as specified in ER1A. The latter universe/calendar/action components have **no qualified free source yet**; the named three sources are a candidate core, not a complete bundle.
+
+**EGX daily PIT pilot:** original EGX official index/constituent editions and bulletin PDFs where their dated scope matches the declared cohort, plus authentic raw daily OHLCV, stable identity/crosswalk, complete exact-date universe, every-date session evidence and bounded action coverage. Preserve original artifacts and ER1A timing/review evidence. Whether the official public archive supplies each component for one contiguous pilot interval is **UNKNOWN**; mirrors can only guide discovery or corroboration until independently qualified.
+
+For either market, freeze the interval, MIC/security type or EGX cohort rule, warm-up and outcome horizon before inspecting outcomes. Include a historically eligible later-removed instrument where the declared universe had one, and preserve all members of each complete snapshot even if deriving only a small pilot cohort. If source evidence cannot establish a required field or exact-date completeness, stop admission for the affected date/instrument/claim. Never synthesize or forward-fill missing universe membership, actions, session state, availability time, identity, prices or execution bars. A later receipt or a current page cannot be backdated into pre-market truth. Unknown required evidence is a failed gate, not a negative observation.
+
+## Next acquisition probes (separate, authorized milestone)
+
+1. Review each source's current terms for permitted internal research, retention of original bytes, automation, redistribution and rate limits before fetching data. Record the exact terms edition.
+2. Freeze recent contiguous pilot dates and cohort rules, then locate original dated authoritative US universe and EGX roster/bulletin editions, including removal/delisting evidence. Check every required session date, gaps, corrections, publication/effective clocks and whether the archive is complete. Record negative findings without filling gaps.
+3. For selected US symbols, verify Tiingo raw OHLCV basis, actual per-symbol depth, dividend/split fields, corrections, source availability and row provenance within free limits. Determine whether separate authoritative evidence supplies all action types and explicit empty coverage.
+4. For EGX, inspect original official artifacts for raw OHLCV, identity changes, sessions, action terms and exact publication timing. Check whether any free price source can be tied to those artifacts without losing raw basis or PIT provenance.
+5. Probe free authoritative calendar and date-effective cost sources separately. Execution research additionally requires genuine opening-origin intraday bars, liquidity/volume and supportable slippage and participation inputs; a daily PIT pilot does not imply those exist.
+6. Retain hashes, original bytes, row locators and review attachments; construct ER1A evidence packages and run the relevant admission checks only in that later milestone. Test 2008/2020 and recent holdout coverage separately rather than infer it from a pilot interval.
+
+## Decision at this milestone
+
+| Claim | Decision | Gate |
+| --- | --- | --- |
+| US daily PIT pilot | **CONDITIONAL GO for free-source acquisition; NO-GO for admission today** | The Tiingo/SEC/Nasdaq core is plausible, but complete dated universe, sessions, all required actions, timing, licensing and reviews remain unproven. |
+| EGX daily PIT pilot | **CONDITIONAL GO for probing official free artifacts; NO-GO for admission today** | Official artifacts are the preferred authority, but archive completeness and the full canonical package remain unproven. |
+| US full empirical validation | **NO-GO** | No complete survivorship-safe historical universe, full action/intraday/economic inputs, stress-era coverage or frozen out-of-sample package is qualified. |
+| EGX full empirical validation | **NO-GO** | Historical archive, 2008/2020 reach, complete universe/actions and execution/economic inputs are unproven. |
+
+A successful small daily pilot can validate admission and PIT plumbing, including selected bias checks. It is neither statistical strategy validation nor survivorship-safe full-market research. Full empirical claims require the broader ER1A/M8 package and measured out-of-sample results, never a pass inferred from software validation alone.
