@@ -314,3 +314,30 @@ These metadata checks do not authenticate a claimed retrieval independently or
 prove historical availability; the original bytes and independent source review
 remain necessary. The unchanged authentic probe passes; 23 focused and
 listing-index dependency tests pass. No new acquisition was performed.
+
+## Return-independent SEC form sample declaration
+
+A bounded six-record submission sample was frozen under
+`/home/egx-agent/research-data/er1c-us-pilot/sec-form-sample-20260912T194500Z`
+before inspecting any selected submission content. For each retained Q2, Q3 and
+Q4 2022 form index and each unamended Form 8-A12B and Form 25-NSE group, the
+selection takes the lexicographically smallest SHA256 of the fixed seed,
+a NUL separator and the indexed submission locator. This makes selection
+reproducible from exact retained index bytes and independent of issuer returns,
+security class, exchange, or filing contents. The declaration SHA256 is
+`cbe07c48d823755350f31ea0ac4384386451727f1919701567ff409375820a63`.
+
+The offline declaration auditor recomputes all six choices, index hashes, line
+numbers, accession URLs and output names. It rejects a changed index edition,
+selection seed, record, locator or sidecar. This verifies the selection process;
+it does not authenticate submission bytes or establish that the sample is
+representative of every filing.
+
+Two attempts to retrieve the first selected submission from the official SEC
+archive, using Python urllib and curl with descriptive user agents, each
+received HTTP 403. No response body was retained as evidence and the remaining
+five URLs were not requested. Consequently, venue/security-class extraction
+has not been tested on this sample. Historical XNYS universe completeness,
+listing-ledger completeness, canonical US5A and overall PIT admission remain
+**NO-GO**. The failed retrieval is an acquisition constraint, not evidence
+about the filing or historical availability.
