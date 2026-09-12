@@ -348,3 +348,27 @@ def test_evidence_manifest_rejects_unsafe_or_ambiguous_metadata(change, message)
 def test_audit_rejects_noncanonical_price_rows(rows, message):
     with pytest.raises(ValueError, match=message):
         audit_rows(payload(*rows), date(2022, 4, 1), date(2022, 11, 4))
+
+
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "volume", "divCash", "splitFactor"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf"), True, None, "1"])
+def test_audit_rejects_nonfinite_or_nonnumeric_market_values(field, value):
+    with pytest.raises(ValueError, match="raw price|invalid"):
+        audit_rows(payload(row(**{field: value})), date(2022, 4, 1), date(2022, 11, 4))
+
+
+@pytest.mark.parametrize("changes", [{"volume": -1}, {"divCash": -1}, {"splitFactor": -1}, {"splitFactor": 0}])
+def test_audit_rejects_invalid_volume_and_action_domains(changes):
+    with pytest.raises(ValueError, match="invalid"):
+        audit_rows(payload(row(**changes)), date(2022, 4, 1), date(2022, 11, 4))
+
+
+@pytest.mark.parametrize("value", [None, [], 1, "date"])
+def test_audit_rejects_nonobject_rows(value):
+    with pytest.raises(ValueError, match="must be an object"):
+        audit_rows(payload(value), date(2022, 4, 1), date(2022, 11, 4))
+
+
+def test_audit_preserves_reverse_split_marker_without_deriving_coverage():
+    result = audit_rows(payload(row(splitFactor=0.1)), date(2022, 4, 1), date(2022, 11, 4))
+    assert result["vendor_action_markers_not_action_coverage"][0]["splitFactor"] == 0.1

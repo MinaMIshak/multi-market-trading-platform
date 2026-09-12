@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import html
 import json
+import math
 import re
 import zlib
 from datetime import date, datetime, timezone
@@ -493,6 +494,8 @@ def audit_rows(payload: bytes, start: date, end: date) -> dict[str, Any]:
     action_markers: list[dict[str, Any]] = []
     previous: date | None = None
     for number, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise ValueError(f"row {number} must be an object")
         missing = RAW_FIELDS.difference(row)
         if missing:
             raise ValueError(f"row {number} missing fields: {sorted(missing)}")
@@ -505,14 +508,34 @@ def audit_rows(payload: bytes, start: date, end: date) -> dict[str, Any]:
         previous = day
 
         prices = tuple(row[field] for field in ("open", "high", "low", "close"))
-        if any(type(value) not in (int, float) or value <= 0 for value in prices):
-            raise ValueError(f"row {number} has nonpositive raw price")
+        if any(
+            type(value) not in (int, float)
+            or (isinstance(value, float) and not math.isfinite(value))
+            or value <= 0
+            for value in prices
+        ):
+            raise ValueError(
+                f"row {number} has nonpositive raw price or non-finite/nonnumeric value"
+            )
         if row["low"] > min(row["open"], row["close"], row["high"]):
             raise ValueError(f"row {number} has incoherent raw low")
         if row["high"] < max(row["open"], row["close"], row["low"]):
             raise ValueError(f"row {number} has incoherent raw high")
-        if type(row["volume"]) not in (int, float) or row["volume"] < 0:
+        if (
+            type(row["volume"]) not in (int, float)
+            or (isinstance(row["volume"], float) and not math.isfinite(row["volume"]))
+            or row["volume"] < 0
+        ):
             raise ValueError(f"row {number} has invalid volume")
+        for field in ("divCash", "splitFactor"):
+            value = row[field]
+            if (
+                type(value) not in (int, float)
+                or (isinstance(value, float) and not math.isfinite(value))
+                or value < 0
+                or (field == "splitFactor" and value == 0)
+            ):
+                raise ValueError(f"row {number} has invalid {field}")
         if row["volume"] == 0:
             zero_volume.append(day.isoformat())
         if row["divCash"] != 0 or row["splitFactor"] != 1:

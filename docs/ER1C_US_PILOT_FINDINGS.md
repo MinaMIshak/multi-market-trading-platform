@@ -145,3 +145,17 @@ PYTHONDONTWRITEBYTECODE=1 /home/egx-agent/work/egx-trading-platform/.venv/bin/py
   tools/audit_er1c_us_pilot.py \
   /home/egx-agent/research-data/er1c-us-pilot/20260912T152213Z
 ```
+
+## Raw numeric integrity boundary
+
+The offline audit rejects non-object rows and non-finite or nonnumeric raw
+OHLCV and action markers, including booleans. Raw prices and split factors
+must be positive; volume and cash-dividend markers must be nonnegative.
+Positive fractional split factors remain valid vendor markers. Invalid values
+are rejected without repairing the original bytes or deriving market state.
+These checks close a comparison gap where NaN could bypass positivity and
+OHLC consistency checks. They do not establish complete action coverage.
+
+The retained authentic bundle passes the tightened audit offline. Canonical
+PIT admission remains NO_GO with the same mandatory evidence gaps. The new
+malformed-value test cases are software fixtures, not empirical observations.
