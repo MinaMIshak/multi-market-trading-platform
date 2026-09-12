@@ -7,6 +7,7 @@ import pytest
 from tools.audit_er1c_us_pilot import (
     audit_rows,
     inspect_nyse_2022_calendar,
+    inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
     sha256_bytes,
     validate_acquisition_manifest,
@@ -208,6 +209,25 @@ def test_twitter_event_missing_independent_cash_terms_fails_closed():
 
     with pytest.raises(ValueError, match="corporate-event anchors missing"):
         inspect_twitter_corporate_event(filing, removal)
+
+
+def test_pilot_identity_scope_keeps_filing_corroboration_out_of_us1():
+    event = inspect_twitter_corporate_event(*twitter_event_documents())
+
+    result = inspect_pilot_identity_scope({"TWTR", "IBM"}, event)
+
+    assert result["twitter_filing_identity_corroborated"] is True
+    assert result["ibm_issuer_identity_artifact_retained"] is False
+    assert result["stable_instrument_ids_evidenced"] is False
+    assert result["exact_date_identity_interval_evidenced"] is False
+    assert result["canonical_us1_identity_evidence"] == "NO_GO"
+
+
+def test_pilot_identity_scope_rejects_acquisition_cohort_drift():
+    event = inspect_twitter_corporate_event(*twitter_event_documents())
+
+    with pytest.raises(ValueError, match="does not match frozen pilot"):
+        inspect_pilot_identity_scope({"IBM"}, event)
 
 
 @pytest.mark.parametrize(

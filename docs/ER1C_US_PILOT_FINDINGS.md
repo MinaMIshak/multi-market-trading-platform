@@ -83,6 +83,26 @@ this incomplete package. The next defensible acquisition step is to seek free,
 dated authoritative evidence for those missing boundaries without redownloading
 the unchanged retained artifacts.
 
+## Identity scope qualification
+
+The audit now enforces that the acquisition request set exactly matches the
+frozen `IBM` and `TWTR` cohort. This prevents a later manifest or bundle from
+silently substituting, adding, or dropping a symbol while still claiming to be
+the predeclared pilot.
+
+The retained Twitter 8-K corroborates CIK `0001418091`, the `TWTR` symbol,
+common stock, and New York Stock Exchange representation at that filing. That
+is a filing-level identity fact only. No IBM issuer identity artifact is
+retained, provider request symbols are not stable instrument IDs, the exchange
+name does not by itself prove the canonical `XNYS` MIC mapping, and no artifact
+establishes exact-date identity for every required session. The audit therefore
+reports `canonical_us1_identity_evidence: NO_GO` and does not construct a
+`USListingIdentity`.
+
+An attempted free direct capture of an official IBM 2022 SEC filing page was
+denied with HTTP 403. The failed staging directory was removed and no bytes from
+that attempt were retained or represented as evidence.
+
 ## NYSE calendar scope qualification
 
 The retained official NYSE PDF is a one-page `2022 TRADING CALENDAR`, created

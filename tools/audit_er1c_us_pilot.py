@@ -70,6 +70,7 @@ EVIDENCE_RECORD_FIELDS = {
 NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
 TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
 TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
+PILOT_TICKERS = {"IBM", "TWTR"}
 NYSE_CALENDAR_TEXT_ANCHORS = {
     "2022 TRADING CALENDAR",
     "Exchange Holiday  -  Market Closed",
@@ -136,6 +137,42 @@ def inspect_twitter_corporate_event(
             "artifacts prove this event but not complete action coverage for the acquisition interval",
             "artifact historical availability is not proven",
             "approved human review bindings are absent",
+        ],
+    }
+
+
+def inspect_pilot_identity_scope(
+    acquisition_tickers: set[str], twitter_event_scope: dict[str, Any]
+) -> dict[str, Any]:
+    """Enforce the frozen cohort and state the retained US1 identity limit."""
+    if acquisition_tickers != PILOT_TICKERS:
+        raise ValueError(
+            "acquisition cohort does not match frozen pilot: "
+            f"expected={sorted(PILOT_TICKERS)}, actual={sorted(acquisition_tickers)}"
+        )
+    if twitter_event_scope.get("symbol") != "TWTR" or twitter_event_scope.get(
+        "cik"
+    ) != "0001418091":
+        raise ValueError("Twitter filing identity does not match frozen pilot")
+
+    return {
+        "frozen_acquisition_symbols": sorted(acquisition_tickers),
+        "twitter_filing_identity_corroborated": True,
+        "twitter_cik": "0001418091",
+        "twitter_symbol": "TWTR",
+        "twitter_exchange_text": "New York Stock Exchange",
+        "ibm_issuer_identity_artifact_retained": False,
+        "stable_instrument_ids_evidenced": False,
+        "exact_date_identity_interval_evidenced": False,
+        "listing_mic_evidenced": False,
+        "canonical_us1_identity_evidence": "NO_GO",
+        "limitations": [
+            "the retained Twitter filing corroborates one issuer, symbol, security, and exchange representation",
+            "no retained issuer artifact corroborates IBM identity",
+            "provider request symbols are mutable identifiers, not stable instrument IDs",
+            "NYSE exchange text does not itself evidence the canonical XNYS MIC mapping",
+            "no retained artifact proves exact-date identity on every required session date",
+            "artifact historical availability and approved human review bindings are absent",
         ],
     }
 
@@ -458,6 +495,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         evidence_payloads[TWITTER_8K_FILENAME],
         evidence_payloads[TWITTER_REMOVAL_FILENAME],
     )
+    identity_scope = inspect_pilot_identity_scope(set(results), twitter_event_scope)
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -471,6 +509,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "public_evidence": evidence_results,
         "nyse_2022_calendar_scope": calendar_scope,
         "twitter_corporate_event_scope": twitter_event_scope,
+        "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
             "source historical availability is not proven",
