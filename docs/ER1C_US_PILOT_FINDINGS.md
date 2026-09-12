@@ -230,3 +230,28 @@ only the already retained issuer record/payable-date history; search results
 that state ex-dates were secondary and were not acquired or admitted. The next
 evidence probe should prioritize an official historical XNYS roster or
 listing-change archive, while complete bounded actions remain unresolved.
+
+## Official NYSE historical-roster probe
+
+An official NYSE FTP probe retained the current symbol-mapping directory index
+and daily short-sale volume files for 2022-07-01, 2022-10-27 and 2022-10-28.
+The original bytes, locators, actual 2026 receipt times, HTTP metadata, sizes and
+SHA256 values are recorded under
+`/home/egx-agent/research-data/er1c-us-pilot/nyse-roster-probe-20260912`.
+The current directory index exposed no symbol-mapping edition for any of those
+pilot dates; direct requests for 2022-07-01 and 2022-10-27 editions returned
+HTTP 404 and no response bytes were admitted as evidence.
+
+The official reports contain NYSE-market (`N`) rows for IBM and TWTR on July 1
+and October 27. On October 28 they contain IBM but no TWTR row. These are
+bounded trading-report observations only. The report is a daily short-sale
+volume report, not a complete listing roster, and an absent row cannot prove an
+exchange closure, suspension, delisting, or universe ineligibility. TWTR's
+October 28 suspension remains supported by the previously retained
+issue-specific SEC-hosted NYSE notice, not inferred from this absence.
+
+The probe therefore does not establish complete exact-date XNYS membership,
+removed-name completeness, stable listing identity, or historical availability
+at a decision cutoff. Canonical US5A and overall PIT admission remain
+**NO-GO**. The bounded files may serve as independent activity corroboration,
+but they must not be promoted into universe snapshots or execution volume.
