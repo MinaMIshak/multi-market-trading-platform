@@ -50,6 +50,21 @@ currently supportable TWTR executable bar is 2022-10-27. Suspension on
 zero-volume row was interpreted as an exchange closure, suspension, or
 delisting by itself.
 
+The offline audit verifies the semantic scope of both retained SEC-hosted
+artifacts before reporting these facts. Twitter's Form 8-K binds CIK
+`0001418091`, common stock symbol `TWTR`, and the New York Stock Exchange. The
+NYSE removal notice independently corroborates the merger date, USD 54.20
+per-share cash terms, and pre-open suspension, and states the formal removal
+date.
+
+This proves one issue-specific event from the retained artifacts. It does not
+prove that every corporate action for TWTR, or either pilot instrument, is
+covered throughout 2022-04-01 through 2022-11-04. Both records declare
+historical availability unproven, their local receipt occurred in 2026, and no
+approved review binding exists. The audit therefore reports
+`canonical_us4_action_coverage: NO_GO`; complete bounded corporate-action
+coverage remains an admission blocker.
+
 ## Admission decision
 
 The acquired price bytes pass this bounded offline integrity audit, but an

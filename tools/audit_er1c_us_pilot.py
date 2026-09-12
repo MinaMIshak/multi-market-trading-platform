@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import re
 import zlib
@@ -67,12 +68,76 @@ EVIDENCE_RECORD_FIELDS = {
 }
 
 NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
+TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
+TWITTER_REMOVAL_FILENAME = "sec_nyse_twitter_removal_notice.html"
 NYSE_CALENDAR_TEXT_ANCHORS = {
     "2022 TRADING CALENDAR",
     "Exchange Holiday  -  Market Closed",
     "Early Market Close at 1pm eastern",
     "Dates are correct as of Dec. 13 2021 but are subject to change.",
 }
+
+
+def normalized_html_text(payload: bytes, label: str) -> str:
+    """Extract stable visible text for tightly scoped retained HTML artifacts."""
+    try:
+        decoded = payload.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"{label} is not UTF-8 HTML") from error
+    if not re.search(r"<(?:html|document)\b", decoded, re.IGNORECASE):
+        raise ValueError(f"{label} is not HTML")
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", decoded)).split())
+
+
+def inspect_twitter_corporate_event(
+    filing_payload: bytes, removal_payload: bytes
+) -> dict[str, Any]:
+    """Corroborate the retained TWTR merger/removal without claiming coverage."""
+    filing = normalized_html_text(filing_payload, "Twitter 8-K")
+    removal = normalized_html_text(removal_payload, "NYSE removal notice")
+    filing_anchors = {
+        "FORM 8-K",
+        "Twitter, Inc.",
+        "0001418091",
+        "Common Stock, par value $0.000005 per share TWTR New York Stock Exchange",
+        "On October 27, 2022, pursuant to the terms of the Merger Agreement, the Merger was consummated.",
+        "converted into the right to receive $54.20 in cash",
+        "trading of Twitter’s common stock on the NYSE was suspended prior to the opening of the NYSE on October 28, 2022",
+    }
+    removal_anchors = {
+        "NOTIFICATION OF THE REMOVAL FROM LISTING AND REGISTRATION OF THE STATED SECURITIES",
+        "The New York Stock Exchange hereby notifies the SEC",
+        "opening of business on November 08, 2022",
+        "The merger between Twitter, Inc. and X Holdings II, Inc.",
+        "became effective on October 27, 2022",
+        "Each share of Twitter, Inc. Common Stock was exchanged for USD 54.20 in cash",
+        "suspended from trading before market open on October 28, 2022",
+    }
+    missing_filing = sorted(anchor for anchor in filing_anchors if anchor not in filing)
+    missing_removal = sorted(anchor for anchor in removal_anchors if anchor not in removal)
+    if missing_filing or missing_removal:
+        raise ValueError(
+            "Twitter corporate-event anchors missing: "
+            f"filing={missing_filing}, removal_notice={missing_removal}"
+        )
+    return {
+        "issuer": "Twitter, Inc.",
+        "cik": "0001418091",
+        "security": "Common Stock, par value $0.000005 per share",
+        "symbol": "TWTR",
+        "exchange": "New York Stock Exchange",
+        "merger_effective_date": "2022-10-27",
+        "cash_consideration_usd_per_share": 54.20,
+        "trading_suspended_before_open_date": "2022-10-28",
+        "formal_removal_opening_of_business_date": "2022-11-08",
+        "independently_corroborated_by_retained_artifacts": True,
+        "canonical_us4_action_coverage": "NO_GO",
+        "limitations": [
+            "artifacts prove this event but not complete action coverage for the acquisition interval",
+            "artifact historical availability is not proven",
+            "approved human review bindings are absent",
+        ],
+    }
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -359,6 +424,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     evidence_records = validate_evidence_manifest(evidence_manifest)
     evidence_results = []
     calendar_scope = None
+    evidence_payloads: dict[str, bytes] = {}
     for record in evidence_records:
         payload = (evidence_manifest_path.parent / record["filename"]).read_bytes()
         if len(payload) != record["byte_size"]:
@@ -375,11 +441,23 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
                 ],
             }
         )
+        evidence_payloads[record["filename"]] = payload
         if record["filename"] == NYSE_CALENDAR_FILENAME:
             calendar_scope = inspect_nyse_2022_calendar(payload)
 
     if calendar_scope is None:
         raise ValueError("retained NYSE 2022 calendar evidence is absent")
+    missing_twitter = sorted(
+        {TWITTER_8K_FILENAME, TWITTER_REMOVAL_FILENAME}.difference(evidence_payloads)
+    )
+    if missing_twitter:
+        raise ValueError(
+            f"retained Twitter corporate-event evidence is absent: {missing_twitter}"
+        )
+    twitter_event_scope = inspect_twitter_corporate_event(
+        evidence_payloads[TWITTER_8K_FILENAME],
+        evidence_payloads[TWITTER_REMOVAL_FILENAME],
+    )
 
     return {
         "schema_version": "er1c-offline-audit-v1",
@@ -392,6 +470,7 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "public_evidence_manifest_sha256": evidence_manifest_sha256,
         "public_evidence": evidence_results,
         "nyse_2022_calendar_scope": calendar_scope,
+        "twitter_corporate_event_scope": twitter_event_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
             "source historical availability is not proven",
