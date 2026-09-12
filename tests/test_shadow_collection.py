@@ -14,7 +14,7 @@ from app.research.historical_evidence import (
 from tests.test_shadow_records import AT, watchlist
 
 
-def package(identity_char, reference):
+def package(identity_char, reference, covered_fields=("fixture",)):
     raw = HistoricalRawReceipt(
         provider="fixture", source="fixture", source_locator=reference.source_locator,
         sha256=reference.artifact_sha256, byte_size=10,
@@ -32,7 +32,7 @@ def package(identity_char, reference):
     evidence = HistoricalAvailabilityEvidence(
         subject_receipt_id=raw.identity, subject_sha256=raw.sha256,
         source_edition="fixture-v1", covered_scope="fixture shadow input",
-        covered_fields=("fixture",), revision_semantics="immutable fixture",
+        covered_fields=covered_fields, revision_semantics="immutable fixture",
         attachments=(attachment_ref,),
         availability=HistoricalAvailability(kind="EXACT", exact_at=reference.available_at),
     )

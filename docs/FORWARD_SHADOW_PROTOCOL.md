@@ -131,6 +131,33 @@ Every event remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED** with `NO EXECUT
 INFERENCE`. It is a candidate-preservation boundary only: it does not establish
 canonical session, identity, price, liquidity or risk truth beyond what the
 upstream records and packages actually prove, and it creates no trigger, fill,
-position, P&L or NAV. The next milestone is canonical fact admission before any
-trigger evaluation, followed by authenticated execution events and conservative
-fill logic.
+position, P&L or NAV.
+
+### Forward fact admission
+
+`app.paper.shadow_facts` adds the canonical fact boundary required before trigger
+evaluation. One `shadow-forward-facts-v1` bundle binds an exact known candidate
+event to its open session, stable listing identity, complete corporate-action
+coverage through the session, and one or more final `RAW_UNADJUSTED` bars. Bars
+must start at the authenticated session open, use gap-free sequence and time
+continuity, remain inside the session, carry coherent positive OHLC and
+nonnegative volume, and cannot be admitted before their stated availability.
+
+Every fact role references an exact reviewed `HistoricalEvidencePackage`. The
+package set must equal the referenced set, pass the existing availability and
+build-clock gate, and declare all canonical fields consumed for that role in
+`covered_fields`. Each bar's `available_at` must equal its package's exact or
+latest bounded availability. An earlier convenient timestamp cannot replace the
+evidence boundary. `COMPLETE` action coverage may contain an explicit empty event
+tuple. `UNKNOWN` coverage is not admissible.
+
+`append_forward_fact_event` publishes a content-addressed, atomic event binding
+the candidate event hash, exact canonical facts and package identities.
+`audit_forward_fact_event` rechecks candidate and evidence bindings, clocks,
+semantic field coverage, duplicate/unexpected fields and exact event content
+without writing. These events remain **EXPERIMENTAL / PAPER ONLY — NOT SCORED**
+and say `NO TRIGGER OR FILL INFERENCE`. They do not decide whether an entry
+condition fired, resolve price ordering within a bar, create a fill or position,
+or update P&L/NAV. Source review remains a trusted attestation rather than
+cryptographic proof of source truth. The next milestone is a separate trigger
+evaluation event with conservative gap and same-bar ambiguity handling.
