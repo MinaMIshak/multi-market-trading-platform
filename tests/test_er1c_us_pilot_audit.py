@@ -18,6 +18,7 @@ from tools.audit_er1c_us_pilot import (
     sha256_bytes,
     validate_acquisition_manifest,
     validate_evidence_manifest,
+    verify_closed_directory,
     verify_predeclaration,
     verify_sha256_sidecar,
 )
@@ -339,6 +340,42 @@ def test_evidence_manifest_rejects_unsafe_or_ambiguous_metadata(change, message)
     change(manifest)
     with pytest.raises(ValueError, match=message):
         validate_evidence_manifest(manifest)
+
+
+def test_closed_directory_accepts_exact_regular_inventory(tmp_path):
+    (tmp_path / "manifest.json").write_bytes(b"{}")
+    (tmp_path / "raw.json").write_bytes(b"[]")
+    (tmp_path / "evidence").mkdir()
+
+    verify_closed_directory(
+        tmp_path, {"manifest.json", "raw.json"}, {"evidence"}, "bundle"
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation,message",
+    [
+        (lambda path: (path / "undeclared.html").write_bytes(b"x"), "undeclared"),
+        (lambda path: (path / "raw.json").unlink(), "missing"),
+    ],
+)
+def test_closed_directory_rejects_incomplete_or_undeclared_inventory(
+    tmp_path, mutation, message
+):
+    (tmp_path / "raw.json").write_bytes(b"[]")
+    mutation(tmp_path)
+
+    with pytest.raises(ValueError, match=message):
+        verify_closed_directory(tmp_path, {"raw.json"}, set(), "evidence")
+
+
+def test_closed_directory_rejects_symlinked_artifact(tmp_path):
+    target = tmp_path.parent / "outside.raw"
+    target.write_bytes(b"[]")
+    (tmp_path / "raw.json").symlink_to(target)
+
+    with pytest.raises(ValueError, match="not a regular file"):
+        verify_closed_directory(tmp_path, {"raw.json"}, set(), "evidence")
 
 
 @pytest.mark.parametrize(

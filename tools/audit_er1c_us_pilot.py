@@ -528,6 +528,31 @@ def safe_filename(value: Any, label: str) -> str:
     return value
 
 
+def verify_closed_directory(
+    directory: Path,
+    expected_files: set[str],
+    expected_directories: set[str],
+    label: str,
+) -> None:
+    """Require a manifest-controlled directory with no undeclared artifacts."""
+    expected = expected_files | expected_directories
+    entries = {entry.name: entry for entry in directory.iterdir()}
+    if set(entries) != expected:
+        missing = sorted(expected.difference(entries))
+        undeclared = sorted(set(entries).difference(expected))
+        raise ValueError(
+            f"{label} inventory mismatch: missing={missing}, undeclared={undeclared}"
+        )
+    for name in expected_files:
+        entry = entries[name]
+        if entry.is_symlink() or not entry.is_file():
+            raise ValueError(f"{label} artifact is not a regular file: {name}")
+    for name in expected_directories:
+        entry = entries[name]
+        if entry.is_symlink() or not entry.is_dir():
+            raise ValueError(f"{label} entry is not a regular directory: {name}")
+
+
 def utc_timestamp(value: Any, label: str) -> datetime:
     if not isinstance(value, str):
         raise ValueError(f"invalid {label} timestamp")
@@ -766,6 +791,13 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     )
     manifest = json.loads(manifest_payload)
     requests = validate_acquisition_manifest(manifest)
+    verify_closed_directory(
+        bundle,
+        {"manifest.json", "manifest.sha256"}
+        | {request["raw_file"] for request in requests},
+        {"evidence"},
+        "acquisition bundle",
+    )
     predeclaration_sha256 = verify_predeclaration(
         predeclaration.read_bytes(), manifest["predeclaration_sha256"]
     )
@@ -797,6 +829,13 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
     )
     evidence_manifest = json.loads(evidence_manifest_payload)
     evidence_records = validate_evidence_manifest(evidence_manifest)
+    verify_closed_directory(
+        evidence_manifest_path.parent,
+        {"evidence_manifest.json", "evidence_manifest.sha256"}
+        | {record["filename"] for record in evidence_records},
+        set(),
+        "public evidence",
+    )
     evidence_results = []
     calendar_scope = None
     evidence_payloads: dict[str, bytes] = {}

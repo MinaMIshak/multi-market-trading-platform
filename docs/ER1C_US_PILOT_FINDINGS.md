@@ -214,3 +214,19 @@ changed. Two web discovery queries for official IBM May/August 2022 ex-date
 statements did not establish new authoritative evidence; no search result was
 admitted and no source was redownloaded. Ex-dates, full action coverage and all
 other mandatory PIT gaps remain unresolved.
+
+## Closed acquisition inventory
+
+The offline audit now requires the acquisition root and public-evidence
+directory to contain exactly the files declared by their manifests, plus the
+expected manifest sidecars and evidence directory. Missing files, undeclared
+artifacts, substituted directories and symbolic links fail closed. This closes
+an audit ambiguity where valid declared hashes could coexist with untracked raw
+bytes that were outside the reported inventory. It does not authenticate source
+authority or relax any PIT gate.
+
+A new official-source search for the IBM May 9 and August 9, 2022 ex-dates found
+only the already retained issuer record/payable-date history; search results
+that state ex-dates were secondary and were not acquired or admitted. The next
+evidence probe should prioritize an official historical XNYS roster or
+listing-change archive, while complete bounded actions remain unresolved.
