@@ -8,6 +8,7 @@ from tools.audit_er1c_us_pilot import (
     audit_rows,
     inspect_nyse_2022_calendar,
     inspect_ibm_submission,
+    inspect_ibm_dividend_scope,
     inspect_ibm_2022q2_filing,
     inspect_pilot_identity_scope,
     inspect_twitter_corporate_event,
@@ -372,3 +373,45 @@ def test_audit_rejects_nonobject_rows(value):
 def test_audit_preserves_reverse_split_marker_without_deriving_coverage():
     result = audit_rows(payload(row(splitFactor=0.1)), date(2022, 4, 1), date(2022, 11, 4))
     assert result["vendor_action_markers_not_action_coverage"][0]["splitFactor"] == 0.1
+
+
+def ibm_dividend_filing():
+    # Software fixture only; not empirical evidence.
+    return ibm_2022q2_filing().replace(b"</body>", (
+        b"On July 25, 2022 , the company announced that the Board of Directors "
+        b"approved a quarterly dividend of $ 1.65 per common share. The dividend "
+        b"is payable September 10, 2022 to shareholders of record on August 10, 2022 ."
+        b"</body>"
+    ))
+
+
+def test_ibm_dividend_preserves_date_roles_without_admitting_actions():
+    source = ibm_dividend_filing()
+    result = inspect_ibm_dividend_scope(source)
+    assert result["source_sha256"] == sha256_bytes(source)
+    assert result["reported_announcement_date"] == "2022-07-25"
+    assert result["reported_record_date"] == "2022-08-10"
+    assert result["reported_payable_date"] == "2022-09-10"
+    assert result["reported_amount_usd_per_common_share"] == "1.65"
+    assert result["ex_date"] is None
+    assert result["historical_available_at"] is None
+    assert result["complete_bounded_action_coverage"] is False
+    assert result["canonical_us4_action_coverage"] == "NO_GO"
+
+
+@pytest.mark.parametrize("old,new", [
+    (b"July 25", b"July 26"),
+    (b"1.65", b"1.66"),
+    (b"September 10", b"September 11"),
+    (b"August 10", b"August 09"),
+    (b"per common share", b"per preferred share"),
+    (b"0000051143", b"0001418091"),
+])
+def test_ibm_dividend_rejects_changed_terms_or_issuer(old, new):
+    with pytest.raises(ValueError):
+        inspect_ibm_dividend_scope(ibm_dividend_filing().replace(old, new))
+
+
+def test_ibm_listing_statement_alone_cannot_prove_dividend():
+    with pytest.raises(ValueError, match="dividend announcement terms"):
+        inspect_ibm_dividend_scope(ibm_2022q2_filing())

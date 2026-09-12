@@ -159,3 +159,28 @@ OHLC consistency checks. They do not establish complete action coverage.
 The retained authentic bundle passes the tightened audit offline. Canonical
 PIT admission remains NO_GO with the same mandatory evidence gaps. The new
 malformed-value test cases are software fixtures, not empirical observations.
+
+## IBM dividend announcement scope
+
+The retained IBM Q2 10-Q, page 52, reports a July 25, 2022 announcement
+of a USD 1.65 quarterly dividend per common share, payable September 10, 2022
+to shareholders of record August 10, 2022. The offline audit binds this exact
+statement to the filing identity, archive locator and original-byte SHA256.
+It reports these three date roles separately and leaves ex-date and historical
+availability unknown. A payable date is not proof that payment occurred.
+
+The amount agrees with the August vendor marker, but the statement does not
+independently establish the vendor's August 9 ex-date. Neither record date nor
+payable date may be substituted for an effective ex-date. The July announcement
+also cannot supply pre-announcement knowledge. No current receipt is backdated.
+
+This is one reported action announcement, not a complete bounded action history
+for April 1 through November 4. It supplies neither negative evidence for other
+actions nor approval for canonical US4 coverage. Admission remains **NO-GO**.
+The next action probe should seek retained or free official dated issuer notices
+for both vendor-marked dividends, preserving announcement, ex-date, record and
+payment roles and checking their exact scope before any admission claim.
+
+Verification: 86 focused audit tests passed; the authentic retained bundle audit
+completed successfully with five verified public artifacts and PIT NO_GO. No
+external requests were made and no raw artifacts or frozen declarations changed.

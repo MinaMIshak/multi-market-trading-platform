@@ -244,6 +244,41 @@ def inspect_ibm_2022q2_filing(payload: bytes) -> dict[str, Any]:
     }
 
 
+def inspect_ibm_dividend_scope(payload: bytes) -> dict[str, Any]:
+    """Qualify a reported dividend announcement, never infer its ex-date."""
+    inspect_ibm_2022q2_filing(payload)
+    filing = normalized_html_text(payload, "IBM dividend announcement")
+    statement = (
+        "On July 25, 2022 , the company announced that the Board of Directors "
+        "approved a quarterly dividend of $ 1.65 per common share. The dividend "
+        "is payable September 10, 2022 to shareholders of record on August 10, 2022 ."
+    )
+    if statement not in filing:
+        raise ValueError("IBM dividend announcement terms missing or changed")
+    return {
+        "symbol": "IBM",
+        "source_file": IBM_2022Q2_10Q_FILENAME,
+        "source_locator": IBM_2022Q2_10Q_URL,
+        "source_sha256": sha256_bytes(payload),
+        "statement_locator": "page 52; paragraph beginning On July 25, 2022",
+        "reported_announcement_date": "2022-07-25",
+        "reported_amount_usd_per_common_share": "1.65",
+        "reported_record_date": "2022-08-10",
+        "reported_payable_date": "2022-09-10",
+        "ex_date": None,
+        "historical_available_at": None,
+        "complete_bounded_action_coverage": False,
+        "canonical_us4_action_coverage": "NO_GO",
+        "limitations": [
+            "reported announcement date is not proven historical availability",
+            "record and payable dates do not establish an ex-date or actual payment",
+            "matching vendor amount does not independently corroborate its ex-date",
+            "one announcement does not establish complete bounded actions or empty coverage",
+            "artifact historical availability and approved human review bindings are absent",
+        ],
+    }
+
+
 def inspect_pilot_identity_scope(
     acquisition_tickers: set[str],
     twitter_event_scope: dict[str, Any],
@@ -665,6 +700,9 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         "twitter_corporate_event_scope": twitter_event_scope,
         "ibm_submission_scope": ibm_submission_scope,
         "ibm_2022q2_filing_scope": ibm_filing_scope,
+        "ibm_dividend_scope": inspect_ibm_dividend_scope(
+            evidence_payloads[IBM_2022Q2_10Q_FILENAME]
+        ),
         "pilot_identity_scope": identity_scope,
         "canonical_pit_admission": "NO_GO",
         "admission_blockers": [
