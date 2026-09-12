@@ -210,6 +210,37 @@ require the trigger recording time to be at or after the upstream fact-event
 recording time, during both publication and audit. Bar availability alone cannot
 authorize a trigger event backdated before the fact event it consumes. They do
 not authenticate arbitrary source semantics or establish queues, participation,
-spread, slippage, costs, fills, positions, P&L or strategy edge. The next
-milestone must add a separately authenticated simulated-fill boundary and must
-refuse ambiguous trigger events.
+spread, slippage, costs, fills, positions, P&L or strategy edge. Simulated-fill
+admission is the separate downstream boundary described below.
+
+### Simulated entry-fill admission
+
+`app.paper.shadow_fills` consumes the exact audited trigger chain and accepts only
+the `TRIGGERED` status. `TRIGGERED_AMBIGUOUS_BAR`, non-trigger, invalidation and
+target-gap outcomes cannot produce a fill. The boundary reuses the authenticated
+trigger bar and candidate's predeclared full paper quantity; it does not invent a
+queue, partial fill, tick path or exact intrabar timestamp.
+
+Every `shadow-fill-policy-v1` supplies exact Decimal entry slippage, variable and
+fixed per-side costs, maximum volume participation, market and currency. Separate
+reviewed evidence-package references must cover each assumption. The exact package
+set is re-admitted at the watchlist information cutoff, so evidence acquired,
+reviewed or available only after candidate selection cannot tune the simulated
+economics. US policies use USD and EGX policies use EGP. These are explicit
+evidenced assumptions, not measured spread or impact unless their source packages
+actually establish that stronger scope.
+
+Capacity is `floor(authenticated trigger-bar volume * participation fraction)`.
+If the declared quantity exceeds it, the event records `NO FILL: INSUFFICIENT
+CAPACITY`; there is no partial fill. An admitted long fill applies buy-side
+slippage adversely to the trigger reference price, rejects a slipped price outside
+the candidate's stop/target geometry, and records exact quantity, raw and slipped
+price, bar interval, fact availability, notional and entry-side cost.
+
+`append_fill_event` publishes one atomic content-addressed
+`shadow-fill-event-v1`, binding the upstream trigger bytes hash, policy, package
+identities and optional fill. Publication cannot precede the trigger event.
+`audit_fill_event` recomputes the full chain and rejects duplicate fields,
+tampering, future clocks and backdating. Every event remains **EXPERIMENTAL /
+PAPER ONLY — NOT SCORED**. It explicitly creates no position event, exit, P&L or
+NAV. Position state and conservative exit processing are later boundaries.
