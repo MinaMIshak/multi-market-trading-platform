@@ -505,3 +505,19 @@ their prior counts and Twitter filing rows unchanged. This custody correction
 does not turn filing indexes into a historical roster or complete listing-change
 ledger. Historical XNYS universe and listing-ledger conclusions remain
 **NO-GO**.
+
+## SEC direct-attempt audit clock and byte binding
+
+The negative direct-submission attempt auditor now requires a canonical UTC
+audit clock and rejects receipt completion later than that clock. Equality is
+accepted; reversed request bounds remain rejected. Its output includes the audit
+time and hashes the same byte buffer used for validation, avoiding a second read
+that could report a hash for different bytes.
+
+The retained attempt passes with SHA256
+`6dd754aae8e489947e65a16ddf07c441f2892589c07dde1b90fdb121b1048d74`
+and still reports `NO_SUBMISSION_BYTES_ACQUIRED`. This check establishes temporal
+consistency of the attempt record, not independent authentication of the HTTP
+exchange or historical availability of any filing. No new retrieval was made.
+Historical universe/listing completeness and PIT admission remain **NO-GO**;
+the platform remains **EXPERIMENTAL / PAPER ONLY**.

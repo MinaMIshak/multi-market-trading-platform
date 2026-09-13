@@ -45,10 +45,16 @@ def _direct_locator(record: dict) -> str:
 
 def audit_direct_attempt(
     attempt_path: Path, declaration_root: Path, index_root: Path,
+    *, audited_at: datetime | None = None,
 ) -> dict:
+    if audited_at is None:
+        audited_at = datetime.now(timezone.utc)
+    if type(audited_at) is not datetime or audited_at.tzinfo is not timezone.utc:
+        raise ValueError("audited_at must use datetime.timezone.utc")
     declaration_result = audit_declaration(declaration_root, index_root)
     declaration = json.loads((declaration_root / "declaration.json").read_bytes())
-    attempt = json.loads(attempt_path.read_bytes(), object_pairs_hook=_unique_object)
+    raw_attempt = attempt_path.read_bytes()
+    attempt = json.loads(raw_attempt, object_pairs_hook=_unique_object)
     if not isinstance(attempt, dict) or set(attempt) != FIELDS:
         raise ValueError("unexpected attempt schema")
     if attempt["schema"] != "er1c-sec-direct-submission-attempt-v1":
@@ -64,6 +70,8 @@ def audit_direct_attempt(
     completed = _utc(attempt["completed_at_utc"], "attempt completion")
     if completed < started:
         raise ValueError("attempt completion precedes start")
+    if completed > audited_at:
+        raise ValueError("attempt completion is after audit time")
     if attempt["client"] != "curl" or type(attempt["http_status"]) is not int:
         raise ValueError("invalid attempt transport result")
     if attempt["http_status"] != 403 or attempt["result"] != "HTTP_REJECTED":
@@ -76,7 +84,8 @@ def audit_direct_attempt(
     ):
         raise ValueError("invalid response-byte disposition")
     return {
-        "attempt_sha256": hashlib.sha256(attempt_path.read_bytes()).hexdigest(),
+        "attempt_sha256": hashlib.sha256(raw_attempt).hexdigest(),
+        "audited_at": audited_at.isoformat(),
         "declaration_sha256": declaration_result["declaration_sha256"],
         "first_selected_record_bound": True,
         "http_status": 403,
