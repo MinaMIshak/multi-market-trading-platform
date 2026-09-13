@@ -1,0 +1,194 @@
+"""Conservative authenticated paper exits; no portfolio or performance aggregation."""
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import datetime, timezone
+from decimal import Context, Decimal, localcontext
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.paper.shadow_collection import _publish_once
+from app.paper.shadow_facts import ForwardFactBundle
+from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
+from app.paper.shadow_ledger import LABEL
+from app.paper.shadow_positions import audit_position_open_event
+from app.paper.shadow_records import ShadowWatchlist
+from app.research.historical_evidence import HistoricalEvidencePackage, require_historical_evidence
+
+EXIT_SLIPPAGE_FIELDS = {"stop_slippage_bps", "target_slippage_bps"}
+EXIT_COST_FIELDS = {"cost_bps_per_side", "fixed_cost_per_side", "currency"}
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class ShadowExitPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    schema_version: Literal["shadow-exit-policy-v1"] = "shadow-exit-policy-v1"
+    market: Literal["EGX", "US"]
+    currency: Literal["EGP", "USD"]
+    stop_slippage_bps: Decimal = Field(ge=0)
+    target_slippage_bps: Decimal = Field(ge=0)
+    cost_bps_per_side: Decimal = Field(ge=0)
+    fixed_cost_per_side: Decimal = Field(ge=0)
+    slippage_evidence_package_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cost_evidence_package_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("stop_slippage_bps", "target_slippage_bps", "cost_bps_per_side",
+                     "fixed_cost_per_side", mode="before")
+    @classmethod
+    def exact_decimal(cls, value):
+        if type(value) is not Decimal or not value.is_finite():
+            raise ValueError("finite exact Decimal required")
+        return value
+
+    @model_validator(mode="after")
+    def coherent(self):
+        if (self.market == "US") != (self.currency == "USD"):
+            raise ValueError("market/currency mismatch")
+        return self
+
+
+def _packages(policy, supplied, cutoff):
+    if type(supplied) is not tuple:
+        raise ValueError("exact exit evidence package tuple required")
+    found = {}
+    for package in supplied:
+        if type(package) is not HistoricalEvidencePackage or package.identity in found:
+            raise ValueError("exact unique exit evidence packages required")
+        found[package.identity] = package
+    expected = {policy.slippage_evidence_package_id, policy.cost_evidence_package_id}
+    if set(found) != expected:
+        raise ValueError("exit evidence packages must match references exactly")
+    for package in found.values():
+        require_historical_evidence(package, decision_at=cutoff, research_built_at=cutoff)
+    for identity, fields in ((policy.slippage_evidence_package_id, EXIT_SLIPPAGE_FIELDS),
+                             (policy.cost_evidence_package_id, EXIT_COST_FIELDS)):
+        if not fields <= set(found[identity].evidence.covered_fields):
+            raise ValueError("evidence package does not cover exit-policy fields")
+    return found
+
+
+def evaluate_exit(position: dict, facts: ForwardFactBundle, policy: ShadowExitPolicy) -> dict:
+    entry = position["entry"]
+    if (policy.market != facts.session.market or policy.currency != entry["currency"]
+            or str(facts.identity.instrument_id) != entry["instrument_id"]
+            or facts.identity.ticker != entry["ticker"]):
+        raise ValueError("exit inputs do not bind open position")
+    stop, target = Decimal(position["initial_stop"]), Decimal(position["initial_targets"][0])
+    entry_sequence = entry["bar_sequence"]
+    outcome, reason, bar, raw = "OPEN", "NO_EXIT_OBSERVED", None, None
+    for item in facts.bars:
+        if item.sequence < entry_sequence:
+            continue
+        entry_at_open = (item.sequence == entry_sequence
+                         and Decimal(entry["raw_price"]) == item.open)
+        if item.sequence == entry_sequence and not entry_at_open:
+            # The accepted trigger proves stop/target did not precede entry, but does not
+            # establish their relative post-entry order if both occur.
+            if item.low <= stop and item.high >= target:
+                return {"status": "UNKNOWN", "reason": "ENTRY_BAR_STOP_TARGET_ORDER_UNKNOWN",
+                        "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+        if item.open <= stop:
+            outcome, reason, bar, raw = "CLOSED", "STOP_GAP", item, item.open
+            break
+        if item.open >= target:
+            outcome, reason, bar, raw = "CLOSED", "TARGET_GAP", item, target
+            break
+        hit_stop, hit_target = item.low <= stop, item.high >= target
+        if hit_stop and hit_target:
+            return {"status": "UNKNOWN", "reason": "STOP_TARGET_ORDER_UNKNOWN",
+                    "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+        if hit_stop:
+            outcome, reason, bar, raw = "CLOSED", "STOP", item, stop
+            break
+        if hit_target:
+            outcome, reason, bar, raw = "CLOSED", "TARGET_1", item, target
+            break
+    if outcome == "OPEN":
+        return {"status": outcome, "reason": reason,
+                "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+    bps = policy.stop_slippage_bps if reason.startswith("STOP") else policy.target_slippage_bps
+    with localcontext(Context(prec=34)):
+        price = raw * (Decimal(1) - bps / Decimal(10000))
+        if price <= 0:
+            raise ValueError("exit slippage produces nonpositive price")
+        notional = price * entry["quantity"]
+        cost = notional * policy.cost_bps_per_side / Decimal(10000) + policy.fixed_cost_per_side
+    return {"status": outcome, "reason": reason,
+            "evaluated_through_sequence": bar.sequence,
+            "exit": {"quantity": entry["quantity"], "bar_sequence": bar.sequence,
+                     "interval_start": bar.interval_start.isoformat(),
+                     "interval_end": bar.interval_end.isoformat(),
+                     "known_at": bar.available_at.isoformat(), "raw_price": str(raw),
+                     "fill_price": str(price), "notional": str(notional),
+                     "exit_cost": str(cost), "currency": policy.currency}}
+
+
+def _basis(position, facts, policy, package_ids):
+    evaluation = evaluate_exit(position, facts, policy)
+    return {"schema_version": "shadow-exit-event-v1", "label": LABEL,
+            "event_type": "EXIT_EVALUATED", "scoring": "NOT SCORED",
+            "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
+            "performance_status": "NO P&L OR NAV",
+            "position_event_id": position["event_id"],
+            "position_event_sha256": hashlib.sha256(_canonical(position)).hexdigest(),
+            "fact_record_id": facts.record_id, "exit_package_ids": package_ids,
+            "policy": policy.model_dump(mode="json"), "evaluation": evaluation}
+
+
+def append_exit_event(directory: Path, watchlist: ShadowWatchlist,
+                      watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+                      facts: ForwardFactBundle, fact_packages: tuple[HistoricalEvidencePackage, ...],
+                      fill_policy: ShadowFillPolicy, fill_packages: tuple[HistoricalEvidencePackage, ...],
+                      exit_policy: ShadowExitPolicy,
+                      exit_packages: tuple[HistoricalEvidencePackage, ...]) -> Path:
+    exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
+    position = audit_position_open_event(directory, watchlist, watchlist_packages, facts,
+                                         fact_packages, fill_policy, fill_packages)
+    packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
+    basis = _basis(position, facts, exit_policy, sorted(packages))
+    recorded_at = _utc(_now())
+    if recorded_at < _utc(datetime.fromisoformat(position["recorded_at"])) or recorded_at < facts.bars[-1].available_at:
+        raise ValueError("exit publication precedes authenticated inputs")
+    payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
+                       "recorded_at": recorded_at.isoformat()}
+    path = _publish_once(Path(directory) / "exit-events" / f'{position["event_id"]}.json', payload)
+    if _now() < recorded_at:
+        path.unlink()
+        raise ValueError("clock rollback during exit publication")
+    return path
+
+
+def audit_exit_event(directory: Path, watchlist: ShadowWatchlist,
+                     watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+                     facts: ForwardFactBundle, fact_packages: tuple[HistoricalEvidencePackage, ...],
+                     fill_policy: ShadowFillPolicy, fill_packages: tuple[HistoricalEvidencePackage, ...],
+                     exit_policy: ShadowExitPolicy,
+                     exit_packages: tuple[HistoricalEvidencePackage, ...]) -> dict:
+    exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
+    position = audit_position_open_event(directory, watchlist, watchlist_packages, facts,
+                                         fact_packages, fill_policy, fill_packages)
+    packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
+    basis = _basis(position, facts, exit_policy, sorted(packages))
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate exit-event field")
+            result[key] = value
+        return result
+    path = Path(directory) / "exit-events" / f'{position["event_id"]}.json'
+    event = json.loads(path.read_bytes(), object_pairs_hook=unique)
+    if type(event) is not dict or set(event) != set(basis) | {"event_id", "recorded_at"}:
+        raise ValueError("unexpected exit-event fields")
+    recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
+    expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
+                        "recorded_at": recorded_at.isoformat()}
+    if not max(_utc(datetime.fromisoformat(position["recorded_at"])), facts.bars[-1].available_at) <= recorded_at <= _now() or event != expected:
+        raise ValueError("exit event does not bind authenticated inputs")
+    return event

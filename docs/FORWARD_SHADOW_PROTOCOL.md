@@ -270,3 +270,30 @@ not yet reconciled into one portfolio position per candidate. Shared capital,
 candidate-level allocation/deduplication, conservative exits (including entry-bar
 stop/target uncertainty), marks, FX and performance require separate admission.
 No authentic position or performance result was created by this milestone.
+
+### Conservative exit provenance
+
+`app.paper.shadow_exits` re-audits the durable position-open event and its entire
+watchlist, fact, trigger and fill chain before evaluating an exit. A separately
+predeclared `shadow-exit-policy-v1` requires exact Decimal stop and target
+slippage plus variable and fixed exit-side costs. The referenced evidence
+packages must exactly cover those fields and be safely known by the frozen
+information cutoff.
+
+For a long paper position, an open below the stop exits at that worse open; an
+open above target 1 remains capped at target 1. Other single-boundary touches use
+the frozen stop or target. Sell slippage is always adverse. If one bar touches
+both stop and target and their order is unknowable, the result is `UNKNOWN` and
+no exit fill is invented. The evaluated bar interval and availability are
+preserved without an invented intrabar timestamp.
+
+One atomic event per exact position is stored under `exit-events/`. Audit binds
+the position bytes hash, exact policy and evidence package identities, rejects
+duplicate or additional JSON fields, backdating, future clocks, tampering and
+upstream corruption. An `OPEN` result states only that no exit was observed in
+the supplied admitted bars; it is not a current mark. Every result remains
+**EXPERIMENTAL / PAPER ONLY — NOT SCORED**, with **SHARED CAPITAL NOT ALLOCATED**
+and **NO P&L OR NAV**. Multi-session continuation, candidate-level
+deduplication, allocation, marks, P&L, FX and portfolio NAV remain separate
+boundaries. No authentic exit or performance result was created by this
+milestone.
