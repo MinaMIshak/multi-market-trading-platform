@@ -291,6 +291,29 @@ candidate-level allocation, conservative exits (including entry-bar
 stop/target uncertainty), marks, FX and performance require separate admission.
 No authentic position or performance result was created by this milestone.
 
+### Authenticated later-session continuation facts
+
+`app.paper.shadow_continuations` adds a fact-only boundary for an already audited
+open paper position. Each bundle begins on the calendar date immediately after
+the original position session and explicitly covers every intervening calendar
+date through one later open session. Closed dates have no invented hours; the
+bundle cannot skip an intervening open session. The observed open date requires
+exact UTC open and close, stable position identity,
+complete action coverage across the whole interval, affirmative issue-specific
+tradability, and raw opening-origin contiguous bars. Every calendar, identity,
+action, status and bar reference must resolve to an admitted evidence package,
+and each bar's availability must equal its package availability.
+
+Publication reaudits the original watchlist, fact, trigger, fill and position
+chain. It cannot precede either the position receipt or observed continuation
+bars. One immutable file per position and authenticated target market date
+prevents competing fact bundles for the same later session. Audit rejects
+tampering, duplicate fields, unbound packages and future receipts. The event is
+**EXPERIMENTAL / PAPER ONLY — NOT SCORED** and explicitly creates no exit or P&L.
+It does not yet join multiple sessions into exit evaluation, schedule holding
+window exits, prove liquidity at an observed price, or authenticate the local
+clock and storage independently. Tests use artificial fixtures only.
+
 ### Conservative exit provenance
 
 `app.paper.shadow_exits` re-audits the durable position-open event and its entire
