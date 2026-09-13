@@ -445,5 +445,18 @@ drawdown, hit rate, expectancy and market attribution remain explicitly
 unevaluated, with unavailable numerical metrics represented by null, never zero.
 It does not infer present market state from a previously declared session or
 infer cash-only performance from an empty candidate list. Full daily aggregation,
-audited marks, cost/FX-aware performance and position views remain outstanding.
+audited marks and cost/FX-aware performance remain outstanding.
 No authentic collection or empirical result was created by this milestone.
+
+`position_open_view(...)` re-audits the complete frozen watchlist, fact, trigger,
+fill-policy and fill chain before exposing the durable entry record, initial stop
+and targets. It reports only **SIMULATED OPEN AT ENTRY**. Current position status
+remains unknown because the view does not assume that no later exit exists.
+
+`exit_evaluation_view(...)` additionally re-audits the position and conservative
+exit event. It preserves the exact `OPEN`, `CLOSED` or `UNKNOWN` evaluation and
+the bar sequence through which it was evaluated. `OPEN` means only that the
+supplied admitted bars contained no observed exit. Neither view infers a current
+mark, aggregates positions, calculates P&L or updates NAV; those fields remain
+explicitly not evaluated/null. Both readers are read-only and fail closed when
+any durable event or upstream evidence binding is missing or altered.

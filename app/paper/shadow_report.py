@@ -2,7 +2,11 @@
 from pathlib import Path
 
 from app.paper.shadow_collection import LABEL, audit_missed_session
+from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event
+from app.paper.shadow_facts import ForwardFactBundle
+from app.paper.shadow_fills import ShadowFillPolicy
 from app.paper.shadow_ledger import audit_candidate_event
+from app.paper.shadow_positions import audit_position_open_event
 from app.paper.shadow_records import ShadowSession, ShadowWatchlist
 from app.research.historical_evidence import HistoricalEvidencePackage
 
@@ -83,5 +87,72 @@ def missed_collection_view(
         "candidates": None,
         "audit_references": {
             "session_evidence_package_id": receipt["session_evidence_package_id"],
+        },
+    }
+
+
+def position_open_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display an audited entry-position record without inferring current state."""
+    event = audit_position_open_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    return _base() | {
+        "record_id": event["watchlist_record_id"],
+        "market": event["market"],
+        "collection_status": "SIMULATED OPEN AT ENTRY",
+        "current_position_status": "UNKNOWN / EXIT NOT AUDITED BY THIS VIEW",
+        "position": {
+            "candidate_position_key": event["candidate_position_key"],
+            "entry": event["entry"],
+            "initial_stop": event["initial_stop"],
+            "initial_targets": event["initial_targets"],
+            "holding_window": event["holding_window"],
+        },
+        "audit_references": {
+            "position_event_id": event["event_id"],
+            "fill_event_id": event["fill_event_id"],
+            "fill_event_sha256": event["fill_event_sha256"],
+        },
+    }
+
+
+def exit_evaluation_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display one audited conservative exit evaluation without calculating P&L."""
+    event = audit_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, exit_policy, exit_packages,
+    )
+    evaluation = event["evaluation"]
+    return _base() | {
+        "record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "collection_status": "EXIT EVALUATED",
+        "position_status": evaluation["status"],
+        "exit_evaluation": evaluation,
+        "audit_references": {
+            "exit_event_id": event["event_id"],
+            "position_event_id": event["position_event_id"],
+            "position_event_sha256": event["position_event_sha256"],
+            "fact_record_id": event["fact_record_id"],
+            "exit_package_ids": event["exit_package_ids"],
         },
     }
