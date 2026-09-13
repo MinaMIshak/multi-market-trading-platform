@@ -378,6 +378,28 @@ def test_closed_directory_rejects_symlinked_artifact(tmp_path):
         verify_closed_directory(tmp_path, {"raw.json"}, set(), "evidence")
 
 
+def test_closed_directory_rejects_symlinked_root(tmp_path):
+    package = tmp_path / "package"
+    package.mkdir()
+    (package / "raw.json").write_bytes(b"[]")
+    linked_package = tmp_path / "linked-package"
+    linked_package.symlink_to(package, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="must be a real directory"):
+        verify_closed_directory(linked_package, {"raw.json"}, set(), "evidence")
+
+
+def test_closed_directory_rejects_hard_linked_artifact(tmp_path):
+    outside = tmp_path / "outside.raw"
+    outside.write_bytes(b"[]")
+    package = tmp_path / "package"
+    package.mkdir()
+    (package / "raw.json").hardlink_to(outside)
+
+    with pytest.raises(ValueError, match="must not be hard linked"):
+        verify_closed_directory(package, {"raw.json"}, set(), "evidence")
+
+
 @pytest.mark.parametrize(
     "rows, message",
     [

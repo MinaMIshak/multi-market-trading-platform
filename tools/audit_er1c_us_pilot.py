@@ -13,6 +13,7 @@ import html
 import json
 import math
 import re
+import stat
 import zlib
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -535,6 +536,12 @@ def verify_closed_directory(
     label: str,
 ) -> None:
     """Require a manifest-controlled directory with no undeclared artifacts."""
+    try:
+        directory_stat = directory.lstat()
+    except OSError as error:
+        raise ValueError(f"{label} directory is unavailable") from error
+    if directory.is_symlink() or not stat.S_ISDIR(directory_stat.st_mode):
+        raise ValueError(f"{label} must be a real directory")
     expected = expected_files | expected_directories
     entries = {entry.name: entry for entry in directory.iterdir()}
     if set(entries) != expected:
@@ -545,12 +552,28 @@ def verify_closed_directory(
         )
     for name in expected_files:
         entry = entries[name]
-        if entry.is_symlink() or not entry.is_file():
+        entry_stat = entry.lstat()
+        if entry.is_symlink() or not stat.S_ISREG(entry_stat.st_mode):
             raise ValueError(f"{label} artifact is not a regular file: {name}")
+        if entry_stat.st_nlink != 1:
+            raise ValueError(f"{label} artifact must not be hard linked: {name}")
     for name in expected_directories:
         entry = entries[name]
-        if entry.is_symlink() or not entry.is_dir():
+        entry_stat = entry.lstat()
+        if entry.is_symlink() or not stat.S_ISDIR(entry_stat.st_mode):
             raise ValueError(f"{label} entry is not a regular directory: {name}")
+
+
+def require_regular_file(path: Path, label: str) -> None:
+    """Reject linked or non-regular custody entries before reading their bytes."""
+    try:
+        path_stat = path.lstat()
+    except OSError as error:
+        raise ValueError(f"{label} is unavailable") from error
+    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+        raise ValueError(f"{label} is not a regular file")
+    if path_stat.st_nlink != 1:
+        raise ValueError(f"{label} must not be hard linked")
 
 
 def utc_timestamp(value: Any, label: str) -> datetime:
@@ -783,6 +806,16 @@ def audit_rows(payload: bytes, start: date, end: date) -> dict[str, Any]:
 
 
 def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
+    # Validate the fixed custody envelope before trusting a manifest-controlled
+    # inventory. The complete inventory is checked again after parsing.
+    try:
+        bundle_stat = bundle.lstat()
+    except OSError as error:
+        raise ValueError("acquisition bundle directory is unavailable") from error
+    if bundle.is_symlink() or not stat.S_ISDIR(bundle_stat.st_mode):
+        raise ValueError("acquisition bundle must be a real directory")
+    require_regular_file(bundle / "manifest.json", "acquisition manifest")
+    require_regular_file(bundle / "manifest.sha256", "acquisition manifest sidecar")
     manifest_payload = (bundle / "manifest.json").read_bytes()
     manifest_sha256 = verify_sha256_sidecar(
         manifest_payload,
@@ -821,6 +854,11 @@ def audit_bundle(bundle: Path, predeclaration: Path) -> dict[str, Any]:
         }
 
     evidence_manifest_path = bundle / "evidence" / "evidence_manifest.json"
+    require_regular_file(evidence_manifest_path, "public evidence manifest")
+    require_regular_file(
+        evidence_manifest_path.parent / "evidence_manifest.sha256",
+        "public evidence manifest sidecar",
+    )
     evidence_manifest_payload = evidence_manifest_path.read_bytes()
     evidence_manifest_sha256 = verify_sha256_sidecar(
         evidence_manifest_payload,

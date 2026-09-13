@@ -521,3 +521,19 @@ consistency of the attempt record, not independent authentication of the HTTP
 exchange or historical availability of any filing. No new retrieval was made.
 Historical universe/listing completeness and PIT admission remain **NO-GO**;
 the platform remains **EXPERIMENTAL / PAPER ONLY**.
+
+## Primary acquisition-package custody
+
+The original Tiingo and official-evidence bundle auditor now requires the
+acquisition root and nested evidence directory to be real directories. Every
+manifest, sidecar, raw response and evidence artifact must be a direct regular
+file with link count one. Fixed manifest entries are checked before their bytes
+are read, then each manifest-controlled directory is checked for its exact
+closed inventory. Symlinked roots and entries, hard-linked files and undeclared
+artifacts therefore fail the offline audit.
+
+This change protects the retained package boundary from substitution or
+external inode mutation. It does not authenticate Tiingo or public-source HTTP
+receipts, prove historical availability, or fill the universe, identity,
+session and complete action-coverage gaps. Canonical admission remains
+**NO-GO** and the platform remains **EXPERIMENTAL / PAPER ONLY**.
