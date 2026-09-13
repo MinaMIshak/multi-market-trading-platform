@@ -3,12 +3,14 @@ from datetime import datetime
 from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
+from app.paper.shadow_allocations import audit_capital_settlement
 from app.paper.shadow_collection import LABEL, audit_missed_session
 from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_fills import ShadowFillPolicy, audit_fill_event
 from app.paper.shadow_ledger import audit_candidate_event
 from app.paper.shadow_positions import audit_position_open_event
+from app.paper.shadow_portfolio import ShadowPortfolioPolicy
 from app.paper.shadow_records import ShadowSession, ShadowWatchlist
 from app.paper.shadow_triggers import audit_trigger_event
 from app.research.historical_evidence import HistoricalEvidencePackage
@@ -331,3 +333,47 @@ def exit_evaluation_view(
         },
     }
     return view
+
+
+def capital_settlement_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    portfolio: ShadowPortfolioPolicy,
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display authenticated native cash settlement without inferring NAV."""
+    settlement = audit_capital_settlement(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio, exit_policy, exit_packages,
+    )
+    exit_view = exit_evaluation_view(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, exit_policy, exit_packages,
+    )
+    if exit_view["position_status"] != "CLOSED":
+        raise ValueError("capital settlement requires authenticated closed trade")
+    return exit_view | {
+        "collection_status": "CAPITAL SETTLED",
+        "capital_settlement": {
+            "status": "AUTHENTICATED NATIVE CASH FLOW / NO NAV OR PERFORMANCE",
+            "market": settlement["market"],
+            "currency": settlement["currency"],
+            "capital_released": settlement["capital_released"],
+            "risk_released": settlement["risk_released"],
+            "exit_notional": settlement["exit_notional"],
+            "exit_cost": settlement["exit_cost"],
+            "net_exit_proceeds": settlement["net_exit_proceeds"],
+            "recorded_at": settlement["recorded_at"],
+        },
+        "audit_references": exit_view["audit_references"] | {
+            "reservation_id": settlement["reservation_id"],
+            "settlement_id": settlement["settlement_id"],
+            "portfolio_policy_id": settlement["policy_id"],
+        },
+    }

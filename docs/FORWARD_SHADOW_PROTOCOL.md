@@ -484,6 +484,15 @@ exit evaluations expose no mark because the position state itself is unresolved.
 Both readers are read-only and fail closed when any durable event or upstream
 evidence binding is missing or altered.
 
+`capital_settlement_view(...)` re-audits the complete portfolio policy,
+reservation, conservative closed exit and settlement chain. It reports the
+released capital and risk, exit notional, exit cost and net exit proceeds in the
+position's authenticated native currency. These are settled cash-flow facts for
+one trade. They do not establish portfolio NAV, return, attribution or reusable
+cross-currency capital. All aggregate performance fields remain null, and the
+reader fails closed if the settlement receipt or any upstream binding is absent
+or altered.
+
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or
 **NO FILL: INSUFFICIENT CAPACITY** with a null fill. It preserves the policy,

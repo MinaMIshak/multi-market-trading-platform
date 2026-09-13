@@ -230,8 +230,19 @@ def test_closed_exit_settles_native_cash_and_releases_risk(tmp_path, monkeypatch
     assert event["performance_status"] == "NATIVE CASH FLOW / NO NAV OR PERFORMANCE"
     reservations = shadow_allocations._read_reservations(tmp_path)
     assert shadow_allocations._read_settlements(tmp_path, reservations) == [event]
+    assert shadow_allocations.audit_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    ) == event
     with pytest.raises(FileExistsError):
         shadow_allocations.append_capital_settlement(
+            tmp_path, *args, portfolio, exit_policy, evidence,
+        )
+
+
+def test_settlement_audit_requires_durable_receipt(tmp_path, monkeypatch):
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
+    with pytest.raises(FileNotFoundError, match="settlement absent"):
+        shadow_allocations.audit_capital_settlement(
             tmp_path, *args, portfolio, exit_policy, evidence,
         )
 

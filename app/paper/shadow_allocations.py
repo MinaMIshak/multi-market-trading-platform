@@ -375,6 +375,38 @@ def append_capital_settlement(
         return path
 
 
+def audit_capital_settlement(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
+    exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Re-audit a settlement against its reservation and conservative exit."""
+    directory = Path(directory)
+    reservation = audit_capital_reservation(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio,
+    )
+    exit_event = audit_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, exit_policy, exit_packages,
+    )
+    reservations = _read_reservations(directory)
+    settlements = _read_settlements(directory, reservations)
+    target = next(
+        (item for item in settlements if item["reservation_id"] == reservation["reservation_id"]),
+        None,
+    )
+    if target is None:
+        raise FileNotFoundError("capital settlement absent")
+    if (target["exit_event_id"] != exit_event["event_id"]
+            or target["exit_event_sha256"] != hashlib.sha256(_canonical(exit_event)).hexdigest()
+            or target["candidate_position_key"] != reservation["candidate_position_key"]):
+        raise ValueError("capital settlement does not bind authenticated inputs")
+    return target
+
+
 def _require_timely_policy(policy_receipt: dict, portfolio: ShadowPortfolioPolicy,
                            watchlist: ShadowWatchlist) -> None:
     frozen_at = _utc(datetime.fromisoformat(policy_receipt["frozen_at"]))

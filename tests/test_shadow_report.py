@@ -6,13 +6,14 @@ import pytest
 
 from app.paper import shadow_collection, shadow_exits, shadow_ledger, shadow_positions
 from app.paper.shadow_report import (
-    exit_evaluation_view, missed_collection_view, position_open_view,
+    capital_settlement_view, exit_evaluation_view, missed_collection_view, position_open_view,
     trigger_evaluation_view, watchlist_collection_view,
 )
 from tests.test_shadow_collection import authenticated_watchlist
 from tests.test_shadow_exits import prepared_exit
 from tests.test_shadow_ledger import completed
 from tests.test_shadow_positions import setup_position
+from tests.test_shadow_allocations import setup_settlement
 
 
 def test_view_preserves_candidate_and_evidence_without_performance_claim(tmp_path, monkeypatch):
@@ -172,6 +173,34 @@ def test_exit_view_preserves_closed_outcome(tmp_path, monkeypatch):
             Decimal(trade["entry_notional"]) + Decimal(trade["entry_cost"])
         )
     assert view["performance"]["nav"] is None
+
+
+def test_settlement_view_reports_native_cash_without_performance(tmp_path, monkeypatch):
+    from app.paper import shadow_allocations
+
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
+    shadow_allocations.append_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    )
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    view = capital_settlement_view(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    )
+    assert view["collection_status"] == "CAPITAL SETTLED"
+    assert view["position_status"] == "CLOSED"
+    cash = view["capital_settlement"]
+    assert cash == {
+        "status": "AUTHENTICATED NATIVE CASH FLOW / NO NAV OR PERFORMANCE",
+        "market": "US", "currency": "USD", "capital_released": "101.15005",
+        "risk_released": "7.19755", "exit_notional": "94.810",
+        "exit_cost": "1.047405", "net_exit_proceeds": "93.762595",
+        "recorded_at": cash["recorded_at"],
+    }
+    assert view["audit_references"]["settlement_id"]
+    assert view["audit_references"]["reservation_id"]
+    assert all(value is None for key, value in view["performance"].items() if key != "status")
+    json.dumps(view, allow_nan=False)
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
 
 
 def test_position_and_exit_views_fail_closed_on_tampered_events(tmp_path, monkeypatch):
