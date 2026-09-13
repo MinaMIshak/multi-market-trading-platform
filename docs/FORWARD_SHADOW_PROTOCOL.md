@@ -321,8 +321,10 @@ milestone.
 ### Shared normalized portfolio policy
 
 `app.paper.shadow_portfolio` declares one immutable policy at the shared ledger
-root (`portfolio-policy.json`). Initial paper NAV is normalized to 100, independent
-of personal wealth. EGX and US capital caps are fractions of that **same** total;
+root (`portfolio-policy.json`). Performance NAV is normalized to 100, independent
+of personal wealth, while an explicit positive research-capital amount supplies
+the monetary denominator in the declared base currency. EGX and US capital caps
+are fractions of that **same** total;
 their sum plus the minimum cash fraction cannot exceed one. Position and aggregate
 stop-risk caps are explicit fractions of the total, with internally consistent
 bounds. Exact rational checks avoid Decimal-context rounding admitting an excess.
@@ -347,3 +349,22 @@ notional, costs and risk require admissible point-in-time FX conversion; without
 it that allocation is NO-GO. No equal-currency assumption or independent full-NAV
 market sleeves are permitted. No policy has been frozen for authentic operations
 by this software milestone; performance and NAV remain unavailable.
+
+### Shared capital reservation
+
+`app.paper.shadow_allocations` reserves normalized paper capital only after it
+reaudits the frozen watchlist, authenticated facts, fill-policy selection,
+simulated fill, position-open event and single frozen portfolio policy. The
+policy must be frozen and effective by the watchlist information cutoff. An OS
+file lock serializes reservations across candidates, sessions and markets under
+one ledger root; every receipt binds preceding reservation IDs and exact totals.
+
+Reserved capital is fill notional plus entry cost. Stop risk includes the
+fill-to-stop loss, entry cost and estimated policy cost for an exit at the frozen
+initial stop. Exact rational comparisons enforce per-position capital and risk,
+market sleeve, minimum cash and aggregate risk caps against the declared monetary
+research capital. Normalized NAV remains the separate performance index base.
+The receipt preserves no mark, return, P&L or performance claim. A fill currency
+different from the portfolio base fails closed because no admitted PIT FX
+conversion boundary exists. Reservations are simulated ledger events, never
+broker orders.

@@ -18,10 +18,11 @@ from app.paper.shadow_ledger import LABEL
 
 class ShadowPortfolioPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    schema_version: Literal["shadow-portfolio-policy-v1"] = "shadow-portfolio-policy-v1"
+    schema_version: Literal["shadow-portfolio-policy-v2"] = "shadow-portfolio-policy-v2"
     label: Literal["EXPERIMENTAL / PAPER ONLY"] = LABEL
     normalized_initial_nav: Literal[100] = 100
     base_currency: Literal["USD", "EGP"]
+    initial_capital: Decimal = Field(gt=0)
     effective_at: datetime
     egx_capital_fraction: Decimal = Field(ge=0, le=1)
     us_capital_fraction: Decimal = Field(ge=0, le=1)
@@ -36,7 +37,7 @@ class ShadowPortfolioPolicy(BaseModel):
         return _utc(value)
 
     @field_validator(
-        "egx_capital_fraction", "us_capital_fraction", "minimum_cash_fraction",
+        "initial_capital", "egx_capital_fraction", "us_capital_fraction", "minimum_cash_fraction",
         "max_position_fraction", "max_position_risk_fraction",
         "max_portfolio_risk_fraction", mode="before",
     )

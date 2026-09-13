@@ -9,7 +9,8 @@ from app.paper import shadow_portfolio as sp
 
 
 def policy(**changes):
-    values = dict(base_currency="USD", effective_at=datetime(2030, 1, 1, tzinfo=timezone.utc),
+    values = dict(base_currency="USD", initial_capital=Decimal('100000'),
+                  effective_at=datetime(2030, 1, 1, tzinfo=timezone.utc),
                   egx_capital_fraction=Decimal('.4'), us_capital_fraction=Decimal('.5'),
                   minimum_cash_fraction=Decimal('.1'), max_position_fraction=Decimal('.1'),
                   max_position_risk_fraction=Decimal('.01'),
@@ -25,7 +26,7 @@ def policy(**changes):
     dict(max_portfolio_risk_fraction=Decimal('.95')),
     dict(egx_capital_fraction=Decimal('0'), us_capital_fraction=Decimal('0')),
     dict(us_capital_fraction=float('nan')), dict(us_capital_fraction=.5),
-    dict(us_capital_fraction=Decimal('Infinity')),
+    dict(us_capital_fraction=Decimal('Infinity')), dict(initial_capital=Decimal('NaN')),
     dict(effective_at=datetime(2030, 1, 1)),
 ])
 def test_reject_invalid_budget(changes):
