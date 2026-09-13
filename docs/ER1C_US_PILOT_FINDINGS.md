@@ -414,3 +414,10 @@ as Eastern Time. Scheduled resumption is not proof of actual execution. The
 market category only says `NASDAQ` or `Non-NASDAQ`, so it cannot establish XNYS
 identity. No feed observation was acquired; all canonical status and execution
 gates remain **NO-GO**.
+
+The retained terms were then reviewed against the acquisition protocol and bound
+to their exact SHA256 by an offline auditor. They do not expressly grant the raw
+archival retention and transformation needed for immutable version capture and
+normalized facts. Both permissions remain **UNRESOLVED**, so feed acquisition is
+**NO-GO**. Public accessibility and documentation integrity do not override this
+gate. No feed request was made.

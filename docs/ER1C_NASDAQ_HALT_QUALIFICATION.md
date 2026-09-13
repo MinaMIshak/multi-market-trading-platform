@@ -32,11 +32,14 @@ minute. This cycle acquired documentation only and started no polling service.
 
 The [published terms](https://www.nasdaqtrader.com/content/administrationsupport/agreementstrading/THRSSFeedTermsCond.pdf)
 state that accessing/using the feed accepts the terms. They restrict editing,
-modification and misrepresentation, disclaim accuracy/timeliness/completeness,
-and include indemnification and revision provisions. This qualification does
-not establish permission for derived-feed redistribution or indefinite archival
-reuse. Retention and transformation scope remain unresolved before integration;
-no subscription, paid service or separate agreement was entered into here.
+modification and misrepresentation absent a separate agreement, disclaim
+accuracy/timeliness/completeness, and include indemnification and revision
+provisions. They do not expressly grant the archival retention and transformation
+needed to preserve immutable feed versions and produce normalized research facts.
+Public access is therefore insufficient permission for this workflow. Raw
+retention and transformation remain **UNRESOLVED**, and feed acquisition is
+**NO_GO** unless an applicable official policy or agreement resolves both. No
+subscription, paid service or separate agreement was entered into here.
 The PDF was retained verbatim; its text was reviewed through the browser's PDF
 extraction because local PDF extraction tools were unavailable.
 
@@ -95,10 +98,17 @@ No live feed was called. Canonical security status, XNYS identity binding,
 actual execution resumption, historical availability and complete active-halt
 coverage remain **NO_GO**.
 
+`tools/audit_er1c_nasdaq_halt_terms.py` binds this decision to the exact three-file
+package and reviewed terms SHA256. It rejects changed editions, redirects,
+tampered bytes, expanded inventory, non-UTC receipts and any claim that the
+current documentation proves historical availability. An integrity pass does
+not grant rights: its output keeps retention and transformation unresolved and
+both feed acquisition and canonical admission at **NO_GO**.
+
 ## Next bounded work
 
-Resolve usable retention/transformation scope from the retained terms and any
-further official policy. If admissible, predeclare a bounded acquisition
+Resolve usable retention/transformation scope from a further applicable official
+policy or agreement. If admissible, predeclare a bounded acquisition
 and capture immutable feed bytes with actual receipt clocks, field locators and
 correction lineage. Validate date/time semantics and distinguish initial halt,
 quote resumption and trade resumption before constructing canonical facts.
