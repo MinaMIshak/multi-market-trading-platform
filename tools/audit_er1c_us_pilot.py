@@ -16,6 +16,7 @@ import re
 import stat
 import zlib
 from datetime import date, datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -68,6 +69,7 @@ EVIDENCE_RECORD_FIELDS = {
     "sha256",
     "source_url",
 }
+SAFE_RESPONSE_HEADER_FIELDS = {"content-length", "content-type", "date"}
 
 NYSE_CALENDAR_FILENAME = "nyse_2022_trading_calendar.pdf"
 TWITTER_8K_FILENAME = "sec_twitter_merger_8k.html"
@@ -623,6 +625,27 @@ def validate_acquisition_manifest(manifest: Any) -> list[dict[str, Any]]:
         completed = utc_timestamp(request["completed_at_utc"], "acquisition completion")
         if completed < started:
             raise ValueError("acquisition completion precedes start")
+        headers = request["safe_response_headers"]
+        if not isinstance(headers, dict) or set(headers) != SAFE_RESPONSE_HEADER_FIELDS:
+            raise ValueError("acquisition safe response headers are incomplete or unexpected")
+        if headers["content-type"] != "application/json":
+            raise ValueError("acquisition response content type is not JSON")
+        if headers["content-length"] != str(request["raw_byte_size"]):
+            raise ValueError("acquisition response content length mismatch")
+        try:
+            response_date = parsedate_to_datetime(headers["date"])
+        except (TypeError, ValueError) as error:
+            raise ValueError("invalid acquisition response date") from error
+        if response_date.tzinfo is None or response_date.utcoffset() != timezone.utc.utcoffset(response_date):
+            raise ValueError("non-UTC acquisition response date")
+        # HTTP dates have whole-second precision. Bind the server response clock
+        # to the locally observed request interval without inventing sub-seconds.
+        if not (
+            int(started.timestamp())
+            <= int(response_date.timestamp())
+            <= int(completed.timestamp())
+        ):
+            raise ValueError("acquisition response date falls outside request interval")
         start = date.fromisoformat(request["start_date"])
         end = date.fromisoformat(request["end_date"])
         if end < start:
@@ -726,7 +749,14 @@ def inspect_nyse_2022_calendar(payload: bytes) -> dict[str, Any]:
 
 
 def market_date(value: str) -> date:
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if not isinstance(value, str):
+        raise ValueError(f"invalid Tiingo daily timestamp: {value}")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"invalid Tiingo daily timestamp: {value}") from error
+    if parsed.tzinfo is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+        raise ValueError(f"non-UTC Tiingo daily timestamp: {value}")
     if parsed.time().isoformat() != "00:00:00":
         raise ValueError(f"non-midnight Tiingo daily timestamp: {value}")
     return parsed.date()

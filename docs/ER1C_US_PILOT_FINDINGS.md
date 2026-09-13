@@ -537,3 +537,20 @@ external inode mutation. It does not authenticate Tiingo or public-source HTTP
 receipts, prove historical availability, or fill the universe, identity,
 session and complete action-coverage gaps. Canonical admission remains
 **NO-GO** and the platform remains **EXPERIMENTAL / PAPER ONLY**.
+
+## Primary receipt and daily-timestamp integrity
+
+The primary bundle auditor now treats the retained response headers as a closed
+safe set. The content type must be JSON, the reported content length must match
+the manifest byte count, and the whole-second HTTP response date must be UTC and
+fall within the locally observed request interval. Unexpected headers are
+rejected so a rewritten manifest cannot place arbitrary or sensitive metadata
+inside the field described as safe.
+
+Every Tiingo daily timestamp must also carry an explicit UTC offset and represent
+midnight UTC before its calendar date is used. A naive or non-UTC timestamp can
+therefore no longer be silently assigned to the wrong market date. These checks
+bind retained receipt metadata and raw rows more tightly; they do not authenticate
+the HTTP exchange, prove historical availability or fill universe, identity,
+session, and complete action-coverage gaps. Canonical admission remains
+**NO-GO** and the platform remains **EXPERIMENTAL / PAPER ONLY**.

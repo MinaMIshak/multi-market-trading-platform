@@ -59,7 +59,11 @@ def acquisition_manifest():
             "raw_byte_size": 1,
             "raw_file": "ibm.raw",
             "raw_sha256": "c" * 64,
-            "safe_response_headers": {},
+            "safe_response_headers": {
+                "content-length": "1",
+                "content-type": "application/json",
+                "date": "Sat, 12 Sep 2026 15:22:13 GMT",
+            },
             "start_date": "2022-04-01",
             "started_at_utc": "2026-09-12T15:22:13+00:00",
             "ticker": "IBM",
@@ -317,6 +321,10 @@ def test_ibm_submission_rejects_wrong_identity_or_missing_2022_anchor():
         (lambda value: value["requests"][0].update(completed_at_utc="2026-09-12T15:22:12+00:00"), "completion precedes start"),
         (lambda value: value["requests"][0].update(endpoint="https://api.tiingo.com/tiingo/daily/TWTR/prices?startDate=2022-04-01&endDate=2022-11-04"), "endpoint does not match"),
         (lambda value: value["requests"][0].update(http_status=500), "was not successful"),
+        (lambda value: value["requests"][0]["safe_response_headers"].update({"authorization": "secret"}), "headers are incomplete or unexpected"),
+        (lambda value: value["requests"][0]["safe_response_headers"].update({"content-length": "2"}), "content length mismatch"),
+        (lambda value: value["requests"][0]["safe_response_headers"].update({"content-type": "text/html"}), "content type is not JSON"),
+        (lambda value: value["requests"][0]["safe_response_headers"].update({"date": "Sat, 12 Sep 2026 15:23:13 GMT"}), "outside request interval"),
     ],
 )
 def test_acquisition_manifest_rejects_unsafe_or_incoherent_metadata(change, message):
@@ -411,6 +419,20 @@ def test_closed_directory_rejects_hard_linked_artifact(tmp_path):
 def test_audit_rejects_noncanonical_price_rows(rows, message):
     with pytest.raises(ValueError, match=message):
         audit_rows(payload(*rows), date(2022, 4, 1), date(2022, 11, 4))
+
+
+@pytest.mark.parametrize(
+    "timestamp, message",
+    [
+        ("2022-10-27T00:00:00", "non-UTC"),
+        ("2022-10-27T00:00:00+02:00", "non-UTC"),
+        ("2022-10-27T00:00:01Z", "non-midnight"),
+        (None, "invalid Tiingo daily timestamp"),
+    ],
+)
+def test_audit_requires_explicit_utc_midnight_daily_timestamps(timestamp, message):
+    with pytest.raises(ValueError, match=message):
+        audit_rows(payload(row(day=timestamp)), date(2022, 4, 1), date(2022, 11, 4))
 
 
 @pytest.mark.parametrize("field", ["open", "high", "low", "close", "volume", "divCash", "splitFactor"])
