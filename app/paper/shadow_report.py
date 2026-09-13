@@ -5,7 +5,7 @@ from pathlib import Path
 from app.paper.shadow_collection import LABEL, audit_missed_session
 from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event
 from app.paper.shadow_facts import ForwardFactBundle
-from app.paper.shadow_fills import ShadowFillPolicy
+from app.paper.shadow_fills import ShadowFillPolicy, audit_fill_event
 from app.paper.shadow_ledger import audit_candidate_event
 from app.paper.shadow_positions import audit_position_open_event
 from app.paper.shadow_records import ShadowSession, ShadowWatchlist
@@ -88,6 +88,39 @@ def missed_collection_view(
         "candidates": None,
         "audit_references": {
             "session_evidence_package_id": receipt["session_evidence_package_id"],
+        },
+    }
+
+
+def entry_fill_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display an audited entry attempt, including capacity-rejected no fills."""
+    event = audit_fill_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    return _base() | {
+        "record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "market_date": watchlist.session.market_date.isoformat(),
+        "collection_status": "ENTRY FILL EVALUATED",
+        "execution_status": event["execution_status"],
+        "current_position_status": "UNKNOWN / POSITION AND EXIT NOT AUDITED BY THIS VIEW",
+        "recorded_at": event["recorded_at"],
+        "fill": event["fill"],
+        "fill_policy": event["policy"],
+        "audit_references": {
+            "fill_event_id": event["event_id"],
+            "trigger_event_id": event["trigger_event_id"],
+            "trigger_event_sha256": event["trigger_event_sha256"],
+            "fill_package_ids": event["fill_package_ids"],
         },
     }
 

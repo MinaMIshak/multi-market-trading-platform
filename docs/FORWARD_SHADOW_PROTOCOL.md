@@ -470,3 +470,13 @@ aggregate performance fields remain explicitly not evaluated/null. `UNKNOWN`
 exit evaluations expose no mark because the position state itself is unresolved.
 Both readers are read-only and fail closed when any durable event or upstream
 evidence binding is missing or altered.
+
+`entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
+entry-fill event, exposing either the preserved simulated entry fill or
+**NO FILL: INSUFFICIENT CAPACITY** with a null fill. It preserves the policy,
+receipt timestamp and trigger/fill evidence references. Missing or tampered
+receipts fail closed. This read-only view does not create a position, infer
+current position state, or count a rejected entry as a zero-return trade. An
+untriggered candidate is outside this fill-event boundary; it must not be
+relabeled as capacity-rejected. Position, exit and aggregate performance remain
+unevaluated. Every result remains **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**.

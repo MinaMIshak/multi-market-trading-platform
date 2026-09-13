@@ -158,3 +158,40 @@ def test_position_and_exit_views_fail_closed_on_tampered_events(tmp_path, monkey
         position_open_view(tmp_path, *args)
     with pytest.raises(ValueError):
         exit_evaluation_view(tmp_path, *args, policy, evidence)
+
+
+@pytest.mark.parametrize("participation,expected", [
+    (Decimal("0.10"), "SIMULATED ENTRY FILL CREATED"),
+    (Decimal("0.0009"), "NO FILL: INSUFFICIENT CAPACITY"),
+])
+def test_entry_view_preserves_fill_and_no_fill_without_position_claim(
+    tmp_path, monkeypatch, participation, expected,
+):
+    from app.paper.shadow_fills import append_fill_event
+    from app.paper.shadow_report import entry_fill_view
+    from tests.test_shadow_fills import prepared
+
+    args = prepared(tmp_path, monkeypatch, participation=participation)[:-1]
+    with pytest.raises(FileNotFoundError):
+        entry_fill_view(tmp_path, *args)
+    path = append_fill_event(tmp_path, *args)
+    event = json.loads(path.read_bytes())
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    view = entry_fill_view(tmp_path, *args)
+    assert view["label"] == "EXPERIMENTAL / PAPER ONLY"
+    assert view["scoring"] == "NOT SCORED"
+    assert view["execution_status"] == expected
+    assert view["fill"] == event["fill"]
+    assert (view["fill"] is None) == (participation == Decimal("0.0009"))
+    assert view["fill_policy"] == event["policy"]
+    assert view["audit_references"]["fill_event_id"] == event["event_id"]
+    assert view["current_position_status"].startswith("UNKNOWN")
+    assert view["open_paper_positions"] == {"status": "NOT EVALUATED"}
+    assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
+    assert all(v is None for k, v in view["performance"].items() if k != "status")
+    json.dumps(view, allow_nan=False)
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    event["execution_status"] = "fabricated successful fill"
+    path.write_text(json.dumps(event))
+    with pytest.raises(ValueError, match="does not bind authenticated inputs"):
+        entry_fill_view(tmp_path, *args)
