@@ -463,6 +463,12 @@ also reports gross unrealized P&L as gross marked value minus audited entry
 notional, in the position's native currency. Entry fill slippage is embedded in
 that notional; fees and hypothetical liquidation slippage are excluded. This
 as-of valuation is not an executable exit, realized return or portfolio NAV.
+Open and closed trade views also preserve the original stop, targets and
+unvalidated holding-window declaration. Their observed holding duration is the
+exact elapsed time between authenticated entry and observation/exit **bar
+ends**. It is explicitly a bounded observation window because the fill boundary
+does not invent an intrabar timestamp; it must not be presented as exact time in
+position.
 Net liquidation unrealized P&L remains unknown
 until applicable liquidation slippage and cost are authenticated. For a `CLOSED` result only,
 the view re-audits the entry chain again and reports one native-currency closed

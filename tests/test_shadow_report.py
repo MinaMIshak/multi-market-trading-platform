@@ -114,6 +114,7 @@ def test_exit_view_reports_gross_mark_pnl_without_net_liquidation_claim(tmp_path
     open_position = view["open_paper_positions"]
     assert open_position["status"] == "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR"
     mark = open_position["position"]
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
     assert mark["mark_price"] == close
     assert Decimal(mark["gross_market_value"]) == (
         Decimal(mark["quantity"]) * Decimal(mark["mark_price"])
@@ -121,8 +122,12 @@ def test_exit_view_reports_gross_mark_pnl_without_net_liquidation_claim(tmp_path
     assert mark["marked_through_sequence"] == 1
     assert mark["mark_interval_end"] == args[2].bars[-1].interval_end.isoformat()
     assert mark["mark_known_at"] == args[2].bars[-1].available_at.isoformat()
+    assert mark["initial_stop"] == position["initial_stop"]
+    assert mark["initial_targets"] == position["initial_targets"]
+    assert mark["holding_window"] == position["holding_window"]
+    assert mark["observed_bar_end_elapsed"] == "0:00:00"
+    assert "INTRABAR FILL TIME UNKNOWN" in mark["observed_bar_end_elapsed_status"]
     assert mark["unrealized_pnl"] is None
-    position = shadow_positions.audit_position_open_event(tmp_path, *args)
     with localcontext(Context(prec=34)):
         expected = Decimal(mark["quantity"]) * Decimal(close) - Decimal(position["entry"]["notional"])
     assert Decimal(mark["gross_unrealized_pnl"]) == expected
@@ -151,6 +156,12 @@ def test_exit_view_preserves_closed_outcome(tmp_path, monkeypatch):
     assert Decimal(trade["net_pnl"]) == (
         Decimal(trade["gross_pnl"]) - Decimal(trade["entry_cost"]) - Decimal(trade["exit_cost"])
     )
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    assert trade["initial_stop"] == position["initial_stop"]
+    assert trade["initial_targets"] == position["initial_targets"]
+    assert trade["holding_window"] == position["holding_window"]
+    assert trade["observed_bar_end_elapsed"] == "0:00:00"
+    assert "INTRABAR FILL TIME UNKNOWN" in trade["observed_bar_end_elapsed_status"]
     with localcontext(Context(prec=34)):
         assert Decimal(trade["net_return"]) == Decimal(trade["net_pnl"]) / (
             Decimal(trade["entry_notional"]) + Decimal(trade["entry_cost"])

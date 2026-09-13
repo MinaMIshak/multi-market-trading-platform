@@ -1,4 +1,5 @@
 """Read-only collection views; no portfolio inference."""
+from datetime import datetime
 from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
@@ -31,6 +32,16 @@ def _base() -> dict:
             )},
         },
     }
+
+
+def _bar_end_elapsed(entry: dict, observed_interval_end: str) -> str:
+    """Measure authenticated bar-end elapsed time without inventing fill time."""
+    started = datetime.fromisoformat(entry["interval_end"])
+    observed = datetime.fromisoformat(observed_interval_end)
+    elapsed = observed - started
+    if elapsed.total_seconds() < 0:
+        raise ValueError("observed bar precedes authenticated entry bar")
+    return str(elapsed)
 
 
 def watchlist_collection_view(
@@ -241,6 +252,9 @@ def exit_evaluation_view(
                 "quantity": entry["quantity"],
                 "currency": entry["currency"],
                 "entry_fill_price": entry["fill_price"],
+                "initial_stop": position["initial_stop"],
+                "initial_targets": position["initial_targets"],
+                "holding_window": position["holding_window"],
                 "mark_price": str(mark.close),
                 "gross_market_value": str(gross_market_value),
                 "gross_unrealized_pnl": str(gross_unrealized_pnl),
@@ -250,6 +264,12 @@ def exit_evaluation_view(
                 "marked_through_sequence": mark.sequence,
                 "mark_interval_end": mark.interval_end.isoformat(),
                 "mark_known_at": mark.available_at.isoformat(),
+                "observed_bar_end_elapsed": _bar_end_elapsed(
+                    entry, mark.interval_end.isoformat(),
+                ),
+                "observed_bar_end_elapsed_status": (
+                    "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
+                ),
                 "unrealized_pnl": None,
                 "unrealized_pnl_status": (
                     "UNKNOWN / NO AUTHENTICATED LIQUIDATION SLIPPAGE AND COST"
@@ -289,11 +309,20 @@ def exit_evaluation_view(
             "exit_notional": exit_fill["notional"],
             "exit_cost": exit_fill["exit_cost"],
             "exit_reason": evaluation["reason"],
+            "initial_stop": position["initial_stop"],
+            "initial_targets": position["initial_targets"],
+            "holding_window": position["holding_window"],
             "gross_pnl": str(gross_pnl),
             "net_pnl": str(net_pnl),
             "net_return": str(net_return),
             "entry_known_at": entry["known_at"],
             "exit_known_at": exit_fill["known_at"],
+            "observed_bar_end_elapsed": _bar_end_elapsed(
+                entry, exit_fill["interval_end"],
+            ),
+            "observed_bar_end_elapsed_status": (
+                "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
+            ),
         },
     }
     return view
