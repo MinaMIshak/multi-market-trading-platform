@@ -1,7 +1,7 @@
 import hashlib, json
 from pathlib import Path
 import pytest
-from tools.audit_er1c_sec_twitter_submission_probe import EXPECTED_SOURCES, audit_probe
+from tools.audit_er1c_sec_twitter_submission_probe import EXPECTED_SOURCES, PURPOSE, audit_probe
 
 def _header(accession, accepted, form, count):
     return f"""<SEC-DOCUMENT>{accession}.txt : 20221028
@@ -22,7 +22,7 @@ def _write_probe(root: Path):
     artifacts = {"twitter_20220418_8a12b_submission.txt": REGISTRATION, "twitter_20221028_25nse_submission.txt": REMOVAL}; records = []
     for filename, payload in artifacts.items():
         (root / filename).write_bytes(payload); records.append({"bytes": len(payload), "content_type": "text/plain", "filename": filename, "historical_availability_proven": False, "http_status": 200, "receipt_utc": "2026-09-12T00:00:00Z", "sha256": hashlib.sha256(payload).hexdigest(), "source_locator": EXPECTED_SOURCES[filename]})
-    raw = (json.dumps({"schema": "er1c-sec-twitter-submission-probe-v1", "records": records}, indent=2, sort_keys=True) + "\n").encode(); (root / "manifest.json").write_bytes(raw); (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
+    raw = (json.dumps({"purpose": PURPOSE, "schema": "er1c-sec-twitter-submission-probe-v1", "records": records}, indent=2, sort_keys=True) + "\n").encode(); (root / "manifest.json").write_bytes(raw); (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
 @pytest.fixture
 def probe(tmp_path): _write_probe(tmp_path); return tmp_path
 def _rehash(root, filename, payload):
@@ -82,6 +82,27 @@ def _change_record(root, key, value):
     raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
     path.write_bytes(raw)
     (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
+
+
+def _change_manifest(root, change):
+    path = root / "manifest.json"
+    manifest = json.loads(path.read_bytes())
+    change(manifest)
+    raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+    path.write_bytes(raw)
+    (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
+
+
+def test_rejects_rehashed_scope_escalation(probe):
+    _change_manifest(probe, lambda doc: doc.update(purpose="Complete 2022 Twitter actions"))
+    with pytest.raises(ValueError, match="manifest purpose"):
+        audit_probe(probe)
+
+
+def test_rejects_rehashed_undeclared_manifest_field(probe):
+    _change_manifest(probe, lambda doc: doc.update(complete_action_coverage=True))
+    with pytest.raises(ValueError, match="manifest schema"):
+        audit_probe(probe)
 
 
 @pytest.mark.parametrize("locator", [

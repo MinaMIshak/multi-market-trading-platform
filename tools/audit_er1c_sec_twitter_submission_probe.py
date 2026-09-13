@@ -9,6 +9,10 @@ EXPECTED_SOURCES = {
     "twitter_20221028_25nse_submission.txt": "https://www.sec.gov/Archives/edgar/data/1418091/000087666122000890/0000876661-22-000890.txt?output=1",
 }
 EXPECTED_FILES = set(EXPECTED_SOURCES)
+PURPOSE = (
+    "Bounded submission-level classification of the two Twitter filings identified "
+    "by the retained EDGAR indexes; not a complete listing ledger or historical universe"
+)
 SUBMISSION_IDENTITIES = {
     "twitter_20220418_8a12b_submission.txt": {
         "accession": "0001193125-22-107480", "acceptance_datetime": "20220418093659",
@@ -94,7 +98,11 @@ def _load(root: Path) -> dict[str, bytes]:
     raw = (root / "manifest.json").read_bytes()
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != f"{_sha256(raw)}  manifest.json": raise ValueError("manifest SHA256 sidecar mismatch")
     manifest = json.loads(raw)
+    if not isinstance(manifest, dict) or set(manifest) != {"purpose", "records", "schema"}:
+        raise ValueError("unexpected manifest schema")
     if manifest.get("schema") != "er1c-sec-twitter-submission-probe-v1": raise ValueError("unexpected manifest schema")
+    if manifest["purpose"] != PURPOSE:
+        raise ValueError("unexpected manifest purpose")
     if not isinstance(manifest.get("records"), list) or len(manifest["records"]) != len(EXPECTED_FILES): raise ValueError("unexpected manifest records")
     if {item.name for item in root.iterdir() if item.is_file()} != EXPECTED_FILES | {"manifest.json", "manifest.sha256"}: raise ValueError("probe inventory does not match manifest scope")
     expected_keys = {"bytes", "content_type", "filename", "historical_availability_proven", "http_status", "receipt_utc", "sha256", "source_locator"}; payloads = {}

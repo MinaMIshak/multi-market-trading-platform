@@ -391,3 +391,8 @@ primary document, while merger, suspension and removal language must occur in th
 notice. Rehashing a bundle after moving a phrase outside that notice or relabeling
 the notice cannot satisfy the audit. This strengthens artifact attribution only
 and does not expand the filing's issue-specific scope.
+
+The auditor also binds the manifest to its exact root fields and bounded declared
+purpose. A rehashed manifest cannot add an apparent completeness flag or rewrite
+the probe as complete corporate-action coverage. This is scope-integrity
+hardening only; the retained bytes and all **NO-GO** decisions are unchanged.
