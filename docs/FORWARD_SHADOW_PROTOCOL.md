@@ -328,9 +328,24 @@ sequence restarts at one and is never confused with the entry-session sequence.
 Open gaps, stop/target touches, adverse sell slippage and exit-side costs follow
 the exit rules below; a bar touching both boundaries or lacking whole-bar
 participation capacity returns `UNKNOWN`. The result is in-memory only and does
-not create a durable exit, current-position, P&L or scoring claim. Successive
-continuation chaining and a durable audited continuation-exit event remain
-required before operational shadow exits can use this evaluator.
+not create a durable exit, current-position, P&L or scoring claim.
+
+One successive continuation can extend the initial continuation without a date
+gap: it binds the predecessor event ID and bytes hash, begins on the next
+calendar date, and reaudits that predecessor. A durable continuation-exit event
+reaudits and hashes every event it consumes, records each session evaluation,
+and stops at the first
+`UNKNOWN` or `CLOSED` result. Supplying any later bundle after that terminal
+result fails closed. An all-`OPEN` result only covers the admitted chain through
+its final observed bar; it does not prove the position is currently open.
+
+The durable event remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED**, with
+**SHARED CAPITAL NOT ALLOCATED** and **NO P&L OR NAV**. It does not schedule
+holding-window exits, publish current marks, support partial liquidation, prove
+liquidity at an exit price, or authenticate the local clock and storage
+independently. Tests use artificial fixtures only.
+Arbitrary-depth predecessor reconstruction remains unsupported; callers must not
+use this boundary beyond the initial continuation and its direct successor.
 
 ### Conservative exit provenance
 

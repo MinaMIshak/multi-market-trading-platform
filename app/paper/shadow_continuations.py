@@ -146,19 +146,35 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
            fill_policy: ShadowFillPolicy,
            fill_packages: tuple[HistoricalEvidencePackage, ...],
            facts: ForwardContinuationBundle,
-           fact_packages: tuple[HistoricalEvidencePackage, ...], recorded_at: datetime) -> dict:
+           fact_packages: tuple[HistoricalEvidencePackage, ...], recorded_at: datetime, *,
+           previous_facts: ForwardContinuationBundle | None = None,
+           previous_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None) -> dict:
     position = audit_position_open_event(directory, watchlist, watchlist_packages, original_facts,
                                          original_fact_packages, fill_policy, fill_packages)
     facts = ForwardContinuationBundle.model_validate(facts.model_dump(mode="python"))
-    original_date = original_facts.session.market_date
-    if ((facts.calendar_days[0].market_date - original_date).days != 1
+    predecessor = None
+    predecessor_date = original_facts.session.market_date
+    predecessor_close = original_facts.session.closes_at
+    if previous_facts is not None:
+        if previous_fact_packages is None:
+            raise ValueError("previous continuation packages required")
+        predecessor = audit_continuation_event(
+            directory, watchlist, watchlist_packages, original_facts,
+            original_fact_packages, fill_policy, fill_packages, previous_facts,
+            previous_fact_packages,
+        )
+        predecessor_date = previous_facts.calendar_days[-1].market_date
+        predecessor_close = previous_facts.calendar_days[-1].closes_at
+    elif previous_fact_packages is not None:
+        raise ValueError("previous continuation facts required")
+    if ((facts.calendar_days[0].market_date - predecessor_date).days != 1
             or facts.calendar_days[-1].market != original_facts.session.market
             or facts.calendar_days[-1].calendar_mic != original_facts.session.calendar_mic
             or facts.identity.instrument_id != original_facts.identity.instrument_id
             or facts.identity.ticker != original_facts.identity.ticker):
         raise ValueError("continuation does not bind the original position and next calendar date")
-    if facts.calendar_days[-1].opens_at <= original_facts.session.closes_at:
-        raise ValueError("continuation session must follow original session close")
+    if facts.calendar_days[-1].opens_at <= predecessor_close:
+        raise ValueError("continuation session must follow predecessor session close")
     observed_through = max(bar.available_at for bar in facts.bars)
     if max(observed_through, _utc(datetime.fromisoformat(position["recorded_at"]))) > recorded_at:
         raise ValueError("continuation publication precedes authenticated inputs")
@@ -169,6 +185,8 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
         "execution_status": "NO EXIT OR PNL INFERENCE",
         "position_event_id": position["event_id"],
         "position_event_sha256": hashlib.sha256(_canonical(position)).hexdigest(),
+        "previous_continuation_event_id": None if predecessor is None else predecessor["event_id"],
+        "previous_continuation_event_sha256": None if predecessor is None else hashlib.sha256(_canonical(predecessor)).hexdigest(),
         "continuation_package_ids": package_ids, "facts": facts.model_dump(mode="json"),
     }
 
@@ -186,11 +204,14 @@ def continuation_event_path(directory: Path, position_event_id: str,
 def append_continuation_event(directory: Path, watchlist: ShadowWatchlist,
                               watchlist_packages, original_facts, original_fact_packages,
                               fill_policy: ShadowFillPolicy, fill_packages,
-                              facts: ForwardContinuationBundle, fact_packages) -> Path:
+                              facts: ForwardContinuationBundle, fact_packages, *,
+                              previous_facts: ForwardContinuationBundle | None = None,
+                              previous_fact_packages=None) -> Path:
     recorded_at = _utc(_now())
     basis = _basis(directory, watchlist, watchlist_packages, original_facts,
                    original_fact_packages, fill_policy, fill_packages, facts, fact_packages,
-                   recorded_at)
+                   recorded_at, previous_facts=previous_facts,
+                   previous_fact_packages=previous_fact_packages)
     payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                        "recorded_at": recorded_at.isoformat()}
     path = _publish_once(continuation_event_path(
@@ -204,7 +225,9 @@ def append_continuation_event(directory: Path, watchlist: ShadowWatchlist,
 def audit_continuation_event(directory: Path, watchlist: ShadowWatchlist,
                              watchlist_packages, original_facts, original_fact_packages,
                              fill_policy: ShadowFillPolicy, fill_packages,
-                             facts: ForwardContinuationBundle, fact_packages) -> dict:
+                             facts: ForwardContinuationBundle, fact_packages, *,
+                             previous_facts: ForwardContinuationBundle | None = None,
+                             previous_fact_packages=None) -> dict:
     path = continuation_event_path(directory, audit_position_open_event(
         directory, watchlist, watchlist_packages, original_facts, original_fact_packages,
         fill_policy, fill_packages)["event_id"], facts.calendar_days[-1].market_date)
@@ -221,7 +244,8 @@ def audit_continuation_event(directory: Path, watchlist: ShadowWatchlist,
     recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
     basis = _basis(directory, watchlist, watchlist_packages, original_facts,
                    original_fact_packages, fill_policy, fill_packages, facts, fact_packages,
-                   recorded_at)
+                   recorded_at, previous_facts=previous_facts,
+                   previous_fact_packages=previous_fact_packages)
     expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                         "recorded_at": recorded_at.isoformat()}
     if set(event) != set(expected) or event != expected or recorded_at > _now():

@@ -315,3 +315,130 @@ def test_publication_revalidates_copied_calendar_models(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="local market date"):
         shadow_continuations.append_continuation_event(tmp_path, *args, changed, evidence)
     assert not (tmp_path / "continuation-facts").exists()
+
+
+def successor(facts, char="8", **bar_updates):
+    shift = timedelta(days=1)
+    day = facts.calendar_days[-1]
+    start = day.opens_at + shift
+    available = start + timedelta(minutes=6)
+    reference = ShadowEvidenceReference(
+        evidence_id=char * 64, source_authority="official fixture authority",
+        source_locator=f"fixture://continuation/{char}", artifact_sha256=char * 64,
+        available_at=available,
+    )
+    evidence = package(char, reference, tuple(
+        SESSION_FIELDS | IDENTITY_FIELDS | ACTION_FIELDS | BAR_FIELDS | TRADING_STATUS_FIELDS
+    ))
+    later = ForwardContinuationBundle(
+        continuation_id=f"session-{char}",
+        calendar_days=(day.model_copy(update={
+            "market_date": day.market_date + shift, "opens_at": start,
+            "closes_at": day.closes_at + shift, "evidence_package_id": evidence.identity,
+        }),),
+        identity=facts.identity.model_copy(update={
+            "effective_through": day.market_date + shift,
+            "evidence_package_id": evidence.identity,
+        }),
+        action_coverage=facts.action_coverage.model_copy(update={
+            "coverage_from": day.market_date + shift,
+            "coverage_through": day.market_date + shift,
+            "evidence_package_id": evidence.identity,
+        }),
+        trading_status=facts.trading_status.model_copy(update={
+            "coverage_start": start, "coverage_end": start + timedelta(minutes=5),
+            "evidence_package_id": evidence.identity,
+        }),
+        bars=(facts.bars[0].model_copy(update={
+            "market_date": day.market_date + shift, "interval_start": start,
+            "interval_end": start + timedelta(minutes=5), "available_at": available,
+            "source_row": f"fixture-continuation-row-{char}",
+            "evidence_package_id": evidence.identity,
+        } | bar_updates),),
+    )
+    return later, (evidence,), available
+
+
+def exit_evidence(cutoff):
+    items = []
+    fields = (shadow_exits.EXIT_SLIPPAGE_FIELDS, shadow_exits.EXIT_COST_FIELDS,
+              shadow_exits.EXIT_PARTICIPATION_FIELDS)
+    for char, covered in zip("123", fields, strict=True):
+        reference = ShadowEvidenceReference(
+            evidence_id=char * 64, source_authority="official fixture authority",
+            source_locator=f"fixture://exit/{char}", artifact_sha256=char * 64,
+            available_at=cutoff,
+        )
+        items.append(package(char, reference, tuple(covered)))
+    return tuple(items)
+
+
+def test_successive_continuation_binds_predecessor(tmp_path, monkeypatch):
+    args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    shadow_continuations.append_continuation_event(tmp_path, *args, first, first_packages)
+    second, second_packages, available = successor(first)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: available + timedelta(minutes=1))
+    path = shadow_continuations.append_continuation_event(
+        tmp_path, *args, second, second_packages,
+        previous_facts=first, previous_fact_packages=first_packages,
+    )
+    event = shadow_continuations.audit_continuation_event(
+        tmp_path, *args, second, second_packages,
+        previous_facts=first, previous_fact_packages=first_packages,
+    )
+    predecessor = shadow_continuations.audit_continuation_event(
+        tmp_path, *args, first, first_packages,
+    )
+    assert event == json.loads(path.read_bytes())
+    assert event["previous_continuation_event_id"] == predecessor["event_id"]
+    assert event["previous_continuation_event_sha256"]
+
+
+def test_successor_cannot_skip_or_omit_predecessor(tmp_path, monkeypatch):
+    args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    shadow_continuations.append_continuation_event(tmp_path, *args, first, first_packages)
+    second, second_packages, available = successor(first)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: available + timedelta(minutes=1))
+    with pytest.raises(ValueError, match="next calendar date"):
+        shadow_continuations.append_continuation_event(tmp_path, *args, second, second_packages)
+    with pytest.raises(ValueError, match="packages required"):
+        shadow_continuations.append_continuation_event(
+            tmp_path, *args, second, second_packages, previous_facts=first,
+        )
+
+
+def test_durable_continuation_exit_stops_at_closed_result(tmp_path, monkeypatch):
+    args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    shadow_continuations.append_continuation_event(tmp_path, *args, first, first_packages)
+    second, second_packages, available = successor(
+        first, open=Decimal("94"), high=Decimal("96"), low=Decimal("93"),
+        close=Decimal("95"), volume=10,
+    )
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: available + timedelta(minutes=1))
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, second, second_packages,
+        previous_facts=first, previous_fact_packages=first_packages,
+    )
+    policy = continuation_exit_policy()
+    evidence = exit_evidence(args[0].information_cutoff)
+    policy = policy.model_copy(update={
+        "slippage_evidence_package_id": evidence[0].identity,
+        "cost_evidence_package_id": evidence[1].identity,
+        "participation_evidence_package_id": evidence[2].identity,
+    })
+    monkeypatch.setattr(shadow_exits, "_now", lambda: available + timedelta(minutes=2))
+    chain, packages = (first, second), (first_packages, second_packages)
+    path = shadow_exits.append_continuation_exit_event(
+        tmp_path, *args, chain, packages, policy, evidence,
+    )
+    event = shadow_exits.audit_continuation_exit_event(
+        tmp_path, *args, chain, packages, policy, evidence,
+    )
+    assert event == json.loads(path.read_bytes())
+    assert [item["status"] for item in event["evaluations"]] == ["OPEN", "CLOSED"]
+    assert event["result"]["reason"] == "STOP_GAP"
+    third, third_packages, _ = successor(second, char="9")
+    with pytest.raises(ValueError, match="depth is not yet supported"):
+        shadow_exits.append_continuation_exit_event(
+            tmp_path, *args, chain + (third,), packages + (third_packages,), policy, evidence,
+        )

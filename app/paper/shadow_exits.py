@@ -11,7 +11,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.paper.shadow_collection import _publish_once
-from app.paper.shadow_continuations import ForwardContinuationBundle
+from app.paper.shadow_continuations import (
+    ForwardContinuationBundle, audit_continuation_event,
+)
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_facts import audit_forward_fact_event
 from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
@@ -27,6 +29,15 @@ EXIT_COST_FIELDS = {"cost_bps_per_side", "fixed_cost_per_side", "currency"}
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate continuation-exit-event field")
+        result[key] = value
+    return result
 
 
 class ShadowExitPolicy(BaseModel):
@@ -204,6 +215,110 @@ def evaluate_continuation_exit(position: dict, facts: ForwardContinuationBundle,
                      "known_at": bar.available_at.isoformat(), "raw_price": str(raw),
                      "fill_price": str(price), "notional": str(notional),
                      "exit_cost": str(cost), "currency": policy.currency}}
+
+
+def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_facts,
+                             original_fact_packages, fill_policy, fill_packages,
+                             continuations, continuation_packages, exit_policy,
+                             exit_packages):
+    if (type(continuations) is not tuple or not continuations
+            or type(continuation_packages) is not tuple
+            or len(continuations) != len(continuation_packages)):
+        raise ValueError("nonempty aligned continuation chain required")
+    if len(continuations) > 2:
+        raise ValueError("continuation chain depth is not yet supported")
+    position = audit_position_open_event(
+        directory, watchlist, watchlist_packages, original_facts,
+        original_fact_packages, fill_policy, fill_packages,
+    )
+    references = []
+    evaluations = []
+    previous_facts = previous_packages = None
+    terminal = False
+    for facts, packages in zip(continuations, continuation_packages):
+        if terminal:
+            raise ValueError("continuation chain extends beyond terminal evaluation")
+        event = audit_continuation_event(
+            directory, watchlist, watchlist_packages, original_facts,
+            original_fact_packages, fill_policy, fill_packages, facts, packages,
+            previous_facts=previous_facts,
+            previous_fact_packages=previous_packages,
+        )
+        evaluation = evaluate_continuation_exit(position, facts, exit_policy)
+        references.append({"market_date": facts.calendar_days[-1].market_date.isoformat(),
+                           "event_id": event["event_id"],
+                           "event_sha256": hashlib.sha256(_canonical(event)).hexdigest()})
+        evaluations.append(evaluation)
+        terminal = evaluation["status"] in {"UNKNOWN", "CLOSED"}
+        previous_facts, previous_packages = facts, packages
+    package_ids = sorted(_packages(exit_policy, exit_packages, watchlist.information_cutoff))
+    return {
+        "schema_version": "shadow-continuation-exit-event-v1", "label": LABEL,
+        "event_type": "CONTINUATION_EXIT_EVALUATED", "scoring": "NOT SCORED",
+        "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
+        "performance_status": "NO P&L OR NAV",
+        "position_event_id": position["event_id"],
+        "position_event_sha256": hashlib.sha256(_canonical(position)).hexdigest(),
+        "continuation_events": references, "exit_package_ids": package_ids,
+        "policy": exit_policy.model_dump(mode="json"), "evaluations": evaluations,
+        "result": evaluations[-1],
+    }
+
+
+def continuation_exit_event_path(directory: Path, position_event_id: str,
+                                 continuation_event_id: str) -> Path:
+    return exit_event_path(directory, position_event_id, continuation_event_id)
+
+
+def append_continuation_exit_event(directory: Path, watchlist: ShadowWatchlist,
+                                   watchlist_packages, original_facts,
+                                   original_fact_packages, fill_policy, fill_packages,
+                                   continuations, continuation_packages,
+                                   exit_policy: ShadowExitPolicy, exit_packages) -> Path:
+    exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
+    basis = _continuation_exit_basis(
+        directory, watchlist, watchlist_packages, original_facts,
+        original_fact_packages, fill_policy, fill_packages, continuations,
+        continuation_packages, exit_policy, exit_packages,
+    )
+    recorded_at = _utc(_now())
+    latest = max(item.bars[-1].available_at for item in continuations)
+    if recorded_at < latest:
+        raise ValueError("continuation exit publication precedes authenticated inputs")
+    payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
+                       "recorded_at": recorded_at.isoformat()}
+    last_id = basis["continuation_events"][-1]["event_id"]
+    path = _publish_once(continuation_exit_event_path(
+        directory, basis["position_event_id"], last_id), payload)
+    if _now() < recorded_at:
+        path.unlink()
+        raise ValueError("clock rollback during continuation exit publication")
+    return path
+
+
+def audit_continuation_exit_event(directory: Path, watchlist: ShadowWatchlist,
+                                  watchlist_packages, original_facts,
+                                  original_fact_packages, fill_policy, fill_packages,
+                                  continuations, continuation_packages,
+                                  exit_policy: ShadowExitPolicy, exit_packages) -> dict:
+    exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
+    basis = _continuation_exit_basis(
+        directory, watchlist, watchlist_packages, original_facts,
+        original_fact_packages, fill_policy, fill_packages, continuations,
+        continuation_packages, exit_policy, exit_packages,
+    )
+    path = continuation_exit_event_path(
+        directory, basis["position_event_id"], basis["continuation_events"][-1]["event_id"])
+    event = json.loads(path.read_bytes(), object_pairs_hook=_unique_json_object)
+    if type(event) is not dict or set(event) != set(basis) | {"event_id", "recorded_at"}:
+        raise ValueError("unexpected continuation-exit-event fields")
+    recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
+    expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
+                        "recorded_at": recorded_at.isoformat()}
+    latest = max(item.bars[-1].available_at for item in continuations)
+    if not latest <= recorded_at <= _now() or event != expected:
+        raise ValueError("continuation exit event does not bind authenticated inputs")
+    return event
 
 
 def _basis(position, facts, fact_event, policy, package_ids):
