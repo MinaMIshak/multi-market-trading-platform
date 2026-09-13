@@ -455,3 +455,11 @@ The manifest edition is independently pinned as well. Its SHA256 is
 `7716804d38c3a713be635cdb950831b46d9b29de92cd1eb6e11f26b0893c5239`.
 This prevents a rewritten manifest and matching sidecar from changing the
 reviewed receipt metadata while retaining the same artifact bytes.
+
+The forward-session package auditor now also requires the package root to be a
+real directory and every manifest, sidecar and artifact entry to be a regular
+file stored directly within it. It rejects symbolic links before reading their
+targets, including links whose external target has the expected bytes. This
+closes a custody ambiguity without changing any retained artifact or evidence
+classification. Target-date session status remains UNKNOWN, canonical US2 is
+NO_GO, and shadow scoring is NOT_READY.

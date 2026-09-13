@@ -129,6 +129,29 @@ def test_rejects_undeclared_inventory(package):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
 
+@pytest.mark.parametrize("name", [
+    "manifest.json",
+    "manifest.sha256",
+    "nyse_2026_calendar.pdf",
+    "nyse_hours_calendars.html",
+])
+def test_rejects_symlinked_package_file(package, name):
+    path = package / name
+    target = package.parent / f"outside-{name}"
+    target.write_bytes(path.read_bytes())
+    path.unlink()
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="not a regular file"):
+        subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
+
+
+def test_rejects_symlinked_package_root(package, tmp_path):
+    link = tmp_path / "linked-package"
+    link.symlink_to(package, target_is_directory=True)
+    with pytest.raises(ValueError, match="root is not a regular directory"):
+        subject.audit_forward_session_truth(link, audited_at=AUDITED_AT)
+
+
 def test_rejects_future_dated_receipt(package, monkeypatch):
     _rewrite_manifest(
         package,

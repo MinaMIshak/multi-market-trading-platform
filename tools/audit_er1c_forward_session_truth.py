@@ -60,11 +60,25 @@ def _visible_html(payload: bytes) -> str:
     return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", source)).split())
 
 
+def _verify_closed_regular_package(root: Path) -> None:
+    if root.is_symlink() or not root.is_dir():
+        raise ValueError("evidence package root is not a regular directory")
+    expected = set(EXPECTED) | MANIFEST_FILES
+    actual = {item.name for item in root.iterdir()}
+    if actual != expected:
+        raise ValueError("evidence inventory does not match manifest scope")
+    for name in expected:
+        entry = root / name
+        if entry.is_symlink() or not entry.is_file():
+            raise ValueError(f"evidence artifact is not a regular file: {name}")
+
+
 def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = None) -> dict:
     if audited_at is None:
         audited_at = datetime.now(timezone.utc)
     if type(audited_at) is not datetime or audited_at.tzinfo is not timezone.utc:
         raise ValueError("audited_at must use datetime.timezone.utc")
+    _verify_closed_regular_package(root)
     raw_manifest = (root / "manifest.json").read_bytes()
     manifest_sha256 = _sha256(raw_manifest)
     expected_sidecar = f"{manifest_sha256}  manifest.json"
@@ -82,10 +96,6 @@ def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = Non
     records = manifest.get("records")
     if not isinstance(records, list) or len(records) != len(EXPECTED):
         raise ValueError("unexpected evidence records")
-    actual = {item.name for item in root.iterdir() if item.is_file()}
-    if actual != set(EXPECTED) | MANIFEST_FILES:
-        raise ValueError("evidence inventory does not match manifest scope")
-
     payloads: dict[str, bytes] = {}
     for record in records:
         required = {

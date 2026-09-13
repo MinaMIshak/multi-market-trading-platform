@@ -15,6 +15,10 @@ editions, so rewriting the manifest and its self-described sidecar cannot alter
 receipt metadata or bless substituted calendar or hours-page bytes. The reviewed
 manifest is 1,089 bytes with SHA256
 `7716804d38c3a713be635cdb950831b46d9b29de92cd1eb6e11f26b0893c5239`.
+The package root must be a real directory and every declared entry must be a
+regular file stored directly inside it. Symbolic links, substituted directories,
+and undeclared entries fail closed, so matching bytes outside the retained
+package cannot satisfy its custody boundary.
 
 | Artifact | Bytes | SHA256 |
 | --- | ---: | --- |
