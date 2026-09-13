@@ -231,6 +231,7 @@ def exit_evaluation_view(
         entry = position["entry"]
         with localcontext(Context(prec=34)):
             gross_market_value = Decimal(entry["quantity"]) * mark.close
+            gross_unrealized_pnl = gross_market_value - Decimal(entry["notional"])
         view["open_paper_positions"] = {
             "status": "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR",
             "position": {
@@ -242,6 +243,10 @@ def exit_evaluation_view(
                 "entry_fill_price": entry["fill_price"],
                 "mark_price": str(mark.close),
                 "gross_market_value": str(gross_market_value),
+                "gross_unrealized_pnl": str(gross_unrealized_pnl),
+                "gross_unrealized_pnl_status": (
+                    "AS OF OBSERVED BAR / BEFORE FEES AND LIQUIDATION SLIPPAGE"
+                ),
                 "marked_through_sequence": mark.sequence,
                 "mark_interval_end": mark.interval_end.isoformat(),
                 "mark_known_at": mark.available_at.isoformat(),

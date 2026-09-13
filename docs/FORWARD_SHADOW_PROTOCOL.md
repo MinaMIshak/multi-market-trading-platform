@@ -459,12 +459,17 @@ the bar sequence through which it was evaluated. `OPEN` means only that the
 supplied admitted bars contained no observed exit. For an `OPEN` result, the view
 reports the final admitted bar close as an authenticated as-of mark, its interval
 end and availability time, and the exact gross market value at that price. It
-does not treat the mark as an executable exit: unrealized P&L remains unknown
+also reports gross unrealized P&L as gross marked value minus audited entry
+notional, in the position's native currency. Entry fill slippage is embedded in
+that notional; fees and hypothetical liquidation slippage are excluded. This
+as-of valuation is not an executable exit, realized return or portfolio NAV.
+Net liquidation unrealized P&L remains unknown
 until applicable liquidation slippage and cost are authenticated. For a `CLOSED` result only,
 the view re-audits the entry chain again and reports one native-currency closed
 trade with exact gross P&L, net P&L after preserved entry and exit costs, and net
-return on entry notional plus entry cost. `OPEN` and `UNKNOWN` results expose no
-P&L. This single-trade arithmetic is not portfolio performance: neither view
+return on entry notional plus entry cost. `UNKNOWN` results expose no P&L;
+`OPEN` results expose only gross marked unrealized P&L. This single-trade arithmetic
+is not portfolio performance: neither view
 infers a current mark, aggregates positions, converts FX or updates NAV, and all
 aggregate performance fields remain explicitly not evaluated/null. `UNKNOWN`
 exit evaluations expose no mark because the position state itself is unresolved.

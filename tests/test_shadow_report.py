@@ -97,10 +97,15 @@ def test_position_view_reaudits_fill_and_does_not_claim_current_position(tmp_pat
     assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
 
 
-def test_exit_view_reports_authenticated_open_mark_without_unrealized_pnl(tmp_path, monkeypatch):
-    args, _, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+@pytest.mark.parametrize("close", ["99", "100.100", "101"])
+def test_exit_view_reports_gross_mark_pnl_without_net_liquidation_claim(tmp_path, monkeypatch, close):
+    args, _, policy, evidence = prepared_exit(
+        tmp_path, monkeypatch, bar_changes={"close": Decimal(close)},
+    )
     shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
-    view = exit_evaluation_view(tmp_path, *args, policy, evidence)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with localcontext(Context(prec=3)):
+        view = exit_evaluation_view(tmp_path, *args, policy, evidence)
     assert view["position_status"] == "OPEN"
     assert view["exit_evaluation"] == {
         "status": "OPEN", "reason": "NO_EXIT_OBSERVED",
@@ -109,7 +114,7 @@ def test_exit_view_reports_authenticated_open_mark_without_unrealized_pnl(tmp_pa
     open_position = view["open_paper_positions"]
     assert open_position["status"] == "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR"
     mark = open_position["position"]
-    assert mark["mark_price"] == "101"
+    assert mark["mark_price"] == close
     assert Decimal(mark["gross_market_value"]) == (
         Decimal(mark["quantity"]) * Decimal(mark["mark_price"])
     )
@@ -117,9 +122,15 @@ def test_exit_view_reports_authenticated_open_mark_without_unrealized_pnl(tmp_pa
     assert mark["mark_interval_end"] == args[2].bars[-1].interval_end.isoformat()
     assert mark["mark_known_at"] == args[2].bars[-1].available_at.isoformat()
     assert mark["unrealized_pnl"] is None
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    with localcontext(Context(prec=34)):
+        expected = Decimal(mark["quantity"]) * Decimal(close) - Decimal(position["entry"]["notional"])
+    assert Decimal(mark["gross_unrealized_pnl"]) == expected
+    assert "BEFORE FEES AND LIQUIDATION SLIPPAGE" in mark["gross_unrealized_pnl_status"]
     assert "UNKNOWN" in mark["unrealized_pnl_status"]
     assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
     assert all(value is None for key, value in view["performance"].items() if key != "status")
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
 
 
 def test_exit_view_preserves_closed_outcome(tmp_path, monkeypatch):
