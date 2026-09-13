@@ -1,5 +1,6 @@
 """Artificial allocation fixtures only; no authentic capital or performance."""
 import json
+import hashlib
 from datetime import timedelta
 from decimal import Decimal
 
@@ -7,6 +8,12 @@ import pytest
 
 from app.paper import shadow_allocations, shadow_portfolio, shadow_positions
 from tests.test_shadow_positions import setup_position
+
+
+def rewrite_reservation(path, event):
+    basis = {key: value for key, value in event.items() if key not in {"reservation_id", "recorded_at"}}
+    event["reservation_id"] = hashlib.sha256(shadow_allocations._canonical(basis)).hexdigest()
+    path.write_text(json.dumps(event))
 
 
 def setup_allocation(tmp_path, monkeypatch, **changes):
@@ -103,3 +110,65 @@ def test_existing_exposure_is_included_in_sleeve_gate(tmp_path, monkeypatch):
     existing = shadow_allocations._read_reservations(tmp_path)
     with pytest.raises(ValueError, match="market sleeve cap"):
         shadow_allocations._basis(position, receipt, portfolio, args[4], existing)
+
+
+@pytest.mark.parametrize("field,value,match", [
+    ("totals_after", {"capital_reserved": "0", "risk_reserved": "0"}, "cumulative total"),
+    ("totals_after", {"capital_reserved": "101.15005"}, "unexpected.*totals"),
+    ("capital_reserved", "NaN", "invalid.*amount"),
+    ("risk_reserved", "-1", "invalid.*amount"),
+    ("event_type", "CAPITAL_RELEASED", "semantics"),
+    ("scoring", "VALIDATED", "semantics"),
+    ("position_event_sha256", "bad", "reference"),
+])
+def test_append_rejects_rehashed_malformed_predecessor(tmp_path, monkeypatch, field, value, match):
+    args, portfolio, _ = setup_allocation(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    event = json.loads(path.read_bytes())
+    event[field] = value
+    rewrite_reservation(path, event)
+    with pytest.raises(ValueError, match=match):
+        shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+
+
+def test_append_rejects_future_predecessor(tmp_path, monkeypatch):
+    args, portfolio, now = setup_allocation(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    event = json.loads(path.read_bytes())
+    event["recorded_at"] = (now + timedelta(seconds=1)).isoformat()
+    rewrite_reservation(path, event)
+    with pytest.raises(ValueError, match="future"):
+        shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+
+
+def test_reservation_cannot_be_renamed(tmp_path, monkeypatch):
+    args, portfolio, _ = setup_allocation(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    path.rename(path.with_name("renamed.json"))
+    with pytest.raises(ValueError, match="filename"):
+        shadow_allocations._read_reservations(tmp_path)
+
+
+@pytest.mark.parametrize("violation", ["clock", "position", "total", "none"])
+def test_chain_checks_every_predecessor(tmp_path, monkeypatch, violation):
+    args, portfolio, now = setup_allocation(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    first = json.loads(path.read_bytes())
+    second = first | {
+        "candidate_position_key": "a" * 64,
+        "position_event_id": "b" * 64,
+        "prior_reservation_ids": [first["reservation_id"]],
+        "totals_after": {"capital_reserved": "202.30010", "risk_reserved": "14.39510"},
+    }
+    if violation == "clock":
+        second["recorded_at"] = (now - timedelta(seconds=1)).isoformat()
+    elif violation == "position":
+        second["position_event_id"] = first["position_event_id"]
+    elif violation == "total":
+        second["totals_after"] = first["totals_after"]
+    rewrite_reservation(path.with_name(second["candidate_position_key"] + ".json"), second)
+    if violation == "none":
+        assert len(shadow_allocations._read_reservations(tmp_path)) == 2
+    else:
+        with pytest.raises(ValueError, match={"clock": "clock ordering", "position": "duplicate", "total": "cumulative total"}[violation]):
+            shadow_allocations._read_reservations(tmp_path)

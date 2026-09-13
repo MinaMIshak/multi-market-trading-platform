@@ -4,6 +4,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import re
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Context, Decimal, localcontext
@@ -58,10 +59,21 @@ def _read_reservations(directory: Path) -> list[dict]:
             raise ValueError("unexpected capital-reservation fields")
         if event["schema_version"] != "shadow-capital-reservation-v1" or event["label"] != LABEL:
             raise ValueError("invalid capital-reservation identity")
+        if (event["event_type"] != "CAPITAL_RESERVED" or event["scoring"] != "NOT SCORED"
+                or event["portfolio_status"] != "SHARED CAPITAL RESERVED / NO NAV OR P&L"):
+            raise ValueError("invalid capital-reservation semantics")
+        for field in ("candidate_position_key", "position_event_id", "position_event_sha256", "policy_id"):
+            if type(event[field]) is not str or re.fullmatch(r"[0-9a-f]{64}", event[field]) is None:
+                raise ValueError("invalid capital-reservation reference")
+        if path.name != f'{event["candidate_position_key"]}.json':
+            raise ValueError("capital-reservation filename mismatch")
         basis = {key: value for key, value in event.items() if key not in {"reservation_id", "recorded_at"}}
         if event["reservation_id"] != hashlib.sha256(_canonical(basis)).hexdigest():
             raise ValueError("capital-reservation hash mismatch")
-        _utc(datetime.fromisoformat(event["recorded_at"]))
+        if _utc(datetime.fromisoformat(event["recorded_at"])) > _utc(_now()):
+            raise ValueError("future capital-reservation clock")
+        _amount(event, "capital_reserved")
+        _amount(event, "risk_reserved")
         unordered.append(event)
     result = []
     remaining = unordered[:]
@@ -70,8 +82,25 @@ def _read_reservations(directory: Path) -> list[dict]:
         matches = [item for item in remaining if item["prior_reservation_ids"] == prior]
         if len(matches) != 1:
             raise ValueError("capital-reservation chain is incomplete or ambiguous")
-        result.append(matches[0])
-        remaining.remove(matches[0])
+        event = matches[0]
+        if result and (
+            _utc(datetime.fromisoformat(event["recorded_at"]))
+            < _utc(datetime.fromisoformat(result[-1]["recorded_at"]))
+        ):
+            raise ValueError("capital-reservation chain clock ordering")
+        if any(item["position_event_id"] == event["position_event_id"] for item in result):
+            raise ValueError("duplicate reserved position")
+        totals = event["totals_after"]
+        if type(totals) is not dict or set(totals) != {"capital_reserved", "risk_reserved"}:
+            raise ValueError("unexpected capital-reservation totals")
+        for field in totals:
+            old = sum((_amount(item, field) for item in result), Fraction())
+            with localcontext(Context(prec=34)):
+                expected_total = Decimal(old.numerator) / Decimal(old.denominator) + Decimal(event[field])
+            if _amount(totals, field) != Fraction(expected_total):
+                raise ValueError("capital-reservation cumulative total mismatch")
+        result.append(event)
+        remaining.remove(event)
     return result
 
 
@@ -151,11 +180,14 @@ def append_capital_reservation(
     policy_receipt = audit_portfolio_policy(directory, portfolio)
     _require_timely_policy(policy_receipt, portfolio, watchlist)
     with _allocation_lock(directory):
-        basis = _basis(position, policy_receipt, portfolio, fill_policy, _read_reservations(directory))
+        existing = _read_reservations(directory)
+        basis = _basis(position, policy_receipt, portfolio, fill_policy, existing)
         reservation_id = hashlib.sha256(_canonical(basis)).hexdigest()
         recorded_at = _utc(_now())
         if recorded_at < _utc(datetime.fromisoformat(position["recorded_at"])):
             raise ValueError("capital reservation precedes position event")
+        if existing and recorded_at < _utc(datetime.fromisoformat(existing[-1]["recorded_at"])):
+            raise ValueError("capital reservation precedes prior reservation")
         payload = basis | {"reservation_id": reservation_id, "recorded_at": recorded_at.isoformat()}
         path = _publish_once(directory / "capital-reservations" / f"{basis['candidate_position_key']}.json", payload)
         if _now() < recorded_at:

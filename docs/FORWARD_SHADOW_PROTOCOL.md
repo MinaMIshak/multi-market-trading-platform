@@ -368,3 +368,15 @@ The receipt preserves no mark, return, P&L or performance claim. A fill currency
 different from the portfolio base fails closed because no admitted PIT FX
 conversion boundary exists. Reservations are simulated ledger events, never
 broker orders.
+
+Before admitting further exposure, the reservation reader checks every stored
+receipt's fixed paper-only semantics, reference formats, candidate filename,
+finite nonnegative amounts, cumulative totals, unique position IDs and monotonic
+nonfuture receipt clocks. Recomputing a hash does not bypass these checks. New
+publication must also follow the preceding reservation clock. Totals are checked
+using the same isolated Decimal precision as publication. These are local ledger
+integrity checks, not independent timestamp attestation or authentication of all
+prior source packages. The target reservation still requires full upstream audit;
+revalidation of all predecessor source chains and authenticated exit settlement
+remain necessary before operational use. Closed positions continue to consume
+capital until that settlement boundary is implemented.
