@@ -66,10 +66,11 @@ def _rewrite_manifest(root, mutate):
 def test_qualifies_current_schedule_without_overstating_us2_or_shadow_readiness(package):
     result = audit_forward_session_truth(package, audited_at=AUDITED_AT)
     assert result["requested_first_us_shadow_date"] == "2026-09-14"
-    assert result["official_current_schedule_corroborated"] is True
+    assert result["official_schedule_text_anchors_present"] is True
+    assert result["target_date_session_status"] == "UNKNOWN"
     assert result["canonical_us2_session_evidence"] == "NO_GO"
     assert result["shadow_scoring"] == "NOT_READY"
-    assert result["watchlist_frozen_by_cutoff"] is False
+    assert result["watchlist_frozen_by_cutoff"] == "UNKNOWN"
     assert result["latest_receipt_at"] == "2026-09-13T00:01:00+00:00"
 
 
@@ -119,3 +120,27 @@ def test_rejects_repurposed_manifest(package):
     _rewrite_manifest(package, lambda doc: doc.update(purpose="canonical session proof"))
     with pytest.raises(ValueError, match="evidence purpose"):
         audit_forward_session_truth(package, audited_at=AUDITED_AT)
+
+
+@pytest.mark.parametrize("extra_text", [
+    "",  # A partial page with anchors is not a complete exceptions calendar.
+    "Special closure: September 14, 2026.",
+    "Early close: September 14, 2026 at 1 p.m. ET.",
+])
+def test_general_anchors_never_establish_target_date_or_watchlist(package, extra_text):
+    path = package / "nyse_hours_calendars.html"
+    payload = path.read_bytes().replace(b"</html>", extra_text.encode() + b"</html>")
+    path.write_bytes(payload)
+
+    def update(doc):
+        record = next(row for row in doc["records"] if row["filename"] == path.name)
+        record.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
+
+    _rewrite_manifest(package, update)
+    result = audit_forward_session_truth(package, audited_at=AUDITED_AT)
+    assert result["target_date_session_status"] == "UNKNOWN"
+    assert "has not been verified" in result["calendar_observation"]
+    assert "is absent" not in result["calendar_observation"]
+    assert result["watchlist_frozen_by_cutoff"] == "UNKNOWN"
+    assert result["canonical_us2_session_evidence"] == "NO_GO"
+    assert result["shadow_scoring"] == "NOT_READY"

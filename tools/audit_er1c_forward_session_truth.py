@@ -119,22 +119,23 @@ def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = Non
     return {
         "market": "NYSE / XNYS",
         "requested_first_us_shadow_date": "2026-09-14",
-        "official_current_schedule_corroborated": True,
+        "official_schedule_text_anchors_present": True,
         "audited_at": audited_at.isoformat(),
         "latest_receipt_at": max(
             _utc(record["retrieval_completed_at_utc"], "retrieval completion")
             for record in records
         ).isoformat(),
         "calendar_observation": (
-            "September 14 is absent from the official 2026 holiday and early-close "
-            "exceptions retained at the receipt time"
+            "General holiday-scope, Labor Day and core-hours text anchors are "
+            "present; target-date exception coverage has not been verified"
         ),
+        "target_date_session_status": "UNKNOWN",
         "published_core_hours": "09:30-16:00 ET",
         "canonical_us2_session_evidence": "NO_GO",
         "shadow_scoring": "NOT_READY",
-        "watchlist_frozen_by_cutoff": False,
+        "watchlist_frozen_by_cutoff": "UNKNOWN",
         "limitations": [
-            "the artifacts do not contain an exact per-date XNYS session assertion",
+            "these checks do not establish an exact per-date XNYS session assertion",
             "the published clocks are Eastern Time rather than exact UTC timestamps",
             "no approved review binds these receipts into a HistoricalEvidencePackage",
             "this package contains no candidate, information cutoff, or frozen watchlist",

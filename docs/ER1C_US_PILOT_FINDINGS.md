@@ -350,3 +350,20 @@ venue/security-class extraction has not been tested on this sample. Historical
 XNYS universe completeness, listing-ledger completeness, canonical US5A and
 overall PIT admission remain **NO-GO**. The failed retrieval is an acquisition
 constraint, not evidence about the filing or historical availability.
+
+## Forward-session audit claim correction
+
+The offline forward-session auditor checks general NYSE holiday-scope, Labor
+Day and core-hours text anchors and basic PDF structure. Those checks do not
+parse a complete exceptions calendar or prove the session state of September
+14, 2026. Its earlier target-date absence statement was unsupported and has
+been removed. The report now identifies only text-anchor presence and returns
+`target_date_session_status: UNKNOWN`. Even a page containing an additional
+target-date closure or early-close notice cannot produce a regular-session
+claim from these checks.
+
+The package also contains no watchlist or ledger evidence, so whether a watchlist
+was frozen by its cutoff is `UNKNOWN`, rather than a global negative assertion.
+Canonical US2 remains **NO_GO** and shadow scoring remains **NOT_READY**.
+This correction neither changes retained source bytes nor admits a session,
+marks one missed, or creates a recommendation. EXPERIMENTAL / PAPER ONLY.
