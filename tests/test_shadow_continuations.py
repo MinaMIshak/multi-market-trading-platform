@@ -206,3 +206,67 @@ def test_rejects_unmatched_evidence_and_tampering(tmp_path, monkeypatch):
     path.write_text(json.dumps(event))
     with pytest.raises(ValueError, match="does not bind authenticated inputs"):
         shadow_continuations.audit_continuation_event(tmp_path, *args, facts, evidence)
+
+
+@pytest.mark.parametrize("market,mic", [("US", "XCAI"), ("EGX", "XNYS"), ("EGX", "XNAS")])
+@pytest.mark.parametrize("state", ["OPEN", "CLOSED"])
+def test_calendar_rejects_cross_market_venue(tmp_path, monkeypatch, market, mic, state):
+    _, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    values = facts.calendar_days[0].model_dump(mode="python") | {
+        "market": market, "calendar_mic": mic, "state": state,
+    }
+    if state == "CLOSED":
+        values.update(opens_at=None, closes_at=None)
+    with pytest.raises(ValidationError, match="market/MIC mismatch"):
+        ContinuationCalendarDay(**values)
+
+
+@pytest.mark.parametrize("field", ["opens_at", "closes_at"])
+def test_calendar_rejects_hours_on_another_local_date(tmp_path, monkeypatch, field):
+    _, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    day = facts.calendar_days[0]
+    shift = timedelta(days=-1 if field == "opens_at" else 1)
+    with pytest.raises(ValidationError, match="local market date"):
+        ContinuationCalendarDay(**(day.model_dump(mode="python") | {
+            field: getattr(day, field) + shift,
+        }))
+
+
+def test_calendar_checks_local_date_instead_of_utc_date(tmp_path, monkeypatch):
+    _, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    day = facts.calendar_days[0]
+    # An artificial late US session closes on the next UTC date, same local date.
+    opens = day.opens_at.replace(hour=22, minute=0)
+    accepted = ContinuationCalendarDay(**(day.model_dump(mode="python") | {
+        "opens_at": opens, "closes_at": opens + timedelta(hours=3),
+    }))
+    assert accepted.closes_at.date() > accepted.market_date
+    # Conversely a UTC-date match can still be the previous New York date.
+    with pytest.raises(ValidationError, match="local market date"):
+        ContinuationCalendarDay(**(day.model_dump(mode="python") | {
+            "opens_at": opens.replace(hour=0), "closes_at": opens.replace(hour=1),
+        }))
+
+
+def test_continuation_cannot_substitute_listing_venue(tmp_path, monkeypatch):
+    args, facts, evidence, _ = prepared_continuation(tmp_path, monkeypatch)
+    changed = facts.model_copy(update={
+        "calendar_days": (facts.calendar_days[0].model_copy(update={"calendar_mic": "XNAS"}),),
+        "identity": facts.identity.model_copy(update={"listing_mic": "XNAS"}),
+        "trading_status": facts.trading_status.model_copy(update={"listing_mic": "XNAS"}),
+    })
+    with pytest.raises(ValueError, match="does not bind the original position"):
+        shadow_continuations.append_continuation_event(tmp_path, *args, changed, evidence)
+    assert not (tmp_path / "continuation-facts").exists()
+
+
+def test_publication_revalidates_copied_calendar_models(tmp_path, monkeypatch):
+    args, facts, evidence, _ = prepared_continuation(tmp_path, monkeypatch)
+    changed = facts.model_copy(update={
+        "calendar_days": (facts.calendar_days[0].model_copy(update={
+            "closes_at": facts.calendar_days[0].closes_at + timedelta(days=1),
+        }),),
+    })
+    with pytest.raises(ValueError, match="local market date"):
+        shadow_continuations.append_continuation_event(tmp_path, *args, changed, evidence)
+    assert not (tmp_path / "continuation-facts").exists()

@@ -304,6 +304,14 @@ tradability, and raw opening-origin contiguous bars. Every calendar, identity,
 action, status and bar reference must resolve to an admitted evidence package,
 and each bar's availability must equal its package availability.
 
+Calendar days must pair EGX with XCAI or US with XNYS/XNAS. Both open and close
+must fall on the declared date in Africa/Cairo or America/New_York, respectively;
+UTC date equality alone is insufficient. This checks supplied clocks rather than
+deriving session hours or inferring an exchange holiday. The continuation MIC
+must equal the original position session MIC, and its open must follow the
+original session close. Venue changes require a future explicit admission path.
+Publication revalidates nested facts so copied models cannot bypass these gates.
+
 Publication reaudits the original watchlist, fact, trigger, fill and position
 chain. It cannot precede either the position receipt or observed continuation
 bars. One immutable file per position and authenticated target market date

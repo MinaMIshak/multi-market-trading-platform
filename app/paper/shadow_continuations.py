@@ -6,6 +6,7 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -34,6 +35,8 @@ class ContinuationCalendarDay(BaseModel):
 
     @model_validator(mode="after")
     def coherent(self):
+        if (self.market == "EGX") != (self.calendar_mic == "XCAI"):
+            raise ValueError("continuation calendar market/MIC mismatch")
         if self.state == "CLOSED":
             if self.opens_at is not None or self.closes_at is not None:
                 raise ValueError("closed calendar day cannot have session hours")
@@ -44,6 +47,10 @@ class ContinuationCalendarDay(BaseModel):
             _utc(self.closes_at)
             if self.closes_at <= self.opens_at:
                 raise ValueError("session close must follow open")
+            zone = ZoneInfo("Africa/Cairo" if self.market == "EGX" else "America/New_York")
+            if any(clock.astimezone(zone).date() != self.market_date
+                   for clock in (self.opens_at, self.closes_at)):
+                raise ValueError("continuation session hours disagree with local market date")
         return self
 
 
@@ -146,9 +153,12 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
     original_date = original_facts.session.market_date
     if ((facts.calendar_days[0].market_date - original_date).days != 1
             or facts.calendar_days[-1].market != original_facts.session.market
+            or facts.calendar_days[-1].calendar_mic != original_facts.session.calendar_mic
             or facts.identity.instrument_id != original_facts.identity.instrument_id
             or facts.identity.ticker != original_facts.identity.ticker):
         raise ValueError("continuation does not bind the original position and next calendar date")
+    if facts.calendar_days[-1].opens_at <= original_facts.session.closes_at:
+        raise ValueError("continuation session must follow original session close")
     observed_through = max(bar.available_at for bar in facts.bars)
     if max(observed_through, _utc(datetime.fromisoformat(position["recorded_at"]))) > recorded_at:
         raise ValueError("continuation publication precedes authenticated inputs")
