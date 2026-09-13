@@ -456,7 +456,12 @@ remains unknown because the view does not assume that no later exit exists.
 `exit_evaluation_view(...)` additionally re-audits the position and conservative
 exit event. It preserves the exact `OPEN`, `CLOSED` or `UNKNOWN` evaluation and
 the bar sequence through which it was evaluated. `OPEN` means only that the
-supplied admitted bars contained no observed exit. Neither view infers a current
-mark, aggregates positions, calculates P&L or updates NAV; those fields remain
-explicitly not evaluated/null. Both readers are read-only and fail closed when
-any durable event or upstream evidence binding is missing or altered.
+supplied admitted bars contained no observed exit. For a `CLOSED` result only,
+the view re-audits the entry chain again and reports one native-currency closed
+trade with exact gross P&L, net P&L after preserved entry and exit costs, and net
+return on entry notional plus entry cost. `OPEN` and `UNKNOWN` results expose no
+P&L. This single-trade arithmetic is not portfolio performance: neither view
+infers a current mark, aggregates positions, converts FX or updates NAV, and all
+aggregate performance fields remain explicitly not evaluated/null. Both readers
+are read-only and fail closed when any durable event or upstream evidence binding
+is missing or altered.

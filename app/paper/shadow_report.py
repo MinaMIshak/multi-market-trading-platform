@@ -1,4 +1,5 @@
-"""Read-only collection views; no execution or portfolio inference."""
+"""Read-only collection views; no portfolio inference."""
+from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
 from app.paper.shadow_collection import LABEL, audit_missed_session
@@ -136,13 +137,13 @@ def exit_evaluation_view(
     exit_policy: ShadowExitPolicy,
     exit_packages: tuple[HistoricalEvidencePackage, ...],
 ) -> dict:
-    """Display one audited conservative exit evaluation without calculating P&L."""
+    """Display one audited exit and exact native P&L only when it is closed."""
     event = audit_exit_event(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, exit_policy, exit_packages,
     )
     evaluation = event["evaluation"]
-    return _base() | {
+    view = _base() | {
         "record_id": watchlist.record_id,
         "market": watchlist.session.market,
         "collection_status": "EXIT EVALUATED",
@@ -156,3 +157,43 @@ def exit_evaluation_view(
             "exit_package_ids": event["exit_package_ids"],
         },
     }
+    if evaluation["status"] != "CLOSED":
+        return view
+
+    position = audit_position_open_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    entry, exit_fill = position["entry"], evaluation["exit"]
+    with localcontext(Context(prec=34)):
+        entry_notional = Decimal(entry["notional"])
+        entry_cost = Decimal(entry["entry_cost"])
+        exit_notional = Decimal(exit_fill["notional"])
+        exit_cost = Decimal(exit_fill["exit_cost"])
+        gross_pnl = exit_notional - entry_notional
+        net_pnl = gross_pnl - entry_cost - exit_cost
+        capital_outlay = entry_notional + entry_cost
+        net_return = net_pnl / capital_outlay
+    view["closed_paper_trades"] = {
+        "status": "ONE AUTHENTICATED CLOSED PAPER TRADE",
+        "trade": {
+            "candidate_position_key": position["candidate_position_key"],
+            "ticker": entry["ticker"],
+            "instrument_id": entry["instrument_id"],
+            "quantity": entry["quantity"],
+            "currency": entry["currency"],
+            "entry_fill_price": entry["fill_price"],
+            "entry_notional": entry["notional"],
+            "entry_cost": entry["entry_cost"],
+            "exit_fill_price": exit_fill["fill_price"],
+            "exit_notional": exit_fill["notional"],
+            "exit_cost": exit_fill["exit_cost"],
+            "exit_reason": evaluation["reason"],
+            "gross_pnl": str(gross_pnl),
+            "net_pnl": str(net_pnl),
+            "net_return": str(net_return),
+            "entry_known_at": entry["known_at"],
+            "exit_known_at": exit_fill["known_at"],
+        },
+    }
+    return view

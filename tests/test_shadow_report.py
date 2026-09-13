@@ -1,6 +1,6 @@
 """Software-only report fixtures; no empirical recommendations or results."""
 import json
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 
 import pytest
 
@@ -120,6 +120,19 @@ def test_exit_view_preserves_closed_outcome(tmp_path, monkeypatch):
     view = exit_evaluation_view(tmp_path, *args, policy, evidence)
     assert view["position_status"] == "CLOSED"
     assert view["exit_evaluation"]["exit"] is not None
+    trade = view["closed_paper_trades"]["trade"]
+    assert view["closed_paper_trades"]["status"] == "ONE AUTHENTICATED CLOSED PAPER TRADE"
+    assert trade["currency"] == "USD"
+    assert Decimal(trade["gross_pnl"]) == (
+        Decimal(trade["exit_notional"]) - Decimal(trade["entry_notional"])
+    )
+    assert Decimal(trade["net_pnl"]) == (
+        Decimal(trade["gross_pnl"]) - Decimal(trade["entry_cost"]) - Decimal(trade["exit_cost"])
+    )
+    with localcontext(Context(prec=34)):
+        assert Decimal(trade["net_return"]) == Decimal(trade["net_pnl"]) / (
+            Decimal(trade["entry_notional"]) + Decimal(trade["entry_cost"])
+        )
     assert view["performance"]["nav"] is None
 
 
