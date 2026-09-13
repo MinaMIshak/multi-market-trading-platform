@@ -11,6 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.paper.shadow_collection import _publish_once
+from app.paper.shadow_continuations import ForwardContinuationBundle
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_facts import audit_forward_fact_event
 from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
@@ -136,6 +137,68 @@ def evaluate_exit(position: dict, facts: ForwardFactBundle, policy: ShadowExitPo
     return {"status": outcome, "reason": reason,
             "evaluated_through_sequence": bar.sequence,
             "exit": {"quantity": entry["quantity"], "bar_sequence": bar.sequence,
+                     "interval_start": bar.interval_start.isoformat(),
+                     "interval_end": bar.interval_end.isoformat(),
+                     "known_at": bar.available_at.isoformat(), "raw_price": str(raw),
+                     "fill_price": str(price), "notional": str(notional),
+                     "exit_cost": str(cost), "currency": policy.currency}}
+
+
+def evaluate_continuation_exit(position: dict, facts: ForwardContinuationBundle,
+                               policy: ShadowExitPolicy) -> dict:
+    """Evaluate one authenticated later session without reusing entry-session sequence."""
+    facts = ForwardContinuationBundle.model_validate(facts.model_dump(mode="python"))
+    policy = ShadowExitPolicy.model_validate(policy.model_dump(mode="python"))
+    entry = position["entry"]
+    target_session = facts.calendar_days[-1]
+    if (policy.market != target_session.market or policy.currency != entry["currency"]
+            or str(facts.identity.instrument_id) != entry["instrument_id"]
+            or facts.identity.ticker != entry["ticker"]):
+        raise ValueError("continuation exit inputs do not bind open position")
+    stop, target = Decimal(position["initial_stop"]), Decimal(position["initial_targets"][0])
+    reason = None
+    bar = None
+    raw = None
+    for item in facts.bars:
+        if item.open <= stop:
+            reason, bar, raw = "STOP_GAP", item, item.open
+            break
+        if item.open >= target:
+            reason, bar, raw = "TARGET_GAP", item, target
+            break
+        hit_stop, hit_target = item.low <= stop, item.high >= target
+        if hit_stop and hit_target:
+            return {"status": "UNKNOWN", "reason": "STOP_TARGET_ORDER_UNKNOWN",
+                    "market_date": target_session.market_date.isoformat(),
+                    "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+        if hit_stop:
+            reason, bar, raw = "STOP", item, stop
+            break
+        if hit_target:
+            reason, bar, raw = "TARGET_1", item, target
+            break
+    if reason is None:
+        return {"status": "OPEN", "reason": "NO_EXIT_OBSERVED",
+                "market_date": target_session.market_date.isoformat(),
+                "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+    with localcontext(Context(prec=34)):
+        capacity = int(Decimal(bar.volume) * policy.max_volume_participation_pct)
+    if capacity < entry["quantity"]:
+        return {"status": "UNKNOWN", "reason": "INSUFFICIENT_EXIT_CAPACITY",
+                "market_date": target_session.market_date.isoformat(),
+                "evaluated_through_sequence": bar.sequence, "exit": None}
+    bps = policy.stop_slippage_bps if reason.startswith("STOP") else policy.target_slippage_bps
+    with localcontext(Context(prec=34)):
+        price = raw * (Decimal(1) - bps / Decimal(10000))
+        if price <= 0:
+            raise ValueError("exit slippage produces nonpositive price")
+        notional = price * entry["quantity"]
+        cost = notional * policy.cost_bps_per_side / Decimal(10000) + policy.fixed_cost_per_side
+    return {"status": "CLOSED", "reason": reason,
+            "market_date": target_session.market_date.isoformat(),
+            "evaluated_through_sequence": bar.sequence,
+            "exit": {"quantity": entry["quantity"], "bar_sequence": bar.sequence,
+                     "market_date": target_session.market_date.isoformat(),
                      "interval_start": bar.interval_start.isoformat(),
                      "interval_end": bar.interval_end.isoformat(),
                      "known_at": bar.available_at.isoformat(), "raw_price": str(raw),

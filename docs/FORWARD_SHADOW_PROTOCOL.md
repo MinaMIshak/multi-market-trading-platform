@@ -322,6 +322,16 @@ It does not yet join multiple sessions into exit evaluation, schedule holding
 window exits, prove liquidity at an observed price, or authenticate the local
 clock and storage independently. Tests use artificial fixtures only.
 
+`evaluate_continuation_exit` can conservatively inspect one admitted later-session
+bundle after its durable event has been audited by the caller. Session-local bar
+sequence restarts at one and is never confused with the entry-session sequence.
+Open gaps, stop/target touches, adverse sell slippage and exit-side costs follow
+the exit rules below; a bar touching both boundaries or lacking whole-bar
+participation capacity returns `UNKNOWN`. The result is in-memory only and does
+not create a durable exit, current-position, P&L or scoring claim. Successive
+continuation chaining and a durable audited continuation-exit event remain
+required before operational shadow exits can use this evaluator.
+
 ### Conservative exit provenance
 
 `app.paper.shadow_exits` re-audits the durable position-open event and its entire

@@ -1,11 +1,14 @@
 """Artificial continuation fixtures only; no authentic sessions, exits, or P&L."""
 import json
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
 from app.paper import shadow_continuations, shadow_positions
+from app.paper import shadow_exits
+from app.paper.shadow_exits import ShadowExitPolicy
 from app.paper.shadow_continuations import (
     ContinuationCalendarDay, ForwardContinuationBundle,
 )
@@ -76,6 +79,48 @@ def test_admits_and_audits_later_session_without_execution(tmp_path, monkeypatch
     assert event["scoring"] == "NOT SCORED"
     with pytest.raises(FileExistsError):
         shadow_continuations.append_continuation_event(tmp_path, *args, facts, evidence)
+
+
+def test_conservative_continuation_exit_resets_session_sequence(tmp_path, monkeypatch):
+    args, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    exit_policy = continuation_exit_policy()
+    later = facts.model_copy(update={"bars": (facts.bars[0].model_copy(update={
+        "open": Decimal("94"), "high": Decimal("96"), "low": Decimal("93"),
+        "close": Decimal("95"), "volume": 10,
+    }),)})
+    result = shadow_exits.evaluate_continuation_exit(position, later, exit_policy)
+    assert result["status"] == "CLOSED"
+    assert result["reason"] == "STOP_GAP"
+    assert result["market_date"] == later.calendar_days[-1].market_date.isoformat()
+    assert result["exit"]["bar_sequence"] == 1
+
+
+def test_continuation_exit_is_unknown_for_order_or_capacity(tmp_path, monkeypatch):
+    args, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    policy = continuation_exit_policy()
+    both = facts.model_copy(update={"bars": (facts.bars[0].model_copy(update={
+        "high": Decimal("110"), "low": Decimal("95"),
+    }),)})
+    assert shadow_exits.evaluate_continuation_exit(position, both, policy)["reason"] == \
+        "STOP_TARGET_ORDER_UNKNOWN"
+    no_capacity = facts.model_copy(update={"bars": (facts.bars[0].model_copy(update={
+        "low": Decimal("95"), "volume": 9,
+    }),)})
+    constrained = policy.model_copy(update={"max_volume_participation_pct": Decimal("0.1")})
+    assert shadow_exits.evaluate_continuation_exit(position, no_capacity, constrained)["reason"] == \
+        "INSUFFICIENT_EXIT_CAPACITY"
+
+
+def continuation_exit_policy():
+    return ShadowExitPolicy(
+        market="US", currency="USD", stop_slippage_bps=Decimal("20"),
+        target_slippage_bps=Decimal("10"), cost_bps_per_side=Decimal("5"),
+        fixed_cost_per_side=Decimal("0.5"), max_volume_participation_pct=Decimal("1"),
+        participation_evidence_package_id="1" * 64,
+        slippage_evidence_package_id="2" * 64, cost_evidence_package_id="3" * 64,
+    )
 
 
 def test_same_position_and_date_cannot_publish_competing_facts(tmp_path, monkeypatch):
