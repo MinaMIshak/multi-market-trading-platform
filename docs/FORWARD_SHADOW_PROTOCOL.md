@@ -317,3 +317,33 @@ and **NO P&L OR NAV**. Multi-session continuation, candidate-level
 deduplication, allocation, marks, P&L, FX and portfolio NAV remain separate
 boundaries. No authentic exit or performance result was created by this
 milestone.
+
+### Shared normalized portfolio policy
+
+`app.paper.shadow_portfolio` declares one immutable policy at the shared ledger
+root (`portfolio-policy.json`). Initial paper NAV is normalized to 100, independent
+of personal wealth. EGX and US capital caps are fractions of that **same** total;
+their sum plus the minimum cash fraction cannot exceed one. Position and aggregate
+stop-risk caps are explicit fractions of the total, with internally consistent
+bounds. Exact rational checks avoid Decimal-context rounding admitting an excess.
+These caps are experimental research choices, not empirically calibrated limits
+or guarantees against gap losses.
+
+Atomic publication permits only one policy per ledger root, regardless of market
+or session. Freeze requires the local clock strictly before the declared effective
+time; audit binds all fields and rejects altered, duplicate or future receipts.
+This effective time does not authenticate an exchange session. The eventual
+reservation gate must also require effectiveness and freezing by each admitted
+watchlist's information cutoff. Local storage/clock trust limitations still apply.
+Separate ledger roots must never be aggregated as one funded portfolio.
+
+This boundary is **EXPERIMENTAL / PAPER ONLY — POLICY ONLY / NOT ALLOCATED**.
+It neither changes existing position provenance nor creates capital reservations.
+Before operational portfolio allocation, implement atomic shared reservations
+including costs and existing exposure across candidates, sessions and markets,
+binding this policy and the entire authenticated fill chain. Each reservation must
+respect its own sleeve as well as aggregate and position caps. Foreign-currency
+notional, costs and risk require admissible point-in-time FX conversion; without
+it that allocation is NO-GO. No equal-currency assumption or independent full-NAV
+market sleeves are permitted. No policy has been frozen for authentic operations
+by this software milestone; performance and NAV remain unavailable.
