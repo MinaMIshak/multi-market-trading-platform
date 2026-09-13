@@ -7,6 +7,7 @@ import pytest
 from tools.audit_er1c_nyse_corporate_actions_product import (
     PRODUCT_SOURCE,
     PURPOSE,
+    SPEC_BINARY_ANCHORS,
     SPEC_SOURCE,
     audit_product,
 )
@@ -20,7 +21,7 @@ cash dividends, stock dividends, distributions, splits, new listings (IPOs), sus
 consolidated view of daily corporate events happening on the NYSE Group
 on the current Trading Day
 </body></html>"""
-PDF = b"%PDF-1.7\nfixture only\n%%EOF\n"
+PDF = b"%PDF-1.7\n" + b"\n".join(SPEC_BINARY_ANCHORS) + b"\n%%EOF\n"
 
 
 def _artifact(filename, source, payload, started="2026-09-13T05:39:00Z"):
@@ -97,6 +98,16 @@ def test_rejects_missing_scope_anchor(package):
     _mutate(package, lambda doc: doc["product_page"].update(
         bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest()))
     with pytest.raises(ValueError, match="scope anchors missing"):
+        audit_product(package, audited_at=AUDITED_AT)
+
+
+@pytest.mark.parametrize("anchor", SPEC_BINARY_ANCHORS)
+def test_rejects_rehashed_specification_with_missing_identity_anchor(package, anchor):
+    payload = PDF.replace(anchor, b"removed")
+    (package / "nyse_corporate_actions_client_spec_v2.2.6.pdf").write_bytes(payload)
+    _mutate(package, lambda doc: doc.update(
+        bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest()))
+    with pytest.raises(ValueError, match="specification identity anchors missing"):
         audit_product(package, audited_at=AUDITED_AT)
 
 

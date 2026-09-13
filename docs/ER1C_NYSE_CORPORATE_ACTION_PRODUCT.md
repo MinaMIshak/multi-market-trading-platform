@@ -30,7 +30,11 @@ only.
 The offline auditor in
 `tools/audit_er1c_nyse_corporate_actions_product.py` verifies both artifact hashes,
 the closed package inventory, exact source and purpose, receipt chronology, PDF
-identity and the product-page scope anchors. Its output remains fail-closed:
+signature, its 24-page catalog declaration, 2024-05-23 creation metadata and
+embedded official NYSE contact/access links, plus the product-page scope anchors.
+These byte-level anchors bind the retained specification more narrowly without
+claiming to interpret every compressed page-content stream. Its output remains
+fail-closed:
 `complete_bounded_us4_action_coverage=NO_GO` and
 `canonical_pit_admission=NO_GO`.
 

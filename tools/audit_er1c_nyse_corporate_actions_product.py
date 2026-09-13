@@ -30,6 +30,13 @@ ARTIFACT_FIELDS = {
     "resolved_locator", "retrieval_completed_at_utc", "retrieval_started_at_utc",
     "sha256", "source_locator",
 }
+SPEC_BINARY_ANCHORS = (
+    b"/Type/Pages/Count 24",
+    b"/CreationDate(D:20240523134530-04'00')",
+    b"mailto:NYSEDataMail@nyse.com",
+    b"https://www.nyse.com/publicdocs/nyse/data/NYSE_SFTP_Access_User_Guide.pdf",
+    b"https://www.nyse.com/publicdocs/nyse/data/NYSE_TAQ_Data_AWS_Cloud_Access_Dev_Instructions.pdf",
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -115,6 +122,14 @@ def audit_product(root: Path, *, audited_at: datetime | None = None) -> dict:
             raise ValueError(f"{label} integrity mismatch")
     if not spec_bytes.startswith(b"%PDF-"):
         raise ValueError("specification artifact is not a PDF")
+    missing_spec_anchors = [
+        anchor.decode("ascii") for anchor in SPEC_BINARY_ANCHORS
+        if anchor not in spec_bytes
+    ]
+    if missing_spec_anchors:
+        raise ValueError(
+            f"specification identity anchors missing: {missing_spec_anchors}"
+        )
 
     text = _visible_text(page_bytes)
     anchors = {
