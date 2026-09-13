@@ -594,6 +594,23 @@ it does not supply authentic session or candidate evidence.
 
 ### Exit participation admission
 
+Continuation receipt chronology is mandatory: a successor receipt cannot
+precede its audited predecessor receipt, and a continuation-exit receipt cannot
+precede any consumed continuation receipt or bar availability. The
+`shadow-continuation-exit-event-v2` schema binds each continuation's receipt
+timestamp alongside its event identity and hash. Audits enforce the same clock
+bounds as publication. Earlier v1 receipts are retained but do not pass the v2
+audit; they must never be rewritten or backdated. Equal receipt timestamps are
+permitted. This is an audit-order safeguard, not historical availability proof.
+
+Remaining execution limitation: an OPEN result over a partial session does not
+prove that the position remained open through the unobserved session remainder.
+The current continuation exit path must not support an empirical execution or
+performance claim until it requires complete predecessor-session coverage and
+evaluates the original entry session before carrying the position forward.
+Extending chain depth is secondary to closing this coverage gate. All current
+outputs remain **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**.
+
 `shadow-exit-policy-v2` requires an explicit exact-decimal participation fraction
 in `(0, 1]` and a matching pre-cutoff evidence package covering
 `max_volume_participation_pct`. Old v1 policies lack this mandatory input and

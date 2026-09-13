@@ -246,6 +246,7 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
         )
         evaluation = evaluate_continuation_exit(position, facts, exit_policy)
         references.append({"market_date": facts.calendar_days[-1].market_date.isoformat(),
+                           "recorded_at": event["recorded_at"],
                            "event_id": event["event_id"],
                            "event_sha256": hashlib.sha256(_canonical(event)).hexdigest()})
         evaluations.append(evaluation)
@@ -253,7 +254,7 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
         previous_facts, previous_packages = facts, packages
     package_ids = sorted(_packages(exit_policy, exit_packages, watchlist.information_cutoff))
     return {
-        "schema_version": "shadow-continuation-exit-event-v1", "label": LABEL,
+        "schema_version": "shadow-continuation-exit-event-v2", "label": LABEL,
         "event_type": "CONTINUATION_EXIT_EVALUATED", "scoring": "NOT SCORED",
         "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
         "performance_status": "NO P&L OR NAV",
@@ -282,7 +283,11 @@ def append_continuation_exit_event(directory: Path, watchlist: ShadowWatchlist,
         continuation_packages, exit_policy, exit_packages,
     )
     recorded_at = _utc(_now())
-    latest = max(item.bars[-1].available_at for item in continuations)
+    latest = max(
+        *(bar.available_at for item in continuations for bar in item.bars),
+        *(_utc(datetime.fromisoformat(event["recorded_at"]))
+          for event in basis["continuation_events"]),
+    )
     if recorded_at < latest:
         raise ValueError("continuation exit publication precedes authenticated inputs")
     payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
@@ -315,7 +320,11 @@ def audit_continuation_exit_event(directory: Path, watchlist: ShadowWatchlist,
     recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
     expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                         "recorded_at": recorded_at.isoformat()}
-    latest = max(item.bars[-1].available_at for item in continuations)
+    latest = max(
+        *(bar.available_at for item in continuations for bar in item.bars),
+        *(_utc(datetime.fromisoformat(event["recorded_at"]))
+          for event in basis["continuation_events"]),
+    )
     if not latest <= recorded_at <= _now() or event != expected:
         raise ValueError("continuation exit event does not bind authenticated inputs")
     return event

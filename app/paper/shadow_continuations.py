@@ -176,7 +176,10 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
     if facts.calendar_days[-1].opens_at <= predecessor_close:
         raise ValueError("continuation session must follow predecessor session close")
     observed_through = max(bar.available_at for bar in facts.bars)
-    if max(observed_through, _utc(datetime.fromisoformat(position["recorded_at"]))) > recorded_at:
+    receipt_clocks = [observed_through, _utc(datetime.fromisoformat(position["recorded_at"]))]
+    if predecessor is not None:
+        receipt_clocks.append(_utc(datetime.fromisoformat(predecessor["recorded_at"])))
+    if max(receipt_clocks) > recorded_at:
         raise ValueError("continuation publication precedes authenticated inputs")
     package_ids = _packages(facts, fact_packages, observed_through, recorded_at)
     return {

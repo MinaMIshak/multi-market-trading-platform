@@ -394,6 +394,54 @@ def test_successive_continuation_binds_predecessor(tmp_path, monkeypatch):
     assert event["previous_continuation_event_sha256"]
 
 
+def test_successor_audit_rejects_receipt_before_predecessor(tmp_path, monkeypatch):
+    args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    second, second_packages, available = successor(first)
+    receipt = available + timedelta(minutes=2)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: receipt)
+    shadow_continuations.append_continuation_event(tmp_path, *args, first, first_packages)
+    path = shadow_continuations.append_continuation_event(
+        tmp_path, *args, second, second_packages,
+        previous_facts=first, previous_fact_packages=first_packages,
+    )
+    event = json.loads(path.read_bytes())
+    event["recorded_at"] = (receipt - timedelta(seconds=1)).isoformat()
+    path.write_text(json.dumps(event))
+    with pytest.raises(ValueError, match="publication precedes authenticated inputs"):
+        shadow_continuations.audit_continuation_event(
+            tmp_path, *args, second, second_packages,
+            previous_facts=first, previous_fact_packages=first_packages,
+        )
+
+
+@pytest.mark.parametrize("operation", ["append", "audit"])
+def test_continuation_exit_cannot_predate_fact_receipt(tmp_path, monkeypatch, operation):
+    args, facts, packages, available = prepared_continuation(tmp_path, monkeypatch)
+    receipt = available + timedelta(minutes=2)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: receipt)
+    shadow_continuations.append_continuation_event(tmp_path, *args, facts, packages)
+    evidence = exit_evidence(args[0].information_cutoff)
+    policy = continuation_exit_policy().model_copy(update={
+        "slippage_evidence_package_id": evidence[0].identity,
+        "cost_evidence_package_id": evidence[1].identity,
+        "participation_evidence_package_id": evidence[2].identity,
+    })
+    inputs = (tmp_path, *args, (facts,), (packages,), policy, evidence)
+    monkeypatch.setattr(shadow_exits, "_now", lambda: receipt)
+    if operation == "append":
+        monkeypatch.setattr(shadow_exits, "_now", lambda: receipt - timedelta(seconds=1))
+        with pytest.raises(ValueError, match="publication precedes authenticated inputs"):
+            shadow_exits.append_continuation_exit_event(*inputs)
+    else:
+        path = shadow_exits.append_continuation_exit_event(*inputs)
+        event = json.loads(path.read_bytes())
+        assert event["continuation_events"][0]["recorded_at"] == receipt.isoformat()
+        event["recorded_at"] = (receipt - timedelta(seconds=1)).isoformat()
+        path.write_text(json.dumps(event))
+        with pytest.raises(ValueError, match="does not bind authenticated inputs"):
+            shadow_exits.audit_continuation_exit_event(*inputs)
+
+
 def test_successor_cannot_skip_or_omit_predecessor(tmp_path, monkeypatch):
     args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
     shadow_continuations.append_continuation_event(tmp_path, *args, first, first_packages)
