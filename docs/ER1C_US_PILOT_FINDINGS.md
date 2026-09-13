@@ -396,3 +396,13 @@ The auditor also binds the manifest to its exact root fields and bounded declare
 purpose. A rehashed manifest cannot add an apparent completeness flag or rewrite
 the probe as complete corporate-action coverage. This is scope-integrity
 hardening only; the retained bytes and all **NO-GO** decisions are unchanged.
+
+## Nasdaq halt-source qualification
+
+Retained three official documentation/terms artifacts and qualified the
+[Nasdaq halt-feed scope](ER1C_NASDAQ_HALT_QUALIFICATION.md). The documented
+current-day query can omit older unresolved halts: absence cannot clear a
+suspension. No feed data was fetched or admitted. Historical coverage, exact-date
+identity, PIT availability, retention/transformation scope and canonical status
+remain unresolved. This is a free-source qualification milestone, with no
+empirical performance or readiness claim.
