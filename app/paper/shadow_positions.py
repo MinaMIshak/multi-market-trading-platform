@@ -18,6 +18,15 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _position_key(watchlist: ShadowWatchlist, fill: dict) -> str:
+    # Policy and fact revisions must compete for the same atomic publication.
+    return hashlib.sha256(_canonical({
+        "watchlist_record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "candidate_id": fill["candidate_id"],
+    })).hexdigest()
+
+
 def _basis(watchlist: ShadowWatchlist, fill_event: dict) -> dict:
     fill = fill_event["fill"]
     if fill is None:
@@ -25,7 +34,9 @@ def _basis(watchlist: ShadowWatchlist, fill_event: dict) -> dict:
     candidate = next(item for item in watchlist.candidates
                      if item.candidate_id == fill["candidate_id"])
     return {
-        "schema_version": "shadow-position-open-v1", "label": LABEL,
+        "schema_version": "shadow-position-open-v2", "label": LABEL,
+        "candidate_position_key": _position_key(watchlist, fill),
+        "watchlist_record_id": watchlist.record_id,
         "event_type": "POSITION_OPENED", "scoring": "NOT SCORED",
         "position_status": "SIMULATED OPEN AT ENTRY",
         "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
@@ -46,7 +57,7 @@ def append_position_open_event(
     fact_packages: tuple[HistoricalEvidencePackage, ...], policy: ShadowFillPolicy,
     fill_packages: tuple[HistoricalEvidencePackage, ...],
 ) -> Path:
-    """Preserve one position-open event per exact fill, never infer current holdings."""
+    """Preserve one position per frozen candidate, never infer current holdings."""
     fill = audit_fill_event(directory, watchlist, watchlist_packages, facts,
                             fact_packages, policy, fill_packages)
     basis = _basis(watchlist, fill)
@@ -55,8 +66,7 @@ def append_position_open_event(
     if recorded_at < _utc(datetime.fromisoformat(fill["recorded_at"])):
         raise ValueError("position publication precedes fill event")
     payload = basis | {"event_id": event_id, "recorded_at": recorded_at.isoformat()}
-    # Key by upstream fill, so a fill cannot open multiple positions in this ledger.
-    path = _publish_once(Path(directory) / "position-open-events" / f'{fill["event_id"]}.json', payload)
+    path = _publish_once(Path(directory) / "position-open-events" / f'{basis["candidate_position_key"]}.json', payload)
     if _now() < recorded_at:
         path.unlink()
         raise ValueError("clock rollback during position publication")
@@ -83,7 +93,7 @@ def audit_position_open_event(
             result[key] = value
         return result
 
-    path = Path(directory) / "position-open-events" / f'{fill["event_id"]}.json'
+    path = Path(directory) / "position-open-events" / f'{basis["candidate_position_key"]}.json'
     event = json.loads(path.read_bytes(), object_pairs_hook=unique_object)
     if type(event) is not dict or set(event) != set(basis) | {"event_id", "recorded_at"}:
         raise ValueError("unexpected position-event fields")

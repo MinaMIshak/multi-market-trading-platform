@@ -78,6 +78,44 @@ def test_position_requires_durable_fill(tmp_path, monkeypatch):
         shadow_positions.append_position_open_event(tmp_path, *args)
 
 
+def test_alternate_policy_cannot_open_same_candidate_twice(tmp_path, monkeypatch):
+    args, _, _ = setup_position(tmp_path, monkeypatch)
+    path = shadow_positions.append_position_open_event(tmp_path, *args)
+    original = path.read_bytes()
+    alternate = list(args)
+    alternate[4] = args[4].model_copy(update={"entry_slippage_bps": Decimal("20")})
+    shadow_fills.append_fill_event(tmp_path, *alternate)
+    with pytest.raises(FileExistsError):
+        shadow_positions.append_position_open_event(tmp_path, *alternate)
+    with pytest.raises(ValueError, match="does not bind authenticated fill"):
+        shadow_positions.audit_position_open_event(tmp_path, *alternate)
+    assert path.read_bytes() == original
+    assert len(list((tmp_path / "position-open-events").glob("*.json"))) == 1
+    shadow_positions.audit_position_open_event(tmp_path, *args)
+
+
+def test_concurrent_alternate_fills_publish_only_one_position(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    args, _, _ = setup_position(tmp_path, monkeypatch)
+    alternate = list(args)
+    alternate[4] = args[4].model_copy(update={"entry_slippage_bps": Decimal("20")})
+    shadow_fills.append_fill_event(tmp_path, *alternate)
+
+    def publish(inputs):
+        try:
+            return shadow_positions.append_position_open_event(tmp_path, *inputs)
+        except FileExistsError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(publish, (args, alternate)))
+    assert sum(result is not None for result in results) == 1
+    winner = args if results[0] is not None else alternate
+    shadow_positions.audit_position_open_event(tmp_path, *winner)
+    assert len(list((tmp_path / "position-open-events").glob("*.json"))) == 1
+
+
 def test_publication_rejects_backdating_and_rollback(tmp_path, monkeypatch):
     args, now, _ = setup_position(tmp_path, monkeypatch)
     monkeypatch.setattr(shadow_positions, "_now", lambda: now - timedelta(seconds=1))

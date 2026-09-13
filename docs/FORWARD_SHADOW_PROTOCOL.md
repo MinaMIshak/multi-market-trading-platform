@@ -250,8 +250,14 @@ NAV. Position state and conservative exit processing are later boundaries.
 `app.paper.shadow_positions` consumes only a durable entry-fill event that passes
 `audit_fill_event` and its complete upstream watchlist/fact/trigger evidence chain.
 An insufficient-capacity event cannot open a position. Atomic create-if-absent
-publication under `position-open-events/`, keyed by the upstream fill ID, prevents
-that exact fill from opening multiple position records in the same ledger.
+publication under `position-open-events/`, keyed by a hash of market, frozen
+watchlist record ID and candidate ID, prevents alternate fact or fill-policy
+evaluations from opening multiple positions for that frozen candidate in the
+same ledger. The v2 event binds this key and watchlist ID. Atomic create-if-absent
+publication also arbitrates concurrent writers; a losing evaluation cannot
+replace the winner, and audit rejects a different fill chain at the same key.
+This is a uniqueness constraint, not permission to select a favorable fill:
+operational policy selection must still be frozen before evaluation.
 The content-addressed event binds the exact fill bytes hash, stable identity,
 quantity, native currency, entry interval/availability, slipped price, notional,
 entry cost and original frozen stop/targets. It preserves the bar interval; it
@@ -265,9 +271,11 @@ local storage and clock-attestation limitations described above apply.
 `POSITION_OPENED` means **SIMULATED OPEN AT ENTRY**, not a claim of current
 holdings after later bars. All output remains **EXPERIMENTAL / PAPER ONLY — NOT
 SCORED**, with **SHARED CAPITAL NOT ALLOCATED** and **NO MARK, EXIT, P&L OR NAV**.
-The boundary is a provenance prerequisite; alternate fact/policy evaluations are
-not yet reconciled into one portfolio position per candidate. Shared capital,
-candidate-level allocation/deduplication, conservative exits (including entry-bar
+The boundary is a provenance prerequisite, not portfolio reconciliation across
+different watchlists, sessions or ledgers. Legacy v1 fill-keyed events are not
+admitted by the v2 auditor; existing ledgers require explicit reviewed migration
+before reuse, without deleting or rewriting evidence. Shared capital,
+candidate-level allocation, conservative exits (including entry-bar
 stop/target uncertainty), marks, FX and performance require separate admission.
 No authentic position or performance result was created by this milestone.
 
