@@ -9,6 +9,16 @@ EXPECTED_SOURCES = {
     "twitter_20221028_25nse_submission.txt": "https://www.sec.gov/Archives/edgar/data/1418091/000087666122000890/0000876661-22-000890.txt?output=1",
 }
 EXPECTED_FILES = set(EXPECTED_SOURCES)
+SUBMISSION_IDENTITIES = {
+    "twitter_20220418_8a12b_submission.txt": {
+        "accession": "0001193125-22-107480", "acceptance_datetime": "20220418093659",
+        "submission_type": "8-A12B", "public_document_count": "1", "file_number": "001-36164",
+    },
+    "twitter_20221028_25nse_submission.txt": {
+        "accession": "0000876661-22-000890", "acceptance_datetime": "20221028083119",
+        "submission_type": "25-NSE", "public_document_count": "2", "file_number": "001-36164",
+    },
+}
 
 def _validate_provenance(record: dict) -> None:
     # This bounded probe binds exact acquired locators, not arbitrary SEC pages.
@@ -31,6 +41,23 @@ def _validate_provenance(record: dict) -> None:
 def _sha256(payload: bytes) -> str: return hashlib.sha256(payload).hexdigest()
 def _plain(payload: bytes) -> str: return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(payload.decode("latin-1")))).strip()
 
+def _validate_submission_identity(filename: str, payload: bytes) -> None:
+    """Bind the retained artifact to its SEC submission-header identity."""
+    text = payload.decode("latin-1")
+    identity = SUBMISSION_IDENTITIES[filename]
+    anchors = (
+        f"<SEC-DOCUMENT>{identity['accession']}.txt",
+        f"<SEC-HEADER>{identity['accession']}.hdr.sgml",
+        f"<ACCEPTANCE-DATETIME>{identity['acceptance_datetime']}",
+        f"ACCESSION NUMBER:\t\t{identity['accession']}",
+        f"CONFORMED SUBMISSION TYPE:\t{identity['submission_type']}",
+        f"PUBLIC DOCUMENT COUNT:\t\t{identity['public_document_count']}",
+        "CENTRAL INDEX KEY:\t\t\t0001418091",
+        f"SEC FILE NUMBER:\t{identity['file_number']}",
+    )
+    if any(anchor not in text for anchor in anchors):
+        raise ValueError(f"SEC submission identity mismatch: {filename}")
+
 def _load(root: Path) -> dict[str, bytes]:
     raw = (root / "manifest.json").read_bytes()
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != f"{_sha256(raw)}  manifest.json": raise ValueError("manifest SHA256 sidecar mismatch")
@@ -51,7 +78,9 @@ def _load(root: Path) -> dict[str, bytes]:
     return payloads
 
 def audit_probe(root: Path) -> dict:
-    payloads = _load(root); registration = _plain(payloads["twitter_20220418_8a12b_submission.txt"]); removal = _plain(payloads["twitter_20221028_25nse_submission.txt"])
+    payloads = _load(root)
+    for filename, payload in payloads.items(): _validate_submission_identity(filename, payload)
+    registration = _plain(payloads["twitter_20220418_8a12b_submission.txt"]); removal = _plain(payloads["twitter_20221028_25nse_submission.txt"])
     if any(anchor not in registration for anchor in ("FORM TYPE: 8-A12B", "FILED AS OF DATE: 20220418", "Preferred Stock Purchase Rights", "New York Stock Exchange")): raise ValueError("Twitter 8-A12B scope mismatch")
     removal_raw = payloads["twitter_20221028_25nse_submission.txt"].decode("latin-1")
     anchors = ("FORM TYPE: 25-NSE", "FILED AS OF DATE: 20221028", "EFFECTIVENESS DATE: 20221028", "NEW YORK STOCK EXCHANGE LLC", "TWITTER, INC.", "opening of business on November 08, 2022", "merger between Twitter, Inc. and X Holdings II, Inc.", "became effective on October 27, 2022", "suspended from trading before market open on October 28, 2022")

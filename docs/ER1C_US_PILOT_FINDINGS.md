@@ -367,3 +367,17 @@ was frozen by its cutoff is `UNKNOWN`, rather than a global negative assertion.
 Canonical US2 remains **NO_GO** and shadow scoring remains **NOT_READY**.
 This correction neither changes retained source bytes nor admits a session,
 marks one missed, or creates a recommendation. EXPERIMENTAL / PAPER ONLY.
+
+## Twitter submission identity integrity
+
+The offline Twitter submission auditor now binds both retained SEC artifacts to
+their submission headers, including accession number, acceptance timestamp,
+submission type, public-document count, Twitter CIK and SEC file number. A
+rehashed payload assembled from the previously checked event phrases can no
+longer satisfy the audit without the exact retained filing identity.
+
+This strengthens artifact identity only. It does not prove historical
+pre-decision availability, complete Twitter action coverage, a complete XNYS
+listing-change ledger or historical-universe completeness. The issue-specific
+merger, suspension and removal facts retain their existing bounded scope, and
+canonical US4 and PIT admission remain **NO-GO**.

@@ -3,8 +3,19 @@ from pathlib import Path
 import pytest
 from tools.audit_er1c_sec_twitter_submission_probe import EXPECTED_SOURCES, audit_probe
 
-REGISTRATION = b"FILED AS OF DATE: 20220418 FORM TYPE: 8-A12B <td>Preferred Stock Purchase Rights</td><td>New York Stock Exchange</td>"
-REMOVAL = b"FILED AS OF DATE: 20221028 EFFECTIVENESS DATE: 20221028 FORM TYPE: 25-NSE NEW YORK STOCK EXCHANGE LLC TWITTER, INC. <descriptionClassSecurity>Common Stock</descriptionClassSecurity> opening of business on November 08, 2022 merger between Twitter, Inc. and X Holdings II, Inc. became effective on October 27, 2022 suspended from trading before market open on October 28, 2022"
+def _header(accession, accepted, form, count):
+    return f"""<SEC-DOCUMENT>{accession}.txt : 20221028
+<SEC-HEADER>{accession}.hdr.sgml : 20221028
+<ACCEPTANCE-DATETIME>{accepted}
+ACCESSION NUMBER:\t\t{accession}
+CONFORMED SUBMISSION TYPE:\t{form}
+PUBLIC DOCUMENT COUNT:\t\t{count}
+CENTRAL INDEX KEY:\t\t\t0001418091
+SEC FILE NUMBER:\t001-36164
+""".encode()
+
+REGISTRATION = _header("0001193125-22-107480", "20220418093659", "8-A12B", "1") + b"FILED AS OF DATE: 20220418 FORM TYPE: 8-A12B <td>Preferred Stock Purchase Rights</td><td>New York Stock Exchange</td>"
+REMOVAL = _header("0000876661-22-000890", "20221028083119", "25-NSE", "2") + b"FILED AS OF DATE: 20221028 EFFECTIVENESS DATE: 20221028 FORM TYPE: 25-NSE NEW YORK STOCK EXCHANGE LLC TWITTER, INC. <descriptionClassSecurity>Common Stock</descriptionClassSecurity> opening of business on November 08, 2022 merger between Twitter, Inc. and X Holdings II, Inc. became effective on October 27, 2022 suspended from trading before market open on October 28, 2022"
 def _write_probe(root: Path):
     artifacts = {"twitter_20220418_8a12b_submission.txt": REGISTRATION, "twitter_20221028_25nse_submission.txt": REMOVAL}; records = []
     for filename, payload in artifacts.items():
@@ -27,6 +38,19 @@ def test_rejects_common_stock_misclassification(probe):
 def test_rejects_missing_issue_specific_suspension(probe):
     _rehash(probe, "twitter_20221028_25nse_submission.txt", REMOVAL.replace(b"suspended from trading", b"removed from trading"))
     with pytest.raises(ValueError, match="25-NSE scope mismatch"): audit_probe(probe)
+
+@pytest.mark.parametrize(("filename", "old", "new"), [
+    ("twitter_20220418_8a12b_submission.txt", b"0001193125-22-107480", b"0001193125-22-107481"),
+    ("twitter_20220418_8a12b_submission.txt", b"20220418093659", b"20220418093700"),
+    ("twitter_20221028_25nse_submission.txt", b"PUBLIC DOCUMENT COUNT:\t\t2", b"PUBLIC DOCUMENT COUNT:\t\t1"),
+    ("twitter_20221028_25nse_submission.txt", b"CENTRAL INDEX KEY:\t\t\t0001418091", b"CENTRAL INDEX KEY:\t\t\t0001418092"),
+    ("twitter_20221028_25nse_submission.txt", b"SEC FILE NUMBER:\t001-36164", b"SEC FILE NUMBER:\t001-36165"),
+])
+def test_rejects_rehashed_wrong_submission_identity(probe, filename, old, new):
+    payload = (probe / filename).read_bytes().replace(old, new)
+    _rehash(probe, filename, payload)
+    with pytest.raises(ValueError, match="submission identity"):
+        audit_probe(probe)
 def test_rejects_undeclared_inventory(probe):
     (probe / "extra.txt").write_text("extra")
     with pytest.raises(ValueError, match="inventory"): audit_probe(probe)
