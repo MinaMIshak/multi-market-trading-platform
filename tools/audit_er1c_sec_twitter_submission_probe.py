@@ -1,6 +1,6 @@
 """Offline audit for the bounded ER1C Twitter SEC submission probe."""
 from __future__ import annotations
-import argparse, hashlib, html, json, re
+import argparse, hashlib, html, json, re, stat
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -9,6 +9,7 @@ EXPECTED_SOURCES = {
     "twitter_20221028_25nse_submission.txt": "https://www.sec.gov/Archives/edgar/data/1418091/000087666122000890/0000876661-22-000890.txt?output=1",
 }
 EXPECTED_FILES = set(EXPECTED_SOURCES)
+PACKAGE_FILES = EXPECTED_FILES | {"manifest.json", "manifest.sha256"}
 PURPOSE = (
     "Bounded submission-level classification of the two Twitter filings identified "
     "by the retained EDGAR indexes; not a complete listing ledger or historical universe"
@@ -56,6 +57,23 @@ def _validate_provenance(record: dict) -> None:
 def _sha256(payload: bytes) -> str: return hashlib.sha256(payload).hexdigest()
 def _plain(payload: bytes) -> str: return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(payload.decode("latin-1")))).strip()
 
+def _validate_custody(root: Path) -> None:
+    try:
+        root_stat = root.lstat()
+    except FileNotFoundError as exc:
+        raise ValueError("probe root must be a real directory") from exc
+    if not stat.S_ISDIR(root_stat.st_mode) or root.is_symlink():
+        raise ValueError("probe root must be a real directory")
+    entries = {item.name: item for item in root.iterdir()}
+    if set(entries) != PACKAGE_FILES:
+        raise ValueError("probe inventory does not match manifest scope")
+    for path in entries.values():
+        entry_stat = path.lstat()
+        if not stat.S_ISREG(entry_stat.st_mode) or path.is_symlink():
+            raise ValueError("probe entries must be regular files")
+        if entry_stat.st_nlink != 1:
+            raise ValueError("probe entries must have link count one")
+
 def _validate_submission_identity(filename: str, payload: bytes) -> None:
     """Bind the retained artifact to its SEC submission-header identity."""
     text = payload.decode("latin-1")
@@ -95,6 +113,7 @@ def _documents(filename: str, payload: bytes) -> dict[str, str]:
     return {document_type: block for (document_type, _, _), block in zip(parsed, blocks)}
 
 def _load(root: Path) -> dict[str, bytes]:
+    _validate_custody(root)
     raw = (root / "manifest.json").read_bytes()
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != f"{_sha256(raw)}  manifest.json": raise ValueError("manifest SHA256 sidecar mismatch")
     manifest = json.loads(raw)
@@ -104,7 +123,6 @@ def _load(root: Path) -> dict[str, bytes]:
     if manifest["purpose"] != PURPOSE:
         raise ValueError("unexpected manifest purpose")
     if not isinstance(manifest.get("records"), list) or len(manifest["records"]) != len(EXPECTED_FILES): raise ValueError("unexpected manifest records")
-    if {item.name for item in root.iterdir() if item.is_file()} != EXPECTED_FILES | {"manifest.json", "manifest.sha256"}: raise ValueError("probe inventory does not match manifest scope")
     expected_keys = {"bytes", "content_type", "filename", "historical_availability_proven", "http_status", "receipt_utc", "sha256", "source_locator"}; payloads = {}
     for record in manifest["records"]:
         if not isinstance(record, dict) or set(record) != expected_keys: raise ValueError("unexpected evidence-record schema")

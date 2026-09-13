@@ -1,4 +1,4 @@
-import hashlib, json
+import hashlib, json, os
 from pathlib import Path
 import pytest
 from tools.audit_er1c_sec_twitter_submission_probe import EXPECTED_SOURCES, PURPOSE, audit_probe
@@ -73,6 +73,44 @@ def test_rejects_rehashed_event_phrases_moved_outside_notice(probe):
 def test_rejects_undeclared_inventory(probe):
     (probe / "extra.txt").write_text("extra")
     with pytest.raises(ValueError, match="inventory"): audit_probe(probe)
+
+
+def test_rejects_undeclared_directory(probe):
+    (probe / "undeclared").mkdir()
+    with pytest.raises(ValueError, match="inventory"):
+        audit_probe(probe)
+
+
+@pytest.mark.parametrize("filename", [
+    "manifest.json",
+    "manifest.sha256",
+    "twitter_20220418_8a12b_submission.txt",
+])
+def test_rejects_symlinked_package_entry(probe, tmp_path, filename):
+    target = tmp_path.parent / f"{tmp_path.name}-target-{filename}"
+    target.write_bytes((probe / filename).read_bytes())
+    (probe / filename).unlink()
+    (probe / filename).symlink_to(target)
+    with pytest.raises(ValueError, match="regular files"):
+        audit_probe(probe)
+
+
+def test_rejects_symlinked_package_root(probe, tmp_path):
+    linked_root = tmp_path / "linked-probe"
+    linked_root.symlink_to(probe, target_is_directory=True)
+    with pytest.raises(ValueError, match="real directory"):
+        audit_probe(linked_root)
+
+
+@pytest.mark.parametrize("filename", [
+    "manifest.json",
+    "manifest.sha256",
+    "twitter_20221028_25nse_submission.txt",
+])
+def test_rejects_hard_linked_package_entry(probe, tmp_path, filename):
+    os.link(probe / filename, tmp_path.parent / f"{tmp_path.name}-linked-{filename}")
+    with pytest.raises(ValueError, match="link count one"):
+        audit_probe(probe)
 
 
 def _change_record(root, key, value):

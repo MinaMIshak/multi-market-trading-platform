@@ -468,3 +468,17 @@ Every package entry must also have a link count of one. This rejects hard-linked
 manifests or artifacts whose retained inode could be changed through a path
 outside the package. The target-date and admission classifications remain
 unchanged.
+
+## Twitter submission package custody
+
+The Twitter submission auditor now requires the probe root to be a real
+directory and its exact four entries to be regular files stored directly within
+it with link count one. Substituted root or entry symlinks, undeclared
+directories and hard-linked manifests, sidecars or SEC submissions fail before
+content is read. An external path therefore cannot satisfy or later mutate the
+retained issue-specific suspension evidence through a shared inode.
+
+The authentic package bytes and classification are unchanged. This custody
+check does not prove historical availability, a complete XNYS listing ledger or
+complete corporate-action coverage. Canonical US4, US5A and overall PIT
+admission remain **NO-GO**.
