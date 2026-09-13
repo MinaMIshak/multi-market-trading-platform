@@ -333,11 +333,20 @@ selection seed, record, locator or sidecar. This verifies the selection process;
 it does not authenticate submission bytes or establish that the sample is
 representative of every filing.
 
-Two attempts to retrieve the first selected submission from the official SEC
-archive, using Python urllib and curl with descriptive user agents, each
-received HTTP 403. No response body was retained as evidence and the remaining
-five URLs were not requested. Consequently, venue/security-class extraction
-has not been tested on this sample. Historical XNYS universe completeness,
-listing-ledger completeness, canonical US5A and overall PIT admission remain
-**NO-GO**. The failed retrieval is an acquisition constraint, not evidence
-about the filing or historical availability.
+Two attempts to retrieve the first selected submission from its accession URL
+in the official SEC archive, using Python urllib and curl with descriptive user
+agents, each received HTTP 403. A later bounded probe used the distinct direct
+submission locator published in the retained SEC quarterly index and also
+received HTTP 403. Its immutable attempt record has SHA256
+`6dd754aae8e489947e65a16ddf07c441f2892589c07dde1b90fdb121b1048d74`.
+No rejection body was retained as evidence and the remaining five records were
+not requested.
+
+The direct-attempt auditor binds that negative result to the frozen declaration,
+the first deterministic record, its exact index locator, explicit UTC request
+bounds, HTTP status and response-byte disposition. It rejects sample or locator
+substitution and does not treat HTTP rejection as source evidence. Consequently,
+venue/security-class extraction has not been tested on this sample. Historical
+XNYS universe completeness, listing-ledger completeness, canonical US5A and
+overall PIT admission remain **NO-GO**. The failed retrieval is an acquisition
+constraint, not evidence about the filing or historical availability.
