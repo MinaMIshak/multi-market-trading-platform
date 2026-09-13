@@ -438,3 +438,15 @@ archive depth, correction lineage, exact historical publication time or usable
 retention/transformation rights. Prior 404 pilot-date requests were not repeated.
 Canonical US1 identity and US5A universe remain **NO-GO**. See
 `docs/ER1C_NYSE_SYMBOL_MAPPING_QUALIFICATION.md` for the bounded decision.
+
+## Forward-session reviewed-edition integrity
+
+The forward-session auditor pins the retained NYSE 2026 calendar and hours page
+to their independently reviewed byte counts and SHA256 values. Manifest and
+artifact bytes must still agree, but a rewritten manifest can no longer bless a
+substituted source edition. The regression includes that exact rehash attack.
+
+This integrity improvement does not change the evidence scope. The target-date
+session remains UNKNOWN, canonical US2 remains NO_GO, and shadow scoring remains
+NOT_READY. Current schedule text does not establish an exact per-date XNYS
+session record, exact UTC clocks, historical availability, or approved review.

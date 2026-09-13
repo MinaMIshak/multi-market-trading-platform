@@ -18,9 +18,15 @@ from pathlib import Path
 EXPECTED = {
     "nyse_2026_calendar.pdf": (
         "https://www.nyse.com/publicdocs/nyse/"
-        "ICE_NYSE_2026_Yearly_Trading_Calendar.pdf"
+        "ICE_NYSE_2026_Yearly_Trading_Calendar.pdf",
+        232670,
+        "70f5577eb43e60a9dbbecaae3cec23d0f02028c05c7f175013bb3e97816d394f",
     ),
-    "nyse_hours_calendars.html": "https://www.nyse.com/trade/hours-calendars",
+    "nyse_hours_calendars.html": (
+        "https://www.nyse.com/trade/hours-calendars",
+        109180,
+        "49ee8a651ec01ef2866e347842c0fb11309541f247d17aeaaf7ad9d6a513b1ed",
+    ),
 }
 MANIFEST_FILES = {"manifest.json", "manifest.sha256"}
 MANIFEST_FIELDS = {"purpose", "records", "schema"}
@@ -84,7 +90,8 @@ def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = Non
         if not isinstance(record, dict) or set(record) != required:
             raise ValueError("unexpected evidence-record schema")
         name = record["filename"]
-        if name in payloads or EXPECTED.get(name) != record["source_locator"]:
+        expected = EXPECTED.get(name)
+        if name in payloads or expected is None or expected[0] != record["source_locator"]:
             raise ValueError("unexpected filename, duplicate, or source locator")
         if record["http_status"] != 200:
             raise ValueError(f"unsuccessful retrieval: {name}")
@@ -99,6 +106,8 @@ def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = Non
         payload = (root / name).read_bytes()
         if record["bytes"] != len(payload) or record["sha256"] != _sha256(payload):
             raise ValueError(f"artifact integrity mismatch: {name}")
+        if (record["bytes"], record["sha256"]) != expected[1:]:
+            raise ValueError(f"reviewed edition mismatch: {name}")
         payloads[name] = payload
 
     pdf = payloads["nyse_2026_calendar.pdf"]

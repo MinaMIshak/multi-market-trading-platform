@@ -10,6 +10,9 @@ The immutable package is stored outside the repository at
 It contains the official NYSE 2026 yearly trading calendar and the official NYSE
 holidays and trading-hours page. The manifest records each source locator, actual
 UTC receipt interval, byte size, and SHA256. Raw source bytes are not committed.
+The offline auditor independently pins both reviewed editions to the exact byte
+counts and SHA256 values below, so rewriting the manifest cannot bless substituted
+calendar or hours-page bytes.
 
 | Artifact | Bytes | SHA256 |
 | --- | ---: | --- |
