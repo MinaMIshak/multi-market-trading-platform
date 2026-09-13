@@ -7,7 +7,7 @@ import pytest
 from app.paper import shadow_collection, shadow_exits, shadow_ledger, shadow_positions
 from app.paper.shadow_report import (
     exit_evaluation_view, missed_collection_view, position_open_view,
-    watchlist_collection_view,
+    trigger_evaluation_view, watchlist_collection_view,
 )
 from tests.test_shadow_collection import authenticated_watchlist
 from tests.test_shadow_exits import prepared_exit
@@ -195,3 +195,41 @@ def test_entry_view_preserves_fill_and_no_fill_without_position_claim(
     path.write_text(json.dumps(event))
     with pytest.raises(ValueError, match="does not bind authenticated inputs"):
         entry_fill_view(tmp_path, *args)
+
+
+@pytest.mark.parametrize("changes,expected", [
+    ({"open": Decimal("105"), "high": Decimal("106"), "low": Decimal("102"),
+      "close": Decimal("104")}, "NOT_TRIGGERED"),
+    ({"open": Decimal("94"), "high": Decimal("100"), "low": Decimal("90"),
+      "close": Decimal("96")}, "INVALIDATED_OPEN_GAP"),
+    ({"open": Decimal("105"), "high": Decimal("111"), "low": Decimal("100"),
+      "close": Decimal("101")}, "TRIGGERED_AMBIGUOUS_BAR"),
+])
+def test_trigger_view_preserves_non_fill_outcomes_without_scoring(
+    tmp_path, monkeypatch, changes, expected,
+):
+    from app.paper import shadow_triggers
+    from tests.test_shadow_triggers import admitted
+
+    args = admitted(tmp_path, monkeypatch, changes)[:4]
+    with pytest.raises(FileNotFoundError):
+        trigger_evaluation_view(tmp_path, *args)
+    path = shadow_triggers.append_trigger_event(tmp_path, *args)
+    event = json.loads(path.read_bytes())
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    view = trigger_evaluation_view(tmp_path, *args)
+    assert view["label"] == "EXPERIMENTAL / PAPER ONLY"
+    assert view["scoring"] == "NOT SCORED"
+    assert view["trigger_evaluation"] == event["evaluation"]
+    assert view["trigger_evaluation"]["status"] == expected
+    assert view["execution_status"] == "NO FILL OR POSITION CREATED"
+    assert view["current_position_status"] == "NO FILL OR POSITION CREATED BY THIS EVENT"
+    assert view["open_paper_positions"] == {"status": "NOT EVALUATED"}
+    assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
+    assert all(v is None for k, v in view["performance"].items() if k != "status")
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    event["evaluation"]["status"] = "TRIGGERED"
+    path.write_text(json.dumps(event))
+    with pytest.raises(ValueError, match="does not bind evaluation"):
+        trigger_evaluation_view(tmp_path, *args)

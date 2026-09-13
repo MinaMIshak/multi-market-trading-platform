@@ -9,6 +9,7 @@ from app.paper.shadow_fills import ShadowFillPolicy, audit_fill_event
 from app.paper.shadow_ledger import audit_candidate_event
 from app.paper.shadow_positions import audit_position_open_event
 from app.paper.shadow_records import ShadowSession, ShadowWatchlist
+from app.paper.shadow_triggers import audit_trigger_event
 from app.research.historical_evidence import HistoricalEvidencePackage
 
 
@@ -121,6 +122,34 @@ def entry_fill_view(
             "trigger_event_id": event["trigger_event_id"],
             "trigger_event_sha256": event["trigger_event_sha256"],
             "fill_package_ids": event["fill_package_ids"],
+        },
+    }
+
+
+def trigger_evaluation_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display an audited trigger outcome without inferring a fill or position."""
+    event = audit_trigger_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+    )
+    return _base() | {
+        "record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "market_date": watchlist.session.market_date.isoformat(),
+        "collection_status": "ENTRY TRIGGER EVALUATED",
+        "execution_status": event["execution_status"],
+        "trigger_evaluation": event["evaluation"],
+        "current_position_status": "NO FILL OR POSITION CREATED BY THIS EVENT",
+        "recorded_at": event["recorded_at"],
+        "audit_references": {
+            "trigger_event_id": event["event_id"],
+            "fact_event_id": event["fact_event_id"],
+            "fact_event_sha256": event["fact_event_sha256"],
         },
     }
 

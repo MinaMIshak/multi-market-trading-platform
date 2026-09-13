@@ -480,3 +480,12 @@ current position state, or count a rejected entry as a zero-return trade. An
 untriggered candidate is outside this fill-event boundary; it must not be
 relabeled as capacity-rejected. Position, exit and aggregate performance remain
 unevaluated. Every result remains **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**.
+
+`trigger_evaluation_view(...)` covers the earlier audited trigger boundary,
+including `NOT_TRIGGERED`, pre-entry invalidation or target gaps, and
+`TRIGGERED_AMBIGUOUS_BAR`. It re-audits the exact forward-fact and trigger event
+chain, preserves the evaluation boundary, reason, optional trigger reference and
+receipt timestamp, and exposes the bound fact-event references. It never turns
+an untriggered or ambiguous observation into a fill, position, no-fill return or
+score. Missing or altered receipts fail closed; position, exit and aggregate
+performance remain unevaluated.
