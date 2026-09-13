@@ -261,7 +261,7 @@ def test_settlement_tampering_blocks_reuse(tmp_path, monkeypatch):
         )
 
 
-def test_settled_loss_reduces_but_does_not_block_recovered_capacity(tmp_path, monkeypatch):
+def test_excess_settled_loss_halts_reuse_but_preserves_historical_audit(tmp_path, monkeypatch):
     args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
     shadow_allocations.append_capital_settlement(
         tmp_path, *args, portfolio, exit_policy, evidence,
@@ -272,5 +272,40 @@ def test_settled_loss_reduces_but_does_not_block_recovered_capacity(tmp_path, mo
         "candidate_position_key": "a" * 64, "event_id": "b" * 64,
     }
     receipt = shadow_portfolio.audit_portfolio_policy(tmp_path, portfolio)
-    basis = shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
-    assert basis["totals_after"] == {"capital_reserved": "202.30010", "risk_reserved": "14.39510"}
+    with pytest.raises(ValueError, match="settled loss exceeds reserved risk"):
+        shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    with pytest.raises(ValueError, match="settled loss exceeds reserved risk"):
+        shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before
+    assert shadow_allocations.audit_capital_reservation(tmp_path, *args, portfolio) == reservations[0]
+
+
+@pytest.mark.parametrize("loss,halt", [
+    ("0", False), ("7.19754", False), ("7.19755", False),
+    ("7.197550000000000000000000000001", True),
+])
+def test_excess_loss_exact_boundary_and_no_profit_offset(tmp_path, monkeypatch, loss, halt):
+    # Artificial arithmetic fixtures; public settlement authentication is tested above.
+    from decimal import localcontext
+    args, portfolio, _ = setup_allocation(tmp_path, monkeypatch)
+    shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    reservations = shadow_allocations._read_reservations(tmp_path)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    receipt = shadow_portfolio.audit_portfolio_policy(tmp_path, portfolio)
+    with localcontext() as ctx:
+        ctx.prec = 60
+        proceeds = str(Decimal("101.15005") - Decimal(loss))
+    settlements = [dict(reservation_id=reservations[0]["reservation_id"], market="US",
+                        capital_released="101.15005", net_exit_proceeds=proceeds,
+                        risk_released="7.19755"),
+                   dict(reservation_id="a" * 64, market="EGX", capital_released="100",
+                        net_exit_proceeds="200", risk_released="10")]
+    with localcontext() as ctx:
+        ctx.prec = 6
+        if halt:
+            with pytest.raises(ValueError, match="settled loss exceeds reserved risk"):
+                shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
+        else:
+            result = shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
+            assert result["capital_reserved"] == "101.15005"

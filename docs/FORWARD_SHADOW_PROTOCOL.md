@@ -404,3 +404,19 @@ binding and nonfuture clock ordering. This does not independently attest local
 clocks or reauthenticate every historical source package without those original
 inputs. Portfolio NAV, marks, combined-market performance and PIT FX remain
 separate unavailable boundaries.
+
+### Excess-loss halt
+
+Before any new reservation, a settled native loss (released entry capital minus
+net exit proceeds, including both sides' costs) is compared exactly with that
+reservation's released stop-risk estimate. A strictly greater loss halts all new
+reservations in the shared ledger, across both sleeves. Equality does not trigger
+this gate. Gains elsewhere cannot offset a breach. Existing settlements and
+historical reservation audits remain available; no receipt is rewritten.
+
+This mandatory conservative rule has no automatic reset or override. Do not open
+a new ledger to evade a halt. An explicit reviewed recovery protocol would be a
+separate milestone. This detects settled excess loss; it does not bound gap losses,
+monitor unrealized losses or make multi-session execution operational. The initial
+stop-risk estimate still omits exit slippage; even an ordinary stop exit may halt
+reuse. All outputs remain **EXPERIMENTAL / PAPER ONLY**.

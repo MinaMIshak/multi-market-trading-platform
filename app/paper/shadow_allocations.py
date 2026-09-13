@@ -197,6 +197,12 @@ def _basis(position: dict, policy_receipt: dict, portfolio: ShadowPortfolioPolic
         capital = Decimal(fill["notional"]) + entry_cost
         risk = (fill_price - stop) * quantity + entry_cost + stop_exit_cost
 
+    # A stop estimate is not a bound on gap/slippage losses. Any settled breach
+    # halts new exposure for this ledger; profits cannot offset or reset it.
+    if any(_amount(item, "capital_released") - _amount(item, "net_exit_proceeds")
+           > _amount(item, "risk_released") for item in settlements):
+        raise ValueError("settled loss exceeds reserved risk; new paper exposure halted")
+
     settled_ids = {item["reservation_id"] for item in settlements}
     active = [item for item in existing if item["reservation_id"] not in settled_ids]
     old_capital = sum((_amount(item, "capital_reserved") for item in active), Fraction())
