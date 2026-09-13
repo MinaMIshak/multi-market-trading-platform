@@ -463,3 +463,8 @@ targets, including links whose external target has the expected bytes. This
 closes a custody ambiguity without changing any retained artifact or evidence
 classification. Target-date session status remains UNKNOWN, canonical US2 is
 NO_GO, and shadow scoring is NOT_READY.
+
+Every package entry must also have a link count of one. This rejects hard-linked
+manifests or artifacts whose retained inode could be changed through a path
+outside the package. The target-date and admission classifications remain
+unchanged.

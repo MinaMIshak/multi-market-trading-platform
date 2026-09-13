@@ -71,6 +71,8 @@ def _verify_closed_regular_package(root: Path) -> None:
         entry = root / name
         if entry.is_symlink() or not entry.is_file():
             raise ValueError(f"evidence artifact is not a regular file: {name}")
+        if entry.stat().st_nlink != 1:
+            raise ValueError(f"evidence artifact has external hard links: {name}")
 
 
 def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = None) -> dict:
