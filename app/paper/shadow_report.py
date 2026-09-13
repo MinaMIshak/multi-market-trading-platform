@@ -241,8 +241,10 @@ def exit_evaluation_view(
         )
         entry = position["entry"]
         with localcontext(Context(prec=34)):
+            entry_notional = Decimal(entry["notional"])
             gross_market_value = Decimal(entry["quantity"]) * mark.close
-            gross_unrealized_pnl = gross_market_value - Decimal(entry["notional"])
+            gross_unrealized_pnl = gross_market_value - entry_notional
+            gross_unrealized_return = gross_unrealized_pnl / entry_notional
         view["open_paper_positions"] = {
             "status": "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR",
             "position": {
@@ -258,6 +260,7 @@ def exit_evaluation_view(
                 "mark_price": str(mark.close),
                 "gross_market_value": str(gross_market_value),
                 "gross_unrealized_pnl": str(gross_unrealized_pnl),
+                "gross_unrealized_return": str(gross_unrealized_return),
                 "gross_unrealized_pnl_status": (
                     "AS OF OBSERVED BAR / BEFORE FEES AND LIQUIDATION SLIPPAGE"
                 ),
@@ -291,6 +294,7 @@ def exit_evaluation_view(
         exit_notional = Decimal(exit_fill["notional"])
         exit_cost = Decimal(exit_fill["exit_cost"])
         gross_pnl = exit_notional - entry_notional
+        gross_return = gross_pnl / entry_notional
         net_pnl = gross_pnl - entry_cost - exit_cost
         capital_outlay = entry_notional + entry_cost
         net_return = net_pnl / capital_outlay
@@ -313,6 +317,7 @@ def exit_evaluation_view(
             "initial_targets": position["initial_targets"],
             "holding_window": position["holding_window"],
             "gross_pnl": str(gross_pnl),
+            "gross_return": str(gross_return),
             "net_pnl": str(net_pnl),
             "net_return": str(net_return),
             "entry_known_at": entry["known_at"],

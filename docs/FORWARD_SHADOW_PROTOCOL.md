@@ -460,8 +460,9 @@ supplied admitted bars contained no observed exit. For an `OPEN` result, the vie
 reports the final admitted bar close as an authenticated as-of mark, its interval
 end and availability time, and the exact gross market value at that price. It
 also reports gross unrealized P&L as gross marked value minus audited entry
-notional, in the position's native currency. Entry fill slippage is embedded in
-that notional; fees and hypothetical liquidation slippage are excluded. This
+notional, in the position's native currency, and gross unrealized return over
+that entry notional. Entry fill slippage is embedded in that notional; fees and
+hypothetical liquidation slippage are excluded. This
 as-of valuation is not an executable exit, realized return or portfolio NAV.
 Open and closed trade views also preserve the original stop, targets and
 unvalidated holding-window declaration. Their observed holding duration is the
@@ -473,7 +474,8 @@ Net liquidation unrealized P&L remains unknown
 until applicable liquidation slippage and cost are authenticated. For a `CLOSED` result only,
 the view re-audits the entry chain again and reports one native-currency closed
 trade with exact gross P&L, net P&L after preserved entry and exit costs, and net
-return on entry notional plus entry cost. `UNKNOWN` results expose no P&L;
+return on entry notional plus entry cost. Gross return uses entry notional alone;
+it excludes entry and exit costs consistently with gross P&L. `UNKNOWN` results expose no P&L;
 `OPEN` results expose only gross marked unrealized P&L. This single-trade arithmetic
 is not portfolio performance: neither view
 infers a current mark, aggregates positions, converts FX or updates NAV, and all

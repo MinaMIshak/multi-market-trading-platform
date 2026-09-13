@@ -130,7 +130,9 @@ def test_exit_view_reports_gross_mark_pnl_without_net_liquidation_claim(tmp_path
     assert mark["unrealized_pnl"] is None
     with localcontext(Context(prec=34)):
         expected = Decimal(mark["quantity"]) * Decimal(close) - Decimal(position["entry"]["notional"])
+        expected_return = expected / Decimal(position["entry"]["notional"])
     assert Decimal(mark["gross_unrealized_pnl"]) == expected
+    assert Decimal(mark["gross_unrealized_return"]) == expected_return
     assert "BEFORE FEES AND LIQUIDATION SLIPPAGE" in mark["gross_unrealized_pnl_status"]
     assert "UNKNOWN" in mark["unrealized_pnl_status"]
     assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
@@ -163,6 +165,9 @@ def test_exit_view_preserves_closed_outcome(tmp_path, monkeypatch):
     assert trade["observed_bar_end_elapsed"] == "0:00:00"
     assert "INTRABAR FILL TIME UNKNOWN" in trade["observed_bar_end_elapsed_status"]
     with localcontext(Context(prec=34)):
+        assert Decimal(trade["gross_return"]) == (
+            Decimal(trade["gross_pnl"]) / Decimal(trade["entry_notional"])
+        )
         assert Decimal(trade["net_return"]) == Decimal(trade["net_pnl"]) / (
             Decimal(trade["entry_notional"]) + Decimal(trade["entry_cost"])
         )
