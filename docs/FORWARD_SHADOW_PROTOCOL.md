@@ -230,6 +230,18 @@ economics. US policies use USD and EGX policies use EGP. These are explicit
 evidenced assumptions, not measured spread or impact unless their source packages
 actually establish that stronger scope.
 
+Before a trigger may become a fill, `freeze_fill_policy_selection` publishes one
+immutable `shadow-fill-policy-selection-v1` receipt for the exact completed
+watchlist. The receipt binds the completion and watchlist hashes, market, full
+evidenced fill policy and exact evidence-package identities. It must be published
+before the authenticated session opens. All policy variants for that watchlist
+compete for one atomic path, so observed facts cannot be used to choose among
+slippage, cost or participation assumptions. Duplicate fields, alteration,
+future clocks, post-open selection and a caller-supplied alternate policy fail
+closed. Every fill append and audit re-audits the selection and requires it to
+precede trigger publication. This freezes operational assumptions; their
+empirical accuracy remains bounded by the admitted evidence.
+
 Capacity is `floor(authenticated trigger-bar volume * participation fraction)`.
 If the declared quantity exceeds it, the event records `NO FILL: INSUFFICIENT
 CAPACITY`; there is no partial fill. An admitted long fill applies buy-side

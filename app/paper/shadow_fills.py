@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.paper.shadow_collection import _publish_once
+from app.paper.shadow_collection import _publish_once, audit_completed_watchlist
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_ledger import LABEL
 from app.paper.shadow_records import ShadowWatchlist
@@ -132,6 +132,91 @@ def _packages(
     return result
 
 
+def _selection_basis(
+    watchlist: ShadowWatchlist, completion: dict, policy: ShadowFillPolicy,
+    package_ids: list[str],
+) -> dict:
+    return {
+        "schema_version": "shadow-fill-policy-selection-v1", "label": LABEL,
+        "event_type": "FILL_POLICY_SELECTED", "scoring": "NOT SCORED",
+        "watchlist_record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "watchlist_sha256": completion["watchlist_sha256"],
+        "completion_sha256": hashlib.sha256(_canonical(completion)).hexdigest(),
+        "policy": policy.model_dump(mode="json"),
+        "fill_package_ids": package_ids,
+    }
+
+
+def _selection_path(directory: Path, watchlist: ShadowWatchlist) -> Path:
+    key = hashlib.sha256(_canonical({
+        "watchlist_record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+    })).hexdigest()
+    return Path(directory) / "fill-policy-selections" / f"{key}.json"
+
+
+def freeze_fill_policy_selection(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+) -> Path:
+    """Select one evidenced fill policy before any trigger is published."""
+    if type(watchlist) is not ShadowWatchlist or type(policy) is not ShadowFillPolicy:
+        raise ValueError("exact watchlist and fill policy required")
+    watchlist = ShadowWatchlist.model_validate(watchlist.model_dump(mode="python"))
+    policy = ShadowFillPolicy.model_validate(policy.model_dump(mode="python"))
+    if policy.market != watchlist.session.market:
+        raise ValueError("fill policy market mismatch")
+    completion = audit_completed_watchlist(directory, watchlist, watchlist_packages)
+    packages = _packages(policy, fill_packages, watchlist.information_cutoff)
+    selected_at = _utc(_now())
+    if selected_at >= watchlist.session.opens_at:
+        raise ValueError("fill policy must be selected before session open")
+    basis = _selection_basis(watchlist, completion, policy, sorted(packages))
+    event_id = hashlib.sha256(_canonical(basis)).hexdigest()
+    payload = basis | {"event_id": event_id, "selected_at": selected_at.isoformat()}
+    path = _publish_once(_selection_path(directory, watchlist), payload)
+    if _now() < selected_at:
+        path.unlink()
+        raise ValueError("clock rollback during fill-policy selection")
+    return path
+
+
+def audit_fill_policy_selection(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Bind the caller's policy to the immutable pre-session selection."""
+    if type(watchlist) is not ShadowWatchlist or type(policy) is not ShadowFillPolicy:
+        raise ValueError("exact watchlist and fill policy required")
+    watchlist = ShadowWatchlist.model_validate(watchlist.model_dump(mode="python"))
+    policy = ShadowFillPolicy.model_validate(policy.model_dump(mode="python"))
+    completion = audit_completed_watchlist(directory, watchlist, watchlist_packages)
+    packages = _packages(policy, fill_packages, watchlist.information_cutoff)
+    basis = _selection_basis(watchlist, completion, policy, sorted(packages))
+    event_id = hashlib.sha256(_canonical(basis)).hexdigest()
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate fill-policy-selection field")
+            result[key] = value
+        return result
+
+    event = json.loads(_selection_path(directory, watchlist).read_bytes(),
+                       object_pairs_hook=unique_object)
+    if type(event) is not dict or set(event) != set(basis) | {"event_id", "selected_at"}:
+        raise ValueError("unexpected fill-policy-selection fields")
+    selected_at = _utc(datetime.fromisoformat(event["selected_at"]))
+    expected = basis | {"event_id": event_id, "selected_at": selected_at.isoformat()}
+    if selected_at >= watchlist.session.opens_at or selected_at > _now() or event != expected:
+        raise ValueError("fill policy does not bind pre-session selection")
+    return event
+
+
 def evaluate_entry_fill(
     watchlist: ShadowWatchlist, facts: ForwardFactBundle, trigger_event: dict,
     policy: ShadowFillPolicy,
@@ -193,7 +278,12 @@ def append_fill_event(
     if type(policy) is not ShadowFillPolicy:
         raise ValueError("exact fill policy required")
     policy = ShadowFillPolicy.model_validate(policy.model_dump(mode="python"))
+    selection = audit_fill_policy_selection(
+        directory, watchlist, watchlist_packages, policy, fill_packages,
+    )
     trigger = audit_trigger_event(directory, watchlist, watchlist_packages, facts, fact_packages)
+    if _utc(datetime.fromisoformat(selection["selected_at"])) > _utc(datetime.fromisoformat(trigger["recorded_at"])):
+        raise ValueError("fill policy selected after trigger evaluation")
     packages = _packages(policy, fill_packages, watchlist.information_cutoff)
     fill = evaluate_entry_fill(watchlist, facts, trigger, policy)
     basis = _basis(trigger, policy, sorted(packages), fill)
@@ -219,7 +309,12 @@ def audit_fill_event(
     if type(policy) is not ShadowFillPolicy:
         raise ValueError("exact fill policy required")
     policy = ShadowFillPolicy.model_validate(policy.model_dump(mode="python"))
+    selection = audit_fill_policy_selection(
+        directory, watchlist, watchlist_packages, policy, fill_packages,
+    )
     trigger = audit_trigger_event(directory, watchlist, watchlist_packages, facts, fact_packages)
+    if _utc(datetime.fromisoformat(selection["selected_at"])) > _utc(datetime.fromisoformat(trigger["recorded_at"])):
+        raise ValueError("fill policy selected after trigger evaluation")
     packages = _packages(policy, fill_packages, watchlist.information_cutoff)
     fill = evaluate_entry_fill(watchlist, facts, trigger, policy)
     basis = _basis(trigger, policy, sorted(packages), fill)

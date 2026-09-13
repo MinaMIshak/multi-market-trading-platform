@@ -15,12 +15,11 @@ from tests.test_shadow_collection import package
 from tests.test_shadow_triggers import admitted
 
 
-def prepared(tmp_path, monkeypatch, *, bar_changes=None, participation=Decimal("0.10")):
+def prepared(tmp_path, monkeypatch, *, bar_changes=None, participation=Decimal("0.10"),
+             slippage=Decimal("10")):
     item, packages, facts, fact_packages, now = admitted(
         tmp_path, monkeypatch, bar_changes,
     )
-    monkeypatch.setattr(shadow_triggers, "_now", lambda: now)
-    shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
     fill_packages = []
     for char, fields in zip(
         "def", (SLIPPAGE_FIELDS, COST_FIELDS, PARTICIPATION_FIELDS), strict=True,
@@ -32,15 +31,69 @@ def prepared(tmp_path, monkeypatch, *, bar_changes=None, participation=Decimal("
         )
         fill_packages.append(package(char, reference, tuple(fields)))
     policy = ShadowFillPolicy(
-        market="US", currency="USD", entry_slippage_bps=Decimal("10"),
+        market="US", currency="USD", entry_slippage_bps=slippage,
         cost_bps_per_side=Decimal("5"), fixed_cost_per_side=Decimal("1"),
         max_volume_participation_pct=participation,
         slippage_evidence_package_id=fill_packages[0].identity,
         cost_evidence_package_id=fill_packages[1].identity,
         participation_evidence_package_id=fill_packages[2].identity,
     )
+    selection_at = item.generated_at + timedelta(minutes=31)
+    monkeypatch.setattr(shadow_fills, "_now", lambda: selection_at)
+    shadow_fills.freeze_fill_policy_selection(
+        tmp_path, item, packages, policy, tuple(fill_packages),
+    )
+    monkeypatch.setattr(shadow_triggers, "_now", lambda: now)
+    shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
     monkeypatch.setattr(shadow_fills, "_now", lambda: now)
     return item, packages, facts, fact_packages, policy, tuple(fill_packages), now
+
+
+def test_fill_requires_immutable_pre_session_policy_selection(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, policy, fill_packages, now = prepared(
+        tmp_path, monkeypatch,
+    )
+    selection = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    selection.unlink()
+    with pytest.raises(FileNotFoundError):
+        shadow_fills.append_fill_event(
+            tmp_path, item, packages, facts, fact_packages, policy, fill_packages,
+        )
+    selection_at = item.generated_at + timedelta(minutes=31)
+    monkeypatch.setattr(shadow_fills, "_now", lambda: selection_at)
+    shadow_fills.freeze_fill_policy_selection(
+        tmp_path, item, packages, policy, fill_packages,
+    )
+    alternate = policy.model_copy(update={"entry_slippage_bps": Decimal("20")})
+    with pytest.raises(FileExistsError):
+        shadow_fills.freeze_fill_policy_selection(
+            tmp_path, item, packages, alternate, fill_packages,
+        )
+    with pytest.raises(ValueError, match="does not bind pre-session selection"):
+        shadow_fills.append_fill_event(
+            tmp_path, item, packages, facts, fact_packages, alternate, fill_packages,
+        )
+
+
+def test_fill_rejects_tampered_or_post_open_policy_selection(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, policy, fill_packages, now = prepared(
+        tmp_path, monkeypatch,
+    )
+    path = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    original = path.read_text()
+    path.write_text('{"market":"US",' + original[1:])
+    with pytest.raises(ValueError, match="duplicate fill-policy-selection field"):
+        shadow_fills.append_fill_event(
+            tmp_path, item, packages, facts, fact_packages, policy, fill_packages,
+        )
+    event = json.loads(original)
+    event["selected_at"] = item.session.opens_at.isoformat()
+    path.write_text(json.dumps(event))
+    monkeypatch.setattr(shadow_fills, "_now", lambda: now)
+    with pytest.raises(ValueError, match="does not bind pre-session selection"):
+        shadow_fills.append_fill_event(
+            tmp_path, item, packages, facts, fact_packages, policy, fill_packages,
+        )
 
 
 def test_appends_and_audits_evidenced_simulated_fill(tmp_path, monkeypatch):
@@ -131,12 +184,11 @@ def test_late_policy_evidence_is_rejected(tmp_path, monkeypatch):
 
 def test_slippage_cannot_cross_target(tmp_path, monkeypatch):
     item, packages, facts, fact_packages, policy, fill_packages, _ = prepared(
-        tmp_path, monkeypatch,
+        tmp_path, monkeypatch, slippage=Decimal("1000"),
     )
-    changed = policy.model_copy(update={"entry_slippage_bps": Decimal("1000")})
     with pytest.raises(ValueError, match="outside candidate geometry"):
         shadow_fills.append_fill_event(
-            tmp_path, item, packages, facts, fact_packages, changed, fill_packages,
+            tmp_path, item, packages, facts, fact_packages, policy, fill_packages,
         )
 
 
