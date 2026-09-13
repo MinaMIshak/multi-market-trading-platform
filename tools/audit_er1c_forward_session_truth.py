@@ -11,7 +11,7 @@ import hashlib
 import html
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -23,6 +23,11 @@ EXPECTED = {
     "nyse_hours_calendars.html": "https://www.nyse.com/trade/hours-calendars",
 }
 MANIFEST_FILES = {"manifest.json", "manifest.sha256"}
+MANIFEST_FIELDS = {"purpose", "records", "schema"}
+EXPECTED_PURPOSE = (
+    "Bounded official-source qualification for requested first US shadow dates; "
+    "not canonical US2 admission or a watchlist."
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -46,14 +51,22 @@ def _visible_html(payload: bytes) -> str:
     return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", source)).split())
 
 
-def audit_forward_session_truth(root: Path) -> dict:
+def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = None) -> dict:
+    if audited_at is None:
+        audited_at = datetime.now(timezone.utc)
+    if type(audited_at) is not datetime or audited_at.tzinfo is not timezone.utc:
+        raise ValueError("audited_at must use datetime.timezone.utc")
     raw_manifest = (root / "manifest.json").read_bytes()
     expected_sidecar = f"{_sha256(raw_manifest)}  manifest.json"
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != expected_sidecar:
         raise ValueError("manifest SHA256 sidecar mismatch")
     manifest = json.loads(raw_manifest)
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS:
+        raise ValueError("unexpected manifest fields")
     if manifest.get("schema") != "er1c-forward-session-truth-v1":
         raise ValueError("unexpected manifest schema")
+    if manifest.get("purpose") != EXPECTED_PURPOSE:
+        raise ValueError("unexpected evidence purpose")
     records = manifest.get("records")
     if not isinstance(records, list) or len(records) != len(EXPECTED):
         raise ValueError("unexpected evidence records")
@@ -81,6 +94,8 @@ def audit_forward_session_truth(root: Path) -> dict:
         completed = _utc(record["retrieval_completed_at_utc"], "retrieval completion")
         if completed < started:
             raise ValueError("retrieval completion precedes start")
+        if completed > audited_at:
+            raise ValueError("retrieval completion is after audit time")
         payload = (root / name).read_bytes()
         if record["bytes"] != len(payload) or record["sha256"] != _sha256(payload):
             raise ValueError(f"artifact integrity mismatch: {name}")
@@ -105,6 +120,11 @@ def audit_forward_session_truth(root: Path) -> dict:
         "market": "NYSE / XNYS",
         "requested_first_us_shadow_date": "2026-09-14",
         "official_current_schedule_corroborated": True,
+        "audited_at": audited_at.isoformat(),
+        "latest_receipt_at": max(
+            _utc(record["retrieval_completed_at_utc"], "retrieval completion")
+            for record in records
+        ).isoformat(),
         "calendar_observation": (
             "September 14 is absent from the official 2026 holiday and early-close "
             "exceptions retained at the receipt time"
