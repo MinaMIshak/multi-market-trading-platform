@@ -511,3 +511,14 @@ receipt timestamp, and exposes the bound fact-event references. It never turns
 an untriggered or ambiguous observation into a fill, position, no-fill return or
 score. Missing or altered receipts fail closed; position, exit and aggregate
 performance remain unevaluated.
+
+Before entry, a bar that never intersects the entry zone still retires the
+candidate if its low touches or crosses the stop (`INVALIDATED_BEFORE_ENTRY`),
+or its high touches or crosses the first target (`TARGET_PASSED_BEFORE_ENTRY`).
+These are terminal observations within the supplied forward bar sequence: a
+later entry-zone touch cannot revive that candidate. Exact boundary touches
+count. A bar touching both the entry zone and a relevant boundary continues to
+use the existing conservative path-order rules. These retirement observations
+remain **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**, with no simulated fill,
+position or return. This rule is covered by artificial regression fixtures;
+it does not supply authentic session or candidate evidence.

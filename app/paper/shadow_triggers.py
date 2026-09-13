@@ -41,6 +41,7 @@ class TriggerEvaluation(BaseModel):
     candidate_id: str = Field(min_length=1)
     status: Literal[
         "NOT_TRIGGERED", "INVALIDATED_OPEN_GAP", "TARGET_PASSED_OPEN_GAP",
+        "INVALIDATED_BEFORE_ENTRY", "TARGET_PASSED_BEFORE_ENTRY",
         "TRIGGERED", "TRIGGERED_AMBIGUOUS_BAR",
     ]
     evaluated_through_sequence: int = Field(ge=1)
@@ -50,6 +51,7 @@ class TriggerEvaluation(BaseModel):
     reason: Literal[
         "ENTRY_ZONE_NOT_TOUCHED", "OPEN_AT_OR_BELOW_STOP_BEFORE_ENTRY",
         "OPEN_AT_OR_ABOVE_TARGET_BEFORE_ENTRY", "ENTRY_ZONE_TOUCHED",
+        "STOP_TOUCHED_WITHOUT_ENTRY", "TARGET_TOUCHED_WITHOUT_ENTRY",
         "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN",
     ]
 
@@ -103,6 +105,14 @@ def evaluate_trigger(watchlist: ShadowWatchlist, facts: ForwardFactBundle) -> Tr
             break
         intersects = bar.low <= candidate.entry_high and bar.high >= candidate.entry_low
         if not intersects:
+            # A wholly outside-zone bar can retire the thesis before a later
+            # bar reaches entry. No intrabar ordering assumption is needed.
+            if bar.low <= candidate.stop:
+                status, reason = "INVALIDATED_BEFORE_ENTRY", "STOP_TOUCHED_WITHOUT_ENTRY"
+                break
+            if bar.high >= candidate.targets[0]:
+                status, reason = "TARGET_PASSED_BEFORE_ENTRY", "TARGET_TOUCHED_WITHOUT_ENTRY"
+                break
             continue
         trigger_sequence = bar.sequence
         trigger_price = (bar.open if candidate.entry_low <= bar.open <= candidate.entry_high

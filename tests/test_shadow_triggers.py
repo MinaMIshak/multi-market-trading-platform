@@ -140,3 +140,40 @@ def test_ambiguous_target_order_is_preserved_in_audited_event(tmp_path, monkeypa
     event = shadow_triggers.audit_trigger_event(tmp_path, item, packages, facts, fact_packages)
     assert event["evaluation"]["status"] == "TRIGGERED_AMBIGUOUS_BAR"
     assert event["execution_status"] == "NO FILL OR POSITION CREATED"
+
+
+@pytest.mark.parametrize("ohlc,status,reason", [
+    (("96", "98", "95", "97"), "INVALIDATED_BEFORE_ENTRY", "STOP_TOUCHED_WITHOUT_ENTRY"),
+    (("96", "98", "94", "97"), "INVALIDATED_BEFORE_ENTRY", "STOP_TOUCHED_WITHOUT_ENTRY"),
+    (("105", "110", "103", "106"), "TARGET_PASSED_BEFORE_ENTRY", "TARGET_TOUCHED_WITHOUT_ENTRY"),
+    (("105", "111", "103", "106"), "TARGET_PASSED_BEFORE_ENTRY", "TARGET_TOUCHED_WITHOUT_ENTRY"),
+    (("96", "98", "95.01", "97"), "TRIGGERED", "ENTRY_ZONE_TOUCHED"),
+    (("105", "109.99", "103", "106"), "TRIGGERED", "ENTRY_ZONE_TOUCHED"),
+])
+def test_pre_entry_bar_retirement_survives_later_entry_touch(
+    tmp_path, monkeypatch, ohlc, status, reason,
+):
+    item, packages, facts, fact_packages, available = prepared(tmp_path, monkeypatch)
+    original = facts.bars[0]
+    middle = original.interval_start + timedelta(minutes=2)
+    first = original.model_copy(update={
+        **dict(zip(("open", "high", "low", "close"), map(Decimal, ohlc), strict=True)),
+        "interval_end": middle,
+    })
+    second = original.model_copy(update={"sequence": 2, "interval_start": middle})
+    facts = facts.model_copy(update={"bars": (first, second)})
+    now = available + timedelta(minutes=1)
+    monkeypatch.setattr(shadow_facts, "_now", lambda: now)
+    monkeypatch.setattr(shadow_triggers, "_now", lambda: now)
+    shadow_facts.append_forward_fact_event(tmp_path, item, packages, facts, fact_packages)
+    shadow_triggers.append_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    event = shadow_triggers.audit_trigger_event(tmp_path, item, packages, facts, fact_packages)
+    result = event["evaluation"]
+    assert (result["status"], result["reason"]) == (status, reason)
+    assert result["trigger_sequence"] == (2 if status == "TRIGGERED" else None)
+    if status != "TRIGGERED":
+        assert result["trigger_reference_price"] is None
+        prefix = facts.model_copy(update={"bars": (first,)})
+        assert shadow_triggers.evaluate_trigger(item, prefix).status == status
+    assert event["execution_status"] == "NO FILL OR POSITION CREATED"
+    assert event["scoring"] == "NOT SCORED"
