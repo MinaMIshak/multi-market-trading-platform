@@ -310,7 +310,11 @@ preserved without an invented intrabar timestamp.
 One atomic event per exact position and authenticated fact snapshot is stored
 under `exit-events/`. A later fact snapshot may append another immutable
 evaluation for a position that remained open; replaying the same snapshot cannot
-overwrite or duplicate it. Audit binds the position bytes hash, exact
+overwrite or duplicate it. The later snapshot must preserve every originally
+admitted bar exactly and may only append bars. Revision or truncation fails
+closed even when the changed snapshot independently passes fact admission;
+later receipt does not authorize rewriting the position's observed history.
+Audit binds the position bytes hash, exact
 forward-fact event ID and bytes hash, exact policy and evidence package
 identities, and rejects
 duplicate or additional JSON fields, backdating, future clocks, tampering and

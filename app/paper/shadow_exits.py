@@ -157,6 +157,31 @@ def _basis(position, facts, fact_event, policy, package_ids):
             "policy": policy.model_dump(mode="json"), "evaluation": evaluation}
 
 
+def _require_monotonic_fact_extension(original: ForwardFactBundle,
+                                      evaluation: ForwardFactBundle) -> None:
+    """Reject a later snapshot that rewrites or drops already admitted facts."""
+    original_values = original.model_dump(mode="json", exclude={"bars", "trading_status"})
+    evaluation_values = evaluation.model_dump(mode="json", exclude={"bars", "trading_status"})
+    if evaluation_values != original_values:
+        raise ValueError("exit evaluation facts rewrite original admitted facts")
+    original_status = original.trading_status.model_dump(mode="json")
+    evaluation_status = evaluation.trading_status.model_dump(mode="json")
+    original_end = original_status.pop("coverage_end")
+    evaluation_end = evaluation_status.pop("coverage_end")
+    original_status.pop("evidence_package_id")
+    evaluation_status.pop("evidence_package_id")
+    if evaluation_status != original_status or evaluation_end < original_end:
+        raise ValueError("exit evaluation facts rewrite original trading status")
+    if len(evaluation.bars) < len(original.bars):
+        raise ValueError("exit evaluation facts truncate original admitted bars")
+    original_bars = tuple(item.model_dump(mode="json") for item in original.bars)
+    evaluation_prefix = tuple(
+        item.model_dump(mode="json") for item in evaluation.bars[:len(original.bars)]
+    )
+    if evaluation_prefix != original_bars:
+        raise ValueError("exit evaluation facts rewrite original admitted bars")
+
+
 def exit_event_path(directory: Path, position_event_id: str, fact_event_id: str) -> Path:
     """Address one immutable evaluation of a position against one fact snapshot."""
     if (type(position_event_id) is not str or len(position_event_id) != 64
@@ -181,6 +206,7 @@ def append_exit_event(directory: Path, watchlist: ShadowWatchlist,
                                          fact_packages, fill_policy, fill_packages)
     evaluation_facts = facts if evaluation_facts is None else evaluation_facts
     evaluation_fact_packages = fact_packages if evaluation_fact_packages is None else evaluation_fact_packages
+    _require_monotonic_fact_extension(facts, evaluation_facts)
     fact_event = audit_forward_fact_event(directory, watchlist, watchlist_packages,
                                           evaluation_facts, evaluation_fact_packages)
     packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
@@ -212,6 +238,7 @@ def audit_exit_event(directory: Path, watchlist: ShadowWatchlist,
                                          fact_packages, fill_policy, fill_packages)
     evaluation_facts = facts if evaluation_facts is None else evaluation_facts
     evaluation_fact_packages = fact_packages if evaluation_fact_packages is None else evaluation_fact_packages
+    _require_monotonic_fact_extension(facts, evaluation_facts)
     fact_event = audit_forward_fact_event(directory, watchlist, watchlist_packages,
                                           evaluation_facts, evaluation_fact_packages)
     packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)

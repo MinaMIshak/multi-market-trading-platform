@@ -107,6 +107,54 @@ def test_open_position_accepts_later_immutable_fact_evaluation(tmp_path, monkeyp
     ])
 
 
+def test_later_evaluation_cannot_rewrite_admitted_history(tmp_path, monkeypatch):
+    args, _, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+    original = args[2]
+    first = original.bars[0]
+    second = first.model_copy(update={
+        "sequence": 2, "interval_start": first.interval_end,
+        "interval_end": first.interval_end + timedelta(minutes=1),
+        "available_at": first.available_at + timedelta(minutes=1),
+    })
+    evaluation = original.model_copy(update={
+        "bars": (first.model_copy(update={"close": Decimal("100")}), second),
+    })
+
+    with pytest.raises(ValueError, match="rewrite original admitted bars"):
+        shadow_exits.append_exit_event(
+            tmp_path, args[0], args[1], original, args[3], args[4], args[5],
+            policy, evidence, evaluation_facts=evaluation,
+            evaluation_fact_packages=args[3],
+        )
+    assert not (tmp_path / "exit-events").exists()
+
+
+def test_exit_fact_extension_rejects_truncation(tmp_path, monkeypatch):
+    args, _, _, _ = prepared_exit(tmp_path, monkeypatch)
+    facts = args[2]
+    first = facts.bars[0]
+    second = first.model_copy(update={
+        "sequence": 2, "interval_start": first.interval_end,
+        "interval_end": first.interval_end + timedelta(minutes=1),
+        "available_at": first.available_at + timedelta(minutes=1),
+    })
+    original = facts.model_copy(update={"bars": (first, second)})
+    with pytest.raises(ValueError, match="truncate original admitted bars"):
+        shadow_exits._require_monotonic_fact_extension(original, facts)
+
+
+def test_exit_fact_extension_rejects_nonbar_fact_revision(tmp_path, monkeypatch):
+    args, _, _, _ = prepared_exit(tmp_path, monkeypatch)
+    facts = args[2]
+    revised = facts.model_copy(update={
+        "action_coverage": facts.action_coverage.model_copy(update={
+            "status": "UNKNOWN",
+        }),
+    })
+    with pytest.raises(ValueError, match="rewrite original admitted facts"):
+        shadow_exits._require_monotonic_fact_extension(facts, revised)
+
+
 def test_conservative_outcomes_from_exact_models(tmp_path, monkeypatch):
     args, _, policy, _ = prepared_exit(tmp_path, monkeypatch)
     position = shadow_positions.audit_position_open_event(tmp_path, *args)
