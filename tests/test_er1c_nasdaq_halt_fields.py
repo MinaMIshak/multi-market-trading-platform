@@ -1,4 +1,4 @@
-import hashlib, json
+import hashlib, json, os
 from datetime import datetime, timezone
 import pytest
 from tools.audit_er1c_nasdaq_halt_fields import PURPOSE, audit_halt_fields
@@ -34,6 +34,20 @@ def test_rejects_redirect(package):
 def test_rejects_unbounded_inventory(package):
     (package/"feed.xml").write_text("not acquired")
     with pytest.raises(ValueError,match="inventory"): audit_halt_fields(package,audited_at=AUDITED_AT)
+def test_rejects_undeclared_directory(package):
+    (package/"undeclared").mkdir()
+    with pytest.raises(ValueError,match="inventory"): audit_halt_fields(package,audited_at=AUDITED_AT)
+def test_rejects_symlinked_package_root(package):
+    link=package.parent/"package-link"; link.symlink_to(package, target_is_directory=True)
+    with pytest.raises(ValueError,match="real directory"): audit_halt_fields(link,audited_at=AUDITED_AT)
+@pytest.mark.parametrize("name", ["manifest.json", "manifest.sha256", "field_definitions.html", "trading_halts.html"])
+def test_rejects_symlinked_package_entry(package,name):
+    target=package.parent/f"{package.name}-{name}.target"; target.write_bytes((package/name).read_bytes()); (package/name).unlink(); (package/name).symlink_to(target)
+    with pytest.raises(ValueError,match="regular non-symlink"): audit_halt_fields(package,audited_at=AUDITED_AT)
+@pytest.mark.parametrize("name", ["manifest.json", "manifest.sha256", "field_definitions.html", "trading_halts.html"])
+def test_rejects_hard_linked_package_entry(package,name):
+    target=package.parent/f"{package.name}-{name}.target"; os.link(package/name,target)
+    with pytest.raises(ValueError,match="hard linked"): audit_halt_fields(package,audited_at=AUDITED_AT)
 def test_rejects_non_utc_receipt(package):
     doc=json.loads((package/"manifest.json").read_bytes()); doc["artifacts"][0]["receipt_completed_at"]="2026-09-13T03:00:00"; _manifest(package,doc)
     with pytest.raises(ValueError,match="explicit UTC"): audit_halt_fields(package,audited_at=AUDITED_AT)

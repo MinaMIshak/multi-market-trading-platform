@@ -1,6 +1,6 @@
 """Audit retained Nasdaq halt-field documentation without admitting halt facts."""
 from __future__ import annotations
-import argparse, hashlib, html, json, re
+import argparse, hashlib, html, json, re, stat
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,6 +23,16 @@ def audit_halt_fields(root: Path, *, audited_at: datetime | None = None) -> dict
     audited_at = audited_at or datetime.now(timezone.utc)
     if type(audited_at) is not datetime or audited_at.tzinfo is None: raise ValueError("audited_at must be timezone-aware")
     audited_at = audited_at.astimezone(timezone.utc)
+    try: root_stat = root.lstat()
+    except OSError as error: raise ValueError("package root is not an accessible directory") from error
+    if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode): raise ValueError("package root must be a real directory")
+    expected_inventory = set(EXPECTED) | {"manifest.json", "manifest.sha256"}
+    entries = {entry.name: entry for entry in root.iterdir()}
+    if set(entries) != expected_inventory: raise ValueError("artifact inventory does not match bounded scope")
+    for name, entry in entries.items():
+        entry_stat = entry.lstat()
+        if entry.is_symlink() or not stat.S_ISREG(entry_stat.st_mode): raise ValueError(f"package entry must be a regular non-symlink file: {name}")
+        if entry_stat.st_nlink != 1: raise ValueError(f"package entry must not be hard linked: {name}")
     raw = (root / "manifest.json").read_bytes()
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != f"{_sha(raw)}  manifest.json": raise ValueError("manifest SHA256 sidecar mismatch")
     manifest = json.loads(raw)
@@ -32,7 +42,6 @@ def audit_halt_fields(root: Path, *, audited_at: datetime | None = None) -> dict
     if created > audited_at: raise ValueError("manifest creation is after audit time")
     records = manifest["artifacts"]
     if not isinstance(records, list) or len(records) != 2: raise ValueError("unexpected artifact records")
-    if {p.name for p in root.iterdir() if p.is_file()} != set(EXPECTED) | {"manifest.json", "manifest.sha256"}: raise ValueError("artifact inventory does not match bounded scope")
     required = {"bytes", "content_type", "http_status", "path", "receipt_completed_at", "request_started_at", "resolved_locator", "sha256", "source_locator"}
     payloads: dict[str, bytes] = {}
     receipt_times: list[datetime] = []

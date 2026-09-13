@@ -422,6 +422,14 @@ normalized facts. Both permissions remain **UNRESOLVED**, so feed acquisition is
 **NO-GO**. Public accessibility and documentation integrity do not override this
 gate. No feed request was made.
 
+The halt-field package auditor now also treats the package boundary as evidence:
+it requires a real directory containing exactly four direct, regular,
+non-symlink files with one link each before reading content. Undeclared
+directories, symlinked roots or entries, and hard-linked entries can no longer
+escape the bounded inventory or substitute bytes. This changes custody
+enforcement only; the retained documentation and all **NO-GO** conclusions are
+unchanged.
+
 ## Official NYSE symbol-mapping specification qualification
 
 Two official NYSE PDFs were retained as a documentation-only package and bound
