@@ -23,6 +23,10 @@ from app.paper.shadow_records import ShadowWatchlist
 from app.research.historical_evidence import HistoricalEvidencePackage, require_historical_evidence
 
 
+# Resource bound, not a validated holding horizon.
+MAX_CONTINUATION_SESSIONS = 512
+
+
 class ContinuationCalendarDay(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     market: Literal["EGX", "US"]
@@ -148,7 +152,8 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
            facts: ForwardContinuationBundle,
            fact_packages: tuple[HistoricalEvidencePackage, ...], recorded_at: datetime, *,
            previous_facts: ForwardContinuationBundle | None = None,
-           previous_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None) -> dict:
+           previous_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
+           authenticated_predecessor: dict | None = None) -> dict:
     position = audit_position_open_event(directory, watchlist, watchlist_packages, original_facts,
                                          original_fact_packages, fill_policy, fill_packages)
     facts = ForwardContinuationBundle.model_validate(facts.model_dump(mode="python"))
@@ -158,11 +163,9 @@ def _basis(directory: Path, watchlist: ShadowWatchlist,
     if previous_facts is not None:
         if previous_fact_packages is None:
             raise ValueError("previous continuation packages required")
-        predecessor = audit_continuation_event(
-            directory, watchlist, watchlist_packages, original_facts,
-            original_fact_packages, fill_policy, fill_packages, previous_facts,
-            previous_fact_packages,
-        )
+        if authenticated_predecessor is None:
+            raise ValueError("authenticated predecessor required")
+        predecessor = authenticated_predecessor
         predecessor_date = previous_facts.calendar_days[-1].market_date
         predecessor_close = previous_facts.calendar_days[-1].closes_at
     elif previous_fact_packages is not None:
@@ -209,12 +212,19 @@ def append_continuation_event(directory: Path, watchlist: ShadowWatchlist,
                               fill_policy: ShadowFillPolicy, fill_packages,
                               facts: ForwardContinuationBundle, fact_packages, *,
                               previous_facts: ForwardContinuationBundle | None = None,
-                              previous_fact_packages=None) -> Path:
+                              previous_fact_packages=None,
+                              predecessor_chain=()) -> Path:
+    chain = _predecessors(predecessor_chain, previous_facts, previous_fact_packages)
+    common = (directory, watchlist, watchlist_packages, original_facts,
+              original_fact_packages, fill_policy, fill_packages)
+    predecessor = _audit_chain(common, chain)
+    previous_facts, previous_fact_packages = chain[-1] if chain else (None, None)
     recorded_at = _utc(_now())
     basis = _basis(directory, watchlist, watchlist_packages, original_facts,
                    original_fact_packages, fill_policy, fill_packages, facts, fact_packages,
                    recorded_at, previous_facts=previous_facts,
-                   previous_fact_packages=previous_fact_packages)
+                   previous_fact_packages=previous_fact_packages,
+                   authenticated_predecessor=predecessor)
     payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                        "recorded_at": recorded_at.isoformat()}
     path = _publish_once(continuation_event_path(
@@ -225,12 +235,13 @@ def append_continuation_event(directory: Path, watchlist: ShadowWatchlist,
     return path
 
 
-def audit_continuation_event(directory: Path, watchlist: ShadowWatchlist,
+def _audit_one(directory: Path, watchlist: ShadowWatchlist,
                              watchlist_packages, original_facts, original_fact_packages,
                              fill_policy: ShadowFillPolicy, fill_packages,
                              facts: ForwardContinuationBundle, fact_packages, *,
                              previous_facts: ForwardContinuationBundle | None = None,
-                             previous_fact_packages=None) -> dict:
+                             previous_fact_packages=None,
+                             authenticated_predecessor=None) -> dict:
     path = continuation_event_path(directory, audit_position_open_event(
         directory, watchlist, watchlist_packages, original_facts, original_fact_packages,
         fill_policy, fill_packages)["event_id"], facts.calendar_days[-1].market_date)
@@ -248,9 +259,57 @@ def audit_continuation_event(directory: Path, watchlist: ShadowWatchlist,
     basis = _basis(directory, watchlist, watchlist_packages, original_facts,
                    original_fact_packages, fill_policy, fill_packages, facts, fact_packages,
                    recorded_at, previous_facts=previous_facts,
-                   previous_fact_packages=previous_fact_packages)
+                   previous_fact_packages=previous_fact_packages,
+                   authenticated_predecessor=authenticated_predecessor)
     expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                         "recorded_at": recorded_at.isoformat()}
     if set(event) != set(expected) or event != expected or recorded_at > _now():
         raise ValueError("continuation event does not bind authenticated inputs")
     return event
+
+
+def _predecessors(chain, previous_facts, previous_packages):
+    """Accept a complete ordered prefix or the legacy single predecessor pair."""
+    if type(chain) is not tuple:
+        raise ValueError("exact predecessor chain tuple required")
+    if previous_facts is not None:
+        if previous_packages is None:
+            raise ValueError("previous continuation packages required")
+        if chain:
+            raise ValueError("cannot combine predecessor chain and previous facts")
+        chain = ((previous_facts, previous_packages),)
+    elif previous_packages is not None:
+        raise ValueError("previous continuation facts required")
+    if len(chain) >= MAX_CONTINUATION_SESSIONS:
+        raise ValueError("continuation chain exceeds session resource bound")
+    for pair in chain:
+        if (type(pair) is not tuple or len(pair) != 2
+                or type(pair[0]) is not ForwardContinuationBundle
+                or type(pair[1]) is not tuple):
+            raise ValueError("exact continuation facts/package pairs required")
+    return chain
+
+
+def _audit_chain(common, chain):
+    predecessor = None
+    previous_facts = previous_packages = None
+    for facts, packages in chain:
+        predecessor = _audit_one(
+            *common, facts, packages, previous_facts=previous_facts,
+            previous_fact_packages=previous_packages,
+            authenticated_predecessor=predecessor,
+        )
+        previous_facts, previous_packages = facts, packages
+    return predecessor
+
+
+def audit_continuation_event(directory: Path, watchlist: ShadowWatchlist,
+                             watchlist_packages, original_facts, original_fact_packages,
+                             fill_policy: ShadowFillPolicy, fill_packages,
+                             facts: ForwardContinuationBundle, fact_packages, *,
+                             previous_facts: ForwardContinuationBundle | None = None,
+                             previous_fact_packages=None, predecessor_chain=()) -> dict:
+    chain = _predecessors(predecessor_chain, previous_facts, previous_fact_packages)
+    common = (directory, watchlist, watchlist_packages, original_facts,
+              original_fact_packages, fill_policy, fill_packages)
+    return _audit_chain(common, chain + ((facts, fact_packages),))

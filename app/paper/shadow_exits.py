@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.paper.shadow_collection import _publish_once
 from app.paper.shadow_continuations import (
-    ForwardContinuationBundle, audit_continuation_event,
+    ForwardContinuationBundle, MAX_CONTINUATION_SESSIONS, audit_continuation_event,
 )
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_facts import audit_forward_fact_event
@@ -225,8 +225,8 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
             or type(continuation_packages) is not tuple
             or len(continuations) != len(continuation_packages)):
         raise ValueError("nonempty aligned continuation chain required")
-    if len(continuations) > 2:
-        raise ValueError("continuation chain depth is not yet supported")
+    if len(continuations) > MAX_CONTINUATION_SESSIONS:
+        raise ValueError("continuation chain exceeds session resource bound")
     position = audit_position_open_event(
         directory, watchlist, watchlist_packages, original_facts,
         original_fact_packages, fill_policy, fill_packages,
@@ -239,7 +239,7 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
         raise ValueError("open predecessor session requires complete close coverage")
     references = []
     evaluations = []
-    previous_facts = previous_packages = None
+    predecessor_chain = ()
     terminal = False
     for index, (facts, packages) in enumerate(zip(continuations, continuation_packages)):
         if terminal:
@@ -247,8 +247,7 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
         event = audit_continuation_event(
             directory, watchlist, watchlist_packages, original_facts,
             original_fact_packages, fill_policy, fill_packages, facts, packages,
-            previous_facts=previous_facts,
-            previous_fact_packages=previous_packages,
+            predecessor_chain=predecessor_chain,
         )
         evaluation = evaluate_continuation_exit(position, facts, exit_policy)
         references.append({"market_date": facts.calendar_days[-1].market_date.isoformat(),
@@ -262,7 +261,7 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
                      or facts.trading_status.coverage_end
                      < facts.calendar_days[-1].closes_at)):
             raise ValueError("open predecessor session requires complete close coverage")
-        previous_facts, previous_packages = facts, packages
+        predecessor_chain += ((facts, packages),)
     package_ids = sorted(_packages(exit_policy, exit_packages, watchlist.information_cutoff))
     return {
         "schema_version": "shadow-continuation-exit-event-v3", "label": LABEL,

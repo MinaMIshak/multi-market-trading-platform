@@ -322,8 +322,8 @@ def test_publication_revalidates_copied_calendar_models(tmp_path, monkeypatch):
     assert not (tmp_path / "continuation-facts").exists()
 
 
-def successor(facts, char="8", **bar_updates):
-    shift = timedelta(days=1)
+def successor(facts, char="8", *, closed_days=0, **bar_updates):
+    shift = timedelta(days=1 + closed_days)
     day = facts.calendar_days[-1]
     start = day.opens_at + shift
     close = day.closes_at + shift
@@ -338,7 +338,11 @@ def successor(facts, char="8", **bar_updates):
     ))
     later = ForwardContinuationBundle(
         continuation_id=f"session-{char}",
-        calendar_days=(day.model_copy(update={
+        calendar_days=tuple(day.model_copy(update={
+            "market_date": day.market_date + timedelta(days=offset),
+            "state": "CLOSED", "opens_at": None, "closes_at": None,
+            "evidence_package_id": evidence.identity,
+        }) for offset in range(1, closed_days + 1)) + (day.model_copy(update={
             "market_date": day.market_date + shift, "opens_at": start,
             "closes_at": close, "evidence_package_id": evidence.identity,
         }),),
@@ -347,7 +351,7 @@ def successor(facts, char="8", **bar_updates):
             "evidence_package_id": evidence.identity,
         }),
         action_coverage=facts.action_coverage.model_copy(update={
-            "coverage_from": day.market_date + shift,
+            "coverage_from": day.market_date + timedelta(days=1),
             "coverage_through": day.market_date + shift,
             "evidence_package_id": evidence.identity,
         }),
@@ -494,7 +498,7 @@ def test_durable_continuation_exit_stops_at_closed_result(tmp_path, monkeypatch)
     assert [item["status"] for item in event["evaluations"]] == ["OPEN", "CLOSED"]
     assert event["result"]["reason"] == "STOP_GAP"
     third, third_packages, _ = successor(second, char="9")
-    with pytest.raises(ValueError, match="depth is not yet supported"):
+    with pytest.raises(ValueError, match="extends beyond terminal evaluation"):
         shadow_exits.append_continuation_exit_event(
             tmp_path, *args, chain + (third,), packages + (third_packages,), policy, evidence,
         )
@@ -552,4 +556,88 @@ def test_carry_rejects_partial_open_continuation_predecessor(tmp_path, monkeypat
         shadow_exits.append_continuation_exit_event(
             tmp_path, *args, (partial, second), (first_packages, second_packages),
             continuation_exit_policy(), exit_evidence(args[0].information_cutoff),
+        )
+
+
+def deep_chain(tmp_path, monkeypatch, *, terminal=None):
+    args, first, packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    chain = ((first, packages),)
+    paths = [shadow_continuations.append_continuation_event(tmp_path, *args, first, packages)]
+    for index, char in enumerate("89a"):
+        changes = {}
+        if index == 1 and terminal:
+            changes = ({"low": Decimal("94")} if terminal == "CLOSED" else
+                       {"low": Decimal("94"), "high": Decimal("111")})
+        facts, packages, available = successor(
+            chain[-1][0], char, closed_days=2 if index == 1 else 0, **changes,
+        )
+        monkeypatch.setattr(shadow_continuations, "_now", lambda: available + timedelta(minutes=1))
+        paths.append(shadow_continuations.append_continuation_event(
+            tmp_path, *args, facts, packages, predecessor_chain=chain,
+        ))
+        chain += ((facts, packages),)
+    monkeypatch.setattr(shadow_exits, "_now", lambda: available + timedelta(minutes=2))
+    evidence = exit_evidence(args[0].information_cutoff)
+    policy = continuation_exit_policy().model_copy(update={
+        "slippage_evidence_package_id": evidence[0].identity,
+        "cost_evidence_package_id": evidence[1].identity,
+        "participation_evidence_package_id": evidence[2].identity,
+    })
+    inputs = (tmp_path, *args, tuple(f for f, _ in chain),
+              tuple(p for _, p in chain), policy, evidence)
+    return args, chain, paths, inputs
+
+
+def test_four_session_chain_with_explicit_closed_days(tmp_path, monkeypatch):
+    args, chain, paths, inputs = deep_chain(tmp_path, monkeypatch)
+    event = shadow_continuations.audit_continuation_event(
+        tmp_path, *args, *chain[-1], predecessor_chain=chain[:-1],
+    )
+    assert event == json.loads(paths[-1].read_bytes())
+    assert [day.state for day in chain[2][0].calendar_days] == ["CLOSED", "CLOSED", "OPEN"]
+    path = shadow_exits.append_continuation_exit_event(*inputs)
+    result = shadow_exits.audit_continuation_exit_event(*inputs)
+    assert result == json.loads(path.read_bytes())
+    assert [item["status"] for item in result["evaluations"]] == ["OPEN"] * 4
+    assert len(result["continuation_events"]) == 4
+    assert result["scoring"] == "NOT SCORED"
+
+
+@pytest.mark.parametrize("tamper", ["link", "receipt", "omit", "duplicate", "missing"])
+def test_deep_chain_reaudits_all_predecessors(tmp_path, monkeypatch, tamper):
+    args, chain, paths, _ = deep_chain(tmp_path, monkeypatch)
+    prefix = chain[:-1]
+    if tamper in {"link", "receipt"}:
+        event = json.loads(paths[1].read_bytes())
+        if tamper == "link":
+            event["previous_continuation_event_id"] = "0" * 64
+        else:
+            event["recorded_at"] = json.loads(paths[0].read_bytes())["recorded_at"]
+        paths[1].write_text(json.dumps(event))
+    elif tamper == "omit":
+        prefix = prefix[1:]
+    elif tamper == "duplicate":
+        prefix = (prefix[0],) + prefix
+    else:
+        paths[0].unlink()
+    with pytest.raises((ValueError, FileNotFoundError)):
+        shadow_continuations.audit_continuation_event(
+            tmp_path, *args, *chain[-1], predecessor_chain=prefix,
+        )
+
+
+@pytest.mark.parametrize("terminal", ["CLOSED", "UNKNOWN"])
+def test_deep_exit_chain_rejects_after_terminal(tmp_path, monkeypatch, terminal):
+    _, _, _, inputs = deep_chain(tmp_path, monkeypatch, terminal=terminal)
+    with pytest.raises(ValueError, match="extends beyond terminal evaluation"):
+        shadow_exits.append_continuation_exit_event(*inputs)
+    assert not (tmp_path / "exit-events").exists()
+
+
+def test_chain_resource_bound_before_io(tmp_path):
+    chain = (None,) * shadow_continuations.MAX_CONTINUATION_SESSIONS
+    with pytest.raises(ValueError, match="resource bound"):
+        shadow_continuations.audit_continuation_event(
+            tmp_path, None, None, None, None, None, None, None, None,
+            predecessor_chain=chain,
         )

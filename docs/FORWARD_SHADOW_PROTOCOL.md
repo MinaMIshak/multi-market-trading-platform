@@ -330,7 +330,7 @@ the exit rules below; a bar touching both boundaries or lacking whole-bar
 participation capacity returns `UNKNOWN`. The result is in-memory only and does
 not create a durable exit, current-position, P&L or scoring claim.
 
-One successive continuation can extend the initial continuation without a date
+Successive continuations can extend the initial continuation without a date
 gap: it binds the predecessor event ID and bytes hash, begins on the next
 calendar date, and reaudits that predecessor. A durable continuation-exit event
 reaudits and hashes every event it consumes, records each session evaluation,
@@ -352,8 +352,16 @@ The durable event remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED**, with
 holding-window exits, publish current marks, support partial liquidation, prove
 liquidity at an exit price, or authenticate the local clock and storage
 independently. Tests use artificial fixtures only.
-Arbitrary-depth predecessor reconstruction remains unsupported; callers must not
-use this boundary beyond the initial continuation and its direct successor.
+Callers supply the complete ordered `predecessor_chain` of facts/package pairs
+for longer chains. Admission and audit iteratively reconstruct every predecessor
+from the original position, without recursive calls or trusting a supplied event.
+The legacy single predecessor arguments remain supported for a direct successor;
+they cannot be combined with a chain. Each link binds the predecessor ID, full
+receipt hash and chronology. Omitted, repeated, reordered or altered predecessors
+fail closed. Every intervening closed calendar date still needs explicit evidence.
+A 512-session resource bound applies to the entire continuation chain; this is
+not an empirically validated holding horizon. The v1 fact and v3 exit receipt
+formats remain unchanged, and retained compatible receipts remain auditable.
 
 ### Conservative exit provenance
 
