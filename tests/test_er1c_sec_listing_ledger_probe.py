@@ -1,4 +1,4 @@
-import hashlib, json
+import hashlib, json, os
 from pathlib import Path
 import pytest
 from tools.audit_er1c_sec_listing_ledger_probe import INDEX_FILES, audit_probe
@@ -47,6 +47,28 @@ def test_rejects_tampered_artifact(probe):
 def test_rejects_undeclared_inventory(probe):
     (probe / "extra.txt").write_text("extra")
     with pytest.raises(ValueError, match="inventory"): audit_probe(probe)
+
+def test_rejects_undeclared_directory(probe):
+    (probe / "undeclared").mkdir()
+    with pytest.raises(ValueError, match="inventory"): audit_probe(probe)
+
+def test_rejects_symlinked_root(probe, tmp_path):
+    linked = tmp_path / "linked-probe"
+    linked.symlink_to(probe, target_is_directory=True)
+    with pytest.raises(ValueError, match="real directory"): audit_probe(linked)
+
+@pytest.mark.parametrize("filename", ["manifest.json", "manifest.sha256", "sec_2022_q2_form.idx"])
+def test_rejects_symlinked_package_file(probe, tmp_path, filename):
+    target = tmp_path.parent / f"{tmp_path.name}-external-{filename}"
+    (probe / filename).replace(target)
+    (probe / filename).symlink_to(target)
+    with pytest.raises(ValueError, match="regular non-symlink file"): audit_probe(probe)
+
+@pytest.mark.parametrize("filename", ["manifest.json", "manifest.sha256", "sec_2022_q2_form.idx"])
+def test_rejects_hard_linked_package_file(probe, tmp_path, filename):
+    external = tmp_path.parent / f"{tmp_path.name}-external-hardlink-{filename}"
+    os.link(probe / filename, external)
+    with pytest.raises(ValueError, match="must not be hard linked"): audit_probe(probe)
 
 def test_rejects_availability_overclaim(probe):
     _rewrite(probe, lambda doc: doc["records"][0].update(historical_availability_proven=True))

@@ -1,15 +1,33 @@
 """Offline audit for the bounded ER1C SEC listing-ledger probe."""
 from __future__ import annotations
-import argparse, hashlib, json, re
+import argparse, hashlib, json, re, stat
 from pathlib import Path
 
 INDEX_FILES = {"sec_2022_q2_form.idx": "June 30, 2022", "sec_2022_q3_form.idx": "September 30, 2022", "sec_2022_q4_form.idx": "December 31, 2022"}
 GUIDE_FILES = {"sec_accessing_edgar_data.html", "sec_exchange_delistings.html"}
 EXPECTED_FILES = set(INDEX_FILES) | GUIDE_FILES
+PACKAGE_FILES = EXPECTED_FILES | {"manifest.json", "manifest.sha256"}
 TARGET_FORMS = {"25-NSE", "8-A12B", "8-A12B/A"}
 INDEX_ROW = re.compile(r"^(\S+)\s+(.+?)\s+(\d+)\s+(\d{4}-\d{2}-\d{2})\s+(edgar/data/\S+)\s*$")
 
 def _sha256(payload: bytes) -> str: return hashlib.sha256(payload).hexdigest()
+
+def _validate_custody(root: Path) -> None:
+    try:
+        root_stat = root.lstat()
+    except OSError as exc:
+        raise ValueError("probe root is unavailable") from exc
+    if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode):
+        raise ValueError("probe root must be a real directory")
+    entries = {entry.name: entry for entry in root.iterdir()}
+    if set(entries) != PACKAGE_FILES:
+        raise ValueError("probe inventory does not match manifest scope")
+    for name, entry in entries.items():
+        entry_stat = entry.lstat()
+        if entry.is_symlink() or not stat.S_ISREG(entry_stat.st_mode):
+            raise ValueError(f"probe entry must be a regular non-symlink file: {name}")
+        if entry_stat.st_nlink != 1:
+            raise ValueError(f"probe entry must not be hard linked: {name}")
 
 def _load_manifest(root: Path) -> dict:
     raw = (root / "manifest.json").read_bytes()
@@ -37,8 +55,8 @@ def _parse_index(payload: bytes, filename: str):
     return counts, twitter
 
 def audit_probe(root: Path) -> dict:
+    _validate_custody(root)
     manifest = _load_manifest(root)
-    if {x.name for x in root.iterdir() if x.is_file()} != EXPECTED_FILES | {"manifest.json", "manifest.sha256"}: raise ValueError("probe inventory does not match manifest scope")
     payloads = {}
     expected_keys = {"bytes", "content_type", "filename", "historical_availability_proven", "http_last_modified", "http_status", "receipt_utc", "sha256", "source_locator"}
     for record in manifest["records"]:

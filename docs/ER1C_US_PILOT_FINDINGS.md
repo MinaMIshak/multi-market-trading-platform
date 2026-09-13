@@ -490,3 +490,18 @@ The authentic package bytes and classification are unchanged. This custody
 check does not prove historical availability, a complete XNYS listing ledger or
 complete corporate-action coverage. Canonical US4, US5A and overall PIT
 admission remain **NO-GO**.
+
+## SEC listing-ledger package custody
+
+The SEC listing-ledger auditor now requires a real package directory containing
+exactly the five declared source artifacts, manifest and sidecar. Every entry
+must be a direct regular non-symlink file with link count one. Undeclared
+directories, linked roots, linked manifests and linked source artifacts are
+rejected before any content is read, so external paths and shared inodes cannot
+substitute or later mutate the audited package bytes.
+
+The retained EDGAR indexes and guidance pass the strengthened offline audit with
+their prior counts and Twitter filing rows unchanged. This custody correction
+does not turn filing indexes into a historical roster or complete listing-change
+ledger. Historical XNYS universe and listing-ledger conclusions remain
+**NO-GO**.
