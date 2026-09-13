@@ -14,7 +14,7 @@ from pathlib import Path
 from app.paper.shadow_collection import _publish_once
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
-from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event
+from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event, exit_event_path
 from app.paper.shadow_ledger import LABEL
 from app.paper.shadow_portfolio import ShadowPortfolioPolicy, audit_portfolio_policy
 from app.paper.shadow_positions import audit_position_open_event
@@ -135,8 +135,18 @@ def _read_settlements(directory: Path, reservations: list[dict]) -> list[dict]:
             raise ValueError("capital settlement references absent or duplicate reservation")
         if path.name != f'{event["candidate_position_key"]}.json':
             raise ValueError("capital-settlement filename mismatch")
-        exit_path = directory / "exit-events" / f'{reservation["position_event_id"]}.json'
-        exit_event = json.loads(exit_path.read_bytes(), object_pairs_hook=_unique)
+        candidates = []
+        for exit_path in sorted((directory / "exit-events").glob(
+                f'{reservation["position_event_id"]}.*.json')):
+            candidate = json.loads(exit_path.read_bytes(), object_pairs_hook=_unique)
+            if candidate.get("event_id") == event["exit_event_id"]:
+                candidates.append((exit_path, candidate))
+        if len(candidates) != 1:
+            raise ValueError("capital settlement exit event is absent or ambiguous")
+        exit_path, exit_event = candidates[0]
+        if exit_path != exit_event_path(
+                directory, reservation["position_event_id"], exit_event.get("fact_event_id")):
+            raise ValueError("capital settlement exit-event filename mismatch")
         if (type(exit_event) is not dict or exit_event.get("event_id") != event["exit_event_id"]
                 or hashlib.sha256(_canonical(exit_event)).hexdigest() != event["exit_event_sha256"]
                 or exit_event.get("position_event_id") != reservation["position_event_id"]
@@ -321,6 +331,8 @@ def append_capital_settlement(
     fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
     fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
     exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
+    *, evaluation_facts: ForwardFactBundle | None = None,
+    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
 ) -> Path:
     """Release one reservation only after an authenticated conservative CLOSED exit."""
     directory = Path(directory)
@@ -331,6 +343,8 @@ def append_capital_settlement(
     exit_event = audit_exit_event(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
     )
     evaluation = exit_event["evaluation"]
     if evaluation["status"] != "CLOSED" or type(evaluation["exit"]) is not dict:
@@ -381,6 +395,8 @@ def audit_capital_settlement(
     fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
     fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
     exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
+    *, evaluation_facts: ForwardFactBundle | None = None,
+    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
 ) -> dict:
     """Re-audit a settlement against its reservation and conservative exit."""
     directory = Path(directory)
@@ -391,6 +407,8 @@ def audit_capital_settlement(
     exit_event = audit_exit_event(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
     )
     reservations = _read_reservations(directory)
     settlements = _read_settlements(directory, reservations)

@@ -211,12 +211,17 @@ def exit_evaluation_view(
     fill_packages: tuple[HistoricalEvidencePackage, ...],
     exit_policy: ShadowExitPolicy,
     exit_packages: tuple[HistoricalEvidencePackage, ...],
+    *, evaluation_facts: ForwardFactBundle | None = None,
+    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
 ) -> dict:
     """Display one audited exit and exact native P&L only when it is closed."""
     event = audit_exit_event(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
     )
+    observed_facts = facts if evaluation_facts is None else evaluation_facts
     evaluation = event["evaluation"]
     view = _base() | {
         "record_id": watchlist.record_id,
@@ -229,12 +234,14 @@ def exit_evaluation_view(
             "position_event_id": event["position_event_id"],
             "position_event_sha256": event["position_event_sha256"],
             "fact_record_id": event["fact_record_id"],
+            "fact_event_id": event["fact_event_id"],
+            "fact_event_sha256": event["fact_event_sha256"],
             "exit_package_ids": event["exit_package_ids"],
         },
     }
     if evaluation["status"] == "OPEN":
         sequence = evaluation["evaluated_through_sequence"]
-        mark = next((bar for bar in facts.bars if bar.sequence == sequence), None)
+        mark = next((bar for bar in observed_facts.bars if bar.sequence == sequence), None)
         if mark is None:
             raise ValueError("open exit evaluation does not bind an admitted mark")
         position = audit_position_open_event(

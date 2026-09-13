@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.paper import shadow_exits, shadow_positions
+from app.paper import shadow_exits, shadow_facts, shadow_positions
 from app.paper.shadow_exits import EXIT_COST_FIELDS, EXIT_PARTICIPATION_FIELDS, EXIT_SLIPPAGE_FIELDS, ShadowExitPolicy
 from app.paper.shadow_records import ShadowEvidenceReference
 from tests.test_shadow_collection import package
@@ -49,6 +49,62 @@ def test_open_evaluation_is_durable_and_has_no_performance(tmp_path, monkeypatch
     assert event["performance_status"] == "NO P&L OR NAV"
     with pytest.raises(FileExistsError):
         shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
+
+
+def test_open_position_accepts_later_immutable_fact_evaluation(tmp_path, monkeypatch):
+    args, now, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+    first_path = shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
+    first = json.loads(first_path.read_bytes())
+    bar = args[2].bars[0]
+    later_bar = bar.model_copy(update={
+        "sequence": 2, "interval_start": bar.interval_end,
+        "interval_end": bar.interval_end + timedelta(minutes=1),
+        "available_at": bar.available_at + timedelta(minutes=1),
+    })
+    later_ref = ShadowEvidenceReference(
+        evidence_id="d" * 64, source_authority="official fixture authority",
+        source_locator="fixture://later-forward-bars", artifact_sha256="d" * 64,
+        available_at=later_bar.available_at,
+    )
+    later_package = package(
+        "d", later_ref,
+        tuple(shadow_facts.BAR_FIELDS | shadow_facts.TRADING_STATUS_FIELDS),
+    )
+    later_bar = later_bar.model_copy(
+        update={"evidence_package_id": later_package.identity},
+    )
+    later_facts = args[2].model_copy(update={
+        "bars": (bar, later_bar),
+        "trading_status": args[2].trading_status.model_copy(
+            update={"coverage_end": later_bar.interval_end,
+                    "evidence_package_id": later_package.identity},
+        ),
+    })
+    later_packages = args[3] + (later_package,)
+    monkeypatch.setattr(shadow_facts, "_now", lambda: now + timedelta(minutes=1))
+    fact_path = shadow_facts.append_forward_fact_event(
+        tmp_path, args[0], args[1], later_facts, later_packages,
+    )
+    fact_event = json.loads(fact_path.read_bytes())
+    monkeypatch.setattr(shadow_exits, "_now", lambda: now + timedelta(minutes=1))
+
+    later_path = shadow_exits.append_exit_event(
+        tmp_path, *args, policy, evidence, evaluation_facts=later_facts,
+        evaluation_fact_packages=later_packages,
+    )
+    later = shadow_exits.audit_exit_event(
+        tmp_path, *args, policy, evidence, evaluation_facts=later_facts,
+        evaluation_fact_packages=later_packages,
+    )
+
+    assert later_path != first_path
+    assert json.loads(first_path.read_bytes()) == first
+    assert later["fact_record_id"] == later_facts.record_id
+    assert later["evaluation"]["evaluated_through_sequence"] == 2
+    assert sorted(path.name for path in (tmp_path / "exit-events").iterdir()) == sorted([
+        shadow_exits.exit_event_path(tmp_path, first["position_event_id"], first["fact_event_id"]).name,
+        shadow_exits.exit_event_path(tmp_path, first["position_event_id"], fact_event["event_id"]).name,
+    ])
 
 
 def test_conservative_outcomes_from_exact_models(tmp_path, monkeypatch):

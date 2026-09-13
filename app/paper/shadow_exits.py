@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.paper.shadow_collection import _publish_once
 from app.paper.shadow_facts import ForwardFactBundle
+from app.paper.shadow_facts import audit_forward_fact_event
 from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
 from app.paper.shadow_ledger import LABEL
 from app.paper.shadow_positions import audit_position_open_event
@@ -142,16 +143,29 @@ def evaluate_exit(position: dict, facts: ForwardFactBundle, policy: ShadowExitPo
                      "exit_cost": str(cost), "currency": policy.currency}}
 
 
-def _basis(position, facts, policy, package_ids):
+def _basis(position, facts, fact_event, policy, package_ids):
     evaluation = evaluate_exit(position, facts, policy)
-    return {"schema_version": "shadow-exit-event-v1", "label": LABEL,
+    return {"schema_version": "shadow-exit-event-v2", "label": LABEL,
             "event_type": "EXIT_EVALUATED", "scoring": "NOT SCORED",
             "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
             "performance_status": "NO P&L OR NAV",
             "position_event_id": position["event_id"],
             "position_event_sha256": hashlib.sha256(_canonical(position)).hexdigest(),
-            "fact_record_id": facts.record_id, "exit_package_ids": package_ids,
+            "fact_record_id": facts.record_id, "fact_event_id": fact_event["event_id"],
+            "fact_event_sha256": hashlib.sha256(_canonical(fact_event)).hexdigest(),
+            "exit_package_ids": package_ids,
             "policy": policy.model_dump(mode="json"), "evaluation": evaluation}
+
+
+def exit_event_path(directory: Path, position_event_id: str, fact_event_id: str) -> Path:
+    """Address one immutable evaluation of a position against one fact snapshot."""
+    if (type(position_event_id) is not str or len(position_event_id) != 64
+            or any(c not in "0123456789abcdef" for c in position_event_id)):
+        raise ValueError("invalid position event id")
+    if (type(fact_event_id) is not str or len(fact_event_id) != 64
+            or any(c not in "0123456789abcdef" for c in fact_event_id)):
+        raise ValueError("invalid fact event id")
+    return Path(directory) / "exit-events" / f"{position_event_id}.{fact_event_id}.json"
 
 
 def append_exit_event(directory: Path, watchlist: ShadowWatchlist,
@@ -159,18 +173,26 @@ def append_exit_event(directory: Path, watchlist: ShadowWatchlist,
                       facts: ForwardFactBundle, fact_packages: tuple[HistoricalEvidencePackage, ...],
                       fill_policy: ShadowFillPolicy, fill_packages: tuple[HistoricalEvidencePackage, ...],
                       exit_policy: ShadowExitPolicy,
-                      exit_packages: tuple[HistoricalEvidencePackage, ...]) -> Path:
+                      exit_packages: tuple[HistoricalEvidencePackage, ...], *,
+                      evaluation_facts: ForwardFactBundle | None = None,
+                      evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None) -> Path:
     exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
     position = audit_position_open_event(directory, watchlist, watchlist_packages, facts,
                                          fact_packages, fill_policy, fill_packages)
+    evaluation_facts = facts if evaluation_facts is None else evaluation_facts
+    evaluation_fact_packages = fact_packages if evaluation_fact_packages is None else evaluation_fact_packages
+    fact_event = audit_forward_fact_event(directory, watchlist, watchlist_packages,
+                                          evaluation_facts, evaluation_fact_packages)
     packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
-    basis = _basis(position, facts, exit_policy, sorted(packages))
+    basis = _basis(position, evaluation_facts, fact_event, exit_policy, sorted(packages))
     recorded_at = _utc(_now())
-    if recorded_at < _utc(datetime.fromisoformat(position["recorded_at"])) or recorded_at < facts.bars[-1].available_at:
+    if recorded_at < _utc(datetime.fromisoformat(position["recorded_at"])) or recorded_at < evaluation_facts.bars[-1].available_at:
         raise ValueError("exit publication precedes authenticated inputs")
     payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                        "recorded_at": recorded_at.isoformat()}
-    path = _publish_once(Path(directory) / "exit-events" / f'{position["event_id"]}.json', payload)
+    path = _publish_once(
+        exit_event_path(directory, position["event_id"], fact_event["event_id"]), payload,
+    )
     if _now() < recorded_at:
         path.unlink()
         raise ValueError("clock rollback during exit publication")
@@ -182,12 +204,18 @@ def audit_exit_event(directory: Path, watchlist: ShadowWatchlist,
                      facts: ForwardFactBundle, fact_packages: tuple[HistoricalEvidencePackage, ...],
                      fill_policy: ShadowFillPolicy, fill_packages: tuple[HistoricalEvidencePackage, ...],
                      exit_policy: ShadowExitPolicy,
-                     exit_packages: tuple[HistoricalEvidencePackage, ...]) -> dict:
+                     exit_packages: tuple[HistoricalEvidencePackage, ...], *,
+                     evaluation_facts: ForwardFactBundle | None = None,
+                     evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None) -> dict:
     exit_policy = ShadowExitPolicy.model_validate(exit_policy.model_dump(mode="python"))
     position = audit_position_open_event(directory, watchlist, watchlist_packages, facts,
                                          fact_packages, fill_policy, fill_packages)
+    evaluation_facts = facts if evaluation_facts is None else evaluation_facts
+    evaluation_fact_packages = fact_packages if evaluation_fact_packages is None else evaluation_fact_packages
+    fact_event = audit_forward_fact_event(directory, watchlist, watchlist_packages,
+                                          evaluation_facts, evaluation_fact_packages)
     packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
-    basis = _basis(position, facts, exit_policy, sorted(packages))
+    basis = _basis(position, evaluation_facts, fact_event, exit_policy, sorted(packages))
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -195,13 +223,13 @@ def audit_exit_event(directory: Path, watchlist: ShadowWatchlist,
                 raise ValueError("duplicate exit-event field")
             result[key] = value
         return result
-    path = Path(directory) / "exit-events" / f'{position["event_id"]}.json'
+    path = exit_event_path(directory, position["event_id"], fact_event["event_id"])
     event = json.loads(path.read_bytes(), object_pairs_hook=unique)
     if type(event) is not dict or set(event) != set(basis) | {"event_id", "recorded_at"}:
         raise ValueError("unexpected exit-event fields")
     recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
     expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                         "recorded_at": recorded_at.isoformat()}
-    if not max(_utc(datetime.fromisoformat(position["recorded_at"])), facts.bars[-1].available_at) <= recorded_at <= _now() or event != expected:
+    if not max(_utc(datetime.fromisoformat(position["recorded_at"])), evaluation_facts.bars[-1].available_at) <= recorded_at <= _now() or event != expected:
         raise ValueError("exit event does not bind authenticated inputs")
     return event

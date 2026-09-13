@@ -307,8 +307,12 @@ both stop and target and their order is unknowable, the result is `UNKNOWN` and
 no exit fill is invented. The evaluated bar interval and availability are
 preserved without an invented intrabar timestamp.
 
-One atomic event per exact position is stored under `exit-events/`. Audit binds
-the position bytes hash, exact policy and evidence package identities, rejects
+One atomic event per exact position and authenticated fact snapshot is stored
+under `exit-events/`. A later fact snapshot may append another immutable
+evaluation for a position that remained open; replaying the same snapshot cannot
+overwrite or duplicate it. Audit binds the position bytes hash, exact
+forward-fact event ID and bytes hash, exact policy and evidence package
+identities, and rejects
 duplicate or additional JSON fields, backdating, future clocks, tampering and
 upstream corruption. An `OPEN` result states only that no exit was observed in
 the supplied admitted bars; it is not a current mark. Every result remains
@@ -317,6 +321,11 @@ and **NO P&L OR NAV**. Multi-session continuation, candidate-level
 deduplication, allocation, marks, P&L, FX and portfolio NAV remain separate
 boundaries. No authentic exit or performance result was created by this
 milestone.
+
+Legacy `shadow-exit-event-v1` position-only filenames are not admitted by the
+v2 auditor. Preserve them unchanged; any migration requires explicit review and
+must retain their original bytes. A collection record ID is shared by successive
+fact snapshots and therefore cannot identify an evaluation snapshot.
 
 ### Shared normalized portfolio policy
 
