@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 
 from app.paper import shadow_allocations, shadow_exits, shadow_portfolio, shadow_positions
-from app.paper.shadow_exits import EXIT_COST_FIELDS, EXIT_SLIPPAGE_FIELDS, ShadowExitPolicy
+from app.paper.shadow_exits import EXIT_COST_FIELDS, EXIT_PARTICIPATION_FIELDS, EXIT_SLIPPAGE_FIELDS, ShadowExitPolicy
 from app.paper.shadow_records import ShadowEvidenceReference
 from tests.test_shadow_collection import package
 from tests.test_shadow_positions import setup_position
@@ -58,7 +58,7 @@ def setup_settlement(tmp_path, monkeypatch, *, closed=True, **portfolio_changes)
     monkeypatch.setattr(shadow_allocations, "_now", lambda: now)
     shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
     evidence = []
-    for char, fields in zip("12", (EXIT_SLIPPAGE_FIELDS, EXIT_COST_FIELDS), strict=True):
+    for char, fields in zip("123", (EXIT_SLIPPAGE_FIELDS, EXIT_COST_FIELDS, EXIT_PARTICIPATION_FIELDS), strict=True):
         ref = ShadowEvidenceReference(
             evidence_id=char * 64, source_authority="official fixture authority",
             source_locator=f"fixture://settlement/{char}", artifact_sha256=char * 64,
@@ -69,6 +69,8 @@ def setup_settlement(tmp_path, monkeypatch, *, closed=True, **portfolio_changes)
         market="US", currency="USD", stop_slippage_bps=Decimal("20"),
         target_slippage_bps=Decimal("10"), cost_bps_per_side=Decimal("5"),
         fixed_cost_per_side=Decimal("1"),
+        max_volume_participation_pct=Decimal("0.1"),
+        participation_evidence_package_id=evidence[2].identity,
         slippage_evidence_package_id=evidence[0].identity,
         cost_evidence_package_id=evidence[1].identity,
     )

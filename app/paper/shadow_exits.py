@@ -19,6 +19,7 @@ from app.paper.shadow_records import ShadowWatchlist
 from app.research.historical_evidence import HistoricalEvidencePackage, require_historical_evidence
 
 EXIT_SLIPPAGE_FIELDS = {"stop_slippage_bps", "target_slippage_bps"}
+EXIT_PARTICIPATION_FIELDS = {"max_volume_participation_pct"}
 EXIT_COST_FIELDS = {"cost_bps_per_side", "fixed_cost_per_side", "currency"}
 
 
@@ -28,18 +29,20 @@ def _now() -> datetime:
 
 class ShadowExitPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    schema_version: Literal["shadow-exit-policy-v1"] = "shadow-exit-policy-v1"
+    schema_version: Literal["shadow-exit-policy-v2"] = "shadow-exit-policy-v2"
     market: Literal["EGX", "US"]
     currency: Literal["EGP", "USD"]
     stop_slippage_bps: Decimal = Field(ge=0)
     target_slippage_bps: Decimal = Field(ge=0)
     cost_bps_per_side: Decimal = Field(ge=0)
     fixed_cost_per_side: Decimal = Field(ge=0)
+    max_volume_participation_pct: Decimal = Field(gt=0, le=1)
+    participation_evidence_package_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     slippage_evidence_package_id: str = Field(pattern=r"^[0-9a-f]{64}$")
     cost_evidence_package_id: str = Field(pattern=r"^[0-9a-f]{64}$")
 
     @field_validator("stop_slippage_bps", "target_slippage_bps", "cost_bps_per_side",
-                     "fixed_cost_per_side", mode="before")
+                     "fixed_cost_per_side", "max_volume_participation_pct", mode="before")
     @classmethod
     def exact_decimal(cls, value):
         if type(value) is not Decimal or not value.is_finite():
@@ -61,13 +64,15 @@ def _packages(policy, supplied, cutoff):
         if type(package) is not HistoricalEvidencePackage or package.identity in found:
             raise ValueError("exact unique exit evidence packages required")
         found[package.identity] = package
-    expected = {policy.slippage_evidence_package_id, policy.cost_evidence_package_id}
+    expected = {policy.slippage_evidence_package_id, policy.cost_evidence_package_id,
+                policy.participation_evidence_package_id}
     if set(found) != expected:
         raise ValueError("exit evidence packages must match references exactly")
     for package in found.values():
         require_historical_evidence(package, decision_at=cutoff, research_built_at=cutoff)
     for identity, fields in ((policy.slippage_evidence_package_id, EXIT_SLIPPAGE_FIELDS),
-                             (policy.cost_evidence_package_id, EXIT_COST_FIELDS)):
+                             (policy.cost_evidence_package_id, EXIT_COST_FIELDS),
+                             (policy.participation_evidence_package_id, EXIT_PARTICIPATION_FIELDS)):
         if not fields <= set(found[identity].evidence.covered_fields):
             raise ValueError("evidence package does not cover exit-policy fields")
     return found
@@ -112,6 +117,14 @@ def evaluate_exit(position: dict, facts: ForwardFactBundle, policy: ShadowExitPo
     if outcome == "OPEN":
         return {"status": outcome, "reason": reason,
                 "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
+    # Whole-bar participation is an upper bound, not liquidity at the exit price.
+    # Count entry and exit together when both use this same observed bar.
+    with localcontext(Context(prec=34)):
+        capacity = int(Decimal(bar.volume) * policy.max_volume_participation_pct)
+    required = entry["quantity"] * (2 if bar.sequence == entry_sequence else 1)
+    if capacity < required:
+        return {"status": "UNKNOWN", "reason": "INSUFFICIENT_EXIT_CAPACITY",
+                "evaluated_through_sequence": bar.sequence, "exit": None}
     bps = policy.stop_slippage_bps if reason.startswith("STOP") else policy.target_slippage_bps
     with localcontext(Context(prec=34)):
         price = raw * (Decimal(1) - bps / Decimal(10000))

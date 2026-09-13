@@ -522,3 +522,26 @@ use the existing conservative path-order rules. These retirement observations
 remain **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**, with no simulated fill,
 position or return. This rule is covered by artificial regression fixtures;
 it does not supply authentic session or candidate evidence.
+
+### Exit participation admission
+
+`shadow-exit-policy-v2` requires an explicit exact-decimal participation fraction
+in `(0, 1]` and a matching pre-cutoff evidence package covering
+`max_volume_participation_pct`. Old v1 policies lack this mandatory input and
+cannot be silently upgraded or used to re-admit an exit. Existing immutable
+receipts must be retained; this change does not rewrite earlier records.
+
+Before closing a whole position at a stop, target or gap, the evaluator limits
+quantity to the integer floor of observed exit-bar volume times the declared
+fraction. If entry and exit share a bar, both quantities consume that bound.
+Insufficient capacity returns **UNKNOWN / INSUFFICIENT_EXIT_CAPACITY**, with no
+exit fill, realized P&L or capital settlement. The evaluator stops at that bar;
+a later liquid bar cannot retroactively supply its missing capacity. Partial
+fills and delayed liquidation remain unsupported. Existing stop/target ordering
+ambiguity still fails closed.
+
+This is a necessary upper-bound check only: total bar volume does not establish
+available volume at a particular price or within a particular intrabar interval.
+Passing it does not validate executable liquidity. All results remain
+**EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**. Tests use artificial software
+fixtures; no authentic candidate, fill or empirical result was created.
