@@ -6,7 +6,10 @@ from decimal import Decimal
 
 import pytest
 
-from app.paper import shadow_allocations, shadow_portfolio, shadow_positions
+from app.paper import shadow_allocations, shadow_exits, shadow_portfolio, shadow_positions
+from app.paper.shadow_exits import EXIT_COST_FIELDS, EXIT_SLIPPAGE_FIELDS, ShadowExitPolicy
+from app.paper.shadow_records import ShadowEvidenceReference
+from tests.test_shadow_collection import package
 from tests.test_shadow_positions import setup_position
 
 
@@ -33,6 +36,45 @@ def setup_allocation(tmp_path, monkeypatch, **changes):
     monkeypatch.setattr(shadow_portfolio, "_now", lambda: now)
     monkeypatch.setattr(shadow_allocations, "_now", lambda: now)
     return args, portfolio, now
+
+
+def setup_settlement(tmp_path, monkeypatch, *, closed=True, **portfolio_changes):
+    args, now, _ = setup_position(
+        tmp_path, monkeypatch, bar_changes={"low": Decimal("95")} if closed else None,
+    )
+    shadow_positions.append_position_open_event(tmp_path, *args)
+    item = args[0]
+    values = dict(
+        base_currency="USD", initial_capital=Decimal("1000"),
+        effective_at=item.information_cutoff - timedelta(minutes=1),
+        egx_capital_fraction=Decimal(".3"), us_capital_fraction=Decimal(".2"),
+        minimum_cash_fraction=Decimal(".1"), max_position_fraction=Decimal(".2"),
+        max_position_risk_fraction=Decimal(".1"), max_portfolio_risk_fraction=Decimal(".2"),
+    ) | portfolio_changes
+    portfolio = shadow_portfolio.ShadowPortfolioPolicy(**values)
+    monkeypatch.setattr(shadow_portfolio, "_now", lambda: item.information_cutoff - timedelta(minutes=2))
+    shadow_portfolio.freeze_portfolio_policy(tmp_path, portfolio)
+    monkeypatch.setattr(shadow_portfolio, "_now", lambda: now)
+    monkeypatch.setattr(shadow_allocations, "_now", lambda: now)
+    shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+    evidence = []
+    for char, fields in zip("12", (EXIT_SLIPPAGE_FIELDS, EXIT_COST_FIELDS), strict=True):
+        ref = ShadowEvidenceReference(
+            evidence_id=char * 64, source_authority="official fixture authority",
+            source_locator=f"fixture://settlement/{char}", artifact_sha256=char * 64,
+            available_at=item.information_cutoff,
+        )
+        evidence.append(package(char, ref, tuple(fields)))
+    exit_policy = ShadowExitPolicy(
+        market="US", currency="USD", stop_slippage_bps=Decimal("20"),
+        target_slippage_bps=Decimal("10"), cost_bps_per_side=Decimal("5"),
+        fixed_cost_per_side=Decimal("1"),
+        slippage_evidence_package_id=evidence[0].identity,
+        cost_evidence_package_id=evidence[1].identity,
+    )
+    monkeypatch.setattr(shadow_exits, "_now", lambda: now)
+    shadow_exits.append_exit_event(tmp_path, *args, exit_policy, tuple(evidence))
+    return args, portfolio, exit_policy, tuple(evidence), now
 
 
 def test_reserves_exact_cash_and_conservative_stop_risk(tmp_path, monkeypatch):
@@ -172,3 +214,63 @@ def test_chain_checks_every_predecessor(tmp_path, monkeypatch, violation):
     else:
         with pytest.raises(ValueError, match={"clock": "clock ordering", "position": "duplicate", "total": "cumulative total"}[violation]):
             shadow_allocations._read_reservations(tmp_path)
+
+
+def test_closed_exit_settles_native_cash_and_releases_risk(tmp_path, monkeypatch):
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    )
+    event = json.loads(path.read_bytes())
+    assert event["capital_released"] == "101.15005"
+    assert event["risk_released"] == "7.19755"
+    assert event["exit_notional"] == "94.810"
+    assert event["exit_cost"] == "1.047405"
+    assert event["net_exit_proceeds"] == "93.762595"
+    assert event["performance_status"] == "NATIVE CASH FLOW / NO NAV OR PERFORMANCE"
+    reservations = shadow_allocations._read_reservations(tmp_path)
+    assert shadow_allocations._read_settlements(tmp_path, reservations) == [event]
+    with pytest.raises(FileExistsError):
+        shadow_allocations.append_capital_settlement(
+            tmp_path, *args, portfolio, exit_policy, evidence,
+        )
+
+
+def test_open_or_unknown_exit_cannot_release_capital(tmp_path, monkeypatch):
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(
+        tmp_path, monkeypatch, closed=False,
+    )
+    with pytest.raises(ValueError, match="requires authenticated CLOSED exit"):
+        shadow_allocations.append_capital_settlement(
+            tmp_path, *args, portfolio, exit_policy, evidence,
+        )
+    assert not (tmp_path / "capital-settlements").exists()
+
+
+def test_settlement_tampering_blocks_reuse(tmp_path, monkeypatch):
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
+    path = shadow_allocations.append_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    )
+    event = json.loads(path.read_bytes())
+    event["net_exit_proceeds"] = "1000"
+    path.write_text(json.dumps(event))
+    with pytest.raises(ValueError, match="cash flow"):
+        shadow_allocations._read_settlements(
+            tmp_path, shadow_allocations._read_reservations(tmp_path),
+        )
+
+
+def test_settled_loss_reduces_but_does_not_block_recovered_capacity(tmp_path, monkeypatch):
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(tmp_path, monkeypatch)
+    shadow_allocations.append_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence,
+    )
+    reservations = shadow_allocations._read_reservations(tmp_path)
+    settlements = shadow_allocations._read_settlements(tmp_path, reservations)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args) | {
+        "candidate_position_key": "a" * 64, "event_id": "b" * 64,
+    }
+    receipt = shadow_portfolio.audit_portfolio_policy(tmp_path, portfolio)
+    basis = shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
+    assert basis["totals_after"] == {"capital_reserved": "202.30010", "risk_reserved": "14.39510"}

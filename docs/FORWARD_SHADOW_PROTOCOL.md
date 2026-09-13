@@ -380,3 +380,27 @@ prior source packages. The target reservation still requires full upstream audit
 revalidation of all predecessor source chains and authenticated exit settlement
 remain necessary before operational use. Closed positions continue to consume
 capital until that settlement boundary is implemented.
+
+### Shared capital settlement
+
+`app.paper.shadow_allocations` releases a reservation only from a durable exit
+event whose fully reaudited input chain evaluates to `CLOSED`. `OPEN` and
+`UNKNOWN` outcomes cannot settle. The append-only settlement binds the original
+reservation, preserved closed-exit bytes, policy, market and native currency. It
+records capital and stop-risk released together with exit notional, exit cost and
+net exit proceeds. These are cash-flow facts labelled **EXPERIMENTAL / PAPER
+ONLY**; they do not create NAV, aggregate P&L or a performance claim.
+
+Later reservations validate every local settlement and its referenced closed
+exit before excluding the settled exposure. Realized losses reduce the remaining
+aggregate and market-sleeve capacity. Paper gains do not enlarge either cap, so
+unvalidated profits cannot compound research exposure. The historical
+reservation chain and cumulative receipt totals remain append-only and are never
+rewritten. Risk is released only at the same authenticated settlement boundary.
+
+The local reader verifies hashes, exact finite nonnegative cash values, receipt
+semantics, filenames, unique reservation settlement, policy/market/currency
+binding and nonfuture clock ordering. This does not independently attest local
+clocks or reauthenticate every historical source package without those original
+inputs. Portfolio NAV, marks, combined-market performance and PIT FX remain
+separate unavailable boundaries.
