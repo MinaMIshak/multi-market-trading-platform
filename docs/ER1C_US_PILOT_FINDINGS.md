@@ -421,3 +421,20 @@ archival retention and transformation needed for immutable version capture and
 normalized facts. Both permissions remain **UNRESOLVED**, so feed acquisition is
 **NO-GO**. Public accessibility and documentation integrity do not override this
 gate. No feed request was made.
+
+## Official NYSE symbol-mapping specification qualification
+
+Two official NYSE PDFs were retained as a documentation-only package and bound
+to exact hashes by `tools/audit_er1c_nyse_symbol_mapping_spec.py`. The March 2022
+notice documents trade-date filenames and availability by 12 midnight ET; the
+reviewed 2024 static-file layout documents symbol, NYSE trading market and listed
+market fields. A retained daily edition is therefore a useful candidate for a
+bounded listing fact.
+
+No pilot-date mapping file was acquired. The reviewed layout lacks a security-type
+field, its symbol index is not proven as permanent identity through ticker reuse
+or corporate events, and neither document establishes roster completeness,
+archive depth, correction lineage, exact historical publication time or usable
+retention/transformation rights. Prior 404 pilot-date requests were not repeated.
+Canonical US1 identity and US5A universe remain **NO-GO**. See
+`docs/ER1C_NYSE_SYMBOL_MAPPING_QUALIFICATION.md` for the bounded decision.
