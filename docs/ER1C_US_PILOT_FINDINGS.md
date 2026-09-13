@@ -381,3 +381,13 @@ pre-decision availability, complete Twitter action coverage, a complete XNYS
 listing-change ledger or historical-universe completeness. The issue-specific
 merger, suspension and removal facts retain their existing bounded scope, and
 canonical US4 and PIT admission remain **NO-GO**.
+
+The submission audit additionally binds semantic facts to the exact SEC document
+envelopes present in each retained submission. The rights classification must be
+inside the sole sequence-1 `8-A12B` document. The removal filing must contain the
+sequence-1 `25-NSE` primary XML and sequence-2 `EX-99.25` notice with their exact
+filenames; issuer, class, exchange and effective-date facts must occur in the
+primary document, while merger, suspension and removal language must occur in the
+notice. Rehashing a bundle after moving a phrase outside that notice or relabeling
+the notice cannot satisfy the audit. This strengthens artifact attribution only
+and does not expand the filing's issue-specific scope.

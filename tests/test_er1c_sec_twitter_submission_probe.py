@@ -12,10 +12,12 @@ CONFORMED SUBMISSION TYPE:\t{form}
 PUBLIC DOCUMENT COUNT:\t\t{count}
 CENTRAL INDEX KEY:\t\t\t0001418091
 SEC FILE NUMBER:\t001-36164
+FILED AS OF DATE:\t\t{accepted[:8]}
+{"EFFECTIVENESS DATE:" + chr(9) * 2 + accepted[:8] if form == "25-NSE" else ""}
 """.encode()
 
-REGISTRATION = _header("0001193125-22-107480", "20220418093659", "8-A12B", "1") + b"FILED AS OF DATE: 20220418 FORM TYPE: 8-A12B <td>Preferred Stock Purchase Rights</td><td>New York Stock Exchange</td>"
-REMOVAL = _header("0000876661-22-000890", "20221028083119", "25-NSE", "2") + b"FILED AS OF DATE: 20221028 EFFECTIVENESS DATE: 20221028 FORM TYPE: 25-NSE NEW YORK STOCK EXCHANGE LLC TWITTER, INC. <descriptionClassSecurity>Common Stock</descriptionClassSecurity> opening of business on November 08, 2022 merger between Twitter, Inc. and X Holdings II, Inc. became effective on October 27, 2022 suspended from trading before market open on October 28, 2022"
+REGISTRATION = _header("0001193125-22-107480", "20220418093659", "8-A12B", "1") + b"<DOCUMENT>\n<TYPE>8-A12B\n<SEQUENCE>1\n<FILENAME>d303512d8a12b.htm\nFILED AS OF DATE: 20220418 FORM TYPE: 8-A12B <td>Preferred Stock Purchase Rights</td><td>New York Stock Exchange</td>\n</DOCUMENT>"
+REMOVAL = _header("0000876661-22-000890", "20221028083119", "25-NSE", "2") + b"<DOCUMENT>\n<TYPE>25-NSE\n<SEQUENCE>1\n<FILENAME>primary_doc.xml\nFILED AS OF DATE: 20221028 EFFECTIVENESS DATE: 20221028 FORM TYPE: 25-NSE NEW YORK STOCK EXCHANGE LLC TWITTER, INC. <descriptionClassSecurity>Common Stock</descriptionClassSecurity>\n</DOCUMENT>\n<DOCUMENT>\n<TYPE>EX-99.25\n<SEQUENCE>2\n<FILENAME>ruleprovisionnotice.htm\nopening of business on November 08, 2022 merger between Twitter, Inc. and X Holdings II, Inc. became effective on October 27, 2022 suspended from trading before market open on October 28, 2022\n</DOCUMENT>"
 def _write_probe(root: Path):
     artifacts = {"twitter_20220418_8a12b_submission.txt": REGISTRATION, "twitter_20221028_25nse_submission.txt": REMOVAL}; records = []
     for filename, payload in artifacts.items():
@@ -50,6 +52,23 @@ def test_rejects_rehashed_wrong_submission_identity(probe, filename, old, new):
     payload = (probe / filename).read_bytes().replace(old, new)
     _rehash(probe, filename, payload)
     with pytest.raises(ValueError, match="submission identity"):
+        audit_probe(probe)
+
+
+def test_rejects_rehashed_event_notice_under_wrong_document_type(probe):
+    payload = (probe / "twitter_20221028_25nse_submission.txt").read_bytes()
+    payload = payload.replace(b"<TYPE>EX-99.25", b"<TYPE>EX-99")
+    _rehash(probe, "twitter_20221028_25nse_submission.txt", payload)
+    with pytest.raises(ValueError, match="document inventory"):
+        audit_probe(probe)
+
+
+def test_rejects_rehashed_event_phrases_moved_outside_notice(probe):
+    payload = (probe / "twitter_20221028_25nse_submission.txt").read_bytes()
+    phrase = b"suspended from trading before market open on October 28, 2022"
+    payload = payload.replace(phrase, b"").replace(b"</DOCUMENT>", b"</DOCUMENT>" + phrase, 1)
+    _rehash(probe, "twitter_20221028_25nse_submission.txt", payload)
+    with pytest.raises(ValueError, match="25-NSE scope"):
         audit_probe(probe)
 def test_rejects_undeclared_inventory(probe):
     (probe / "extra.txt").write_text("extra")

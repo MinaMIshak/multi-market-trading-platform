@@ -13,11 +13,22 @@ SUBMISSION_IDENTITIES = {
     "twitter_20220418_8a12b_submission.txt": {
         "accession": "0001193125-22-107480", "acceptance_datetime": "20220418093659",
         "submission_type": "8-A12B", "public_document_count": "1", "file_number": "001-36164",
+        "filed_as_of_date": "20220418", "effectiveness_date": None,
     },
     "twitter_20221028_25nse_submission.txt": {
         "accession": "0000876661-22-000890", "acceptance_datetime": "20221028083119",
         "submission_type": "25-NSE", "public_document_count": "2", "file_number": "001-36164",
+        "filed_as_of_date": "20221028", "effectiveness_date": "20221028",
     },
+}
+EXPECTED_DOCUMENTS = {
+    "twitter_20220418_8a12b_submission.txt": (
+        ("8-A12B", "1", "d303512d8a12b.htm"),
+    ),
+    "twitter_20221028_25nse_submission.txt": (
+        ("25-NSE", "1", "primary_doc.xml"),
+        ("EX-99.25", "2", "ruleprovisionnotice.htm"),
+    ),
 }
 
 def _validate_provenance(record: dict) -> None:
@@ -44,6 +55,7 @@ def _plain(payload: bytes) -> str: return re.sub(r"\s+", " ", re.sub(r"<[^>]+>",
 def _validate_submission_identity(filename: str, payload: bytes) -> None:
     """Bind the retained artifact to its SEC submission-header identity."""
     text = payload.decode("latin-1")
+    header = text.split("<DOCUMENT>", 1)[0]
     identity = SUBMISSION_IDENTITIES[filename]
     anchors = (
         f"<SEC-DOCUMENT>{identity['accession']}.txt",
@@ -54,9 +66,29 @@ def _validate_submission_identity(filename: str, payload: bytes) -> None:
         f"PUBLIC DOCUMENT COUNT:\t\t{identity['public_document_count']}",
         "CENTRAL INDEX KEY:\t\t\t0001418091",
         f"SEC FILE NUMBER:\t{identity['file_number']}",
+        f"FILED AS OF DATE:\t\t{identity['filed_as_of_date']}",
     )
-    if any(anchor not in text for anchor in anchors):
+    if identity["effectiveness_date"] is not None:
+        anchors += (f"EFFECTIVENESS DATE:\t\t{identity['effectiveness_date']}",)
+    if any(anchor not in header for anchor in anchors):
         raise ValueError(f"SEC submission identity mismatch: {filename}")
+
+def _documents(filename: str, payload: bytes) -> dict[str, str]:
+    """Return exact declared submission documents, keyed by SEC type."""
+    text = payload.decode("latin-1")
+    blocks = re.findall(r"<DOCUMENT>\s*(.*?)\s*</DOCUMENT>", text, re.DOTALL)
+    parsed = []
+    for block in blocks:
+        fields = []
+        for name in ("TYPE", "SEQUENCE", "FILENAME"):
+            match = re.search(rf"(?m)^<{name}>([^\r\n]+)$", block)
+            if match is None:
+                raise ValueError(f"incomplete SEC document envelope: {filename}")
+            fields.append(match.group(1).strip())
+        parsed.append(tuple(fields))
+    if tuple(parsed) != EXPECTED_DOCUMENTS[filename]:
+        raise ValueError(f"SEC document inventory mismatch: {filename}")
+    return {document_type: block for (document_type, _, _), block in zip(parsed, blocks)}
 
 def _load(root: Path) -> dict[str, bytes]:
     raw = (root / "manifest.json").read_bytes()
@@ -80,11 +112,19 @@ def _load(root: Path) -> dict[str, bytes]:
 def audit_probe(root: Path) -> dict:
     payloads = _load(root)
     for filename, payload in payloads.items(): _validate_submission_identity(filename, payload)
-    registration = _plain(payloads["twitter_20220418_8a12b_submission.txt"]); removal = _plain(payloads["twitter_20221028_25nse_submission.txt"])
-    if any(anchor not in registration for anchor in ("FORM TYPE: 8-A12B", "FILED AS OF DATE: 20220418", "Preferred Stock Purchase Rights", "New York Stock Exchange")): raise ValueError("Twitter 8-A12B scope mismatch")
-    removal_raw = payloads["twitter_20221028_25nse_submission.txt"].decode("latin-1")
-    anchors = ("FORM TYPE: 25-NSE", "FILED AS OF DATE: 20221028", "EFFECTIVENESS DATE: 20221028", "NEW YORK STOCK EXCHANGE LLC", "TWITTER, INC.", "opening of business on November 08, 2022", "merger between Twitter, Inc. and X Holdings II, Inc.", "became effective on October 27, 2022", "suspended from trading before market open on October 28, 2022")
-    if any(anchor not in removal for anchor in anchors) or "<descriptionClassSecurity>Common Stock</descriptionClassSecurity>" not in removal_raw: raise ValueError("Twitter 25-NSE scope mismatch")
+    registration_documents = _documents("twitter_20220418_8a12b_submission.txt", payloads["twitter_20220418_8a12b_submission.txt"])
+    removal_documents = _documents("twitter_20221028_25nse_submission.txt", payloads["twitter_20221028_25nse_submission.txt"])
+    registration = _plain(registration_documents["8-A12B"].encode("latin-1"))
+    if any(anchor not in registration for anchor in ("Preferred Stock Purchase Rights", "New York Stock Exchange")): raise ValueError("Twitter 8-A12B scope mismatch")
+    primary_raw = removal_documents["25-NSE"]
+    primary = _plain(primary_raw.encode("latin-1"))
+    primary_anchors = ("NEW YORK STOCK EXCHANGE LLC", "TWITTER, INC.")
+    notice = _plain(removal_documents["EX-99.25"].encode("latin-1"))
+    notice_anchors = ("opening of business on November 08, 2022", "merger between Twitter, Inc. and X Holdings II, Inc.", "became effective on October 27, 2022", "suspended from trading before market open on October 28, 2022")
+    if (any(anchor not in primary for anchor in primary_anchors)
+            or "<descriptionClassSecurity>Common Stock</descriptionClassSecurity>" not in primary_raw
+            or any(anchor not in notice for anchor in notice_anchors)):
+        raise ValueError("Twitter 25-NSE scope mismatch")
     return {"source_classification": "AUTHORITATIVE_WITHIN_EXACT_SEC_SUBMISSION_SCOPE", "registration_finding": {"filed_date": "2022-04-18", "security_class": "Preferred Stock Purchase Rights", "exchange": "New York Stock Exchange", "common_stock_listing_event": False}, "removal_finding": {"filed_date": "2022-10-28", "issuer_cik": "0001418091", "security_class": "Common Stock", "exchange": "New York Stock Exchange LLC", "merger_effective_date": "2022-10-27", "trading_suspended_before_open": "2022-10-28", "removal_from_listing_and_registration": "2022-11-08"}, "historical_xnys_universe": "NO_GO", "complete_xnys_listing_change_ledger": "NO_GO", "limitations": ["the 8-A12B registers preferred-stock purchase rights, not Twitter common stock", "the 25-NSE establishes this issue-specific removal and suspension only", "filing, merger, suspension, and removal dates have distinct meanings", "current receipt does not prove historical pre-decision availability"]}
 
 def main() -> None:
