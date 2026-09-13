@@ -47,6 +47,7 @@ def _write_package(root, monkeypatch):
     raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
     (root / "manifest.json").write_bytes(raw)
     (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
+    monkeypatch.setattr(subject, "EXPECTED_MANIFEST_SHA256", hashlib.sha256(raw).hexdigest())
 
 
 @pytest.fixture
@@ -55,13 +56,15 @@ def package(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _rewrite_manifest(root, mutate):
+def _rewrite_manifest(root, mutate, monkeypatch, *, requalify=True):
     path = root / "manifest.json"
     manifest = json.loads(path.read_bytes())
     mutate(manifest)
     raw = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
     path.write_bytes(raw)
     (root / "manifest.sha256").write_text(f"{hashlib.sha256(raw).hexdigest()}  manifest.json\n")
+    if requalify:
+        monkeypatch.setattr(subject, "EXPECTED_MANIFEST_SHA256", hashlib.sha256(raw).hexdigest())
 
 
 def _requalify_fixture_edition(monkeypatch, name, payload):
@@ -87,13 +90,13 @@ def test_rejects_tampered_artifact(package):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
 
-def test_rejects_historical_availability_overclaim(package):
-    _rewrite_manifest(package, lambda doc: doc["records"][0].update(historical_availability_proven=True))
+def test_rejects_historical_availability_overclaim(package, monkeypatch):
+    _rewrite_manifest(package, lambda doc: doc["records"][0].update(historical_availability_proven=True), monkeypatch)
     with pytest.raises(ValueError, match="historical availability"):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
 
-def test_rejects_rehashed_substituted_edition(package):
+def test_rejects_rehashed_substituted_edition(package, monkeypatch):
     path = package / "nyse_2026_calendar.pdf"
     payload = b"%PDF-1.7 /Type/Page substituted %%EOF"
     path.write_bytes(payload)
@@ -102,7 +105,7 @@ def test_rejects_rehashed_substituted_edition(package):
         record = next(row for row in doc["records"] if row["filename"] == path.name)
         record.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
 
-    _rewrite_manifest(package, update)
+    _rewrite_manifest(package, update, monkeypatch)
     with pytest.raises(ValueError, match="reviewed edition mismatch"):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
@@ -115,7 +118,7 @@ def test_rejects_missing_schedule_scope(package, monkeypatch):
     def update(doc):
         record = next(row for row in doc["records"] if row["filename"] == path.name)
         record.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
-    _rewrite_manifest(package, update)
+    _rewrite_manifest(package, update, monkeypatch)
     with pytest.raises(ValueError, match="schedule anchors missing"):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
@@ -126,20 +129,20 @@ def test_rejects_undeclared_inventory(package):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
 
-def test_rejects_future_dated_receipt(package):
+def test_rejects_future_dated_receipt(package, monkeypatch):
     _rewrite_manifest(
         package,
         lambda doc: doc["records"][0].update(
             retrieval_started_at_utc="2026-09-13T01:01:00Z",
             retrieval_completed_at_utc="2026-09-13T01:01:00Z",
-        ),
+        ), monkeypatch,
     )
     with pytest.raises(ValueError, match="after audit time"):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
 
-def test_rejects_repurposed_manifest(package):
-    _rewrite_manifest(package, lambda doc: doc.update(purpose="canonical session proof"))
+def test_rejects_repurposed_manifest(package, monkeypatch):
+    _rewrite_manifest(package, lambda doc: doc.update(purpose="canonical session proof"), monkeypatch)
     with pytest.raises(ValueError, match="evidence purpose"):
         subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
 
@@ -159,7 +162,7 @@ def test_general_anchors_never_establish_target_date_or_watchlist(package, extra
         record = next(row for row in doc["records"] if row["filename"] == path.name)
         record.update(bytes=len(payload), sha256=hashlib.sha256(payload).hexdigest())
 
-    _rewrite_manifest(package, update)
+    _rewrite_manifest(package, update, monkeypatch)
     result = subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)
     assert result["target_date_session_status"] == "UNKNOWN"
     assert "has not been verified" in result["calendar_observation"]
@@ -167,3 +170,17 @@ def test_general_anchors_never_establish_target_date_or_watchlist(package, extra
     assert result["watchlist_frozen_by_cutoff"] == "UNKNOWN"
     assert result["canonical_us2_session_evidence"] == "NO_GO"
     assert result["shadow_scoring"] == "NOT_READY"
+
+
+def test_rejects_rehashed_substituted_manifest(package, monkeypatch):
+    _rewrite_manifest(
+        package,
+        lambda doc: doc["records"][0].update(
+            retrieval_started_at_utc="2026-09-12T00:00:00Z",
+            retrieval_completed_at_utc="2026-09-12T00:01:00Z",
+        ),
+        monkeypatch,
+        requalify=False,
+    )
+    with pytest.raises(ValueError, match="reviewed manifest edition mismatch"):
+        subject.audit_forward_session_truth(package, audited_at=AUDITED_AT)

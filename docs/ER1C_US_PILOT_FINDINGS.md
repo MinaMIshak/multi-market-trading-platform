@@ -450,3 +450,8 @@ This integrity improvement does not change the evidence scope. The target-date
 session remains UNKNOWN, canonical US2 remains NO_GO, and shadow scoring remains
 NOT_READY. Current schedule text does not establish an exact per-date XNYS
 session record, exact UTC clocks, historical availability, or approved review.
+
+The manifest edition is independently pinned as well. Its SHA256 is
+`7716804d38c3a713be635cdb950831b46d9b29de92cd1eb6e11f26b0893c5239`.
+This prevents a rewritten manifest and matching sidecar from changing the
+reviewed receipt metadata while retaining the same artifact bytes.

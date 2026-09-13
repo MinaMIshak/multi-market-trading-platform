@@ -28,6 +28,9 @@ EXPECTED = {
         "49ee8a651ec01ef2866e347842c0fb11309541f247d17aeaaf7ad9d6a513b1ed",
     ),
 }
+EXPECTED_MANIFEST_SHA256 = (
+    "7716804d38c3a713be635cdb950831b46d9b29de92cd1eb6e11f26b0893c5239"
+)
 MANIFEST_FILES = {"manifest.json", "manifest.sha256"}
 MANIFEST_FIELDS = {"purpose", "records", "schema"}
 EXPECTED_PURPOSE = (
@@ -63,9 +66,12 @@ def audit_forward_session_truth(root: Path, *, audited_at: datetime | None = Non
     if type(audited_at) is not datetime or audited_at.tzinfo is not timezone.utc:
         raise ValueError("audited_at must use datetime.timezone.utc")
     raw_manifest = (root / "manifest.json").read_bytes()
-    expected_sidecar = f"{_sha256(raw_manifest)}  manifest.json"
+    manifest_sha256 = _sha256(raw_manifest)
+    expected_sidecar = f"{manifest_sha256}  manifest.json"
     if (root / "manifest.sha256").read_text(encoding="ascii").strip() != expected_sidecar:
         raise ValueError("manifest SHA256 sidecar mismatch")
+    if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
+        raise ValueError("reviewed manifest edition mismatch")
     manifest = json.loads(raw_manifest)
     if not isinstance(manifest, dict) or set(manifest) != MANIFEST_FIELDS:
         raise ValueError("unexpected manifest fields")
