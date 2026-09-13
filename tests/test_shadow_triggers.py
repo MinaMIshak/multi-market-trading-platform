@@ -9,8 +9,10 @@ from app.paper import shadow_facts, shadow_triggers
 from tests.test_shadow_facts import prepared
 
 
-def admitted(tmp_path, monkeypatch, bar_changes=None):
-    item, packages, facts, fact_packages, available = prepared(tmp_path, monkeypatch)
+def admitted(tmp_path, monkeypatch, bar_changes=None, *, complete_session=False):
+    item, packages, facts, fact_packages, available = prepared(
+        tmp_path, monkeypatch, complete_session=complete_session,
+    )
     if bar_changes:
         bar = facts.bars[0].model_copy(update=bar_changes)
         facts = facts.model_copy(update={"bars": (bar,)})

@@ -16,9 +16,9 @@ from tests.test_shadow_triggers import admitted
 
 
 def prepared(tmp_path, monkeypatch, *, bar_changes=None, participation=Decimal("0.10"),
-             slippage=Decimal("10")):
+             slippage=Decimal("10"), complete_session=False):
     item, packages, facts, fact_packages, now = admitted(
-        tmp_path, monkeypatch, bar_changes,
+        tmp_path, monkeypatch, bar_changes, complete_session=complete_session,
     )
     fill_packages = []
     for char, fields in zip(

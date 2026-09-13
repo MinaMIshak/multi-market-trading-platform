@@ -15,7 +15,7 @@ from app.paper.shadow_records import ShadowEvidenceReference
 from tests.test_shadow_collection import authenticated_watchlist, package
 
 
-def prepared(tmp_path, monkeypatch):
+def prepared(tmp_path, monkeypatch, *, complete_session=False):
     item, watchlist_packages = authenticated_watchlist()
     completed_at = item.generated_at + timedelta(minutes=30)
     monkeypatch.setattr(shadow_collection, "_now", lambda: completed_at)
@@ -25,7 +25,9 @@ def prepared(tmp_path, monkeypatch):
     shadow_ledger.append_candidate_event(tmp_path, item, watchlist_packages)
 
     start = item.session.opens_at
-    available = start + timedelta(minutes=6)
+    close = start + timedelta(hours=6, minutes=30)
+    interval_end = close if complete_session else start + timedelta(minutes=5)
+    available = interval_end + timedelta(minutes=1)
     reference = ShadowEvidenceReference(
         evidence_id="c" * 64, source_authority="official fixture authority",
         source_locator="fixture://forward-bars", artifact_sha256="c" * 64,
@@ -38,7 +40,7 @@ def prepared(tmp_path, monkeypatch):
         record_id=item.record_id, candidate_id=item.candidates[0].candidate_id,
         session=ForwardSessionFact(
             market="US", market_date=item.session.market_date, calendar_mic="XNYS",
-            state="OPEN", opens_at=start, closes_at=start + timedelta(hours=6, minutes=30),
+            state="OPEN", opens_at=start, closes_at=close,
             evidence_package_id=fact_package.identity,
         ),
         identity=ForwardIdentityFact(
@@ -53,13 +55,13 @@ def prepared(tmp_path, monkeypatch):
         ),
         trading_status=ForwardTradingStatusFact(
             instrument_id=item.candidates[0].instrument_id, listing_mic="XNYS",
-            coverage_start=start, coverage_end=start + timedelta(minutes=5),
+            coverage_start=start, coverage_end=interval_end,
             trading_status="TRADABLE", evidence_package_id=fact_package.identity,
         ),
         bars=(ForwardRawBar(
             instrument_id=item.candidates[0].instrument_id, ticker="IBM",
             market_date=item.session.market_date, sequence=1, interval_start=start,
-            interval_end=start + timedelta(minutes=5), available_at=available,
+            interval_end=interval_end, available_at=available,
             is_final=True, price_basis="RAW_UNADJUSTED", open=Decimal("100"),
             high=Decimal("102"), low=Decimal("99"), close=Decimal("101"), volume=1000,
             source_row="fixture-row-1", evidence_package_id=fact_package.identity,

@@ -18,14 +18,19 @@ from app.paper.shadow_facts import (
 from app.paper.shadow_records import ShadowEvidenceReference
 from tests.test_shadow_collection import package
 from tests.test_shadow_positions import setup_position
+from tests.test_shadow_records import watchlist
 
 
-def prepared_continuation(tmp_path, monkeypatch):
-    args, now, _ = setup_position(tmp_path, monkeypatch)
+def prepared_continuation(tmp_path, monkeypatch, *, original_bar_changes=None):
+    args, now, _ = setup_position(
+        tmp_path, monkeypatch, bar_changes=original_bar_changes,
+        complete_session=True,
+    )
     shadow_positions.append_position_open_event(tmp_path, *args)
     original = args[2]
     start = original.session.opens_at + timedelta(days=1)
-    available = start + timedelta(minutes=6)
+    close = start + timedelta(hours=6, minutes=30)
+    available = close + timedelta(minutes=1)
     reference = ShadowEvidenceReference(
         evidence_id="7" * 64, source_authority="official fixture authority",
         source_locator="fixture://continuation", artifact_sha256="7" * 64,
@@ -39,7 +44,7 @@ def prepared_continuation(tmp_path, monkeypatch):
         calendar_days=(ContinuationCalendarDay(
             market="US", market_date=original.session.market_date + timedelta(days=1),
             calendar_mic="XNYS", state="OPEN", opens_at=start,
-            closes_at=start + timedelta(hours=6, minutes=30),
+            closes_at=close,
             evidence_package_id=evidence.identity,
         ),),
         identity=original.identity.model_copy(update={
@@ -51,12 +56,12 @@ def prepared_continuation(tmp_path, monkeypatch):
             "evidence_package_id": evidence.identity,
         }),
         trading_status=original.trading_status.model_copy(update={
-            "coverage_start": start, "coverage_end": start + timedelta(minutes=5),
+            "coverage_start": start, "coverage_end": close,
             "evidence_package_id": evidence.identity,
         }),
         bars=(original.bars[0].model_copy(update={
             "market_date": original.session.market_date + timedelta(days=1),
-            "interval_start": start, "interval_end": start + timedelta(minutes=5),
+            "interval_start": start, "interval_end": close,
             "available_at": available, "source_row": "fixture-continuation-row-1",
             "evidence_package_id": evidence.identity,
         }),),
@@ -321,7 +326,8 @@ def successor(facts, char="8", **bar_updates):
     shift = timedelta(days=1)
     day = facts.calendar_days[-1]
     start = day.opens_at + shift
-    available = start + timedelta(minutes=6)
+    close = day.closes_at + shift
+    available = close + timedelta(minutes=1)
     reference = ShadowEvidenceReference(
         evidence_id=char * 64, source_authority="official fixture authority",
         source_locator=f"fixture://continuation/{char}", artifact_sha256=char * 64,
@@ -334,7 +340,7 @@ def successor(facts, char="8", **bar_updates):
         continuation_id=f"session-{char}",
         calendar_days=(day.model_copy(update={
             "market_date": day.market_date + shift, "opens_at": start,
-            "closes_at": day.closes_at + shift, "evidence_package_id": evidence.identity,
+            "closes_at": close, "evidence_package_id": evidence.identity,
         }),),
         identity=facts.identity.model_copy(update={
             "effective_through": day.market_date + shift,
@@ -346,12 +352,12 @@ def successor(facts, char="8", **bar_updates):
             "evidence_package_id": evidence.identity,
         }),
         trading_status=facts.trading_status.model_copy(update={
-            "coverage_start": start, "coverage_end": start + timedelta(minutes=5),
+            "coverage_start": start, "coverage_end": close,
             "evidence_package_id": evidence.identity,
         }),
         bars=(facts.bars[0].model_copy(update={
             "market_date": day.market_date + shift, "interval_start": start,
-            "interval_end": start + timedelta(minutes=5), "available_at": available,
+            "interval_end": close, "available_at": available,
             "source_row": f"fixture-continuation-row-{char}",
             "evidence_package_id": evidence.identity,
         } | bar_updates),),
@@ -483,10 +489,67 @@ def test_durable_continuation_exit_stops_at_closed_result(tmp_path, monkeypatch)
         tmp_path, *args, chain, packages, policy, evidence,
     )
     assert event == json.loads(path.read_bytes())
+    assert event["schema_version"] == "shadow-continuation-exit-event-v3"
+    assert event["entry_session_evaluation"]["status"] == "OPEN"
     assert [item["status"] for item in event["evaluations"]] == ["OPEN", "CLOSED"]
     assert event["result"]["reason"] == "STOP_GAP"
     third, third_packages, _ = successor(second, char="9")
     with pytest.raises(ValueError, match="depth is not yet supported"):
         shadow_exits.append_continuation_exit_event(
             tmp_path, *args, chain + (third,), packages + (third_packages,), policy, evidence,
+        )
+
+
+def test_carry_rejects_partial_open_entry_session(tmp_path, monkeypatch):
+    partial_end = watchlist().session.opens_at + timedelta(hours=6, minutes=25)
+    args, facts, packages, _ = prepared_continuation(
+        tmp_path, monkeypatch,
+        original_bar_changes={"interval_end": partial_end},
+    )
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, facts, packages,
+    )
+    with pytest.raises(ValueError, match="complete close coverage"):
+        shadow_exits.append_continuation_exit_event(
+            tmp_path, *args, (facts,), (packages,), continuation_exit_policy(),
+            exit_evidence(args[0].information_cutoff),
+        )
+
+
+def test_carry_rejects_terminal_entry_session(tmp_path, monkeypatch):
+    args, facts, packages, _ = prepared_continuation(
+        tmp_path, monkeypatch,
+        original_bar_changes={"low": Decimal("94")},
+    )
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, facts, packages,
+    )
+    with pytest.raises(ValueError, match="terminal entry-session"):
+        shadow_exits.append_continuation_exit_event(
+            tmp_path, *args, (facts,), (packages,), continuation_exit_policy(),
+            exit_evidence(args[0].information_cutoff),
+        )
+
+
+def test_carry_rejects_partial_open_continuation_predecessor(tmp_path, monkeypatch):
+    args, first, first_packages, _ = prepared_continuation(tmp_path, monkeypatch)
+    close = first.calendar_days[-1].closes_at
+    partial = first.model_copy(update={
+        "bars": (first.bars[-1].model_copy(update={
+            "interval_end": close - timedelta(minutes=5),
+        }),),
+    })
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, partial, first_packages,
+    )
+    second, second_packages, available = successor(partial)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: available + timedelta(minutes=1))
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, second, second_packages,
+        previous_facts=partial, previous_fact_packages=first_packages,
+    )
+    with pytest.raises(ValueError, match="complete close coverage"):
+        shadow_exits.append_continuation_exit_event(
+            tmp_path, *args, (partial, second), (first_packages, second_packages),
+            continuation_exit_policy(), exit_evidence(args[0].information_cutoff),
         )

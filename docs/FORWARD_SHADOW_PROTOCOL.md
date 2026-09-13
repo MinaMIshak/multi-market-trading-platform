@@ -339,6 +339,14 @@ and stops at the first
 result fails closed. An all-`OPEN` result only covers the admitted chain through
 its final observed bar; it does not prove the position is currently open.
 
+The v3 durable receipt first evaluates the original entry session. It rejects a
+continuation when that evaluation is `CLOSED` or `UNKNOWN`, and permits an
+`OPEN` position to carry only when the final bar and affirmative issue-specific
+status coverage both reach that session's authenticated close. Every later
+`OPEN` continuation must meet the same close-coverage gate before another
+session can follow it. The final supplied session may be partial; its `OPEN`
+result remains bounded by its last observed bar and cannot be carried farther.
+
 The durable event remains **EXPERIMENTAL / PAPER ONLY — NOT SCORED**, with
 **SHARED CAPITAL NOT ALLOCATED** and **NO P&L OR NAV**. It does not schedule
 holding-window exits, publish current marks, support partial liquidation, prove
@@ -603,13 +611,11 @@ bounds as publication. Earlier v1 receipts are retained but do not pass the v2
 audit; they must never be rewritten or backdated. Equal receipt timestamps are
 permitted. This is an audit-order safeguard, not historical availability proof.
 
-Remaining execution limitation: an OPEN result over a partial session does not
-prove that the position remained open through the unobserved session remainder.
-The current continuation exit path must not support an empirical execution or
-performance claim until it requires complete predecessor-session coverage and
-evaluates the original entry session before carrying the position forward.
-Extending chain depth is secondary to closing this coverage gate. All current
-outputs remain **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**.
+The `shadow-continuation-exit-event-v3` entry-session evaluation and predecessor
+close-coverage gates replace v2 semantics. Retained v1/v2 receipts are not
+rewritten and cannot pass the v3 audit. The final partial-session limitation
+still applies to any `OPEN` result, so all current outputs remain
+**EXPERIMENTAL / PAPER ONLY**, **NOT SCORED**.
 
 `shadow-exit-policy-v2` requires an explicit exact-decimal participation fraction
 in `(0, 1]` and a matching pre-cutoff evidence package covering

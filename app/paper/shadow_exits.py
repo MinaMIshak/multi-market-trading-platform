@@ -231,11 +231,17 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
         directory, watchlist, watchlist_packages, original_facts,
         original_fact_packages, fill_policy, fill_packages,
     )
+    entry_session_evaluation = evaluate_exit(position, original_facts, exit_policy)
+    if entry_session_evaluation["status"] != "OPEN":
+        raise ValueError("cannot carry a terminal entry-session evaluation")
+    if (original_facts.bars[-1].interval_end != original_facts.session.closes_at
+            or original_facts.trading_status.coverage_end < original_facts.session.closes_at):
+        raise ValueError("open predecessor session requires complete close coverage")
     references = []
     evaluations = []
     previous_facts = previous_packages = None
     terminal = False
-    for facts, packages in zip(continuations, continuation_packages):
+    for index, (facts, packages) in enumerate(zip(continuations, continuation_packages)):
         if terminal:
             raise ValueError("continuation chain extends beyond terminal evaluation")
         event = audit_continuation_event(
@@ -251,17 +257,24 @@ def _continuation_exit_basis(directory, watchlist, watchlist_packages, original_
                            "event_sha256": hashlib.sha256(_canonical(event)).hexdigest()})
         evaluations.append(evaluation)
         terminal = evaluation["status"] in {"UNKNOWN", "CLOSED"}
+        if (index < len(continuations) - 1 and evaluation["status"] == "OPEN"
+                and (facts.bars[-1].interval_end != facts.calendar_days[-1].closes_at
+                     or facts.trading_status.coverage_end
+                     < facts.calendar_days[-1].closes_at)):
+            raise ValueError("open predecessor session requires complete close coverage")
         previous_facts, previous_packages = facts, packages
     package_ids = sorted(_packages(exit_policy, exit_packages, watchlist.information_cutoff))
     return {
-        "schema_version": "shadow-continuation-exit-event-v2", "label": LABEL,
+        "schema_version": "shadow-continuation-exit-event-v3", "label": LABEL,
         "event_type": "CONTINUATION_EXIT_EVALUATED", "scoring": "NOT SCORED",
         "portfolio_status": "SHARED CAPITAL NOT ALLOCATED",
         "performance_status": "NO P&L OR NAV",
         "position_event_id": position["event_id"],
         "position_event_sha256": hashlib.sha256(_canonical(position)).hexdigest(),
         "continuation_events": references, "exit_package_ids": package_ids,
-        "policy": exit_policy.model_dump(mode="json"), "evaluations": evaluations,
+        "policy": exit_policy.model_dump(mode="json"),
+        "entry_session_evaluation": entry_session_evaluation,
+        "evaluations": evaluations,
         "result": evaluations[-1],
     }
 
