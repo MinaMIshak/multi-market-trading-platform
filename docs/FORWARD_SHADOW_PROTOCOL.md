@@ -420,3 +420,30 @@ separate milestone. This detects settled excess loss; it does not bound gap loss
 monitor unrealized losses or make multi-session execution operational. The initial
 stop-risk estimate still omits exit slippage; even an ordinary stop exit may halt
 reuse. All outputs remain **EXPERIMENTAL / PAPER ONLY**.
+
+### Read-only collection view
+
+`app.paper.shadow_report.watchlist_collection_view(directory, watchlist,
+evidence_packages)` returns a JSON-serializable view after re-auditing the durable
+candidate event, completion receipt, frozen document and evidence packages.
+It preserves every candidate, including WATCH/AVOID, its entry zone, stop,
+targets, thesis, context, experimental confidence, unvalidated horizon and
+probability, declared liquidity/risk fields, and source references. Declared
+paper quantity is not an allocation or simulated fill. Hash references bind the
+view to its upstream records. The reader writes no files.
+
+`missed_collection_view(directory, record_id=..., session=...,
+session_package=...)` instead requires an existing audited missed receipt.
+It returns **MISSED / NOT SCORED**, with unknown candidate count/list; it never
+reconstructs predictions. A frozen empty watchlist has count zero and an empty
+list. Missing receipts or failed audits raise errors rather than producing a
+plausible report.
+
+This is a one-record collection view, not a complete daily portfolio dashboard.
+Market status, downstream execution, open/closed positions, NAV, returns,
+drawdown, hit rate, expectancy and market attribution remain explicitly
+unevaluated, with unavailable numerical metrics represented by null, never zero.
+It does not infer present market state from a previously declared session or
+infer cash-only performance from an empty candidate list. Full daily aggregation,
+audited marks, cost/FX-aware performance and position views remain outstanding.
+No authentic collection or empirical result was created by this milestone.
