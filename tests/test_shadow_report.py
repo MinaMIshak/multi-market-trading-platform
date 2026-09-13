@@ -97,7 +97,7 @@ def test_position_view_reaudits_fill_and_does_not_claim_current_position(tmp_pat
     assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
 
 
-def test_exit_view_preserves_audited_open_evaluation_without_mark_or_pnl(tmp_path, monkeypatch):
+def test_exit_view_reports_authenticated_open_mark_without_unrealized_pnl(tmp_path, monkeypatch):
     args, _, policy, evidence = prepared_exit(tmp_path, monkeypatch)
     shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
     view = exit_evaluation_view(tmp_path, *args, policy, evidence)
@@ -106,7 +106,18 @@ def test_exit_view_preserves_audited_open_evaluation_without_mark_or_pnl(tmp_pat
         "status": "OPEN", "reason": "NO_EXIT_OBSERVED",
         "evaluated_through_sequence": 1, "exit": None,
     }
-    assert view["open_paper_positions"] == {"status": "NOT EVALUATED"}
+    open_position = view["open_paper_positions"]
+    assert open_position["status"] == "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR"
+    mark = open_position["position"]
+    assert mark["mark_price"] == "101"
+    assert Decimal(mark["gross_market_value"]) == (
+        Decimal(mark["quantity"]) * Decimal(mark["mark_price"])
+    )
+    assert mark["marked_through_sequence"] == 1
+    assert mark["mark_interval_end"] == args[2].bars[-1].interval_end.isoformat()
+    assert mark["mark_known_at"] == args[2].bars[-1].available_at.isoformat()
+    assert mark["unrealized_pnl"] is None
+    assert "UNKNOWN" in mark["unrealized_pnl_status"]
     assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
     assert all(value is None for key, value in view["performance"].items() if key != "status")
 

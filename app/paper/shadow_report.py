@@ -157,6 +157,39 @@ def exit_evaluation_view(
             "exit_package_ids": event["exit_package_ids"],
         },
     }
+    if evaluation["status"] == "OPEN":
+        sequence = evaluation["evaluated_through_sequence"]
+        mark = next((bar for bar in facts.bars if bar.sequence == sequence), None)
+        if mark is None:
+            raise ValueError("open exit evaluation does not bind an admitted mark")
+        position = audit_position_open_event(
+            directory, watchlist, watchlist_packages, facts, fact_packages,
+            fill_policy, fill_packages,
+        )
+        entry = position["entry"]
+        with localcontext(Context(prec=34)):
+            gross_market_value = Decimal(entry["quantity"]) * mark.close
+        view["open_paper_positions"] = {
+            "status": "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR",
+            "position": {
+                "candidate_position_key": position["candidate_position_key"],
+                "ticker": entry["ticker"],
+                "instrument_id": entry["instrument_id"],
+                "quantity": entry["quantity"],
+                "currency": entry["currency"],
+                "entry_fill_price": entry["fill_price"],
+                "mark_price": str(mark.close),
+                "gross_market_value": str(gross_market_value),
+                "marked_through_sequence": mark.sequence,
+                "mark_interval_end": mark.interval_end.isoformat(),
+                "mark_known_at": mark.available_at.isoformat(),
+                "unrealized_pnl": None,
+                "unrealized_pnl_status": (
+                    "UNKNOWN / NO AUTHENTICATED LIQUIDATION SLIPPAGE AND COST"
+                ),
+            },
+        }
+        return view
     if evaluation["status"] != "CLOSED":
         return view
 
