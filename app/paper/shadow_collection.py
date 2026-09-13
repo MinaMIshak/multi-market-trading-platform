@@ -182,6 +182,70 @@ def record_missed_session(
     return result
 
 
+def audit_missed_session(
+    directory: Path,
+    *,
+    record_id: str,
+    session: ShadowSession,
+    session_package: HistoricalEvidencePackage,
+) -> dict:
+    """Audit a missed receipt without granting session or scoring eligibility.
+
+    Evidence is re-admitted at the original receipt clock. Local integrity does
+    not independently attest source truth or prove absence of other watchlists.
+    """
+    if type(session) is not ShadowSession or type(session_package) is not HistoricalEvidencePackage:
+        raise ValueError("exact session and evidence package required")
+    if type(record_id) is not str or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}", record_id) is None:
+        raise ValueError("invalid record_id")
+    session = ShadowSession.model_validate(session.model_dump(mode="python"))
+    directory = Path(directory)
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate missed-session field")
+            result[key] = value
+        return result
+
+    receipt = json.loads(
+        (directory / "receipts" / f"{record_id}.json").read_bytes(),
+        object_pairs_hook=unique_object,
+    )
+    fields = {
+        "schema_version", "label", "status", "scoring", "record_id", "market",
+        "market_date", "decision_cutoff", "completed_at", "reason",
+        "session_evidence_package_id",
+    }
+    if type(receipt) is not dict or set(receipt) != fields:
+        raise ValueError("unexpected missed-session fields")
+    completed_at = shadow_freeze._utc(datetime.fromisoformat(receipt["completed_at"]))
+    if not session.decision_cutoff <= completed_at <= _now():
+        raise ValueError("invalid missed-session clock ordering")
+    if receipt["reason"] not in ("NO_TIMELY_WATCHLIST", "COLLECTION_FAILED"):
+        raise ValueError("unsupported missed-session reason")
+    require_historical_evidence(
+        session_package, decision_at=session.decision_cutoff,
+        research_built_at=completed_at,
+    )
+    if tuple(session.evidence_ids) != (session_package.identity,):
+        raise ValueError("session evidence package mismatch")
+    expected = {
+        "schema_version": "shadow-completion-v1", "label": LABEL,
+        "status": "MISSED", "scoring": "NOT SCORED", "record_id": record_id,
+        "market": session.market, "market_date": session.market_date.isoformat(),
+        "decision_cutoff": session.decision_cutoff.isoformat(),
+        "completed_at": completed_at.isoformat(), "reason": receipt["reason"],
+        "session_evidence_package_id": session_package.identity,
+    }
+    if receipt != expected:
+        raise ValueError("missed receipt does not bind session")
+    if (directory / "watchlists" / f"{record_id}.json").exists():
+        raise ValueError("watchlist exists; session cannot be marked missed")
+    return receipt
+
+
 def audit_completed_watchlist(
     directory: Path,
     watchlist: ShadowWatchlist,

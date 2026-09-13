@@ -263,3 +263,81 @@ def test_audit_rechecks_evidence_at_freeze_time(tmp_path, monkeypatch):
     monkeypatch.setattr(shadow_collection, "_admit_packages", capture)
     shadow_collection.audit_completed_watchlist(tmp_path, item, packages)
     assert calls == [AT]
+
+
+def missed_fixture(tmp_path, monkeypatch):
+    item, packages = authenticated_watchlist()
+    monkeypatch.setattr(shadow_collection, "_now", lambda: item.session.decision_cutoff)
+    path = record_missed_session(
+        tmp_path, record_id=item.record_id, session=item.session,
+        session_package=packages[0], reason="NO_TIMELY_WATCHLIST",
+    )
+    return item, packages, path
+
+
+def audit_missed(tmp_path, item, packages):
+    return shadow_collection.audit_missed_session(
+        tmp_path, record_id=item.record_id, session=item.session,
+        session_package=packages[0],
+    )
+
+
+def test_audit_missed_is_read_only_and_unscored(tmp_path, monkeypatch):
+    item, packages, path = missed_fixture(tmp_path, monkeypatch)
+    before = path.read_bytes()
+    calls = []
+    original = shadow_collection.require_historical_evidence
+
+    def capture(package, **kwargs):
+        calls.append(kwargs)
+        return original(package, **kwargs)
+
+    monkeypatch.setattr(shadow_collection, "require_historical_evidence", capture)
+    monkeypatch.setattr(shadow_collection, "_now", lambda: AT + timedelta(days=10))
+    receipt = audit_missed(tmp_path, item, packages)
+    assert receipt["status"] == "MISSED"
+    assert receipt["scoring"] == "NOT SCORED"
+    assert calls == [{"decision_at": item.session.decision_cutoff,
+                      "research_built_at": item.session.decision_cutoff}]
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "FROZEN"), ("scoring", "SCORED"), ("label", "LIVE READY"),
+    ("record_id", "another"), ("market", "EGX"), ("market_date", "2000-01-01"),
+    ("session_evidence_package_id", "0" * 64), ("decision_cutoff", AT.isoformat()),
+    ("completed_at", AT.isoformat()),
+    ("completed_at", (AT + timedelta(days=10)).isoformat()),
+    ("reason", "VERIFIED"), ("extra", True),
+])
+def test_audit_missed_rejects_tampering(tmp_path, monkeypatch, field, value):
+    item, packages, path = missed_fixture(tmp_path, monkeypatch)
+    receipt = json.loads(path.read_bytes())
+    receipt[field] = value
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError):
+        audit_missed(tmp_path, item, packages)
+
+
+def test_audit_missed_rejects_duplicates_and_conflicting_watchlist(tmp_path, monkeypatch):
+    item, packages, path = missed_fixture(tmp_path, monkeypatch)
+    original = path.read_text()
+    path.write_text('{"status":"FROZEN",' + original[1:])
+    with pytest.raises(ValueError, match="duplicate"):
+        audit_missed(tmp_path, item, packages)
+    path.write_text(original)
+    (tmp_path / "watchlists").mkdir()
+    (tmp_path / "watchlists" / f"{item.record_id}.json").write_text("{}")
+    with pytest.raises(ValueError, match="watchlist exists"):
+        audit_missed(tmp_path, item, packages)
+
+
+def test_audit_missed_rejects_unbound_package_and_unsafe_id(tmp_path, monkeypatch):
+    item, packages, path = missed_fixture(tmp_path, monkeypatch)
+    with pytest.raises(ValueError, match="package mismatch"):
+        audit_missed(tmp_path, item, packages[::-1])
+    with pytest.raises(ValueError, match="invalid record_id"):
+        shadow_collection.audit_missed_session(
+            tmp_path, record_id="../escape", session=item.session,
+            session_package=packages[0],
+        )
