@@ -406,3 +406,11 @@ suspension. No feed data was fetched or admitted. Historical coverage, exact-dat
 identity, PIT availability, retention/transformation scope and canonical status
 remain unresolved. This is a free-source qualification milestone, with no
 empirical performance or readiness claim.
+
+The linked official field definitions were subsequently retained and audited.
+They distinguish initial halt clocks from scheduled quotation and trade
+resumption clocks, and the current-halts reference labels displayed halt times
+as Eastern Time. Scheduled resumption is not proof of actual execution. The
+market category only says `NASDAQ` or `Non-NASDAQ`, so it cannot establish XNYS
+identity. No feed observation was acquired; all canonical status and execution
+gates remain **NO-GO**.

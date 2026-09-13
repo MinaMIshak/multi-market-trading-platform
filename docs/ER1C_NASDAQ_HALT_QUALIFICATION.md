@@ -62,10 +62,43 @@ selection rules, not a test of a retrieved feed response.
 - Symbols and reported market labels need exact-date stable-identity and venue
   bindings. A cross-market feed does not itself prove XNYS roster completeness.
 
+## Field-definition qualification
+
+The linked official field definitions and current trading-halts reference were
+retained in a separate documentation-only package at
+`/home/egx-agent/research-data/er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z`.
+The manifest SHA256 is
+`32dffece0ea940ac4809d007546eb0c90ed0f59b2825b6247f95d1ee4a2769be`.
+The field definitions are 73,633 bytes with SHA256
+`f3d84d5e2f84d88a49904f6132dade46abdd7199274bf6b86e89ec4d101493b6`;
+the trading-halts reference is 47,392 bytes with SHA256
+`2d5105fee27893b3b293527c3cdb28a12528571bdc7704f17818778201965b6d`.
+Both official HTTPS requests returned HTTP 200 without redirects. These are
+current documentation receipts, not halt observations or historical editions.
+
+The definitions separate the initial halt date/time from the resumption date,
+scheduled quotation resumption time and scheduled trading resumption time. The
+current-halts page states that displayed halt times use Eastern Time. A scheduled
+resumption time does not prove that quoting or trading actually resumed, so it
+cannot alone authorize a simulated fill. The reason code may change when quoting
+resumes; consumers must preserve observed versions rather than overwrite the
+initial state.
+
+The `Mkt` field only distinguishes `NASDAQ` and `Non-NASDAQ`. `Non-NASDAQ` is not
+an XNYS identifier and cannot bind a mutable symbol to a stable XNYS security.
+Exact-date identity and venue evidence remain mandatory. The offline auditor
+`tools/audit_er1c_nasdaq_halt_fields.py` verifies the closed inventory, hashes,
+locators, UTC receipt ordering, media types and these semantic anchors. Its pass
+means only that the retained documentation matches the qualified scope.
+
+No live feed was called. Canonical security status, XNYS identity binding,
+actual execution resumption, historical availability and complete active-halt
+coverage remain **NO_GO**.
+
 ## Next bounded work
 
-Inspect the linked field definitions and retained terms to resolve usable
-retention/transformation scope. If admissible, predeclare a bounded acquisition
+Resolve usable retention/transformation scope from the retained terms and any
+further official policy. If admissible, predeclare a bounded acquisition
 and capture immutable feed bytes with actual receipt clocks, field locators and
 correction lineage. Validate date/time semantics and distinguish initial halt,
 quote resumption and trade resumption before constructing canonical facts.
