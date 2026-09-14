@@ -475,3 +475,113 @@ def test_continuation_settlement_reaudits_exit_before_release(tmp_path, monkeypa
         )
 
     assert not (tmp_path / "capital-settlements").exists()
+
+
+def test_native_cash_portfolio_starts_at_initial_capital(
+    tmp_path, monkeypatch,
+):
+    from app.paper.shadow_daily_portfolio import native_cash_portfolio_view
+
+    _, portfolio, _ = setup_allocation(tmp_path, monkeypatch)
+
+    view = native_cash_portfolio_view(tmp_path, portfolio)
+
+    initial = Decimal(portfolio.initial_capital)
+
+    assert view["currency"] == "USD"
+    assert Decimal(view["initial_capital"]) == initial
+    assert Decimal(view["cash"]) == initial
+    assert view["active_capital_reserved"] == "0"
+    assert view["historical_capital_reserved"] == "0"
+    assert view["settled_net_exit_proceeds"] == "0"
+    assert view["realized_pnl"] == "0"
+    assert view["reservation_count"] == 0
+    assert view["active_reservation_count"] == 0
+    assert view["settlement_count"] == 0
+    assert view["open_market_value"] is None
+    assert view["gross_marked_nav"] is None
+    assert view["performance_status"] == "NOT EVALUATED"
+
+
+def test_native_cash_portfolio_deducts_active_reservation(
+    tmp_path, monkeypatch,
+):
+    from app.paper.shadow_daily_portfolio import native_cash_portfolio_view
+
+    args, portfolio, _ = setup_allocation(tmp_path, monkeypatch)
+
+    shadow_allocations.append_capital_reservation(
+        tmp_path, *args, portfolio,
+    )
+
+    view = native_cash_portfolio_view(tmp_path, portfolio)
+
+    initial = Decimal(portfolio.initial_capital)
+    reserved = Decimal("101.15005")
+
+    assert Decimal(view["active_capital_reserved"]) == reserved
+    assert Decimal(view["historical_capital_reserved"]) == reserved
+    assert Decimal(view["cash"]) == initial - reserved
+    assert Decimal(view["realized_pnl"]) == 0
+    assert view["reservation_count"] == 1
+    assert view["active_reservation_count"] == 1
+    assert view["settlement_count"] == 0
+
+
+def test_native_cash_portfolio_realizes_closed_cash_flow(
+    tmp_path, monkeypatch,
+):
+    from app.paper.shadow_daily_portfolio import native_cash_portfolio_view
+
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(
+        tmp_path, monkeypatch,
+    )
+
+    shadow_allocations.append_capital_settlement(
+        tmp_path,
+        *args,
+        portfolio,
+        exit_policy,
+        evidence,
+    )
+
+    view = native_cash_portfolio_view(tmp_path, portfolio)
+
+    initial = Decimal(portfolio.initial_capital)
+    released = Decimal("101.15005")
+    proceeds = Decimal("93.762595")
+    realized = proceeds - released
+
+    assert Decimal(view["historical_capital_reserved"]) == released
+    assert Decimal(view["active_capital_reserved"]) == 0
+    assert Decimal(view["settled_net_exit_proceeds"]) == proceeds
+    assert Decimal(view["realized_pnl"]) == realized
+    assert Decimal(view["cash"]) == initial + realized
+    assert view["reservation_count"] == 1
+    assert view["active_reservation_count"] == 0
+    assert view["settlement_count"] == 1
+
+
+def test_native_cash_portfolio_fails_closed_on_tampered_settlement(
+    tmp_path, monkeypatch,
+):
+    from app.paper.shadow_daily_portfolio import native_cash_portfolio_view
+
+    args, portfolio, exit_policy, evidence, _ = setup_settlement(
+        tmp_path, monkeypatch,
+    )
+
+    path = shadow_allocations.append_capital_settlement(
+        tmp_path,
+        *args,
+        portfolio,
+        exit_policy,
+        evidence,
+    )
+
+    event = json.loads(path.read_bytes())
+    event["net_exit_proceeds"] = "1000"
+    path.write_text(json.dumps(event))
+
+    with pytest.raises(ValueError):
+        native_cash_portfolio_view(tmp_path, portfolio)
