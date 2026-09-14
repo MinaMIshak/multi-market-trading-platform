@@ -3,9 +3,13 @@ from datetime import datetime
 from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
-from app.paper.shadow_allocations import audit_capital_settlement
+from app.paper.shadow_allocations import (
+    audit_capital_settlement, audit_continuation_capital_settlement,
+)
 from app.paper.shadow_collection import LABEL, audit_missed_session
-from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event
+from app.paper.shadow_exits import (
+    ShadowExitPolicy, audit_continuation_exit_event, audit_exit_event,
+)
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_fills import ShadowFillPolicy, audit_fill_event
 from app.paper.shadow_ledger import audit_candidate_event
@@ -44,6 +48,80 @@ def _bar_end_elapsed(entry: dict, observed_interval_end: str) -> str:
     if elapsed.total_seconds() < 0:
         raise ValueError("observed bar precedes authenticated entry bar")
     return str(elapsed)
+
+
+def _attach_closed_trade(
+    view: dict,
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    evaluation: dict,
+) -> dict:
+    """Attach exact native one-trade arithmetic only for an authenticated close."""
+    if (
+        type(evaluation) is not dict
+        or evaluation.get("status") != "CLOSED"
+        or type(evaluation.get("exit")) is not dict
+    ):
+        raise ValueError("closed trade view requires authenticated CLOSED exit")
+
+    position = audit_position_open_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    entry, exit_fill = position["entry"], evaluation["exit"]
+
+    if exit_fill["currency"] != entry["currency"]:
+        raise ValueError("closed trade currency mismatch")
+
+    with localcontext(Context(prec=34)):
+        entry_notional = Decimal(entry["notional"])
+        entry_cost = Decimal(entry["entry_cost"])
+        exit_notional = Decimal(exit_fill["notional"])
+        exit_cost = Decimal(exit_fill["exit_cost"])
+        gross_pnl = exit_notional - entry_notional
+        gross_return = gross_pnl / entry_notional
+        net_pnl = gross_pnl - entry_cost - exit_cost
+        capital_outlay = entry_notional + entry_cost
+        net_return = net_pnl / capital_outlay
+
+    view["closed_paper_trades"] = {
+        "status": "ONE AUTHENTICATED CLOSED PAPER TRADE",
+        "trade": {
+            "candidate_position_key": position["candidate_position_key"],
+            "ticker": entry["ticker"],
+            "instrument_id": entry["instrument_id"],
+            "quantity": entry["quantity"],
+            "currency": entry["currency"],
+            "entry_fill_price": entry["fill_price"],
+            "entry_notional": entry["notional"],
+            "entry_cost": entry["entry_cost"],
+            "exit_fill_price": exit_fill["fill_price"],
+            "exit_notional": exit_fill["notional"],
+            "exit_cost": exit_fill["exit_cost"],
+            "exit_reason": evaluation["reason"],
+            "initial_stop": position["initial_stop"],
+            "initial_targets": position["initial_targets"],
+            "holding_window": position["holding_window"],
+            "gross_pnl": str(gross_pnl),
+            "gross_return": str(gross_return),
+            "net_pnl": str(net_pnl),
+            "net_return": str(net_return),
+            "entry_known_at": entry["known_at"],
+            "exit_known_at": exit_fill["known_at"],
+            "observed_bar_end_elapsed": _bar_end_elapsed(
+                entry, exit_fill["interval_end"],
+            ),
+            "observed_bar_end_elapsed_status": (
+                "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
+            ),
+        },
+    }
+    return view
 
 
 def watchlist_collection_view(
@@ -292,54 +370,59 @@ def exit_evaluation_view(
     if evaluation["status"] != "CLOSED":
         return view
 
-    position = audit_position_open_event(
-        directory, watchlist, watchlist_packages, facts, fact_packages,
-        fill_policy, fill_packages,
+    return _attach_closed_trade(
+        view, directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, evaluation,
     )
-    entry, exit_fill = position["entry"], evaluation["exit"]
-    with localcontext(Context(prec=34)):
-        entry_notional = Decimal(entry["notional"])
-        entry_cost = Decimal(entry["entry_cost"])
-        exit_notional = Decimal(exit_fill["notional"])
-        exit_cost = Decimal(exit_fill["exit_cost"])
-        gross_pnl = exit_notional - entry_notional
-        gross_return = gross_pnl / entry_notional
-        net_pnl = gross_pnl - entry_cost - exit_cost
-        capital_outlay = entry_notional + entry_cost
-        net_return = net_pnl / capital_outlay
-    view["closed_paper_trades"] = {
-        "status": "ONE AUTHENTICATED CLOSED PAPER TRADE",
-        "trade": {
-            "candidate_position_key": position["candidate_position_key"],
-            "ticker": entry["ticker"],
-            "instrument_id": entry["instrument_id"],
-            "quantity": entry["quantity"],
-            "currency": entry["currency"],
-            "entry_fill_price": entry["fill_price"],
-            "entry_notional": entry["notional"],
-            "entry_cost": entry["entry_cost"],
-            "exit_fill_price": exit_fill["fill_price"],
-            "exit_notional": exit_fill["notional"],
-            "exit_cost": exit_fill["exit_cost"],
-            "exit_reason": evaluation["reason"],
-            "initial_stop": position["initial_stop"],
-            "initial_targets": position["initial_targets"],
-            "holding_window": position["holding_window"],
-            "gross_pnl": str(gross_pnl),
-            "gross_return": str(gross_return),
-            "net_pnl": str(net_pnl),
-            "net_return": str(net_return),
-            "entry_known_at": entry["known_at"],
-            "exit_known_at": exit_fill["known_at"],
-            "observed_bar_end_elapsed": _bar_end_elapsed(
-                entry, exit_fill["interval_end"],
-            ),
-            "observed_bar_end_elapsed_status": (
-                "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
-            ),
+
+
+def continuation_exit_evaluation_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    continuations: tuple,
+    continuation_packages: tuple,
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display a reaudited continuation exit; realized P&L exists only if CLOSED."""
+    event = audit_continuation_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, continuations, continuation_packages,
+        exit_policy, exit_packages,
+    )
+    evaluation = event["result"]
+
+    view = _base() | {
+        "record_id": watchlist.record_id,
+        "market": watchlist.session.market,
+        "collection_status": "CONTINUATION EXIT EVALUATED",
+        "position_status": evaluation["status"],
+        "exit_evaluation": evaluation,
+        "entry_session_exit_evaluation": event["entry_session_evaluation"],
+        "continuation_evaluations": event["evaluations"],
+        "audit_references": {
+            "exit_event_id": event["event_id"],
+            "position_event_id": event["position_event_id"],
+            "position_event_sha256": event["position_event_sha256"],
+            "continuation_events": event["continuation_events"],
+            "exit_package_ids": event["exit_package_ids"],
         },
     }
-    return view
+
+    # Multi-session as-of marking remains a separate unsupported boundary.
+    # OPEN/UNKNOWN therefore expose no realized P&L and invent no mark.
+    if evaluation["status"] != "CLOSED":
+        return view
+
+    return _attach_closed_trade(
+        view, directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, evaluation,
+    )
 
 
 def capital_settlement_view(
@@ -365,6 +448,57 @@ def capital_settlement_view(
     )
     if exit_view["position_status"] != "CLOSED":
         raise ValueError("capital settlement requires authenticated closed trade")
+    return exit_view | {
+        "collection_status": "CAPITAL SETTLED",
+        "capital_settlement": {
+            "status": "AUTHENTICATED NATIVE CASH FLOW / NO NAV OR PERFORMANCE",
+            "market": settlement["market"],
+            "currency": settlement["currency"],
+            "capital_released": settlement["capital_released"],
+            "risk_released": settlement["risk_released"],
+            "exit_notional": settlement["exit_notional"],
+            "exit_cost": settlement["exit_cost"],
+            "net_exit_proceeds": settlement["net_exit_proceeds"],
+            "recorded_at": settlement["recorded_at"],
+        },
+        "audit_references": exit_view["audit_references"] | {
+            "reservation_id": settlement["reservation_id"],
+            "settlement_id": settlement["settlement_id"],
+            "portfolio_policy_id": settlement["policy_id"],
+        },
+    }
+
+
+def continuation_capital_settlement_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    portfolio: ShadowPortfolioPolicy,
+    continuations: tuple,
+    continuation_packages: tuple,
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Display an authenticated continuation settlement without inferring NAV."""
+    settlement = audit_continuation_capital_settlement(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio, continuations,
+        continuation_packages, exit_policy, exit_packages,
+    )
+    exit_view = continuation_exit_evaluation_view(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, continuations, continuation_packages,
+        exit_policy, exit_packages,
+    )
+    if exit_view["position_status"] != "CLOSED":
+        raise ValueError(
+            "continuation capital settlement requires authenticated closed trade"
+        )
+
     return exit_view | {
         "collection_status": "CAPITAL SETTLED",
         "capital_settlement": {

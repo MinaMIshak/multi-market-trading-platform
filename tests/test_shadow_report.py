@@ -6,14 +6,18 @@ import pytest
 
 from app.paper import shadow_collection, shadow_exits, shadow_ledger, shadow_positions
 from app.paper.shadow_report import (
-    capital_settlement_view, exit_evaluation_view, missed_collection_view, position_open_view,
-    trigger_evaluation_view, watchlist_collection_view,
+    capital_settlement_view, continuation_capital_settlement_view,
+    continuation_exit_evaluation_view, exit_evaluation_view,
+    missed_collection_view, position_open_view, trigger_evaluation_view,
+    watchlist_collection_view,
 )
 from tests.test_shadow_collection import authenticated_watchlist
 from tests.test_shadow_exits import prepared_exit
 from tests.test_shadow_ledger import completed
 from tests.test_shadow_positions import setup_position
-from tests.test_shadow_allocations import setup_settlement
+from tests.test_shadow_allocations import (
+    setup_continuation_settlement, setup_settlement,
+)
 
 
 def test_view_preserves_candidate_and_evidence_without_performance_claim(tmp_path, monkeypatch):
@@ -289,3 +293,150 @@ def test_trigger_view_preserves_non_fill_outcomes_without_scoring(
     path.write_text(json.dumps(event))
     with pytest.raises(ValueError, match="does not bind evaluation"):
         trigger_evaluation_view(tmp_path, *args)
+
+# --- continuation report integration ---
+
+def test_continuation_exit_view_reports_closed_native_pnl(tmp_path, monkeypatch):
+    (
+        args, _, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch)
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    view = continuation_exit_evaluation_view(
+        tmp_path, *args, chain, chain_packages, exit_policy, exit_packages,
+    )
+
+    assert view["collection_status"] == "CONTINUATION EXIT EVALUATED"
+    assert view["position_status"] == "CLOSED"
+    assert view["entry_session_exit_evaluation"]["status"] == "OPEN"
+    assert view["continuation_evaluations"][-1]["status"] == "CLOSED"
+
+    trade = view["closed_paper_trades"]["trade"]
+    assert trade["currency"] == "USD"
+
+    assert Decimal(trade["gross_pnl"]) == (
+        Decimal(trade["exit_notional"]) - Decimal(trade["entry_notional"])
+    )
+    assert Decimal(trade["net_pnl"]) == (
+        Decimal(trade["gross_pnl"])
+        - Decimal(trade["entry_cost"])
+        - Decimal(trade["exit_cost"])
+    )
+
+    with localcontext(Context(prec=34)):
+        assert Decimal(trade["gross_return"]) == (
+            Decimal(trade["gross_pnl"]) / Decimal(trade["entry_notional"])
+        )
+        assert Decimal(trade["net_return"]) == (
+            Decimal(trade["net_pnl"])
+            / (Decimal(trade["entry_notional"]) + Decimal(trade["entry_cost"]))
+        )
+
+    assert trade["observed_bar_end_elapsed"] != "0:00:00"
+    assert len(view["audit_references"]["continuation_events"]) == len(chain)
+    assert all(
+        value is None
+        for key, value in view["performance"].items()
+        if key != "status"
+    )
+    json.dumps(view, allow_nan=False)
+
+    assert before == {
+        p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    }
+
+
+@pytest.mark.parametrize("result", ["OPEN", "UNKNOWN"])
+def test_continuation_nonclosed_view_never_claims_realized_pnl(
+    tmp_path, monkeypatch, result,
+):
+    (
+        args, _, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(
+        tmp_path, monkeypatch, result=result,
+    )
+
+    view = continuation_exit_evaluation_view(
+        tmp_path, *args, chain, chain_packages, exit_policy, exit_packages,
+    )
+
+    assert view["position_status"] == result
+    assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
+    assert view["open_paper_positions"] == {"status": "NOT EVALUATED"}
+    assert all(
+        value is None
+        for key, value in view["performance"].items()
+        if key != "status"
+    )
+
+
+def test_continuation_settlement_view_reports_cash_and_realized_trade(
+    tmp_path, monkeypatch,
+):
+    from app.paper import shadow_allocations
+
+    (
+        args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch)
+
+    shadow_allocations.append_continuation_capital_settlement(
+        tmp_path, *args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages,
+    )
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    view = continuation_capital_settlement_view(
+        tmp_path, *args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages,
+    )
+
+    assert view["collection_status"] == "CAPITAL SETTLED"
+    assert view["position_status"] == "CLOSED"
+
+    trade = view["closed_paper_trades"]["trade"]
+    cash = view["capital_settlement"]
+
+    assert cash["currency"] == trade["currency"] == "USD"
+    assert cash["exit_notional"] == trade["exit_notional"]
+    assert cash["exit_cost"] == trade["exit_cost"]
+    assert Decimal(cash["net_exit_proceeds"]) == (
+        Decimal(cash["exit_notional"]) - Decimal(cash["exit_cost"])
+    )
+
+    assert view["audit_references"]["reservation_id"]
+    assert view["audit_references"]["settlement_id"]
+    assert view["audit_references"]["portfolio_policy_id"]
+
+    assert all(
+        value is None
+        for key, value in view["performance"].items()
+        if key != "status"
+    )
+
+    json.dumps(view, allow_nan=False)
+
+    assert before == {
+        p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    }
+
+
+def test_continuation_report_reaudits_tampered_exit(tmp_path, monkeypatch):
+    (
+        args, _, chain, chain_packages,
+        exit_policy, exit_packages, exit_path,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch)
+
+    event = json.loads(exit_path.read_bytes())
+    event["result"]["exit"]["notional"] = "999"
+    exit_path.write_text(json.dumps(event))
+
+    with pytest.raises(ValueError, match="does not bind authenticated inputs"):
+        continuation_exit_evaluation_view(
+            tmp_path, *args, chain, chain_packages,
+            exit_policy, exit_packages,
+        )

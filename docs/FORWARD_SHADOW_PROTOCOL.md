@@ -585,6 +585,17 @@ exit evaluations expose no mark because the position state itself is unresolved.
 Both readers are read-only and fail closed when any durable event or upstream
 evidence binding is missing or altered.
 
+`continuation_exit_evaluation_view(...)` applies the same closed-trade arithmetic
+only after re-auditing a durable `shadow-continuation-exit-event-v3` and its
+complete ordered continuation chain. A `CLOSED` result may expose one exact
+native-currency realized trade with the preserved entry and exit costs. `OPEN`
+and `UNKNOWN` continuation results expose no realized P&L. They also expose no
+multi-session as-of mark: authenticated continuation marking remains a separate
+unsupported boundary. The view preserves the entry-session evaluation,
+per-session continuation evaluations and continuation receipt references. It
+does not aggregate trades, update NAV, convert FX or establish empirical
+performance.
+
 `capital_settlement_view(...)` re-audits the complete portfolio policy,
 reservation, conservative closed exit and settlement chain. It reports the
 released capital and risk, exit notional, exit cost and net exit proceeds in the
@@ -593,6 +604,16 @@ one trade. They do not establish portfolio NAV, return, attribution or reusable
 cross-currency capital. All aggregate performance fields remain null, and the
 reader fails closed if the settlement receipt or any upstream binding is absent
 or altered.
+
+`continuation_capital_settlement_view(...)` provides the corresponding read-only
+boundary for an authenticated multi-session `CLOSED` exit. It re-audits the
+continuation settlement and complete continuation exit chain, reports the same
+native-currency released capital, released risk, exit notional, exit cost and
+net exit proceeds, and combines those facts with the one-trade realized P&L
+view. `OPEN` or `UNKNOWN` continuation outcomes cannot reach this view because
+they cannot create an authenticated capital settlement. This remains
+**EXPERIMENTAL / PAPER ONLY**, **NOT SCORED** and does not create portfolio NAV,
+cross-market attribution, hit rate, expectancy or validated performance.
 
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or
