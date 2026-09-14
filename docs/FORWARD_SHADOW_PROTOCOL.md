@@ -550,11 +550,13 @@ drawdown, hit rate, expectancy and market attribution remain explicitly
 unevaluated, with unavailable numerical metrics represented by null, never zero.
 It does not infer present market state from a previously declared session or
 infer cash-only performance from an empty candidate list. Durable daily
-portfolio snapshots, executable/net NAV, PIT-FX conversion and cost-aware
-performance remain outstanding. Authenticated native-currency accounting cash
-and observed marks can support the separate multi-position gross marked
-valuation boundary, including a zero-active cash-only valuation; that boundary
-still does not establish performance.
+native-currency valuation snapshots are provided by the separate snapshot
+boundary described below; daily return history, executable/net NAV, PIT-FX
+conversion and cost-aware performance remain outstanding. Authenticated
+native-currency accounting cash and observed marks support the separate
+multi-position gross marked valuation boundary, including a zero-active
+cash-only valuation; neither that read-only boundary nor its durable snapshot
+receipts establish performance.
 No authentic collection or empirical result was created by this milestone.
 
 `position_open_view(...)` re-audits the complete frozen watchlist, fact, trigger,
@@ -668,6 +670,55 @@ single NAV. It does not establish daily return history, drawdown, hit rate,
 expectancy, attribution, validated performance or empirical edge. These readers
 are read-only and create no new receipt or market fact. All outputs remain
 **EXPERIMENTAL / PAPER ONLY**.
+
+### Immutable daily native-currency portfolio valuation snapshots
+
+`app.paper.shadow_daily_snapshots` adds a durable receipt layer above the
+authenticated portfolio-accounting and gross-marking readers. One immutable
+daily receipt is addressed under
+`daily-portfolio-snapshots/YYYY-MM-DD.json`. Publication is append-once through
+the existing atomic publication boundary; an existing daily slot cannot be
+rewritten by a later valuation attempt.
+
+A cash-only daily snapshot is admissible only when the frozen ledger cut has no
+active capital reservation. It binds the audited portfolio-policy identity and
+complete policy receipt hash, the exact historical reservation and settlement
+receipt hashes visible before the snapshot receipt, and independently
+re-derives native-currency cash accounting. A later reservation or settlement
+does not rewrite the historical snapshot and is not silently inserted into its
+frozen ledger cut.
+
+A gross-marked daily snapshot instead requires every frozen active reservation
+to have exactly one authenticated `OPEN` mark. The caller supplies typed
+same-session and/or continuation mark requests; the snapshot re-audits those
+upstream exit boundaries and preserves per-position provenance including the
+reservation receipt, position event, exit receipt and observed mark timing.
+Continuation marks additionally bind the exact continuation-event chain.
+Mixed same-session and continuation positions are permitted inside one shared
+native-currency portfolio when every active reservation is covered exactly
+once. Duplicate, missing, `CLOSED`, `UNKNOWN`, unbound or tampered marks fail
+closed.
+
+For marked snapshots, `gross_marked_nav` remains accounting cash plus
+authenticated observed gross market value. It is still before hypothetical
+liquidation slippage and exit cost and is therefore not executable or net
+liquidation NAV. Cross-currency aggregation is not introduced: the snapshot
+currency must equal the portfolio base currency, and no EGP/USD combination is
+performed without admitted point-in-time FX.
+
+Both cash-only and gross-marked receipts bind their complete basis with a
+deterministic snapshot hash and require their receipt clock to follow all
+authenticated inputs. Historical audit re-derives the frozen ledger accounting
+and, for marked snapshots, re-audits the exact mark provenance. Recomputing a
+snapshot hash after altering ledger references, accounting values or mark
+provenance does not make the receipt auditable.
+
+These receipts establish durable daily valuation observations only. They do not
+yet establish a daily return series, drawdown history, hit rate, expectancy,
+profit factor, Sharpe/Sortino, attribution, validated performance or empirical
+edge. Performance fields remain explicitly **NOT EVALUATED**. All snapshot
+outputs remain **EXPERIMENTAL / PAPER ONLY** and create no real-money execution
+authority.
 
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or
