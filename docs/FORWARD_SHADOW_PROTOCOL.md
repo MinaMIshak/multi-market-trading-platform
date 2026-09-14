@@ -500,11 +500,12 @@ The local reader verifies hashes, exact finite nonnegative cash values, receipt
 semantics, filenames, unique reservation settlement, policy/market/currency
 binding and nonfuture clock ordering. This does not independently attest local
 clocks or reauthenticate every historical source package without those original
-inputs. Executable/net portfolio NAV, multi-position aggregation, combined-market
-performance and PIT FX remain unavailable boundaries. Read-only authenticated
-native-currency cash and an exactly-one-active-position gross marked valuation
-are provided separately by `app.paper.shadow_daily_portfolio`; they do not
-establish executable liquidation value or empirical performance.
+inputs. Executable/net portfolio NAV, combined-market performance and PIT FX
+remain unavailable boundaries. `app.paper.shadow_daily_portfolio` separately
+provides read-only authenticated native-currency accounting cash plus gross
+observed marking for all active reservations when every active position has
+exactly one authenticated `OPEN` mark. This does not establish executable
+liquidation value, cross-currency NAV or empirical performance.
 
 ### Excess-loss halt
 
@@ -548,10 +549,12 @@ Market status, downstream execution, open/closed positions, NAV, returns,
 drawdown, hit rate, expectancy and market attribution remain explicitly
 unevaluated, with unavailable numerical metrics represented by null, never zero.
 It does not infer present market state from a previously declared session or
-infer cash-only performance from an empty candidate list. Full multi-position daily aggregation, executable/net NAV, PIT-FX
-conversion and cost-aware performance remain outstanding. Authenticated
-native-currency observed marks can now support the separate one-active-position
-gross marked valuation boundary.
+infer cash-only performance from an empty candidate list. Durable daily
+portfolio snapshots, executable/net NAV, PIT-FX conversion and cost-aware
+performance remain outstanding. Authenticated native-currency accounting cash
+and observed marks can support the separate multi-position gross marked
+valuation boundary, including a zero-active cash-only valuation; that boundary
+still does not establish performance.
 No authentic collection or empirical result was created by this milestone.
 
 `position_open_view(...)` re-audits the complete frozen watchlist, fact, trigger,
@@ -623,7 +626,7 @@ they cannot create an authenticated capital settlement. This remains
 **EXPERIMENTAL / PAPER ONLY**, **NOT SCORED** and does not create portfolio NAV,
 cross-market attribution, hit rate, expectancy or validated performance.
 
-### Read-only native portfolio accounting and one-position gross mark
+### Read-only native portfolio accounting and authenticated gross marking
 
 `app.paper.shadow_daily_portfolio.native_cash_portfolio_view(...)` re-audits the
 frozen portfolio policy and durable reservation/settlement ledgers, then derives
@@ -634,19 +637,37 @@ fails closed. A reservation includes entry notional plus authenticated entry
 cost, so entry cost is already reflected in accounting cash.
 
 `single_session_marked_portfolio_view(...)` and
-`continuation_marked_portfolio_view(...)` reuse the authenticated exit report
-boundaries rather than reading unaudited bars. They currently require exactly
-one active reservation and an authenticated `OPEN` evaluation, and require the
-observed mark to bind the same candidate position, market and native currency.
-`CLOSED`, `UNKNOWN`, absent marks or binding mismatches fail closed.
+`continuation_marked_portfolio_view(...)` remain backward-compatible
+exactly-one-active-reservation readers. They reuse authenticated exit report
+boundaries rather than reading unaudited bars, require an authenticated `OPEN`
+evaluation, and require the observed mark to bind the same candidate position,
+market and native currency. `CLOSED`, `UNKNOWN`, absent marks or binding
+mismatches fail closed.
 
-For that limited boundary, `gross_marked_nav` is accounting cash plus the
-authenticated observed gross market value of the one active position. It is
-explicitly before hypothetical liquidation slippage and exit cost and therefore
-is not executable/net NAV. These readers do not aggregate multiple open
-positions, convert EGP/USD, establish returns, drawdown, hit rate, expectancy,
-attribution or empirical edge. They are read-only and create no new receipt or
-market fact. All outputs remain **EXPERIMENTAL / PAPER ONLY**.
+`multi_position_marked_portfolio_view(...)` extends that read-only boundary to
+all active reservations in one shared native-currency portfolio. Callers provide
+typed same-session or continuation input requests, not mark dictionaries. Each
+request is re-audited through the existing exit-report boundary. Every resulting
+`OPEN` mark must bind the active reservation's candidate position key, position
+event identity/hash, market and native currency. Duplicate marks, marks without
+an active reservation, missing active marks, `CLOSED`, `UNKNOWN` or malformed
+requests fail closed. The complete authenticated mark-key set must equal the
+complete active-reservation key set.
+
+With active positions, `gross_marked_nav` is authenticated accounting cash plus
+the sum of authenticated observed gross market values. With zero active
+reservations, an empty request tuple produces an authenticated cash-only
+valuation with zero open market value and `gross_marked_nav` equal to accounting
+cash. Neither case is an empirical performance result.
+
+Gross marking is explicitly before hypothetical liquidation slippage and exit
+cost and therefore is not executable/net NAV. Aggregation is native/base
+currency only; a foreign-currency allocation already fails closed without
+admitted point-in-time FX, so this boundary does not combine EGP and USD into a
+single NAV. It does not establish daily return history, drawdown, hit rate,
+expectancy, attribution, validated performance or empirical edge. These readers
+are read-only and create no new receipt or market fact. All outputs remain
+**EXPERIMENTAL / PAPER ONLY**.
 
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or

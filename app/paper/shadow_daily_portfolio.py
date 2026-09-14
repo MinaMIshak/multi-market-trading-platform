@@ -1,7 +1,8 @@
 """Read-only native-currency portfolio accounting and authenticated marking."""
 from __future__ import annotations
 
-from decimal import Context, Decimal, localcontext
+from dataclasses import dataclass
+from decimal import Context, Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
 from app.paper.shadow_allocations import (
@@ -9,6 +10,11 @@ from app.paper.shadow_allocations import (
     _read_settlements,
 )
 from app.paper.shadow_collection import LABEL
+from app.paper.shadow_exits import ShadowExitPolicy
+from app.paper.shadow_facts import ForwardFactBundle
+from app.paper.shadow_fills import ShadowFillPolicy
+from app.paper.shadow_records import ShadowWatchlist
+from app.research.historical_evidence import HistoricalEvidencePackage
 from app.paper.shadow_portfolio import (
     ShadowPortfolioPolicy,
     audit_portfolio_policy,
@@ -374,3 +380,312 @@ def continuation_marked_portfolio_view(
         portfolio,
         report_view,
     )
+
+@dataclass(frozen=True, slots=True)
+class SingleSessionMarkRequest:
+    """Authenticated inputs for one same-session OPEN mark."""
+
+    watchlist: ShadowWatchlist
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...]
+    facts: ForwardFactBundle
+    fact_packages: tuple[HistoricalEvidencePackage, ...]
+    fill_policy: ShadowFillPolicy
+    fill_packages: tuple[HistoricalEvidencePackage, ...]
+    exit_policy: ShadowExitPolicy
+    exit_packages: tuple[HistoricalEvidencePackage, ...]
+    evaluation_facts: ForwardFactBundle | None = None
+    evaluation_fact_packages: (
+        tuple[HistoricalEvidencePackage, ...] | None
+    ) = None
+
+
+@dataclass(frozen=True, slots=True)
+class ContinuationMarkRequest:
+    """Authenticated inputs for one continuation OPEN mark."""
+
+    watchlist: ShadowWatchlist
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...]
+    facts: ForwardFactBundle
+    fact_packages: tuple[HistoricalEvidencePackage, ...]
+    fill_policy: ShadowFillPolicy
+    fill_packages: tuple[HistoricalEvidencePackage, ...]
+    continuations: tuple
+    continuation_packages: tuple
+    exit_policy: ShadowExitPolicy
+    exit_packages: tuple[HistoricalEvidencePackage, ...]
+
+
+def _report_for_mark_request(
+    directory: Path,
+    request,
+) -> dict:
+    """Re-audit one exact request through the existing report boundary."""
+    if type(request) is SingleSessionMarkRequest:
+        return exit_evaluation_view(
+            directory,
+            request.watchlist,
+            request.watchlist_packages,
+            request.facts,
+            request.fact_packages,
+            request.fill_policy,
+            request.fill_packages,
+            request.exit_policy,
+            request.exit_packages,
+            evaluation_facts=request.evaluation_facts,
+            evaluation_fact_packages=(
+                request.evaluation_fact_packages
+            ),
+        )
+
+    if type(request) is ContinuationMarkRequest:
+        return continuation_exit_evaluation_view(
+            directory,
+            request.watchlist,
+            request.watchlist_packages,
+            request.facts,
+            request.fact_packages,
+            request.fill_policy,
+            request.fill_packages,
+            request.continuations,
+            request.continuation_packages,
+            request.exit_policy,
+            request.exit_packages,
+        )
+
+    raise ValueError(
+        "exact authenticated portfolio mark request required"
+    )
+
+
+def _authenticated_open_mark_from_report(
+    report_view: dict,
+    reservation: dict,
+    base_currency: str,
+) -> tuple[dict, Decimal]:
+    """Bind one re-audited OPEN mark to one active reservation."""
+    if (
+        type(report_view) is not dict
+        or report_view.get("position_status") != "OPEN"
+    ):
+        raise ValueError(
+            "portfolio mark requires authenticated OPEN evaluation"
+        )
+
+    opened = report_view.get("open_paper_positions")
+
+    if (
+        type(opened) is not dict
+        or opened.get("status")
+        != "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR"
+        or type(opened.get("position")) is not dict
+    ):
+        raise ValueError(
+            "authenticated OPEN evaluation has no admissible mark"
+        )
+
+    position = opened["position"]
+    key = position.get("candidate_position_key")
+
+    if key != reservation["candidate_position_key"]:
+        raise ValueError(
+            "portfolio mark does not bind active reservation"
+        )
+
+    references = report_view.get("audit_references")
+
+    if (
+        type(references) is not dict
+        or references.get("position_event_id")
+        != reservation["position_event_id"]
+        or references.get("position_event_sha256")
+        != reservation["position_event_sha256"]
+    ):
+        raise ValueError(
+            "portfolio mark does not bind reserved position event"
+        )
+
+    if (
+        report_view.get("market") != reservation["market"]
+        or position.get("currency") != reservation["currency"]
+        or reservation["currency"] != base_currency
+    ):
+        raise ValueError(
+            "portfolio mark market or currency mismatch"
+        )
+
+    try:
+        market_value = Decimal(
+            position["gross_market_value"]
+        )
+    except (
+        InvalidOperation,
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
+        raise ValueError(
+            "invalid authenticated gross market value"
+        ) from None
+
+    if (
+        not market_value.is_finite()
+        or market_value < 0
+    ):
+        raise ValueError(
+            "invalid authenticated gross market value"
+        )
+
+    return (
+        dict(position)
+        | {"reservation_id": reservation["reservation_id"]},
+        market_value,
+    )
+
+
+def multi_position_marked_portfolio_view(
+    directory: Path,
+    portfolio: ShadowPortfolioPolicy,
+    requests: tuple[
+        SingleSessionMarkRequest | ContinuationMarkRequest,
+        ...,
+    ],
+) -> dict:
+    """Value all active native-currency reservations from authenticated marks."""
+    if type(requests) is not tuple:
+        raise ValueError(
+            "portfolio mark requests must be an exact tuple"
+        )
+
+    cash_view = native_cash_portfolio_view(
+        directory,
+        portfolio,
+    )
+    _, _, _, active = _ledger_state(
+        Path(directory),
+        portfolio,
+    )
+
+    active_by_key = {
+        row["candidate_position_key"]: row
+        for row in active
+    }
+
+    if len(active_by_key) != len(active):
+        raise ValueError(
+            "duplicate active candidate position key"
+        )
+
+    marks: dict[str, dict] = {}
+    values: dict[str, Decimal] = {}
+
+    for request in requests:
+        report_view = _report_for_mark_request(
+            Path(directory),
+            request,
+        )
+
+        opened = report_view.get(
+            "open_paper_positions"
+        )
+        position = (
+            opened.get("position")
+            if type(opened) is dict
+            else None
+        )
+
+        if type(position) is not dict:
+            raise ValueError(
+                "portfolio mark requires authenticated OPEN evaluation"
+            )
+
+        key = position.get("candidate_position_key")
+
+        if key in marks:
+            raise ValueError(
+                "duplicate authenticated portfolio mark"
+            )
+
+        reservation = active_by_key.get(key)
+
+        if reservation is None:
+            raise ValueError(
+                "authenticated mark has no active reservation"
+            )
+
+        mark, market_value = (
+            _authenticated_open_mark_from_report(
+                report_view,
+                reservation,
+                cash_view["currency"],
+            )
+        )
+
+        marks[key] = mark
+        values[key] = market_value
+
+    if set(marks) != set(active_by_key):
+        raise ValueError(
+            "every active reservation requires exactly one "
+            "authenticated OPEN mark"
+        )
+
+    with localcontext(Context(prec=34)):
+        cash = Decimal(cash_view["cash"])
+        open_market_value = sum(
+            values.values(),
+            Decimal(0),
+        )
+        gross_marked_nav = cash + open_market_value
+
+    ordered_keys = sorted(marks)
+
+    if ordered_keys:
+        status = (
+            "AUTHENTICATED NATIVE CASH + "
+            "OBSERVED GROSS OPEN MARKS"
+        )
+        marked_status = (
+            "ACCOUNTING CASH PLUS AUTHENTICATED OBSERVED "
+            "GROSS MARKET VALUE / ENTRY COST INCLUDED / "
+            "BEFORE LIQUIDATION COST AND SLIPPAGE"
+        )
+    else:
+        status = (
+            "AUTHENTICATED NATIVE CASH / "
+            "NO ACTIVE RESERVATIONS"
+        )
+        marked_status = (
+            "ACCOUNTING CASH / NO ACTIVE RESERVATIONS / "
+            "NO LIQUIDATION INFERENCE"
+        )
+
+    return cash_view | {
+        "schema_version":
+            "shadow-gross-marked-portfolio-view-v2",
+        "scope": (
+            "ONE SHARED NATIVE-CURRENCY PORTFOLIO / "
+            "ALL ACTIVE RESERVATIONS AUTHENTICATED"
+        ),
+        "status": status,
+        "open_position_count": len(ordered_keys),
+        "open_positions": [
+            marks[key]
+            for key in ordered_keys
+        ],
+        "open_market_value": str(open_market_value),
+        "gross_marked_nav": str(gross_marked_nav),
+        "gross_marked_nav_status": marked_status,
+        "performance": {
+            "status":
+                "MARKED VALUATION ONLY / PERFORMANCE NOT EVALUATED",
+            "nav": None,
+            "cumulative_return": None,
+            "realized_return": None,
+            "max_drawdown": None,
+            "hit_rate": None,
+            "expectancy": None,
+            "egx_attribution": None,
+            "us_attribution": None,
+            "combined_attribution": None,
+        },
+    }
