@@ -348,24 +348,83 @@ def test_continuation_exit_view_reports_closed_native_pnl(tmp_path, monkeypatch)
     }
 
 
-@pytest.mark.parametrize("result", ["OPEN", "UNKNOWN"])
-def test_continuation_nonclosed_view_never_claims_realized_pnl(
-    tmp_path, monkeypatch, result,
+def test_continuation_open_view_reports_authenticated_asof_gross_mark(
+    tmp_path, monkeypatch,
 ):
     (
         args, _, chain, chain_packages,
         exit_policy, exit_packages, _,
     ) = setup_continuation_settlement(
-        tmp_path, monkeypatch, result=result,
+        tmp_path, monkeypatch, result="OPEN",
+    )
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    view = continuation_exit_evaluation_view(
+        tmp_path, *args, chain, chain_packages, exit_policy, exit_packages,
+    )
+
+    assert view["position_status"] == "OPEN"
+    assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
+
+    opened = view["open_paper_positions"]
+    assert opened["status"] == "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR"
+
+    mark = opened["position"]
+    observed = chain[-1].bars[-1]
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+
+    assert mark["currency"] == "USD"
+    assert mark["mark_price"] == str(observed.close)
+    assert mark["marked_through_sequence"] == observed.sequence
+    assert mark["mark_interval_end"] == observed.interval_end.isoformat()
+    assert mark["mark_known_at"] == observed.available_at.isoformat()
+
+    with localcontext(Context(prec=34)):
+        expected_value = Decimal(mark["quantity"]) * observed.close
+        expected_pnl = expected_value - Decimal(position["entry"]["notional"])
+        expected_return = expected_pnl / Decimal(position["entry"]["notional"])
+
+    assert Decimal(mark["gross_market_value"]) == expected_value
+    assert Decimal(mark["gross_unrealized_pnl"]) == expected_pnl
+    assert Decimal(mark["gross_unrealized_return"]) == expected_return
+    assert mark["unrealized_pnl"] is None
+    assert "BEFORE FEES AND LIQUIDATION SLIPPAGE" in (
+        mark["gross_unrealized_pnl_status"]
+    )
+    assert "UNKNOWN" in mark["unrealized_pnl_status"]
+    assert mark["observed_bar_end_elapsed"] != "0:00:00"
+
+    assert all(
+        value is None
+        for key, value in view["performance"].items()
+        if key != "status"
+    )
+    json.dumps(view, allow_nan=False)
+
+    assert before == {
+        p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()
+    }
+
+
+def test_continuation_unknown_view_exposes_no_mark_or_realized_pnl(
+    tmp_path, monkeypatch,
+):
+    (
+        args, _, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(
+        tmp_path, monkeypatch, result="UNKNOWN",
     )
 
     view = continuation_exit_evaluation_view(
         tmp_path, *args, chain, chain_packages, exit_policy, exit_packages,
     )
 
-    assert view["position_status"] == result
+    assert view["position_status"] == "UNKNOWN"
     assert view["closed_paper_trades"] == {"status": "NOT EVALUATED"}
     assert view["open_paper_positions"] == {"status": "NOT EVALUATED"}
+
     assert all(
         value is None
         for key, value in view["performance"].items()

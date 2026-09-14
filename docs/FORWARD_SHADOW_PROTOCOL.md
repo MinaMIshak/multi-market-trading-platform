@@ -585,13 +585,16 @@ exit evaluations expose no mark because the position state itself is unresolved.
 Both readers are read-only and fail closed when any durable event or upstream
 evidence binding is missing or altered.
 
-`continuation_exit_evaluation_view(...)` applies the same closed-trade arithmetic
-only after re-auditing a durable `shadow-continuation-exit-event-v3` and its
-complete ordered continuation chain. A `CLOSED` result may expose one exact
-native-currency realized trade with the preserved entry and exit costs. `OPEN`
-and `UNKNOWN` continuation results expose no realized P&L. They also expose no
-multi-session as-of mark: authenticated continuation marking remains a separate
-unsupported boundary. The view preserves the entry-session evaluation,
+`continuation_exit_evaluation_view(...)` re-audits a durable
+`shadow-continuation-exit-event-v3` and its complete ordered continuation chain.
+A `CLOSED` result applies the same one-trade native-currency realized arithmetic
+as the same-session reader, preserving entry and exit costs. An `OPEN` result
+may expose an authenticated as-of gross mark from the final admitted continuation
+bar used by that evaluation: close price, bar sequence, interval end, availability
+time, gross market value and gross unrealized P&L/return are reported in native
+currency. This is an observed-bar valuation only, before liquidation slippage
+and exit cost; executable/net unrealized P&L remains unknown. `UNKNOWN` exposes
+neither a mark nor realized P&L. The view preserves the entry-session evaluation,
 per-session continuation evaluations and continuation receipt references. It
 does not aggregate trades, update NAV, convert FX or establish empirical
 performance.

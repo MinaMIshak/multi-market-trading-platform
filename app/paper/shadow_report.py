@@ -50,6 +50,79 @@ def _bar_end_elapsed(entry: dict, observed_interval_end: str) -> str:
     return str(elapsed)
 
 
+def _attach_open_mark(
+    view: dict,
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    observed_facts,
+    evaluation: dict,
+) -> dict:
+    """Attach one authenticated as-of gross mark without inventing liquidation."""
+    if type(evaluation) is not dict or evaluation.get("status") != "OPEN":
+        raise ValueError("open mark requires authenticated OPEN evaluation")
+
+    sequence = evaluation["evaluated_through_sequence"]
+    mark = next(
+        (bar for bar in observed_facts.bars if bar.sequence == sequence),
+        None,
+    )
+    if mark is None:
+        raise ValueError("open exit evaluation does not bind an admitted mark")
+
+    position = audit_position_open_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    entry = position["entry"]
+
+    with localcontext(Context(prec=34)):
+        entry_notional = Decimal(entry["notional"])
+        gross_market_value = Decimal(entry["quantity"]) * mark.close
+        gross_unrealized_pnl = gross_market_value - entry_notional
+        gross_unrealized_return = gross_unrealized_pnl / entry_notional
+
+    view["open_paper_positions"] = {
+        "status": "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR",
+        "position": {
+            "candidate_position_key": position["candidate_position_key"],
+            "ticker": entry["ticker"],
+            "instrument_id": entry["instrument_id"],
+            "quantity": entry["quantity"],
+            "currency": entry["currency"],
+            "entry_fill_price": entry["fill_price"],
+            "initial_stop": position["initial_stop"],
+            "initial_targets": position["initial_targets"],
+            "holding_window": position["holding_window"],
+            "mark_price": str(mark.close),
+            "gross_market_value": str(gross_market_value),
+            "gross_unrealized_pnl": str(gross_unrealized_pnl),
+            "gross_unrealized_return": str(gross_unrealized_return),
+            "gross_unrealized_pnl_status": (
+                "AS OF OBSERVED BAR / BEFORE FEES AND LIQUIDATION SLIPPAGE"
+            ),
+            "marked_through_sequence": mark.sequence,
+            "mark_interval_end": mark.interval_end.isoformat(),
+            "mark_known_at": mark.available_at.isoformat(),
+            "observed_bar_end_elapsed": _bar_end_elapsed(
+                entry, mark.interval_end.isoformat(),
+            ),
+            "observed_bar_end_elapsed_status": (
+                "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
+            ),
+            "unrealized_pnl": None,
+            "unrealized_pnl_status": (
+                "UNKNOWN / NO AUTHENTICATED LIQUIDATION SLIPPAGE AND COST"
+            ),
+        },
+    }
+    return view
+
+
 def _attach_closed_trade(
     view: dict,
     directory: Path,
@@ -318,55 +391,10 @@ def exit_evaluation_view(
         },
     }
     if evaluation["status"] == "OPEN":
-        sequence = evaluation["evaluated_through_sequence"]
-        mark = next((bar for bar in observed_facts.bars if bar.sequence == sequence), None)
-        if mark is None:
-            raise ValueError("open exit evaluation does not bind an admitted mark")
-        position = audit_position_open_event(
-            directory, watchlist, watchlist_packages, facts, fact_packages,
-            fill_policy, fill_packages,
+        return _attach_open_mark(
+            view, directory, watchlist, watchlist_packages, facts, fact_packages,
+            fill_policy, fill_packages, observed_facts, evaluation,
         )
-        entry = position["entry"]
-        with localcontext(Context(prec=34)):
-            entry_notional = Decimal(entry["notional"])
-            gross_market_value = Decimal(entry["quantity"]) * mark.close
-            gross_unrealized_pnl = gross_market_value - entry_notional
-            gross_unrealized_return = gross_unrealized_pnl / entry_notional
-        view["open_paper_positions"] = {
-            "status": "ONE AUTHENTICATED OPEN POSITION AS OF OBSERVED BAR",
-            "position": {
-                "candidate_position_key": position["candidate_position_key"],
-                "ticker": entry["ticker"],
-                "instrument_id": entry["instrument_id"],
-                "quantity": entry["quantity"],
-                "currency": entry["currency"],
-                "entry_fill_price": entry["fill_price"],
-                "initial_stop": position["initial_stop"],
-                "initial_targets": position["initial_targets"],
-                "holding_window": position["holding_window"],
-                "mark_price": str(mark.close),
-                "gross_market_value": str(gross_market_value),
-                "gross_unrealized_pnl": str(gross_unrealized_pnl),
-                "gross_unrealized_return": str(gross_unrealized_return),
-                "gross_unrealized_pnl_status": (
-                    "AS OF OBSERVED BAR / BEFORE FEES AND LIQUIDATION SLIPPAGE"
-                ),
-                "marked_through_sequence": mark.sequence,
-                "mark_interval_end": mark.interval_end.isoformat(),
-                "mark_known_at": mark.available_at.isoformat(),
-                "observed_bar_end_elapsed": _bar_end_elapsed(
-                    entry, mark.interval_end.isoformat(),
-                ),
-                "observed_bar_end_elapsed_status": (
-                    "BOUNDED OBSERVATION WINDOW / EXACT INTRABAR FILL TIME UNKNOWN"
-                ),
-                "unrealized_pnl": None,
-                "unrealized_pnl_status": (
-                    "UNKNOWN / NO AUTHENTICATED LIQUIDATION SLIPPAGE AND COST"
-                ),
-            },
-        }
-        return view
     if evaluation["status"] != "CLOSED":
         return view
 
@@ -414,8 +442,11 @@ def continuation_exit_evaluation_view(
         },
     }
 
-    # Multi-session as-of marking remains a separate unsupported boundary.
-    # OPEN/UNKNOWN therefore expose no realized P&L and invent no mark.
+    if evaluation["status"] == "OPEN":
+        return _attach_open_mark(
+            view, directory, watchlist, watchlist_packages, facts, fact_packages,
+            fill_policy, fill_packages, continuations[-1], evaluation,
+        )
     if evaluation["status"] != "CLOSED":
         return view
 
