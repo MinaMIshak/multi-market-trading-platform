@@ -462,9 +462,12 @@ publication must also follow the preceding reservation clock. Totals are checked
 using the same isolated Decimal precision as publication. These are local ledger
 integrity checks, not independent timestamp attestation or authentication of all
 prior source packages. The target reservation still requires full upstream audit;
-revalidation of all predecessor source chains and authenticated exit settlement
-remain necessary before operational use. Closed positions continue to consume
-capital until that settlement boundary is implemented.
+revalidation of all predecessor source chains remains necessary before
+operational use. A reservation continues to consume capital until an
+authenticated settlement receipt exists. Both same-session closed exits and
+bounded multi-session continuation exits can cross that settlement boundary
+only when the fully reaudited result is `CLOSED`; `OPEN` and `UNKNOWN` continue
+to consume the original reservation.
 
 ### Shared capital settlement
 
@@ -475,6 +478,16 @@ reservation, preserved closed-exit bytes, policy, market and native currency. It
 records capital and stop-risk released together with exit notional, exit cost and
 net exit proceeds. These are cash-flow facts labelled **EXPERIMENTAL / PAPER
 ONLY**; they do not create NAV, aggregate P&L or a performance claim.
+
+The same settlement ledger accepts only the two explicitly supported
+authenticated exit schemas: `shadow-exit-event-v2` for same-session evaluation
+and `shadow-continuation-exit-event-v3` for later-session continuation. A v3
+settlement reaudits the complete ordered continuation chain, requires the entry
+session to remain `OPEN`, requires every nonterminal continuation predecessor
+to remain `OPEN` with complete close coverage, and requires the final result to
+be `CLOSED`. The settlement binds the durable continuation-exit event hash and
+the final continuation event used to address that immutable exit receipt. Any
+other schema, malformed chain, `OPEN` result or `UNKNOWN` result fails closed.
 
 Later reservations validate every local settlement and its referenced closed
 exit before excluding the settled exposure. Realized losses reduce the remaining
@@ -501,10 +514,13 @@ historical reservation audits remain available; no receipt is rewritten.
 
 This mandatory conservative rule has no automatic reset or override. Do not open
 a new ledger to evade a halt. An explicit reviewed recovery protocol would be a
-separate milestone. This detects settled excess loss; it does not bound gap losses,
-monitor unrealized losses or make multi-session execution operational. The initial
-stop-risk estimate still omits exit slippage; even an ordinary stop exit may halt
-reuse. All outputs remain **EXPERIMENTAL / PAPER ONLY**.
+separate milestone. This detects settled excess loss; it does not bound gap losses
+or monitor unrealized losses. Authenticated whole-position `CLOSED` continuation
+exits can now settle the original reservation, but this does not make general
+multi-session execution operational: scheduled holding-window exits, partial
+exits and delayed liquidation remain unsupported. The initial stop-risk estimate
+still omits exit slippage; even an ordinary stop exit may halt reuse. All outputs
+remain **EXPERIMENTAL / PAPER ONLY**.
 
 ### Read-only collection view
 

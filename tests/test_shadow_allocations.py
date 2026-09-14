@@ -322,3 +322,156 @@ def test_excess_loss_exact_boundary_and_no_profit_offset(tmp_path, monkeypatch, 
         else:
             result = shadow_allocations._basis(position, receipt, portfolio, args[4], reservations, settlements)
             assert result["capital_reserved"] == "101.15005"
+
+# --- continuation capital settlement integration ---
+
+def setup_continuation_settlement(tmp_path, monkeypatch, *, result="CLOSED"):
+    from datetime import datetime
+    from app.paper import shadow_continuations
+    from tests.test_shadow_continuations import (
+        continuation_exit_policy, exit_evidence, prepared_continuation,
+    )
+
+    args, facts, continuation_evidence, available = prepared_continuation(
+        tmp_path, monkeypatch,
+    )
+    item = args[0]
+
+    portfolio = shadow_portfolio.ShadowPortfolioPolicy(
+        base_currency="USD", initial_capital=Decimal("1000"),
+        effective_at=item.information_cutoff - timedelta(minutes=1),
+        egx_capital_fraction=Decimal(".3"), us_capital_fraction=Decimal(".2"),
+        minimum_cash_fraction=Decimal(".1"), max_position_fraction=Decimal(".2"),
+        max_position_risk_fraction=Decimal(".1"),
+        max_portfolio_risk_fraction=Decimal(".2"),
+    )
+
+    monkeypatch.setattr(
+        shadow_portfolio, "_now",
+        lambda: item.information_cutoff - timedelta(minutes=2),
+    )
+    shadow_portfolio.freeze_portfolio_policy(tmp_path, portfolio)
+
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    reservation_at = datetime.fromisoformat(position["recorded_at"]) + timedelta(seconds=1)
+    monkeypatch.setattr(shadow_portfolio, "_now", lambda: reservation_at)
+    monkeypatch.setattr(shadow_allocations, "_now", lambda: reservation_at)
+    shadow_allocations.append_capital_reservation(tmp_path, *args, portfolio)
+
+    if result == "CLOSED":
+        updates = {
+            "open": Decimal("94"), "high": Decimal("96"), "low": Decimal("93"),
+            "close": Decimal("95"), "volume": 10,
+        }
+        facts = facts.model_copy(update={
+            "bars": (facts.bars[0].model_copy(update=updates),),
+        })
+    elif result == "UNKNOWN":
+        facts = facts.model_copy(update={
+            "bars": (facts.bars[0].model_copy(update={
+                "high": Decimal("110"), "low": Decimal("95"),
+            }),),
+        })
+    elif result != "OPEN":
+        raise ValueError("unsupported artificial continuation result")
+
+    continuation_at = available + timedelta(minutes=1)
+    monkeypatch.setattr(shadow_continuations, "_now", lambda: continuation_at)
+    shadow_continuations.append_continuation_event(
+        tmp_path, *args, facts, continuation_evidence,
+    )
+
+    exit_packages = exit_evidence(item.information_cutoff)
+    exit_policy = continuation_exit_policy().model_copy(update={
+        "slippage_evidence_package_id": exit_packages[0].identity,
+        "cost_evidence_package_id": exit_packages[1].identity,
+        "participation_evidence_package_id": exit_packages[2].identity,
+    })
+
+    exit_at = available + timedelta(minutes=2)
+    monkeypatch.setattr(shadow_exits, "_now", lambda: exit_at)
+    exit_path = shadow_exits.append_continuation_exit_event(
+        tmp_path, *args, (facts,), (continuation_evidence,),
+        exit_policy, exit_packages,
+    )
+
+    settlement_at = available + timedelta(minutes=3)
+    monkeypatch.setattr(shadow_portfolio, "_now", lambda: settlement_at)
+    monkeypatch.setattr(shadow_allocations, "_now", lambda: settlement_at)
+
+    return (
+        args, portfolio, (facts,), (continuation_evidence,),
+        exit_policy, exit_packages, exit_path,
+    )
+
+
+def test_continuation_closed_exit_settles_same_native_cash_ledger(tmp_path, monkeypatch):
+    (
+        args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch)
+
+    path = shadow_allocations.append_continuation_capital_settlement(
+        tmp_path, *args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages,
+    )
+    event = json.loads(path.read_bytes())
+
+    assert event["currency"] == "USD"
+    assert event["capital_released"] == "101.15005"
+    assert event["risk_released"] == "7.19755"
+    assert (
+        Decimal(event["net_exit_proceeds"])
+        == Decimal(event["exit_notional"]) - Decimal(event["exit_cost"])
+    )
+
+    reservations = shadow_allocations._read_reservations(tmp_path)
+    assert shadow_allocations._read_settlements(tmp_path, reservations) == [event]
+
+    assert shadow_allocations.audit_continuation_capital_settlement(
+        tmp_path, *args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages,
+    ) == event
+
+    with pytest.raises(FileExistsError):
+        shadow_allocations.append_continuation_capital_settlement(
+            tmp_path, *args, portfolio, chain, chain_packages,
+            exit_policy, exit_packages,
+        )
+
+
+@pytest.mark.parametrize("result", ["OPEN", "UNKNOWN"])
+def test_continuation_nonclosed_exit_cannot_release_capital(
+    tmp_path, monkeypatch, result,
+):
+    (
+        args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages, _,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch, result=result)
+
+    with pytest.raises(ValueError, match="requires authenticated CLOSED exit"):
+        shadow_allocations.append_continuation_capital_settlement(
+            tmp_path, *args, portfolio, chain, chain_packages,
+            exit_policy, exit_packages,
+        )
+
+    assert not (tmp_path / "capital-settlements").exists()
+
+
+def test_continuation_settlement_reaudits_exit_before_release(tmp_path, monkeypatch):
+    (
+        args, portfolio, chain, chain_packages,
+        exit_policy, exit_packages, exit_path,
+    ) = setup_continuation_settlement(tmp_path, monkeypatch)
+
+    event = json.loads(exit_path.read_bytes())
+    event["result"]["exit"]["notional"] = "999"
+    exit_path.write_text(json.dumps(event))
+
+    with pytest.raises(ValueError, match="does not bind authenticated inputs"):
+        shadow_allocations.append_continuation_capital_settlement(
+            tmp_path, *args, portfolio, chain, chain_packages,
+            exit_policy, exit_packages,
+        )
+
+    assert not (tmp_path / "capital-settlements").exists()

@@ -14,7 +14,9 @@ from pathlib import Path
 from app.paper.shadow_collection import _publish_once
 from app.paper.shadow_facts import ForwardFactBundle
 from app.paper.shadow_fills import ShadowFillPolicy, _canonical, _utc
-from app.paper.shadow_exits import ShadowExitPolicy, audit_exit_event, exit_event_path
+from app.paper.shadow_exits import (
+    ShadowExitPolicy, audit_continuation_exit_event, audit_exit_event, exit_event_path,
+)
 from app.paper.shadow_ledger import LABEL
 from app.paper.shadow_portfolio import ShadowPortfolioPolicy, audit_portfolio_policy
 from app.paper.shadow_positions import audit_position_open_event
@@ -105,6 +107,68 @@ def _read_reservations(directory: Path) -> list[dict]:
     return result
 
 
+
+def _settlement_exit_view(exit_event: dict) -> tuple[str, dict]:
+    """Return the durable exit-link id and CLOSED result for supported exit schemas."""
+    if type(exit_event) is not dict:
+        raise ValueError("capital settlement exit event must be an exact object")
+
+    schema = exit_event.get("schema_version")
+    if schema == "shadow-exit-event-v2":
+        if exit_event.get("event_type") != "EXIT_EVALUATED":
+            raise ValueError("invalid single-session exit-event semantics")
+        link_id = exit_event.get("fact_event_id")
+        evaluation = exit_event.get("evaluation")
+
+    elif schema == "shadow-continuation-exit-event-v3":
+        if exit_event.get("event_type") != "CONTINUATION_EXIT_EVALUATED":
+            raise ValueError("invalid continuation exit-event semantics")
+
+        references = exit_event.get("continuation_events")
+        evaluations = exit_event.get("evaluations")
+        entry_evaluation = exit_event.get("entry_session_evaluation")
+        result = exit_event.get("result")
+
+        if (
+            type(references) is not list
+            or not references
+            or type(evaluations) is not list
+            or not evaluations
+            or len(evaluations) != len(references)
+            or type(entry_evaluation) is not dict
+            or entry_evaluation.get("status") != "OPEN"
+            or any(
+                type(item) is not dict or item.get("status") != "OPEN"
+                for item in evaluations[:-1]
+            )
+            or evaluations[-1] != result
+        ):
+            raise ValueError("invalid continuation exit-event chain")
+
+        last_reference = references[-1]
+        if type(last_reference) is not dict:
+            raise ValueError("invalid continuation exit-event reference")
+        link_id = last_reference.get("event_id")
+        evaluation = result
+
+    else:
+        raise ValueError("unsupported capital-settlement exit-event schema")
+
+    if (
+        type(link_id) is not str
+        or re.fullmatch(r"[0-9a-f]{64}", link_id) is None
+    ):
+        raise ValueError("invalid capital-settlement exit-event link")
+
+    if (
+        type(evaluation) is not dict
+        or evaluation.get("status") != "CLOSED"
+        or type(evaluation.get("exit")) is not dict
+    ):
+        raise ValueError("capital settlement requires authenticated CLOSED exit")
+
+    return link_id, evaluation
+
 def _read_settlements(directory: Path, reservations: list[dict]) -> list[dict]:
     """Validate immutable releases against the locally authenticated reservation chain."""
     by_id = {item["reservation_id"]: item for item in reservations}
@@ -144,15 +208,13 @@ def _read_settlements(directory: Path, reservations: list[dict]) -> list[dict]:
         if len(candidates) != 1:
             raise ValueError("capital settlement exit event is absent or ambiguous")
         exit_path, exit_event = candidates[0]
+        exit_link_id, _ = _settlement_exit_view(exit_event)
         if exit_path != exit_event_path(
-                directory, reservation["position_event_id"], exit_event.get("fact_event_id")):
+                directory, reservation["position_event_id"], exit_link_id):
             raise ValueError("capital settlement exit-event filename mismatch")
-        if (type(exit_event) is not dict or exit_event.get("event_id") != event["exit_event_id"]
+        if (exit_event.get("event_id") != event["exit_event_id"]
                 or hashlib.sha256(_canonical(exit_event)).hexdigest() != event["exit_event_sha256"]
-                or exit_event.get("position_event_id") != reservation["position_event_id"]
-                or not isinstance(exit_event.get("evaluation"), dict)
-                or exit_event["evaluation"].get("status") != "CLOSED"
-                or not isinstance(exit_event["evaluation"].get("exit"), dict)):
+                or exit_event.get("position_event_id") != reservation["position_event_id"]):
             raise ValueError("capital settlement does not bind closed exit event")
         for field in ("capital_released", "risk_released", "exit_notional", "exit_cost",
                       "net_exit_proceeds"):
@@ -325,40 +387,24 @@ def audit_capital_reservation(
     return target
 
 
-def append_capital_settlement(
-    directory: Path, watchlist: ShadowWatchlist,
-    watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
-    fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
-    fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
-    exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
-    *, evaluation_facts: ForwardFactBundle | None = None,
-    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
+
+def _append_capital_settlement_event(
+    directory: Path, reservation: dict, exit_event: dict,
 ) -> Path:
-    """Release one reservation only after an authenticated conservative CLOSED exit."""
-    directory = Path(directory)
-    reservation = audit_capital_reservation(
-        directory, watchlist, watchlist_packages, facts, fact_packages,
-        fill_policy, fill_packages, portfolio,
-    )
-    exit_event = audit_exit_event(
-        directory, watchlist, watchlist_packages, facts, fact_packages,
-        fill_policy, fill_packages, exit_policy, exit_packages,
-        evaluation_facts=evaluation_facts,
-        evaluation_fact_packages=evaluation_fact_packages,
-    )
-    evaluation = exit_event["evaluation"]
-    if evaluation["status"] != "CLOSED" or type(evaluation["exit"]) is not dict:
-        raise ValueError("capital settlement requires authenticated CLOSED exit")
+    _, evaluation = _settlement_exit_view(exit_event)
     exit_fill = evaluation["exit"]
     if exit_fill["currency"] != reservation["currency"]:
         raise ValueError("capital settlement currency mismatch")
+
     with _allocation_lock(directory):
         reservations = _read_reservations(directory)
         _read_settlements(directory, reservations)
+
         with localcontext(Context(prec=34)):
             net_proceeds = Decimal(exit_fill["notional"]) - Decimal(exit_fill["exit_cost"])
         if net_proceeds < 0:
             raise ValueError("exit costs exceed proceeds")
+
         basis = {
             "schema_version": "shadow-capital-settlement-v1", "label": LABEL,
             "event_type": "CAPITAL_SETTLED", "scoring": "NOT SCORED",
@@ -372,24 +418,34 @@ def append_capital_settlement(
             "currency": reservation["currency"],
             "capital_released": reservation["capital_reserved"],
             "risk_released": reservation["risk_reserved"],
-            "exit_notional": exit_fill["notional"], "exit_cost": exit_fill["exit_cost"],
+            "exit_notional": exit_fill["notional"],
+            "exit_cost": exit_fill["exit_cost"],
             "net_exit_proceeds": str(net_proceeds),
         }
+
         recorded_at = _utc(_now())
-        if recorded_at < max(_utc(datetime.fromisoformat(reservation["recorded_at"])),
-                             _utc(datetime.fromisoformat(exit_event["recorded_at"]))):
+        if recorded_at < max(
+            _utc(datetime.fromisoformat(reservation["recorded_at"])),
+            _utc(datetime.fromisoformat(exit_event["recorded_at"])),
+        ):
             raise ValueError("capital settlement precedes authenticated inputs")
-        payload = basis | {"settlement_id": hashlib.sha256(_canonical(basis)).hexdigest(),
-                           "recorded_at": recorded_at.isoformat()}
-        path = _publish_once(directory / "capital-settlements" /
-                             f'{reservation["candidate_position_key"]}.json', payload)
+
+        payload = basis | {
+            "settlement_id": hashlib.sha256(_canonical(basis)).hexdigest(),
+            "recorded_at": recorded_at.isoformat(),
+        }
+        path = _publish_once(
+            directory / "capital-settlements"
+            / f'{reservation["candidate_position_key"]}.json',
+            payload,
+        )
         if _now() < recorded_at:
             path.unlink()
             raise ValueError("clock rollback during capital settlement")
         return path
 
 
-def audit_capital_settlement(
+def append_capital_settlement(
     directory: Path, watchlist: ShadowWatchlist,
     watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
     fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
@@ -397,8 +453,8 @@ def audit_capital_settlement(
     exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
     *, evaluation_facts: ForwardFactBundle | None = None,
     evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
-) -> dict:
-    """Re-audit a settlement against its reservation and conservative exit."""
+) -> Path:
+    """Release one reservation after an authenticated single-session CLOSED exit."""
     directory = Path(directory)
     reservation = audit_capital_reservation(
         directory, watchlist, watchlist_packages, facts, fact_packages,
@@ -410,20 +466,102 @@ def audit_capital_settlement(
         evaluation_facts=evaluation_facts,
         evaluation_fact_packages=evaluation_fact_packages,
     )
+    return _append_capital_settlement_event(directory, reservation, exit_event)
+
+
+def append_continuation_capital_settlement(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
+    continuations: tuple, continuation_packages: tuple,
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> Path:
+    """Release one reservation only after a fully re-audited continuation CLOSED exit."""
+    directory = Path(directory)
+    reservation = audit_capital_reservation(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio,
+    )
+    exit_event = audit_continuation_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, continuations, continuation_packages,
+        exit_policy, exit_packages,
+    )
+    return _append_capital_settlement_event(directory, reservation, exit_event)
+
+
+def _audit_capital_settlement_event(
+    directory: Path, reservation: dict, exit_event: dict,
+) -> dict:
+    _settlement_exit_view(exit_event)
     reservations = _read_reservations(directory)
     settlements = _read_settlements(directory, reservations)
     target = next(
-        (item for item in settlements if item["reservation_id"] == reservation["reservation_id"]),
+        (
+            item for item in settlements
+            if item["reservation_id"] == reservation["reservation_id"]
+        ),
         None,
     )
     if target is None:
         raise FileNotFoundError("capital settlement absent")
-    if (target["exit_event_id"] != exit_event["event_id"]
-            or target["exit_event_sha256"] != hashlib.sha256(_canonical(exit_event)).hexdigest()
-            or target["candidate_position_key"] != reservation["candidate_position_key"]):
+    if (
+        target["exit_event_id"] != exit_event["event_id"]
+        or target["exit_event_sha256"]
+        != hashlib.sha256(_canonical(exit_event)).hexdigest()
+        or target["candidate_position_key"] != reservation["candidate_position_key"]
+    ):
         raise ValueError("capital settlement does not bind authenticated inputs")
     return target
 
+
+def audit_capital_settlement(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
+    exit_policy: ShadowExitPolicy, exit_packages: tuple[HistoricalEvidencePackage, ...],
+    *, evaluation_facts: ForwardFactBundle | None = None,
+    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
+) -> dict:
+    """Re-audit a single-session settlement and its conservative exit."""
+    directory = Path(directory)
+    reservation = audit_capital_reservation(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio,
+    )
+    exit_event = audit_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
+    )
+    return _audit_capital_settlement_event(directory, reservation, exit_event)
+
+
+def audit_continuation_capital_settlement(
+    directory: Path, watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...], facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...], fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...], portfolio: ShadowPortfolioPolicy,
+    continuations: tuple, continuation_packages: tuple,
+    exit_policy: ShadowExitPolicy,
+    exit_packages: tuple[HistoricalEvidencePackage, ...],
+) -> dict:
+    """Re-audit a settlement against the complete authenticated continuation chain."""
+    directory = Path(directory)
+    reservation = audit_capital_reservation(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio,
+    )
+    exit_event = audit_continuation_exit_event(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, continuations, continuation_packages,
+        exit_policy, exit_packages,
+    )
+    return _audit_capital_settlement_event(directory, reservation, exit_event)
 
 def _require_timely_policy(policy_receipt: dict, portfolio: ShadowPortfolioPolicy,
                            watchlist: ShadowWatchlist) -> None:
