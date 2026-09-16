@@ -713,12 +713,63 @@ and, for marked snapshots, re-audits the exact mark provenance. Recomputing a
 snapshot hash after altering ledger references, accounting values or mark
 provenance does not make the receipt auditable.
 
-These receipts establish durable daily valuation observations only. They do not
-yet establish a daily return series, drawdown history, hit rate, expectancy,
-profit factor, Sharpe/Sortino, attribution, validated performance or empirical
-edge. Performance fields remain explicitly **NOT EVALUATED**. All snapshot
-outputs remain **EXPERIMENTAL / PAPER ONLY** and create no real-money execution
+These receipts establish durable daily valuation observations only. By
+themselves they do not establish hit rate, expectancy, profit factor,
+Sharpe/Sortino, attribution, validated performance or empirical edge.
+Performance fields remain explicitly **NOT EVALUATED**. All snapshot outputs
+remain **EXPERIMENTAL / PAPER ONLY** and create no real-money execution
 authority.
+
+### Authenticated historical gross-marked valuation series
+
+`app.paper.shadow_daily_series` adds a read-only historical bridge over those
+immutable audited daily receipts. The caller supplies an exact, strictly
+increasing tuple of typed cash-only and/or gross-marked snapshot requests.
+Every observation is obtained through the corresponding historical snapshot
+audit; the bridge does not trust raw snapshot JSON, silently reorder dates, or
+create a replacement market fact or durable receipt.
+
+A series is bound to one audited portfolio-policy identity and one native/base
+currency. Every included snapshot must preserve **PERFORMANCE NOT EVALUATED**
+semantics, its UTC reporting date and receipt clock, and a unique authenticated
+snapshot identity. The series also records a SHA-256 digest of each complete
+audited snapshot receipt. Cross-currency aggregation remains unsupported: EGP
+and USD are not combined without separately admitted point-in-time FX.
+
+For each adjacent pair of authenticated observations, the bridge reports
+`elapsed_days` and the gross marked valuation return:
+
+`current_gross_marked_nav / previous_gross_marked_nav - 1`.
+
+Calendar gaps are preserved rather than relabeled as equal one-day periods.
+A positive previous gross marked NAV is required; the bridge fails closed
+instead of inventing a return across a zero denominator. The cumulative gross
+marked valuation return is measured from the first authenticated observation
+to the last.
+
+The series also reports running-peak gross marked NAV drawdown. Maximum
+absolute drawdown and maximum fractional drawdown are tracked independently,
+with separate authenticated peak/trough UTC dates because the two maxima need
+not occur in the same episode. This is a **gross marked valuation drawdown**,
+not the existing M7 realized-trade equity drawdown.
+
+These gross marked values remain before hypothetical liquidation slippage and
+exit cost, so the resulting interval and cumulative returns are not executable
+or net-liquidation returns. Reservation and settlement movements inside the
+portfolio are internal accounting flows already represented in portfolio NAV;
+this layer does not reinterpret them as external contributions or withdrawals.
+
+This bridge deliberately does not derive trade hit rate, net expectancy,
+profit factor, average win/loss, MAE/MFE, slippage sensitivity, attribution,
+Sharpe or Sortino. In particular, irregular reporting-day gaps do not satisfy
+the existing fixed-period `PeriodicReturnSeries` contract and are not silently
+converted into an equal-period risk-adjusted return series. M7 realized-trade
+performance semantics remain unchanged.
+
+The series output therefore remains **VALUATION SERIES ONLY / M7 PERFORMANCE
+NOT EVALUATED**, **EXPERIMENTAL / PAPER ONLY**. Passing its software tests is
+engineering evidence for the accounting/audit bridge; it is not empirical
+validation, proof of edge, or authorization for real-money use.
 
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or
