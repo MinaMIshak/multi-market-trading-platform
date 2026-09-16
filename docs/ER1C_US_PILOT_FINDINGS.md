@@ -625,6 +625,64 @@ source-constrained, and complete bounded US4 corporate-action coverage remains
 required. No strategy, return, walk-forward, holdout, execution or readiness
 claim may consume the incomplete pilot.
 
+## Free bounded corporate-action path closure
+
+The bounded zero-cost corporate-action probes performed for this pilot have not
+produced complete `USCorporateActionCoverage` for either frozen pilot
+instrument across the declared interval.
+
+US4 requires complete, gap-free bounded coverage for each stable instrument.
+Explicit empty coverage is valid only when the source evidence establishes that
+completeness; absence of an event from a price row, issuer page, current notice
+list or incomplete archive is not negative evidence.
+
+The retained Tiingo daily rows contain dividend and split markers that may
+corroborate particular reported events, but they do not cover every required
+corporate-action category and cannot establish explicit empty coverage.
+
+For IBM, retained issuer and SEC material corroborates two USD 1.65 dividend
+distributions and establishes bounded split/stock-dividend history. The retained
+material does not establish the required dividend ex-dates and cannot prove that
+mergers, spinoffs, rights, symbol changes, delistings or other required action
+categories are empty throughout the pilot interval.
+
+For Twitter, the retained SEC merger and NYSE removal material establishes the
+specific merger, pre-open suspension and later formal removal facts already
+reported by the pilot audit. Those issue-specific records do not establish a
+complete corporate-action inventory for the full interval.
+
+The official NYSE public corporate-action page establishes issuer notice
+obligations and a current/upcoming event publication scope. Event-specific Info
+Notices are described as available through a Market Data subscription. The
+separately qualified NYSE Corporate Actions product documentation describes a
+broad real-time corporate-action feed, but no complete pilot-period event files,
+historical archive with correction lineage, or explicit empty-coverage records
+were acquired under the zero-budget constraint. Product/schema documentation
+cannot itself become historical action truth.
+
+Accordingly, the currently qualified free-source path cannot establish complete
+bounded US4 action coverage. Canonical US4 therefore remains **NO-GO**. This is
+a source-coverage and access limitation, not a software defect and not evidence
+that an unobserved action did not occur.
+
+Further zero-cost probing should resume only if a materially new authoritative
+historical action archive becomes available that can establish all required
+event categories and explicit empty coverage, with exact event terms,
+correction/revision lineage, historical availability and permitted archival
+retention/transformation. Otherwise, advancing US4 requires a separately
+authorized source whose historical completeness and usage rights can be
+qualified against ER1A and R1.1.
+
+US4 software admission remains unchanged and fail-closed. No event is inferred
+from price movement, adjusted data or missing source rows, and incomplete
+positive-event evidence is never promoted to complete coverage.
+
+This closure does not make the overall pilot admissible. Historical source
+availability and approved human review bindings remain absent, and the
+previously documented US1/US5A and US2 source constraints remain. No strategy,
+return, walk-forward, holdout, execution or readiness claim may consume the
+incomplete pilot.
+
 ## Primary receipt and daily-timestamp integrity
 
 The primary bundle auditor now treats the retained response headers as a closed
