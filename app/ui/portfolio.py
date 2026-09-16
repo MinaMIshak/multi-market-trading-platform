@@ -47,7 +47,7 @@ def _nav() -> str:
     <span class="tab">SWING</span>
     <a class="tab" href="/performance">PERFORMANCE</a>
     <a class="tab active" href="/portfolio">PORTFOLIO</a>
-    <span class="tab">RESEARCH</span>
+    <a class="tab" href="/research">RESEARCH</a>
     <a class="tab" href="/system">SYSTEM</a>
     """
 

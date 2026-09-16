@@ -39,6 +39,10 @@ def _nav() -> str:
             items.append(
                 f'<a class="{classes}" href="/portfolio">PORTFOLIO</a>'
             )
+        elif item == "RESEARCH":
+            items.append(
+                f'<a class="{classes}" href="/research">RESEARCH</a>'
+            )
         elif item == "SYSTEM":
             items.append(
                 f'<a class="{classes}" href="/system">SYSTEM</a>'

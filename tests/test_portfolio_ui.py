@@ -58,7 +58,7 @@ def test_portfolio_navigation_links_only_existing_pages():
     assert 'href="/portfolio"' in page
     assert 'href="/system"' in page
 
-    assert 'href="/research"' not in page
+    assert 'href="/research"' in page
     assert 'href="/live"' not in page
 
 

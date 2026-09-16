@@ -71,7 +71,7 @@ def test_system_navigation_links_only_existing_pages():
     assert 'href="/performance"' in page
     assert 'href="/system"' in page
 
-    assert 'href="/research"' not in page
+    assert 'href="/research"' in page
     assert 'href="/live"' not in page
 
 
