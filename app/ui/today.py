@@ -206,9 +206,8 @@ th{{color:#758a9a;font-weight:600}}
   <div class="tab">PRE-SURGE</div>
   <div class="tab">SWING</div>
   <a class="tab" href="/performance">PERFORMANCE</a>
-  <a class="tab" href="/portfolio">PORTFOLIO</a>
-  <a class="tab" href="/research">RESEARCH</a>
-  <a class="tab" href="/system">SYSTEM</a>
+  <div class="tab">RESEARCH</div>
+  <div class="tab">SYSTEM</div>
 </nav>
 
 <main>

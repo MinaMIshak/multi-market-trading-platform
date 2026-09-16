@@ -13,7 +13,6 @@ NAV_ITEMS = (
     "PRE-SURGE",
     "SWING",
     "PERFORMANCE",
-    "PORTFOLIO",
     "RESEARCH",
     "SYSTEM",
 )
@@ -34,18 +33,6 @@ def _nav() -> str:
         elif item == "PERFORMANCE":
             items.append(
                 f'<a class="{classes}" href="/performance">PERFORMANCE</a>'
-            )
-        elif item == "PORTFOLIO":
-            items.append(
-                f'<a class="{classes}" href="/portfolio">PORTFOLIO</a>'
-            )
-        elif item == "RESEARCH":
-            items.append(
-                f'<a class="{classes}" href="/research">RESEARCH</a>'
-            )
-        elif item == "SYSTEM":
-            items.append(
-                f'<a class="{classes}" href="/system">SYSTEM</a>'
             )
         else:
             items.append(f'<span class="{classes}">{html.escape(item)}</span>')

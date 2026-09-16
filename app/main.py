@@ -6,9 +6,6 @@ from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
 from app.ui.performance import render_performance_dashboard
-from app.ui.portfolio import render_portfolio_dashboard
-from app.ui.research import render_research_dashboard
-from app.ui.system import render_system_dashboard
 from app.ui.today import (
     load_today_state,
     render_today_dashboard,
@@ -40,27 +37,6 @@ def today() -> dict:
 def performance() -> HTMLResponse:
     return HTMLResponse(
         render_performance_dashboard()
-    )
-
-
-@app.get("/portfolio", response_class=HTMLResponse)
-def portfolio() -> HTMLResponse:
-    return HTMLResponse(
-        render_portfolio_dashboard()
-    )
-
-
-@app.get("/research", response_class=HTMLResponse)
-def research() -> HTMLResponse:
-    return HTMLResponse(
-        render_research_dashboard()
-    )
-
-
-@app.get("/system", response_class=HTMLResponse)
-def system() -> HTMLResponse:
-    return HTMLResponse(
-        render_system_dashboard()
     )
 
 
