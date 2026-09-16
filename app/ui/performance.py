@@ -34,6 +34,10 @@ def _nav() -> str:
             items.append(
                 f'<a class="{classes}" href="/performance">PERFORMANCE</a>'
             )
+        elif item == "SYSTEM":
+            items.append(
+                f'<a class="{classes}" href="/system">SYSTEM</a>'
+            )
         else:
             items.append(f'<span class="{classes}">{html.escape(item)}</span>')
     return "".join(items)

@@ -207,7 +207,7 @@ th{{color:#758a9a;font-weight:600}}
   <div class="tab">SWING</div>
   <a class="tab" href="/performance">PERFORMANCE</a>
   <div class="tab">RESEARCH</div>
-  <div class="tab">SYSTEM</div>
+  <a class="tab" href="/system">SYSTEM</a>
 </nav>
 
 <main>
