@@ -771,6 +771,46 @@ NOT EVALUATED**, **EXPERIMENTAL / PAPER ONLY**. Passing its software tests is
 engineering evidence for the accounting/audit bridge; it is not empirical
 validation, proof of edge, or authorization for real-money use.
 
+### Authenticated fixed-period bridge into M7 risk-adjusted analysis
+
+`app.paper.shadow_performance_bridge` is an opt-in adapter from the
+authenticated C1 valuation series into the existing M7
+`PeriodicReturnSeries` contract. It does not replace or reinterpret M7 trade
+economics, realized-trade drawdown, monthly/regime analysis, slippage
+sensitivity, expectancy, profit factor or average win/loss.
+
+Admission requires an explicit `PeriodicReturnBridgeConfig` containing the
+fixed `period_seconds`, exact-decimal risk-free return, exact-decimal Sortino
+target and minimum sample count. Annualization is never inferred. An
+`annualization_factor` is carried only when the caller explicitly supplies a
+positive finite Decimal value.
+
+Before constructing `PeriodicReturnSeries`, the bridge independently validates
+the authenticated C1 material. It rechecks the canonical C1 series identity,
+paper-only/not-scored/not-evaluated semantics, portfolio-policy binding,
+policy-receipt hash, native currency, observation chronology, unique snapshot
+identity, interval-to-observation provenance and interval chronology. Reported
+interval returns are re-derived from adjacent authenticated gross marked NAV
+values and must match exactly.
+
+Receipt timestamps must be canonical UTC and every adjacent timestamp must be
+separated by exactly the configured `period_seconds`. Irregular reporting-day
+or weekend gaps therefore fail closed rather than being normalized, filled,
+resampled or treated as equal periods. This bridge does not manufacture
+periodic returns from an irregular series.
+
+The resulting `PeriodicReturnSeries` can be attached immutably to an existing
+`PerformanceAnalysisInput` only when that request has no periodic-return series
+already present. Existing periodic returns are never overwritten. Feeding the
+new request into the existing M7 analyzer leaves trade-economic summaries and
+realized-trade drawdown unchanged; only the pre-existing risk-adjusted path is
+given authenticated fixed-period return input.
+
+Sharpe and Sortino remain subject to the existing M7 sample, dispersion,
+downside-deviation and annualization rules. Passing this bridge does not make
+gross marked valuation returns executable or net-liquidation returns, does not
+validate empirical edge, and does not authorize real-money use.
+
 `entry_fill_view(...)` re-audits the frozen fill-policy selection, trigger and
 entry-fill event, exposing either the preserved simulated entry fill or
 **NO FILL: INSUFFICIENT CAPACITY** with a null fill. It preserves the policy,
