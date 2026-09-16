@@ -576,6 +576,55 @@ approved human review bindings, every-calendar-date XNYS sessions and complete
 bounded corporate-action coverage remain required. No strategy, return,
 walk-forward, holdout or execution claim may consume the incomplete pilot.
 
+## Free historical XNYS session path closure
+
+The bounded zero-cost session-source probes performed for this project have not
+produced a canonical US2 historical session package for the frozen pilot.
+
+The retained official NYSE 2022 trading calendar corroborates exchange holidays
+and marked shortened-session dates within its stated scope, but the document
+states that its dates were subject to change. It does not bind every calendar
+date to the canonical `XNYS` MIC, state the regular-session open, supply exact
+UTC open and close timestamps for every open date, or establish that no later
+revision changed the retained schedule.
+
+The separately retained NYSE hours/calendar material corroborates published
+core-hours text in Eastern Time. The forward-session auditor deliberately does
+not convert those general schedule anchors into an exact-date session assertion:
+target-date state remains `UNKNOWN` and canonical US2 remains `NO_GO`.
+Current/general schedule text cannot substitute for historical exact-date
+session evidence.
+
+Nasdaq halt documentation is also insufficient for this boundary. Its market
+category does not bind an observation to canonical `XNYS`, absence cannot clear
+an unresolved suspension, and no complete historical issue-status feed has been
+qualified for archival retention and transformation.
+
+US2 software admission is already implemented fail-closed: every calendar date
+in the requested interval requires one explicit evidenced session fact, including
+closed dates, with canonical MIC, state and exact open/close boundaries where
+applicable. No weekend, holiday, DST, early-close or normal-hours inference is
+introduced merely to fill this evidence gap.
+
+Accordingly, the currently qualified free-source path cannot establish the
+complete every-calendar-date `XNYS` session history required by ER1A and US2.
+Canonical US2 therefore remains **NO-GO**. This is a historical evidence/source
+coverage limitation, not a software defect and not evidence that an unevidenced
+date was open or closed.
+
+Further free-source probing should resume only if a materially new authoritative
+historical session archive is identified that can establish exact dated XNYS
+state, revision/finality semantics and exact UTC boundaries under the R1.1
+availability/review rules. Otherwise, advancing US2 requires a separately
+authorized source whose history, licensing, retention, correction lineage and
+PIT timing can be qualified against ER1A.
+
+This closure does not change the remaining pilot blockers. Historical source
+availability and approved review bindings remain absent, US1/US5A remain
+source-constrained, and complete bounded US4 corporate-action coverage remains
+required. No strategy, return, walk-forward, holdout, execution or readiness
+claim may consume the incomplete pilot.
+
 ## Primary receipt and daily-timestamp integrity
 
 The primary bundle auditor now treats the retained response headers as a closed
