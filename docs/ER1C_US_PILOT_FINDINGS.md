@@ -538,6 +538,44 @@ receipts, prove historical availability, or fill the universe, identity,
 session and complete action-coverage gaps. Canonical admission remains
 **NO-GO** and the platform remains **EXPERIMENTAL / PAPER ONLY**.
 
+## Free historical XNYS roster path closure
+
+The bounded free-source probes performed for this pilot have not produced a
+complete authoritative historical XNYS roster or exact-date stable listing
+identity across the frozen interval.
+
+The official NYSE short-sale files retained by the roster probe establish only
+bounded reported trading activity and are not listing rosters. The retained SEC
+Form 25-NSE and Form 8-A12B indexes establish bounded filing facts but do not
+enumerate every listed security, prove continuous listing membership, initial
+trading eligibility, ticker-reuse identity, transfers, suspensions or complete
+daily venue membership.
+
+NYSE documentation confirms that trade-date symbol-mapping files exist as a
+daily reference-data format. However, the retained public directory exposed no
+pilot-date edition, direct pilot-date requests already returned HTTP 404, and
+the documentation does not establish public historical archive depth,
+correction lineage, permanent instrument identity, security type, roster
+completeness or retention/transformation rights. Those requests are not
+repeated merely to convert the same absence into new evidence.
+
+Accordingly, the currently qualified zero-cost sources cannot satisfy the
+ER1A requirement for complete exact-date XNYS membership including removed
+names, nor the exact-date stable listing identity required by US1. Canonical
+US1 and US5A therefore remain **NO-GO**. This is a source-coverage limitation,
+not evidence that a historical member was absent and not a software defect.
+
+Further free-source probing should resume only if a materially new
+authoritative historical roster/archive source or a newly accessible retained
+trade-date edition is identified. Otherwise, advancing US5A requires a
+separately authorized data source whose licensing, historical completeness,
+correction lineage, retention and PIT timing can be qualified against ER1A.
+
+This closure does not change the other blockers. Historical availability,
+approved human review bindings, every-calendar-date XNYS sessions and complete
+bounded corporate-action coverage remain required. No strategy, return,
+walk-forward, holdout or execution claim may consume the incomplete pilot.
+
 ## Primary receipt and daily-timestamp integrity
 
 The primary bundle auditor now treats the retained response headers as a closed

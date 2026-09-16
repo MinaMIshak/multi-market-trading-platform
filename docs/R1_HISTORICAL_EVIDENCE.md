@@ -94,6 +94,8 @@ these packages, and a package is not an operational reference or daily input.
 Existing M3 tests retain late-receipt and late-review rejection coverage.
 
 No DB/schema change, acquisition, provider wiring, current-universe projection,
-historical universe reconstruction, strategy/execution data or planning is added.
-R1.2 PIT derivation remains separate and is **not implemented**. M4–M8 v1 behavior,
-holdout work and parameter selection are outside this change.
+historical universe reconstruction, strategy/execution data or planning is added
+by R1.1 itself. R1.2 retrospective PIT derivation is a separate, subsequently
+implemented research boundary documented in `R1_RETROSPECTIVE_PIT.md`; R1.1
+does not perform that derivation. M4–M8 behavior, holdout work and parameter
+selection remain outside the R1.1 evidence-admission boundary.
