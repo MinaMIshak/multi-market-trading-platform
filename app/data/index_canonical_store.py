@@ -151,6 +151,22 @@ class CanonicalIndexStore:
     ) -> None:
         self.root = Path(root)
 
+    @classmethod
+    def from_data_root(
+        cls,
+        root: str | Path,
+    ) -> "CanonicalIndexStore":
+        """
+        Construct the canonical index store from
+        the platform data root.
+
+        Canonical path conventions stay inside
+        this approved storage boundary.
+        """
+        return cls(
+            Path(root) / "canonical"
+        )
+
     @staticmethod
     def serialize_rows(
         rows: Iterable[
