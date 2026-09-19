@@ -104,7 +104,11 @@ def read_shadow_execution(directory: Path, source):
     from app.paper.shadow_exits import ShadowExitPolicy
     from app.paper.shadow_facts import ForwardFactBundle
     from app.paper.shadow_fills import ShadowFillPolicy
-    from app.paper.shadow_report import continuation_exit_evaluation_view, exit_evaluation_view
+    from app.paper.shadow_portfolio import ShadowPortfolioPolicy
+    from app.paper.shadow_report import (
+        capital_settlement_view, continuation_capital_settlement_view,
+        continuation_exit_evaluation_view, exit_evaluation_view,
+    )
 
     fields = {
         'facts': ForwardFactBundle,
@@ -119,7 +123,7 @@ def read_shadow_execution(directory: Path, source):
     document = _read_document(directory / 'execution.json')
     version = document.get('schema_version') if type(document) is dict else None
     reader = exit_evaluation_view
-    if version == 'shadow-ui-continuation-v1':
+    if version in ('shadow-ui-continuation-v1', 'shadow-ui-continuation-settlement-v1'):
         fields.pop('evaluation_facts')
         fields.pop('evaluation_fact_packages')
         fields.update(
@@ -127,8 +131,16 @@ def read_shadow_execution(directory: Path, source):
             continuation_packages=tuple[tuple[HistoricalEvidencePackage, ...], ...],
         )
         reader = continuation_exit_evaluation_view
+    if version in ('shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1'):
+        fields.pop('evaluation_facts', None)
+        fields.pop('evaluation_fact_packages', None)
+        fields['portfolio'] = ShadowPortfolioPolicy
+        reader = (continuation_capital_settlement_view
+                  if version == 'shadow-ui-continuation-settlement-v1'
+                  else capital_settlement_view)
     if (type(document) is not dict or set(document) != {'schema_version', *fields}
-            or version not in ('shadow-ui-execution-v1', 'shadow-ui-continuation-v1')):
+            or version not in ('shadow-ui-execution-v1', 'shadow-ui-continuation-v1',
+                               'shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1')):
         raise ValueError('invalid execution envelope')
     decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}
     return reader(

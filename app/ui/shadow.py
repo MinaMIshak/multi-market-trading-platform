@@ -110,7 +110,7 @@ def render_shadow_watchlist(state: dict) -> str:
 
         for key in ('collection_status', 'position_status', 'entry_session_exit_evaluation',
                     'continuation_evaluations', 'exit_evaluation', 'open_paper_positions',
-                    'closed_paper_trades', 'audit_references'):
+                    'closed_paper_trades', 'capital_settlement', 'audit_references'):
             if key not in execution:
                 continue
             body += f'<h3>{e(key.replace("_", " "))}</h3>{details(execution[key])}'

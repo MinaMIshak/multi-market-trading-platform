@@ -174,3 +174,28 @@ No runtime, deployment, evidence acquisition or M7/M8 changes are involved.
 
 Next integration boundary: existing authenticated native portfolio snapshot and
 capital-settlement readers, without treating a single trade as a portfolio.
+
+## Existing UI capital settlement integration — 2026-09-19
+
+`execution.json` now also accepts `shadow-ui-settlement-v1` and
+`shadow-ui-continuation-settlement-v1`. Both require the canonical `portfolio`
+policy in addition to entry facts/fill/exit policies and their evidence packages.
+The same-session settlement schema excludes the optional evaluation fields; the
+continuation schema requires complete ordered continuations and package arrays.
+These match the existing settlement readers' supported boundaries exactly.
+
+Every read reaudits the frozen policy, reservation ownership, exit ancestry and
+native-currency settlement through the existing capital-settlement report readers.
+A CLOSED exit alone does not establish settlement. Missing receipts, altered
+policies/packages, unknown fields or mixed schemas fail closed; independently
+audited frozen candidates remain visible. The existing execution section displays
+released capital/risk, exit notional, exit costs, net proceeds and receipt time.
+It does not calculate portfolio NAV, currency conversion, freshness or validated
+performance. No read creates or changes a reservation, settlement or other state.
+
+Artificial integration tests cover both settlement modes, unchanged files on read,
+missing/tampered settlement or reservation, altered policy, unapproved evidence,
+mixed schemas, caller-supplied cash flow and rejection of unsettled OPEN trades.
+No runtime/deployment or M7/M8 changes. Native portfolio snapshot integration is
+still outstanding and must audit the complete portfolio rather than aggregate
+these individual observations as if they were a complete ledger.
