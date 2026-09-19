@@ -104,3 +104,23 @@ def test_cash_only_snapshot_is_accounting_not_performance(tmp_path, monkeypatch)
     assert view['valuation']['open_position_count'] == 0
     assert view['valuation']['performance']['nav'] is None
     assert 'AUTHENTICATED NATIVE CASH-ONLY DAILY VALUATION' in main.shadow_page().body.decode()
+
+
+@pytest.mark.parametrize('continuation', [False, True])
+@pytest.mark.parametrize('damage', ['absent', 'malformed'])
+def test_snapshot_does_not_depend_on_candidate_transport(tmp_path, monkeypatch, continuation, damage):
+    _, _, receipt = prepare(tmp_path, monkeypatch, continuation)
+    path = tmp_path / 'input.json'
+    if damage == 'absent':
+        path.unlink()
+    else:
+        path.write_text('{}')
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    state = main.shadow()
+    assert not state['available'] and state['collection'] is state['execution'] is None
+    assert state['portfolio'] == json.loads(receipt.read_bytes())
+    assert 'UNAVAILABLE / NO AUDITED COLLECTION' in main.shadow_page().body.decode()
+    assert 'AUTHENTICATED NATIVE DAILY GROSS MARKED VALUATION' in main.shadow_page().body.decode()
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    receipt.write_text('{}')
+    assert main.shadow()['portfolio'] is None

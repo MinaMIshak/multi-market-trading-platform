@@ -89,6 +89,8 @@ def strategy_candidate_sha256(
             "exact M4 StrategyCandidate required"
         )
 
+    candidate = StrategyCandidate.model_validate(candidate.model_dump(mode="python"))
+
     payload = json.dumps(
         candidate.model_dump(mode="json"),
         sort_keys=True,
@@ -119,6 +121,10 @@ def admit_strategy_candidate(
         raise ValueError(
             "exact ShadowCandidateAdmission required"
         )
+
+    # Frozen models can still arrive through unchecked model_copy/model_construct.
+    candidate = StrategyCandidate.model_validate(candidate.model_dump(mode="python"))
+    admission = ShadowCandidateAdmission.model_validate(admission.model_dump(mode="python"))
 
     if (
         candidate.validation_status != "UNVALIDATED"

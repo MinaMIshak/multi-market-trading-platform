@@ -200,6 +200,8 @@ def load_today_state(
 
 def render_today_dashboard(
     state: dict,
+    *,
+    shadow_state: dict | None = None,
 ) -> str:
     now = datetime.now(
         ZoneInfo("Africa/Cairo")
@@ -266,7 +268,7 @@ def render_today_dashboard(
           <td>{html.escape(r["newest_market_date"])}</td>
           <td>{r["valid_bar_count"]}</td>
           <td>{r["quarantined_bar_count"]}</td>
-          <td><span class="watch">NO SETUP ENGINE</span></td>
+          <td><span class="watch">NO ADMITTED SETUP</span></td>
         </tr>
         """
         for r in symbols
@@ -291,6 +293,22 @@ def render_today_dashboard(
         "integrity",
         "unknown",
     )
+
+    collection = (shadow_state or {}).get("collection")
+    if collection is None:
+        paper_content = '<p>UNAVAILABLE / NO AUDITED COLLECTION</p>'
+    else:
+        paper_content = (
+            f'<p>Frozen {html.escape(collection["market"])} record for '
+            f'{html.escape(collection["market_date"])} · '
+            f'Information cutoff: {html.escape(collection["information_cutoff"])}</p>'
+            '<ul>' + ''.join(
+                f'<li>{html.escape(item["ticker"])} · {html.escape(item["decision_status"])}</li>'
+                for item in collection['candidates']
+            ) + '</ul>'
+        )
+        if not collection['candidates']:
+            paper_content += '<p>Explicit frozen collection contains zero candidates; NOT SCORED.</p>'
 
     return f"""<!doctype html>
 <html>
@@ -352,7 +370,7 @@ th{{color:#758a9a;font-weight:600}}
 
   <section class="panel">
     <div class="panelhead">
-      <strong>Validated Daily Universe</strong>
+      <strong>Validated Daily Data Inventory</strong>
       <span>{now.strftime("%Y-%m-%d %H:%M")} Cairo</span>
     </div>
 
@@ -372,10 +390,18 @@ th{{color:#758a9a;font-weight:600}}
     </table>
   </section>
 
+  <section class="panel" style="padding:18px 20px">
+    <h2>Frozen paper candidates</h2>
+    <p>EXPERIMENTAL / PAPER ONLY. Freshness NOT ESTABLISHED.
+       These dated declarations are not current signals, fills or positions.</p>
+    {paper_content}
+    <p><a href="/shadow">View audited candidates, execution observations and native portfolio</a></p>
+  </section>
+
   <div class="notice">
-    Trading signals are intentionally disabled until the validated
-    strategy engine is connected. No BUY/SELL recommendation shown here
-    is synthetic or inferred.
+    Structural data validation does not establish freshness or point-in-time
+    universe eligibility. Research engines remain UNVALIDATED and execution-disabled.
+    Current trading signals are unavailable; frozen paper admissions remain separate.
   </div>
 
   <div class="footer">

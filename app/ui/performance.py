@@ -13,6 +13,7 @@ NAV_ITEMS = (
     "PRE-SURGE",
     "SWING",
     "PERFORMANCE",
+    "PAPER CANDIDATES",
     "RESEARCH",
     "SYSTEM",
 )
@@ -34,6 +35,8 @@ def _nav() -> str:
             items.append(
                 f'<a class="{classes}" href="/performance">PERFORMANCE</a>'
             )
+        elif item == "PAPER CANDIDATES":
+            items.append(f'<a class="{classes}" href="/shadow">PAPER CANDIDATES</a>')
         else:
             items.append(f'<span class="{classes}">{html.escape(item)}</span>')
     return "".join(items)
@@ -52,6 +55,9 @@ def render_performance_dashboard(
           <p>
             No canonical M7 paper-performance report is available.
           </p>
+          <p>Authenticated trade observations are required. Portfolio snapshots
+             and valuation changes do not supply M7 trade observations.
+             <a href="/shadow">View audited paper observations and valuations</a>.</p>
           <p>
             No synthetic trades, P&amp;L, Sharpe, Sortino, or recommendations
             are shown.

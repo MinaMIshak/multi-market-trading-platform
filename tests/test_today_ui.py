@@ -194,7 +194,7 @@ def test_today_dashboard_is_trader_safe():
     page = render_today_dashboard(state)
 
     assert "EGX Trading Platform" in page
-    assert "Validated Daily Universe" in page
+    assert "Validated Daily Data Inventory" in page
     assert "COMI" in page
 
     assert "TODAY" in page
@@ -205,8 +205,8 @@ def test_today_dashboard_is_trader_safe():
     assert "RESEARCH" in page
     assert "SYSTEM" in page
 
-    assert "NO SETUP ENGINE" in page
-    assert "Trading signals are intentionally disabled" in page
+    assert "NO ADMITTED SETUP" in page
+    assert "Current trading signals are unavailable" in page
 
 
 def test_today_state_fails_closed(
@@ -449,8 +449,8 @@ def test_today_dashboard_surfaces_market_session_truth():
 
     # Session truth must not accidentally enable
     # strategy recommendations.
-    assert "NO SETUP ENGINE" not in page
+    assert "NO ADMITTED SETUP" not in page
     assert (
-        "Trading signals are intentionally disabled"
+        "Current trading signals are unavailable"
         in page
     )

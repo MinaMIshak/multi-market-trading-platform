@@ -27,7 +27,7 @@ app = FastAPI(
 def root() -> HTMLResponse:
     state = load_today_state()
     return HTMLResponse(
-        render_today_dashboard(state)
+        render_today_dashboard(state, shadow_state=shadow())
     )
 
 

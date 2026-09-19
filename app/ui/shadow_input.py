@@ -2,6 +2,7 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import json
+import math
 import os
 from pathlib import Path
 import stat
@@ -64,6 +65,8 @@ def _decode(kind, value):
                 raise ValueError("finite decimal required")
             return decoded
         return date.fromisoformat(value) if kind is date else UUID(value)
+    if kind is float and type(value) is float and math.isfinite(value):
+        return value
     if kind in (str, int, bool) and type(value) is kind:
         return value
     raise ValueError("invalid transport type")
@@ -143,9 +146,16 @@ def read_shadow_execution(directory: Path, source):
                                'shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1')):
         raise ValueError('invalid execution envelope')
     decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}
-    return reader(
+    report = reader(
         directory, source.watchlist, source.evidence_packages, **decoded,
     )
+    # Only surface policies after the execution reader authenticates their ancestry.
+    return report | {'paper_economics': {
+        'status': 'AUDITED PAPER ASSUMPTIONS / NOT A BROKER QUOTE',
+        'ibkr_applicability': 'NOT ESTABLISHED / NO VERIFIED IBKR SCHEDULE BINDING',
+        'entry_policy': decoded['fill_policy'].model_dump(mode='json'),
+        'exit_policy': decoded['exit_policy'].model_dump(mode='json'),
+    }}
 
 
 def read_shadow_portfolio(directory: Path):

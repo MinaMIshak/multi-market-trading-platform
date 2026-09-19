@@ -168,3 +168,16 @@ def test_continuation_ui_rejects_damaged_ancestry(tmp_path, monkeypatch, damage)
     assert state['execution'] is None
     assert str(tmp_path) not in json.dumps(state)
     assert 'NO AUDITED EXECUTION' in main.shadow_page().body.decode()
+
+
+def test_audited_paper_costs_do_not_claim_ibkr_applicability(tmp_path, monkeypatch):
+    path, _, document = execution_input(tmp_path, monkeypatch)
+    economics = main.shadow()['execution']['paper_economics']
+    assert economics['entry_policy'] == document['fill_policy']
+    assert economics['exit_policy'] == document['exit_policy']
+    assert economics['ibkr_applicability'] == 'NOT ESTABLISHED / NO VERIFIED IBKR SCHEDULE BINDING'
+    assert 'NOT A BROKER QUOTE' in main.shadow_page().body.decode()
+    document['fill_policy']['fixed_cost_per_side'] = '999'
+    path.write_text(json.dumps(document))
+    assert main.shadow()['execution'] is None
+    assert 'AUDITED PAPER ASSUMPTIONS' not in main.shadow_page().body.decode()

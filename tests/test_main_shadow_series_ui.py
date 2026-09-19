@@ -93,3 +93,23 @@ def test_marked_requests_are_reaudited_in_series(tmp_path, monkeypatch, continua
     with pytest.raises(ValueError):
         _audit_request(tmp_path, _decode(ShadowPortfolioPolicy, doc['portfolio']),
                        MarkedSnapshotRequest(date.fromisoformat(doc['snapshot_date_utc']), requests))
+
+
+def test_series_remains_available_without_candidate_transport(tmp_path, monkeypatch):
+    _, _, first, _ = prepare(tmp_path, monkeypatch)
+    original = main.shadow()['series']
+    (tmp_path / 'input.json').unlink()
+    state = main.shadow()
+    assert not state['available'] and state['collection'] is state['execution'] is None
+    assert state['series'] == original
+    assert 'VALUATION SERIES ONLY / M7 PERFORMANCE NOT EVALUATED' in main.shadow_page().body.decode()
+    first.write_text('{}')
+    assert main.shadow()['series'] is None
+
+
+def test_linked_directory_still_blocks_every_stage(tmp_path, monkeypatch):
+    prepare(tmp_path, monkeypatch)
+    (tmp_path / 'input.json').unlink()
+    (tmp_path / 'linked').symlink_to(tmp_path, target_is_directory=True)
+    state = main.shadow()
+    assert state['collection'] is state['execution'] is state['portfolio'] is state['series'] is None
