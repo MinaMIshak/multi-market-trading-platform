@@ -41,3 +41,29 @@ networking, firewall, reverse proxy or production services to expose it.
 Next integrate authenticated shadow readers through existing evidence/package
 contracts. No arbitrary serialized report may become trading truth. M7, shadow
 and M8 semantics remain separate; visibility does not validate trading results.
+
+## Committed source candidate gate
+
+`tools/experimental_snapshot.py` now prepares a candidate from a clean Git HEAD
+using read-only Git commands. It exports only tracked `app`, `tests` and
+`requirements.txt`, excluding runtime data, logs, environment files and deployment
+configuration. Archive traversal, links and non-regular entries are rejected.
+The output root must already exist, be owned by the operator, and have private
+permissions (0700). Each attempt creates a unique directory and never changes
+another candidate or a last-known-good pointer.
+
+The shared read/execute-only Python runs the three existing experimental/TODAY/M7
+UI test modules with a minimal environment, bytecode and pytest cache disabled,
+and a 180-second timeout. These tests use isolated artificial inputs and require
+no external API. This is not an OS network sandbox or a full regression gate.
+Test output remains in `quality.log`. Failure leaves no `candidate.json` receipt.
+Passing candidates receive an atomic receipt binding commit, archive hash,
+individual source hashes, interpreter and test command. Source changes during
+testing and changes to checkout HEAD/cleanliness reject the candidate.
+
+This command prepares source only: it opens no listener, starts no application,
+and does not promote a build. The source directory is not filesystem-immutable;
+a launcher must reverify receipt/source integrity before execution, use separate
+state, perform HTTP identity/label checks and preserve the running known-good
+process on failure. Automatic refresh and remote reachability remain unfinished.
+Run preparation only after the supervisor commits the coherent milestone.
