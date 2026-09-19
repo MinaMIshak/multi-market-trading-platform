@@ -23,7 +23,7 @@ class ShadowWatchlistInput:
 
 
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
-    unavailable = {"available": False, "collection": None, "execution": None, "portfolio": None,
+    unavailable = {"available": False, "collection": None, "execution": None, "portfolio": None, "series": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     try:
         if source is not None and type(source) is not ShadowWatchlistInput:
@@ -53,7 +53,12 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
         portfolio = read_shadow_portfolio(directory)
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         portfolio = None
-    return {"portfolio": portfolio, "available": True, "collection": collection, "execution": execution,
+    try:
+        from app.ui.shadow_input import read_shadow_series
+        series = read_shadow_series(directory)
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
+        series = None
+    return {"series": series, "portfolio": portfolio, "available": True, "collection": collection, "execution": execution,
             "status": "AUDITED FROZEN RECORD"}
 
 
@@ -131,4 +136,15 @@ def render_shadow_watchlist(state: dict) -> str:
                     'valuation_status', 'performance_status', 'valuation',
                     'mark_provenance', 'snapshot_id', 'policy_id'):
             body += f'<h3>{e(key.replace("_", " "))}</h3>{details(portfolio[key])}'
+    body += '<h2>Historical native paper valuation series</h2>'
+    series = state.get('series')
+    if series is None:
+        body += '<p>UNAVAILABLE / NO AUDITED VALUATION SERIES</p>'
+    else:
+        body += ('<p>EXPERIMENTAL / PAPER ONLY. Selected historical snapshots only; '
+                 'gaps are not filled. Gross valuation changes are not net trading returns. '
+                 'Current NAV, FX aggregation and empirical validation NOT ESTABLISHED.</p>')
+        for key in ('currency', 'scoring', 'performance_status', 'summary',
+                    'observations', 'intervals', 'series_id', 'policy_id'):
+            body += f'<h3>{e(key.replace("_", " "))}</h3>{details(series[key])}'
     return '<!doctype html><html><head><title>Frozen paper candidates</title></head><body>' + body + '</body></html>'

@@ -150,9 +150,6 @@ def read_shadow_execution(directory: Path, source):
 
 def read_shadow_portfolio(directory: Path):
     """Re-audit a dated native snapshot; never accept supplied valuation JSON."""
-    from typing import get_type_hints
-    from app.paper.shadow_continuations import ForwardContinuationBundle
-    from app.paper.shadow_daily_portfolio import SingleSessionMarkRequest, ContinuationMarkRequest
     from app.paper.shadow_daily_snapshots import (
         audit_cash_only_daily_portfolio_snapshot, audit_marked_daily_portfolio_snapshot,
     )
@@ -161,13 +158,25 @@ def read_shadow_portfolio(directory: Path):
     document = _read_document(directory / 'portfolio.json')
     if (type(document) is not dict
             or set(document) != {'schema_version', 'portfolio', 'snapshot_date_utc', 'requests'}
-            or document['schema_version'] != 'shadow-ui-portfolio-v1'
-            or type(document['requests']) is not list):
+            or document['schema_version'] != 'shadow-ui-portfolio-v1'):
         raise ValueError('invalid portfolio envelope')
     portfolio = _decode(ShadowPortfolioPolicy, document['portfolio'])
     snapshot_date = _decode(date, document['snapshot_date_utc'])
+    requests = _decode_mark_requests(document['requests'])
+    if requests:
+        return audit_marked_daily_portfolio_snapshot(directory, portfolio, snapshot_date, requests)
+    return audit_cash_only_daily_portfolio_snapshot(directory, portfolio, snapshot_date)
+
+
+def _decode_mark_requests(items):
+    from typing import get_type_hints
+    from app.paper.shadow_continuations import ForwardContinuationBundle
+    from app.paper.shadow_daily_portfolio import SingleSessionMarkRequest, ContinuationMarkRequest
+
+    if type(items) is not list:
+        raise ValueError('mark request array required')
     requests = []
-    for item in document['requests']:
+    for item in items:
         if type(item) is not dict or set(item) != {'kind', 'inputs'}:
             raise ValueError('invalid mark envelope')
         if item['kind'] == 'SAME_SESSION':
@@ -185,6 +194,29 @@ def read_shadow_portfolio(directory: Path):
             raise ValueError('complete exact mark inputs required')
         requests.append(kind(**{key: _decode(annotation, inputs[key])
                                 for key, annotation in fields.items()}))
-    if requests:
-        return audit_marked_daily_portfolio_snapshot(directory, portfolio, snapshot_date, tuple(requests))
-    return audit_cash_only_daily_portfolio_snapshot(directory, portfolio, snapshot_date)
+    return tuple(requests)
+
+
+def read_shadow_series(directory: Path):
+    """Re-audit every dated snapshot; never accept computed series values."""
+    from app.paper.shadow_daily_series import (
+        CashSnapshotRequest, MarkedSnapshotRequest, authenticated_daily_portfolio_series,
+    )
+    from app.paper.shadow_portfolio import ShadowPortfolioPolicy
+
+    document = _read_document(directory / 'series.json')
+    if (type(document) is not dict
+            or set(document) != {'schema_version', 'portfolio', 'snapshots'}
+            or document['schema_version'] != 'shadow-ui-series-v1'
+            or type(document['snapshots']) is not list
+            or not 2 <= len(document['snapshots']) <= 512):
+        raise ValueError('invalid series envelope')
+    portfolio = _decode(ShadowPortfolioPolicy, document['portfolio'])
+    requests = []
+    for item in document['snapshots']:
+        if type(item) is not dict or set(item) != {'snapshot_date_utc', 'requests'}:
+            raise ValueError('invalid snapshot request')
+        day = _decode(date, item['snapshot_date_utc'])
+        marks = _decode_mark_requests(item['requests'])
+        requests.append(MarkedSnapshotRequest(day, marks) if marks else CashSnapshotRequest(day))
+    return authenticated_daily_portfolio_series(directory, portfolio, tuple(requests))
