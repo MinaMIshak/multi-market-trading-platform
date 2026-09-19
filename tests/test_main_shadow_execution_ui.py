@@ -92,3 +92,79 @@ def test_unknown_exit_capacity_exposes_no_trade_or_pnl(tmp_path, monkeypatch):
     assert view['closed_paper_trades'] == {'status': 'NOT EVALUATED'}
     assert view['open_paper_positions'] == {'status': 'NOT EVALUATED'}
     assert all(value is None for key, value in view['performance'].items() if key != 'status')
+
+
+def continuation_input(tmp_path, monkeypatch, status='CLOSED'):
+    from tests.test_shadow_allocations import setup_continuation_settlement
+
+    args, _, chain, chain_packages, policy, packages, receipt = (
+        setup_continuation_settlement(tmp_path, monkeypatch, result=status)
+    )
+
+    def encode(value):
+        if isinstance(value, tuple):
+            return [encode(item) for item in value]
+        return value.model_dump(mode='json')
+
+    (tmp_path / 'input.json').write_text(json.dumps({
+        'schema_version': 'shadow-ui-input-v1',
+        'watchlist': encode(args[0]), 'evidence_packages': encode(args[1]),
+    }))
+    document = dict(zip(
+        ('facts', 'fact_packages', 'fill_policy', 'fill_packages',
+         'continuations', 'continuation_packages', 'exit_policy', 'exit_packages'),
+        map(encode, (*args[2:], chain, chain_packages, policy, packages)), strict=True,
+    ))
+    document['schema_version'] = 'shadow-ui-continuation-v1'
+    path = tmp_path / 'execution.json'
+    path.write_text(json.dumps(document))
+    monkeypatch.setenv('EGX_SHADOW_DIRECTORY', str(tmp_path))
+    return path, receipt, document
+
+
+@pytest.mark.parametrize('status', ['OPEN', 'CLOSED', 'UNKNOWN'])
+def test_continuation_ui_preserves_observation_semantics(tmp_path, monkeypatch, status):
+    continuation_input(tmp_path, monkeypatch, status)
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    view = main.shadow()['execution']
+    assert view['position_status'] == status
+    assert view['collection_status'] == 'CONTINUATION EXIT EVALUATED'
+    assert view['performance']['nav'] is None
+    if status == 'CLOSED':
+        assert view['closed_paper_trades']['trade']['net_pnl'] is not None
+    elif status == 'OPEN':
+        assert view['open_paper_positions']['position']['unrealized_pnl'] is None
+    else:
+        assert view['open_paper_positions'] == {'status': 'NOT EVALUATED'}
+        assert view['closed_paper_trades'] == {'status': 'NOT EVALUATED'}
+    body = main.shadow_page().body.decode()
+    assert 'continuation evaluations' in body
+    assert 'current position status UNKNOWN' in body
+    assert 'same-session observation' not in body
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+
+
+@pytest.mark.parametrize('damage', ['receipt', 'package', 'empty', 'omitted', 'duplicate', 'mixed'])
+def test_continuation_ui_rejects_damaged_ancestry(tmp_path, monkeypatch, damage):
+    path, receipt, document = continuation_input(tmp_path, monkeypatch)
+    assert main.shadow()['execution'] is not None
+    if damage == 'receipt':
+        receipt.write_text('{}')
+    elif damage == 'package':
+        document['continuation_packages'][0][0]['review']['approved'] = False
+    elif damage == 'empty':
+        document['continuations'] = []
+        document['continuation_packages'] = []
+    elif damage == 'omitted':
+        document['continuation_packages'] = []
+    elif damage == 'duplicate':
+        document['continuations'] *= 2
+        document['continuation_packages'] *= 2
+    else:
+        document['evaluation_facts'] = None
+    path.write_text(json.dumps(document))
+    state = main.shadow()
+    assert state['available']
+    assert state['execution'] is None
+    assert str(tmp_path) not in json.dumps(state)
+    assert 'NO AUDITED EXECUTION' in main.shadow_page().body.decode()

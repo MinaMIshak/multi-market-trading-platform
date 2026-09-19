@@ -95,7 +95,7 @@ def render_shadow_watchlist(state: dict) -> str:
     if execution is None:
         body += '<p>UNAVAILABLE / NO AUDITED EXECUTION</p>'
     else:
-        body += ('<p>EXPERIMENTAL / PAPER ONLY. One same-session observation; '
+        body += ('<p>EXPERIMENTAL / PAPER ONLY. One audited execution observation; '
                  'current position status UNKNOWN. Portfolio NAV NOT EVALUATED.</p>')
 
         def details(value):
@@ -108,7 +108,10 @@ def render_shadow_watchlist(state: dict) -> str:
                 return '; '.join(details(item) for item in value) or 'UNKNOWN'
             return e('UNKNOWN' if value is None else value)
 
-        for key in ('position_status', 'exit_evaluation', 'open_paper_positions',
+        for key in ('collection_status', 'position_status', 'entry_session_exit_evaluation',
+                    'continuation_evaluations', 'exit_evaluation', 'open_paper_positions',
                     'closed_paper_trades', 'audit_references'):
+            if key not in execution:
+                continue
             body += f'<h3>{e(key.replace("_", " "))}</h3>{details(execution[key])}'
     return '<!doctype html><html><head><title>Frozen paper candidates</title></head><body>' + body + '</body></html>'

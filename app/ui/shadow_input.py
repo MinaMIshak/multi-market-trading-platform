@@ -99,11 +99,12 @@ def read_shadow_input(directory: Path):
 
 
 def read_shadow_execution(directory: Path, source):
-    """Decode one same-session evaluation and re-audit its complete ancestry."""
+    """Decode one execution observation and re-audit its complete ancestry."""
+    from app.paper.shadow_continuations import ForwardContinuationBundle
     from app.paper.shadow_exits import ShadowExitPolicy
     from app.paper.shadow_facts import ForwardFactBundle
     from app.paper.shadow_fills import ShadowFillPolicy
-    from app.paper.shadow_report import exit_evaluation_view
+    from app.paper.shadow_report import continuation_exit_evaluation_view, exit_evaluation_view
 
     fields = {
         'facts': ForwardFactBundle,
@@ -116,10 +117,20 @@ def read_shadow_execution(directory: Path, source):
         'evaluation_fact_packages': tuple[HistoricalEvidencePackage, ...] | None,
     }
     document = _read_document(directory / 'execution.json')
+    version = document.get('schema_version') if type(document) is dict else None
+    reader = exit_evaluation_view
+    if version == 'shadow-ui-continuation-v1':
+        fields.pop('evaluation_facts')
+        fields.pop('evaluation_fact_packages')
+        fields.update(
+            continuations=tuple[ForwardContinuationBundle, ...],
+            continuation_packages=tuple[tuple[HistoricalEvidencePackage, ...], ...],
+        )
+        reader = continuation_exit_evaluation_view
     if (type(document) is not dict or set(document) != {'schema_version', *fields}
-            or document['schema_version'] != 'shadow-ui-execution-v1'):
+            or version not in ('shadow-ui-execution-v1', 'shadow-ui-continuation-v1')):
         raise ValueError('invalid execution envelope')
     decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}
-    return exit_evaluation_view(
+    return reader(
         directory, source.watchlist, source.evidence_packages, **decoded,
     )

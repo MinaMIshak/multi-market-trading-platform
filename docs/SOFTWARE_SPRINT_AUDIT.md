@@ -151,3 +151,26 @@ validated performance or proof of freshness. Multi-session continuation and
 portfolio readers remain the next integration work. M7/M8 are unchanged. No
 runtime was configured, launched, refreshed or deployed and no authentic input
 or empirical result was created by this software milestone.
+
+## Existing UI multi-session observations — 2026-09-19
+
+`execution.json` also accepts `shadow-ui-continuation-v1`. It retains the six
+required entry facts/fill/exit policy and package fields from the same-session
+schema, replacing `evaluation_facts` and `evaluation_fact_packages` with
+`continuations` and `continuation_packages`: the complete ordered canonical
+ForwardContinuationBundle array and matching nested evidence-package arrays.
+Mixing the schemas or supplying incomplete chains fails closed. The same bounded
+reader and canonical decoding apply; every read invokes the existing
+`continuation_exit_evaluation_view` to re-audit the complete execution ancestry.
+No caller-provided computed report or P&L is admitted.
+
+The existing page displays entry-session and continuation evaluations separately.
+OPEN exposes only the authenticated as-of gross mark; CLOSED exposes native trade
+P&L; UNKNOWN exposes neither inferred marks nor trades. This observation does not
+establish current status, freshness, capital settlement, portfolio NAV or empirical
+validation. Existing same-session transport remains compatible. Invalid execution
+clears the execution view while independently audited candidates remain visible.
+No runtime, deployment, evidence acquisition or M7/M8 changes are involved.
+
+Next integration boundary: existing authenticated native portfolio snapshot and
+capital-settlement readers, without treating a single trade as a portfolio.
