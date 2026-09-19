@@ -91,3 +91,50 @@ def test_head_changed_during_gate_rejected(tmp_path, monkeypatch):
         snapshot.prepare(tmp_path, root)
     assert not list(root.rglob('candidate.json'))
     assert previous.read_text() == 'preserve me'
+
+
+def test_verify_committed_candidate(tmp_path, monkeypatch):
+    root, _ = setup_candidate(tmp_path, monkeypatch)
+    candidate = snapshot.prepare(tmp_path, root)
+    assert snapshot.verify(tmp_path, candidate)['commit'] == 'a' * 40
+
+
+@pytest.mark.parametrize('mutation', ['source', 'receipt_and_source', 'extra',
+                                    'missing', 'symlink', 'archive', 'gate'])
+def test_verify_rejects_tampering(tmp_path, monkeypatch, mutation):
+    root, previous = setup_candidate(tmp_path, monkeypatch)
+    candidate = snapshot.prepare(tmp_path, root)
+    source = candidate / 'source'
+    file = source / 'app/example.py'
+    receipt_path = candidate / 'candidate.json'
+    receipt = json.loads(receipt_path.read_text())
+    if mutation in {'source', 'receipt_and_source'}:
+        file.write_text('changed')
+        if mutation == 'receipt_and_source':
+            receipt['files'] = snapshot.hashes(source)
+    elif mutation == 'extra':
+        (source / 'app/injected.py').write_text('injected')
+    elif mutation == 'missing':
+        file.unlink()
+    elif mutation == 'symlink':
+        file.unlink()
+        file.symlink_to(previous)
+    elif mutation == 'archive':
+        receipt['archive_sha256'] = '0' * 64
+    else:
+        receipt['test_exit_code'] = False
+    receipt_path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError):
+        snapshot.verify(tmp_path, candidate)
+    assert previous.read_text() == 'preserve me'
+
+
+def test_verify_rejects_receipt_symlink(tmp_path, monkeypatch):
+    root, _ = setup_candidate(tmp_path, monkeypatch)
+    candidate = snapshot.prepare(tmp_path, root)
+    receipt = candidate / 'candidate.json'
+    retained = candidate / 'retained.json'
+    receipt.rename(retained)
+    receipt.symlink_to(retained)
+    with pytest.raises(ValueError, match='receipt'):
+        snapshot.verify(tmp_path, candidate)

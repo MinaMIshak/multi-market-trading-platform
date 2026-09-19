@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import subprocess
 import tarfile
@@ -40,8 +41,52 @@ def extract_source(archive, destination):
 
 
 def hashes(directory):
+    if directory.is_symlink() or not directory.is_dir():
+        raise ValueError('unsafe source directory')
+    for path in directory.rglob('*'):
+        if path.is_symlink() or not (path.is_file() or path.is_dir()):
+            raise ValueError('unsafe source entry')
     return {str(p.relative_to(directory)): hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted(directory.rglob('*')) if p.is_file()}
+
+
+def verify(repository: Path, candidate: Path) -> dict:
+    """Rebind a tested candidate to Git, without requiring HEAD to stay current.
+
+    Allows preservation of an older known-good build during development. This is
+    an operator-owned filesystem integrity check, not an adversarial sandbox.
+    """
+    if (not candidate.is_absolute() or candidate.resolve() != candidate
+            or candidate.is_symlink()):
+        raise ValueError('absolute non-symlink candidate required')
+    info = candidate.stat()
+    if not candidate.is_dir() or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise ValueError('candidate must be owned and private')
+    receipt_path = candidate / 'candidate.json'
+    if receipt_path.is_symlink() or not receipt_path.is_file():
+        raise ValueError('missing or unsafe candidate receipt')
+    receipt = json.loads(receipt_path.read_text())
+    commit = receipt.get('commit', '')
+    if (not isinstance(commit, str) or re.fullmatch('[0-9a-f]{40}', commit) is None
+            or receipt.get('schema') != 'experimental-source-candidate-v1'
+            or receipt.get('tests') != GATE
+            or type(receipt.get('test_exit_code')) is not int
+            or receipt['test_exit_code'] != 0
+            or receipt.get('python') != PYTHON
+            or receipt.get('mode') != 'EXPERIMENTAL / PAPER ONLY'
+            or receipt.get('runtime_promoted') is not False):
+        raise ValueError('invalid candidate receipt')
+    archive = git(repository, 'archive', '--format=tar', commit, '--',
+                  'app', 'tests', 'requirements.txt')
+    if hashlib.sha256(archive).hexdigest() != receipt.get('archive_sha256'):
+        raise ValueError('candidate archive differs from Git')
+    with tempfile.TemporaryDirectory(prefix='verify-', dir=candidate) as temporary:
+        original = Path(temporary)
+        extract_source(archive, original)
+        expected = hashes(original)
+    if receipt.get('files') != expected or hashes(candidate / 'source') != expected:
+        raise ValueError('candidate source differs from Git')
+    return receipt
 
 
 def prepare(repository: Path, output_root: Path) -> Path:

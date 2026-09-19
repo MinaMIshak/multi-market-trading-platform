@@ -67,3 +67,23 @@ a launcher must reverify receipt/source integrity before execution, use separate
 state, perform HTTP identity/label checks and preserve the running known-good
 process on failure. Automatic refresh and remote reachability remain unfinished.
 Run preparation only after the supervisor commits the coherent milestone.
+
+## Pre-launch source re-verification
+
+`experimental_snapshot.verify(repository, candidate)` re-exports the receipt's
+full commit with read-only Git, checks the archive digest, and compares both the
+receipt manifest and actual candidate files against that export. Modified,
+additional, missing or symlinked source files fail closed, including source
+changes accompanied by updated receipt file hashes. Candidate directories must
+be private and operator-owned; symlinked receipts are rejected. The recorded gate,
+interpreter, mode and successful exit status must match the preparation contract.
+An older committed candidate can still verify after checkout HEAD advances, so
+ongoing development does not invalidate the last-known-good source.
+
+On 2026-09-19, actual preparation of committed HEAD `8e02166` passed its isolated
+21-test UI gate; the new verifier also accepted that candidate against Git.
+This verifies source provenance, not a cryptographic attestation that tests ran:
+receipt ownership remains trusted. Concurrent operator mutation, hardlinks and
+post-verification edits are outside this integrity check's guarantees. A launcher
+must call it immediately before starting the candidate and enforce its HTTP
+promotion gate. No runtime or current-build pointer was created by this milestone.
