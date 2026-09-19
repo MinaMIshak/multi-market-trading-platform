@@ -1,12 +1,22 @@
+from datetime import date
 import sqlite3
 
+import pytest
+
+from app.domain import (
+    MarketSession,
+    MarketSessionStatus,
+)
 from app.ui.today import (
     load_today_state,
     render_today_dashboard,
 )
 
 
-def make_ui_db(tmp_path):
+def make_ui_db(
+    tmp_path,
+    session_status=MarketSessionStatus.VERIFIED,
+):
     path = tmp_path / "platform.db"
 
     con = sqlite3.connect(path)
@@ -53,6 +63,17 @@ def make_ui_db(tmp_path):
     )
 
     con.execute(
+        """
+        CREATE TABLE market_sessions (
+            market_date TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    con.execute(
         "INSERT INTO data_ingestions VALUES ('i1')"
     )
 
@@ -82,6 +103,29 @@ def make_ui_db(tmp_path):
             'VALIDATED'
         )
         """
+    )
+
+    session = MarketSession(
+        market_date=date(2026, 9, 10),
+        status=session_status,
+    )
+
+    con.execute(
+        """
+        INSERT INTO market_sessions (
+            market_date,
+            status,
+            payload_json,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            session.market_date.isoformat(),
+            session.status.value,
+            session.model_dump_json(),
+            "2026-09-10T07:00:00+00:00",
+        ),
     )
 
     con.commit()
@@ -255,3 +299,158 @@ def test_integrity_failure_discards_snapshot_and_closes(tmp_path, monkeypatch):
         "available": False, "symbols": [], "counts": {}, "error": "ValueError",
     }
     assert closed == [True]
+
+
+
+def test_today_state_surfaces_verified_market_session(
+    tmp_path,
+):
+    state = load_today_state(
+        make_ui_db(tmp_path),
+        market_date=date(2026, 9, 10),
+    )
+
+    assert state["available"] is True
+    assert state["market_session"] == {
+        "market_date": "2026-09-10",
+        "status": "VERIFIED",
+        "calendar_truth":
+            "VERIFIED_TRADING_DAY",
+        "data_verified_at": None,
+    }
+
+
+@pytest.mark.parametrize(
+    "status",
+    (
+        MarketSessionStatus.HOLIDAY,
+        MarketSessionStatus.WEEKEND,
+    ),
+)
+def test_today_state_surfaces_verified_non_trading_day(
+    tmp_path,
+    status,
+):
+    state = load_today_state(
+        make_ui_db(
+            tmp_path,
+            session_status=status,
+        ),
+        market_date=date(2026, 9, 10),
+    )
+
+    assert state["available"] is True
+    assert (
+        state["market_session"]["status"]
+        == status.value
+    )
+    assert (
+        state["market_session"]["calendar_truth"]
+        == "VERIFIED_NON_TRADING_DAY"
+    )
+
+
+def test_today_state_keeps_lifecycle_state_unverified(
+    tmp_path,
+):
+    state = load_today_state(
+        make_ui_db(
+            tmp_path,
+            session_status=(
+                MarketSessionStatus.CLOSED
+            ),
+        ),
+        market_date=date(2026, 9, 10),
+    )
+
+    assert state["available"] is True
+    assert (
+        state["market_session"]["status"]
+        == "CLOSED"
+    )
+    assert (
+        state["market_session"]["calendar_truth"]
+        == "UNVERIFIED"
+    )
+
+
+def test_today_state_missing_market_session_is_unverified(
+    tmp_path,
+):
+    path = make_ui_db(tmp_path)
+
+    with sqlite3.connect(path) as con:
+        con.execute(
+            "DELETE FROM market_sessions"
+        )
+
+    state = load_today_state(
+        path,
+        market_date=date(2026, 9, 10),
+    )
+
+    assert state["available"] is True
+    assert state["market_session"] == {
+        "market_date": "2026-09-10",
+        "status": None,
+        "calendar_truth": "UNVERIFIED",
+        "data_verified_at": None,
+    }
+
+
+def test_today_state_fails_closed_on_session_status_mismatch(
+    tmp_path,
+):
+    path = make_ui_db(tmp_path)
+
+    with sqlite3.connect(path) as con:
+        con.execute(
+            """
+            UPDATE market_sessions
+            SET status = 'HOLIDAY'
+            WHERE market_date = '2026-09-10'
+            """
+        )
+
+    state = load_today_state(
+        path,
+        market_date=date(2026, 9, 10),
+    )
+
+    assert state == {
+        "available": False,
+        "symbols": [],
+        "counts": {},
+        "error": "ValueError",
+    }
+
+
+def test_today_dashboard_surfaces_market_session_truth():
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {},
+        "symbols": [],
+        "market_session": {
+            "market_date": "2026-09-10",
+            "status": "VERIFIED",
+            "calendar_truth":
+                "VERIFIED_TRADING_DAY",
+            "data_verified_at": None,
+        },
+    }
+
+    page = render_today_dashboard(state)
+
+    assert "Market Session" in page
+    assert "VERIFIED" in page
+    assert "Calendar Truth" in page
+    assert "VERIFIED_TRADING_DAY" in page
+
+    # Session truth must not accidentally enable
+    # strategy recommendations.
+    assert "NO SETUP ENGINE" not in page
+    assert (
+        "Trading signals are intentionally disabled"
+        in page
+    )

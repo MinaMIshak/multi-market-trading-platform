@@ -4,17 +4,31 @@ import html
 import os
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from app.core.schedule import CalendarTruth
+from app.domain import MarketSession, MarketSessionStatus
 
-def load_today_state(database_path: Path | None = None) -> dict:
+
+def load_today_state(
+    database_path: Path | None = None,
+    market_date: date | None = None,
+) -> dict:
     path = database_path if database_path is not None else Path(
         os.getenv(
             "EGX_DB_PATH",
             "/app/data/platform.db",
         )
+    )
+
+    target_market_date = (
+        market_date
+        if market_date is not None
+        else datetime.now(
+            ZoneInfo("Africa/Cairo")
+        ).date()
     )
 
     state = {
@@ -54,6 +68,95 @@ def load_today_state(database_path: Path | None = None) -> dict:
                 dict(row) for row in rows
             ]
 
+            market_session_row = con.execute(
+                """
+                SELECT
+                    status,
+                    payload_json
+                FROM market_sessions
+                WHERE market_date = ?
+                """,
+                (
+                    target_market_date.isoformat(),
+                ),
+            ).fetchone()
+
+            market_session = {
+                "market_date":
+                    target_market_date.isoformat(),
+                "status": None,
+                "calendar_truth":
+                    CalendarTruth.UNVERIFIED.value,
+                "data_verified_at": None,
+            }
+
+            if market_session_row is not None:
+                session = (
+                    MarketSession.model_validate_json(
+                        market_session_row[
+                            "payload_json"
+                        ]
+                    )
+                )
+
+                if (
+                    session.market_date
+                    != target_market_date
+                ):
+                    raise ValueError(
+                        "market-session payload date "
+                        "does not match ledger date"
+                    )
+
+                if (
+                    market_session_row["status"]
+                    != session.status.value
+                ):
+                    raise ValueError(
+                        "market-session status column "
+                        "does not match canonical payload"
+                    )
+
+                if (
+                    session.status
+                    == MarketSessionStatus.VERIFIED
+                ):
+                    calendar_truth = (
+                        CalendarTruth
+                        .VERIFIED_TRADING_DAY
+                    )
+                elif session.status in {
+                    MarketSessionStatus.HOLIDAY,
+                    MarketSessionStatus.WEEKEND,
+                }:
+                    calendar_truth = (
+                        CalendarTruth
+                        .VERIFIED_NON_TRADING_DAY
+                    )
+                else:
+                    calendar_truth = (
+                        CalendarTruth.UNVERIFIED
+                    )
+
+                market_session = {
+                    "market_date":
+                        session.market_date.isoformat(),
+                    "status":
+                        session.status.value,
+                    "calendar_truth":
+                        calendar_truth.value,
+                    "data_verified_at": (
+                        session
+                        .data_verified_at
+                        .isoformat()
+                        if (
+                            session.data_verified_at
+                            is not None
+                        )
+                        else None
+                    ),
+                }
+
             counts = {
                 "ingestions": con.execute(
                     "SELECT COUNT(*) "
@@ -81,8 +184,13 @@ def load_today_state(database_path: Path | None = None) -> dict:
             if integrity != "ok":
                 raise ValueError("database integrity check failed")
 
-        state.update(available=True, symbols=symbols, counts=counts,
-                     integrity=integrity)
+        state.update(
+            available=True,
+            symbols=symbols,
+            counts=counts,
+            integrity=integrity,
+            market_session=market_session,
+        )
 
     except Exception as exc:
         state["error"] = type(exc).__name__
@@ -100,6 +208,21 @@ def render_today_dashboard(
     counts = state.get("counts", {})
     symbols = state.get("symbols", [])
 
+    market_session = (
+        state.get("market_session")
+        or {}
+    )
+
+    market_status = (
+        market_session.get("status")
+        or "NO RECORD"
+    )
+
+    calendar_truth = market_session.get(
+        "calendar_truth",
+        CalendarTruth.UNVERIFIED.value,
+    )
+
     cards = [
         ("Validated Symbols", len(symbols)),
         (
@@ -114,13 +237,21 @@ def render_today_dashboard(
             "Quarantined Bars",
             counts.get("quarantined", 0),
         ),
+        (
+            "Market Session",
+            market_status,
+        ),
+        (
+            "Calendar Truth",
+            calendar_truth,
+        ),
     ]
 
     card_html = "".join(
         f"""
         <div class="card">
           <div class="label">{html.escape(label)}</div>
-          <div class="value">{value}</div>
+          <div class="value">{html.escape(str(value))}</div>
         </div>
         """
         for label, value in cards
