@@ -89,3 +89,37 @@ are artificial isolated database tests, not market evidence.
 The sprint is not complete. Historical admission remains NO_GO; empirical edge
 and real-money readiness are NOT YET VALIDATED. No authentic sessions, prices,
 recommendations, fills or results were created or reconstructed.
+
+## Current UI override — 2026-09-19
+
+Resume HEAD `31697a85b056fd98ab2d9a84cf8ee2785159e9a9`, expected branch,
+user egx-agent. Preserved unfinished `shadow.py`, `shadow_input.py` and adapter
+tests. Prior experimental runtime milestones are historical/test infrastructure.
+The current directive supersedes the staging steps above: no additional runtime
+or deployment work is on the critical path. Existing `app.main:app` remains the
+product application, with its existing TODAY and M7 structure.
+
+Integrated read-only `/shadow` and `/api/shadow` into that application and added
+a PAPER CANDIDATES navigation link. `EGX_SHADOW_DIRECTORY` must explicitly name
+an absolute operator-owned directory; absent configuration returns unavailable
+without creating state or inferring a path from the application database.
+The fixed `input.json` envelope uses schema `shadow-ui-input-v1`, with `watchlist`
+and `evidence_packages` containing complete canonical model JSON fields. Decimal
+values are strings and timestamps must explicitly express UTC. The bounded
+4 MiB regular-file reader rejects duplicate fields, noncanonical types and links.
+Transport parsing never substitutes for the upstream freeze/evidence/ledger audit,
+which runs on every read. No upload, evidence approval, freeze or execution action
+is exposed by these routes. Operator-owned files remain a trust boundary; concurrent
+malicious mutation/hardlinks are not prevented by these checks.
+
+An audited frozen record does not prove freshness: both page and API explicitly
+say freshness is not established. Candidates remain distinct from fills; current
+positions, NAV and validated performance are not inferred. Historical candidate
+records may be displayed with their original date and cutoffs. No authentic input
+has been configured or made visible in a running application by this milestone.
+
+Next critical path: adapt existing authenticated execution/portfolio readers into
+the same application, preserving M7 and M8 boundaries, then assess stock/ETF,
+horizon and dated execution-economic contracts against actual evidence. Historical
+PIT/availability/universe/session/action/review limitations remain NO_GO; software
+integration can proceed without claiming empirical validation or LIVE readiness.

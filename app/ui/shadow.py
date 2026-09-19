@@ -1,5 +1,6 @@
 """Read-only frozen candidate surface over the existing shadow audit boundary."""
 from dataclasses import dataclass
+from decimal import InvalidOperation
 from html import escape
 from pathlib import Path
 
@@ -24,10 +25,8 @@ class ShadowWatchlistInput:
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
     unavailable = {"available": False, "collection": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
-    if source is None:
-        return unavailable
     try:
-        if type(source) is not ShadowWatchlistInput:
+        if source is not None and type(source) is not ShadowWatchlistInput:
             raise ValueError("canonical shadow input required")
         # Isolated operator-owned state only; reject links before ledger reads.
         # This does not defend against concurrent malicious filesystem changes.
@@ -35,10 +34,13 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
             raise ValueError("unsafe or missing shadow directory")
         if any(path.is_symlink() for path in directory.rglob("*")):
             raise ValueError("linked shadow state")
+        if source is None:
+            from app.ui.shadow_input import read_shadow_input
+            source = read_shadow_input(directory)
         collection = watchlist_collection_view(
             directory, source.watchlist, source.evidence_packages,
         )
-    except (OSError, ValueError, TypeError, KeyError):
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         # Never return exception details, partial candidates or stale cached views.
         return unavailable
     return {"available": True, "collection": collection, "status": "AUDITED FROZEN RECORD"}
@@ -49,6 +51,7 @@ def render_shadow_watchlist(state: dict) -> str:
         return escape(str(value))
 
     body = '<h1>Frozen paper candidates</h1><p>EXPERIMENTAL / PAPER ONLY</p>'
+    body += '<p>Freshness NOT ESTABLISHED. Frozen record only; not a current trading signal.</p>'
     body += '<p><a href="/">Today</a> · <a href="/performance">M7 performance</a></p>'
     if not state["available"]:
         body += '<p>UNAVAILABLE / NO AUDITED COLLECTION</p>'

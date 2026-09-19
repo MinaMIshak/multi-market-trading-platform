@@ -156,3 +156,75 @@ def test_renderer_escapes_authenticated_text(tmp_path, monkeypatch):
     body = render_shadow_watchlist(state)
     assert '<script>' not in body
     assert '&lt;script&gt;' in body
+
+
+def disk_shadow(tmp_path, monkeypatch):
+    _, ledger, watchlist, packages = prepared_shadow(tmp_path, monkeypatch)
+    document = {
+        'schema_version': 'shadow-ui-input-v1',
+        'watchlist': watchlist.model_dump(mode='json'),
+        'evidence_packages': [item.model_dump(mode='json') for item in packages],
+    }
+    path = tmp_path / 'shadow' / 'input.json'
+    path.write_text(json.dumps(document))
+    app = create_experimental_app(state_directory=tmp_path, build_commit=COMMIT)
+    return app, path, document, ledger
+
+
+def test_disk_input_round_trip_and_fresh_audit(tmp_path, monkeypatch):
+    app, path, document, ledger = disk_shadow(tmp_path, monkeypatch)
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    state = endpoint(app, '/api/shadow')()
+    assert state['available'] is True
+    assert state['collection']['candidate_count'] == len(document['watchlist']['candidates'])
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    ledger.unlink()
+    assert endpoint(app, '/api/shadow')()['collection'] is None
+
+
+@pytest.mark.parametrize('damage', [
+    'duplicate', 'float', 'naive', 'offset', 'unknown', 'missing', 'review',
+    'thesis', 'decimal', 'bool_quantity', 'symlink', 'oversize', 'nested', 'fifo',
+])
+def test_disk_input_rejects_malformed_or_unaudited_records(tmp_path, monkeypatch, damage):
+    from app.ui.shadow_input import MAX_INPUT_BYTES
+    import os
+
+    app, path, document, _ = disk_shadow(tmp_path, monkeypatch)
+    assert endpoint(app, '/api/shadow')()['available'] is True
+    watchlist = document['watchlist']
+    candidate = watchlist['candidates'][0]
+    if damage == 'float':
+        candidate['entry_low'] = 100.0
+    elif damage == 'naive':
+        watchlist['generated_at'] = '2026-09-01T10:00:00'
+    elif damage == 'offset':
+        watchlist['generated_at'] = '2026-09-01T10:00:00+01:00'
+    elif damage == 'unknown':
+        document['extra'] = True
+    elif damage == 'missing':
+        del watchlist['schema_version']
+    elif damage == 'review':
+        document['evidence_packages'][0]['review']['approved'] = False
+    elif damage == 'thesis':
+        candidate['thesis'] = 'Changed after freeze'
+    elif damage == 'decimal':
+        candidate['entry_low'] = 'NaN'
+    elif damage == 'bool_quantity':
+        candidate['paper_quantity'] = True
+    path.write_text(json.dumps(document))
+    if damage == 'duplicate':
+        path.write_text('{"schema_version":"shadow-ui-input-v1",' + path.read_text()[1:])
+    elif damage == 'symlink':
+        path.unlink()
+        path.symlink_to(tmp_path / 'absent')
+    elif damage == 'oversize':
+        path.write_bytes(b' ' * (MAX_INPUT_BYTES + 1))
+    elif damage == 'nested':
+        path.write_text('[' * 2000 + ']' * 2000)
+    elif damage == 'fifo':
+        path.unlink()
+        os.mkfifo(path)
+    state = endpoint(app, '/api/shadow')()
+    assert state['available'] is False and state['collection'] is None
+    assert str(tmp_path) not in json.dumps(state)
