@@ -7,9 +7,13 @@ from fastapi.responses import HTMLResponse
 
 from app.ui.today import load_today_state, render_today_dashboard
 from app.ui.performance import render_performance_dashboard
+from app.ui.shadow import ShadowWatchlistInput, load_shadow_watchlist, render_shadow_watchlist
 
 
-def create_experimental_app(*, state_directory: Path, build_commit: str) -> FastAPI:
+def create_experimental_app(
+    *, state_directory: Path, build_commit: str,
+    shadow_input: ShadowWatchlistInput | None = None,
+) -> FastAPI:
     """Build identity must be supplied by the committed-snapshot launcher.
 
     This factory validates its shape, not Git provenance. It never reads the
@@ -17,6 +21,8 @@ def create_experimental_app(*, state_directory: Path, build_commit: str) -> Fast
     """
     if re.fullmatch(r"[0-9a-f]{40}", build_commit) is None:
         raise ValueError("a full commit identity is required")
+    if shadow_input is not None and type(shadow_input) is not ShadowWatchlistInput:
+        raise ValueError("canonical shadow input required")
     if not state_directory.is_absolute() or not state_directory.is_dir():
         raise ValueError("an existing absolute experimental state directory is required")
     state_directory = state_directory.resolve()
@@ -43,7 +49,17 @@ def create_experimental_app(*, state_directory: Path, build_commit: str) -> Fast
 
     @app.get("/", response_class=HTMLResponse)
     def root():
-        return page(render_today_dashboard(snapshot()))
+        return page(render_today_dashboard(snapshot()).replace(
+            "<body>", '<body><nav><a href="/shadow">Frozen paper candidates</a></nav>', 1,
+        ))
+
+    @app.get("/api/shadow")
+    def shadow():
+        return {**identity, **load_shadow_watchlist(state_directory / "shadow", shadow_input)}
+
+    @app.get("/shadow", response_class=HTMLResponse)
+    def shadow_page():
+        return page(render_shadow_watchlist(shadow()))
 
     @app.get("/api/today")
     def today():

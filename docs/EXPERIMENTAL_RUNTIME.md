@@ -163,3 +163,34 @@ PY
 Continue with authenticated shadow-reader integration independently of this
 runtime limitation. Empty runtime state is not a frozen watchlist, paper trade,
 validated recommendation, NAV or empirical result.
+
+## Authenticated frozen candidate integration
+
+The experimental factory accepts an optional `ShadowWatchlistInput` containing
+an exact canonical `ShadowWatchlist` and its `HistoricalEvidencePackage` tuple.
+It reads the corresponding durable collection only under the isolated state's
+`shadow/` directory. `/api/shadow` and `/shadow` call the existing
+`watchlist_collection_view` on every request, re-auditing completion, frozen
+watchlist/document, evidence bindings and candidate ledger. No serialized report
+JSON is accepted as input. Missing evidence/receipts, invalid ledger contents and
+symlinked shadow state return unavailable with no partial or cached candidates.
+Filesystem ownership remains trusted; concurrent malicious mutation is not covered.
+
+The existing TODAY page links to the frozen candidate page. Its record date and
+cutoffs are explicit; an old collection is not represented as today's watchlist.
+It displays thesis/context, entry conditions, stops, targets, declared liquidity
+and paper sizing, evidence IDs and unknown/unvalidated horizon and probability.
+Frozen risk/liquidity declarations do not prove execution admission. A candidate
+is never presented as a fill, open position or validated recommendation. Empty
+**audited** watchlists remain distinct from unavailable input. M7 is unchanged;
+this single-record view supplies neither daily portfolio completeness nor NAV.
+
+This is a typed application integration, not yet a disk package loader. The
+committed launcher still supplies no shadow input, so its new routes fail closed
+until an operator-owned canonical package adapter is implemented and tested.
+No authentic records were loaded and no staging promotion occurred. Integration
+and adversarial tests are part of `test_experimental_ui.py`, so the existing
+committed-snapshot UI quality gate includes them without invalidating older
+candidate gate receipts. Next implement bounded canonical on-disk input loading
+without weakening exact UTC/Decimal/evidence contracts, then connect existing
+execution and portfolio audit views. Runtime persistence remains unresolved.
