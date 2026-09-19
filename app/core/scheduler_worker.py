@@ -16,6 +16,9 @@ from app.core.calendar_truth import (
 from app.core.calendar_maintenance_runtime import (
     build_calendar_maintenance_runtime,
 )
+from app.core.calendar_live_runtime import (
+    build_calendar_live_runtime,
+)
 from app.storage import (
     Database,
     TradingRepository,
@@ -85,6 +88,19 @@ def main() -> None:
             "unsupported calendar maintenance mode"
         )
 
+    calendar_live_mode = os.getenv(
+        "EGX_CALENDAR_LIVE_MODE",
+        "disabled",
+    ).strip().lower()
+
+    if calendar_live_mode not in {
+        "disabled",
+        "local",
+    }:
+        raise ValueError(
+            "unsupported calendar live mode"
+        )
+
 
     secret_path = os.getenv(
         "EODHD_API_TOKEN_FILE",
@@ -126,6 +142,16 @@ def main() -> None:
             )
         )
 
+    calendar_live_runtime = None
+
+    if calendar_live_mode == "local":
+        calendar_live_runtime = (
+            build_calendar_live_runtime(
+                database=database,
+                scheduler_repository=repository,
+            )
+        )
+
     execution_context = (
         build_scheduler_execution_context(
             mode=mode,
@@ -150,6 +176,7 @@ def main() -> None:
         f"poll_seconds={poll_seconds} "
         "calendar_truth_source=market_sessions "
         f"calendar_maintenance={calendar_maintenance_mode} "
+        f"calendar_live={calendar_live_mode} "
         "execution_enabled="
         f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
@@ -231,6 +258,40 @@ def main() -> None:
                 print(
                     "CALENDAR_MAINTENANCE_DISPATCH "
                     + json.dumps(event, sort_keys=True),
+                    flush=True,
+                )
+
+        if calendar_live_runtime is not None:
+            calendar_live_outcomes = (
+                calendar_live_runtime
+                .dispatcher
+                .dispatch(
+                    evaluation=evaluation
+                )
+            )
+
+            for outcome in calendar_live_outcomes:
+                event = {
+                    "checkpoint": (
+                        outcome.checkpoint_name.value
+                    ),
+                    "claimed": outcome.claimed,
+                    "succeeded": outcome.succeeded,
+                    "verification_status": (
+                        outcome.verification_status.value
+                        if outcome.verification_status
+                        is not None
+                        else None
+                    ),
+                    "error_type": outcome.error_type,
+                }
+
+                print(
+                    "CALENDAR_LIVE_DISPATCH "
+                    + json.dumps(
+                        event,
+                        sort_keys=True,
+                    ),
                     flush=True,
                 )
 
