@@ -9,8 +9,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-def load_today_state() -> dict:
-    path = Path(
+def load_today_state(database_path: Path | None = None) -> dict:
+    path = database_path if database_path is not None else Path(
         os.getenv(
             "EGX_DB_PATH",
             "/app/data/platform.db",
