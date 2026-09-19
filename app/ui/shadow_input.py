@@ -101,6 +101,22 @@ def read_shadow_input(directory: Path):
     )
 
 
+def read_shadow_missed(directory: Path):
+    """Read an explicit missed-session receipt request, never reconstruct picks."""
+    from app.paper.shadow_records import ShadowSession
+    from app.paper.shadow_report import missed_collection_view
+
+    document = _read_document(directory / 'missed.json')
+    fields = {'record_id': str, 'session': ShadowSession,
+              'session_package': HistoricalEvidencePackage}
+    if (type(document) is not dict or set(document) != {'schema_version', *fields}
+            or document['schema_version'] != 'shadow-ui-missed-v1'):
+        raise ValueError('invalid missed collection envelope')
+    return missed_collection_view(
+        directory, **{key: _decode(kind, document[key]) for key, kind in fields.items()},
+    )
+
+
 def read_shadow_execution(directory: Path, source):
     """Decode one execution observation and re-audit its complete ancestry."""
     from app.paper.shadow_continuations import ForwardContinuationBundle
@@ -109,8 +125,9 @@ def read_shadow_execution(directory: Path, source):
     from app.paper.shadow_fills import ShadowFillPolicy
     from app.paper.shadow_portfolio import ShadowPortfolioPolicy
     from app.paper.shadow_report import (
-        capital_settlement_view, continuation_capital_settlement_view,
+        capital_reservation_view, capital_settlement_view, continuation_capital_settlement_view,
         continuation_exit_evaluation_view, exit_evaluation_view,
+        entry_fill_view, position_open_view, trigger_evaluation_view,
     )
 
     fields = {
@@ -126,6 +143,20 @@ def read_shadow_execution(directory: Path, source):
     document = _read_document(directory / 'execution.json')
     version = document.get('schema_version') if type(document) is dict else None
     reader = exit_evaluation_view
+    early_readers = {
+        'shadow-ui-trigger-v1': trigger_evaluation_view,
+        'shadow-ui-entry-fill-v1': entry_fill_view,
+        'shadow-ui-position-open-v1': position_open_view,
+        'shadow-ui-reservation-v1': capital_reservation_view,
+    }
+    if version in early_readers:
+        reader = early_readers[version]
+        fields = {key: fields[key] for key in (
+            ('facts', 'fact_packages') if version == 'shadow-ui-trigger-v1'
+            else ('facts', 'fact_packages', 'fill_policy', 'fill_packages')
+        )}
+        if version == 'shadow-ui-reservation-v1':
+            fields['portfolio'] = ShadowPortfolioPolicy
     if version in ('shadow-ui-continuation-v1', 'shadow-ui-continuation-settlement-v1'):
         fields.pop('evaluation_facts')
         fields.pop('evaluation_fact_packages')
@@ -143,18 +174,22 @@ def read_shadow_execution(directory: Path, source):
                   else capital_settlement_view)
     if (type(document) is not dict or set(document) != {'schema_version', *fields}
             or version not in ('shadow-ui-execution-v1', 'shadow-ui-continuation-v1',
-                               'shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1')):
+                               'shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1',
+                               *early_readers)):
         raise ValueError('invalid execution envelope')
     decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}
     report = reader(
         directory, source.watchlist, source.evidence_packages, **decoded,
     )
+    if 'fill_policy' not in decoded:
+        return report
     # Only surface policies after the execution reader authenticates their ancestry.
     return report | {'paper_economics': {
         'status': 'AUDITED PAPER ASSUMPTIONS / NOT A BROKER QUOTE',
         'ibkr_applicability': 'NOT ESTABLISHED / NO VERIFIED IBKR SCHEDULE BINDING',
         'entry_policy': decoded['fill_policy'].model_dump(mode='json'),
-        'exit_policy': decoded['exit_policy'].model_dump(mode='json'),
+        'exit_policy': (decoded['exit_policy'].model_dump(mode='json')
+                        if 'exit_policy' in decoded else None),
     }}
 
 

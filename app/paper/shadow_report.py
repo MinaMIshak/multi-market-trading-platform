@@ -4,7 +4,7 @@ from decimal import Context, Decimal, localcontext
 from pathlib import Path
 
 from app.paper.shadow_allocations import (
-    audit_capital_settlement, audit_continuation_capital_settlement,
+    audit_capital_reservation, audit_capital_settlement, audit_continuation_capital_settlement,
 )
 from app.paper.shadow_collection import LABEL, audit_missed_session
 from app.paper.shadow_exits import (
@@ -454,6 +454,42 @@ def continuation_exit_evaluation_view(
         view, directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, evaluation,
     )
+
+
+def capital_reservation_view(
+    directory: Path,
+    watchlist: ShadowWatchlist,
+    watchlist_packages: tuple[HistoricalEvidencePackage, ...],
+    facts: ForwardFactBundle,
+    fact_packages: tuple[HistoricalEvidencePackage, ...],
+    fill_policy: ShadowFillPolicy,
+    fill_packages: tuple[HistoricalEvidencePackage, ...],
+    portfolio: ShadowPortfolioPolicy,
+) -> dict:
+    """Expose the historical reservation, never infer currently available capital."""
+    reservation = audit_capital_reservation(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages, portfolio,
+    )
+    position = position_open_view(
+        directory, watchlist, watchlist_packages, facts, fact_packages,
+        fill_policy, fill_packages,
+    )
+    return position | {
+        'collection_status': 'CAPITAL RESERVATION RECORDED',
+        'capital_reservation': {
+            'status': 'HISTORICAL RESERVATION / CURRENT AVAILABILITY NOT EVALUATED',
+            **{key: reservation[key] for key in (
+                'market', 'currency', 'capital_reserved', 'risk_reserved', 'recorded_at',
+            )},
+            'risk_status': 'STOP COST ESTIMATE / NOT A BOUND ON GAP OR SLIPPAGE LOSS',
+        },
+        'portfolio_policy': portfolio.model_dump(mode='json'),
+        'audit_references': position['audit_references'] | {
+            'reservation_id': reservation['reservation_id'],
+            'portfolio_policy_id': reservation['policy_id'],
+        },
+    }
 
 
 def capital_settlement_view(

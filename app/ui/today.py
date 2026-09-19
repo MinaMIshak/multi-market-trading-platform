@@ -309,6 +309,13 @@ def render_today_dashboard(
         )
         if not collection['candidates']:
             paper_content += '<p>Explicit frozen collection contains zero candidates; NOT SCORED.</p>'
+    missed = (shadow_state or {}).get('missed')
+    if missed is not None:
+        paper_content += (
+            f'<p>MISSED / NOT SCORED: {html.escape(missed["market"])} '
+            f'{html.escape(missed["market_date"])} · Record {html.escape(missed["record_id"])} · '
+            f'{html.escape(missed["reason"])}. No candidates reconstructed.</p>'
+        )
 
     return f"""<!doctype html>
 <html>

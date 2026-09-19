@@ -23,7 +23,7 @@ class ShadowWatchlistInput:
 
 
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
-    unavailable = {"available": False, "collection": None, "execution": None, "portfolio": None, "series": None,
+    unavailable = {"available": False, "collection": None, "missed": None, "execution": None, "portfolio": None, "series": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     try:
         # Isolated operator-owned state only; reject links before ledger reads.
@@ -47,6 +47,11 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
         # Never return exception details, partial candidates or stale cached views.
         collection = None
     try:
+        from app.ui.shadow_input import read_shadow_missed
+        missed = read_shadow_missed(directory)
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
+        missed = None
+    try:
         from app.ui.shadow_input import read_shadow_execution
         if collection is None:
             raise ValueError("execution requires an audited collection")
@@ -63,7 +68,7 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
         series = read_shadow_series(directory)
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         series = None
-    return {"series": series, "portfolio": portfolio, "available": collection is not None,
+    return {"series": series, "portfolio": portfolio, "missed": missed, "available": collection is not None,
             "collection": collection, "execution": execution,
             "status": "AUDITED FROZEN RECORD" if collection is not None else unavailable['status']}
 
@@ -116,6 +121,14 @@ def render_shadow_watchlist(state: dict) -> str:
             return '; '.join(details(item) for item in value) or 'UNKNOWN'
         return e('UNKNOWN' if value is None else value)
 
+    missed = state.get('missed')
+    if missed is not None:
+        body += '<h2>Missed paper collection</h2>'
+        body += '<p>MISSED / NOT SCORED. No candidates reconstructed; not a zero-candidate decision.</p>'
+        for key in ('record_id', 'market', 'market_date', 'decision_cutoff',
+                    'recorded_at', 'reason', 'audit_references'):
+            body += f'<h3>{e(key.replace("_", " "))}</h3>{details(missed[key])}'
+
     body += '<h2>Paper execution observation</h2>'
     execution = state.get('execution')
     if execution is None:
@@ -124,9 +137,12 @@ def render_shadow_watchlist(state: dict) -> str:
         body += ('<p>EXPERIMENTAL / PAPER ONLY. One audited execution observation; '
                  'current position status UNKNOWN. Portfolio NAV NOT EVALUATED.</p>')
 
-        for key in ('collection_status', 'position_status', 'entry_session_exit_evaluation',
+        for key in ('collection_status', 'execution_status', 'current_position_status',
+                    'recorded_at', 'trigger_evaluation', 'fill', 'position',
+                    'position_status', 'entry_session_exit_evaluation',
                     'continuation_evaluations', 'exit_evaluation', 'open_paper_positions',
-                    'closed_paper_trades', 'capital_settlement', 'paper_economics', 'audit_references'):
+                    'closed_paper_trades', 'capital_reservation', 'portfolio_policy',
+                    'capital_settlement', 'paper_economics', 'audit_references'):
             if key not in execution:
                 continue
             body += f'<h3>{e(key.replace("_", " "))}</h3>{details(execution[key])}'
