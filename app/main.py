@@ -47,7 +47,7 @@ def performance() -> HTMLResponse:
 def shadow() -> dict:
     # Explicit operator configuration only; never infer state from the live DB.
     configured = os.getenv("EGX_SHADOW_DIRECTORY")
-    state = {"available": False, "collection": None,
+    state = {"available": False, "collection": None, "execution": None,
              "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     if configured:
         directory = Path(configured)

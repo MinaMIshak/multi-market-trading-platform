@@ -123,3 +123,31 @@ the same application, preserving M7 and M8 boundaries, then assess stock/ETF,
 horizon and dated execution-economic contracts against actual evidence. Historical
 PIT/availability/universe/session/action/review limitations remain NO_GO; software
 integration can proceed without claiming empirical validation or LIVE readiness.
+
+## Existing UI execution observation integration — 2026-09-19
+
+The same `/shadow` and `/api/shadow` routes now optionally read `execution.json`
+from the explicitly configured shadow directory. Schema `shadow-ui-execution-v1`
+requires exact fields: `facts`, `fact_packages`, `fill_policy`, `fill_packages`,
+`exit_policy`, `exit_packages`, `evaluation_facts`, `evaluation_fact_packages`.
+The last two are explicitly null for the original entry fact evaluation, or
+complete canonical later same-session facts/packages. All models include every
+canonical field; arrays encode tuples, decimals are strings, clocks express UTC.
+The existing bounded regular-file transport applies independently to this file.
+No arbitrary report, file locator, NAV or externally supplied P&L is accepted.
+
+The adapter binds execution to the separately audited input watchlist and invokes
+`exit_evaluation_view`, reauditing frozen candidates, policy selection, facts,
+trigger, fill, entry position and exit receipts. Missing or altered execution
+clears only execution results; an independently valid frozen collection can still
+be shown. Unsafe linked directory state fails the entire read. Reads create no
+state and publish no exception details. Filesystem trust limitations above remain.
+
+The page distinguishes a gross mark as of an observed bar from liquidation P&L;
+authenticated CLOSED records expose existing native-currency gross/net arithmetic.
+UNKNOWN ordering remains UNKNOWN with no inferred trade or P&L. This is one
+same-session observation, not current portfolio state, capital settlement, NAV,
+validated performance or proof of freshness. Multi-session continuation and
+portfolio readers remain the next integration work. M7/M8 are unchanged. No
+runtime was configured, launched, refreshed or deployed and no authentic input
+or empirical result was created by this software milestone.

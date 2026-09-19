@@ -1,0 +1,94 @@
+"""Artificial execution integration fixtures; never empirical evidence."""
+import json
+from decimal import Decimal
+
+import pytest
+
+from app import main
+from app.paper.shadow_exits import append_exit_event
+from tests.test_shadow_exits import prepared_exit
+
+
+def execution_input(tmp_path, monkeypatch, high='101', low='99', exit_capacity=None):
+    args, _, policy, packages = prepared_exit(
+        tmp_path, monkeypatch, bar_changes={'high': Decimal(high), 'low': Decimal(low)},
+    )
+    if exit_capacity is not None:
+        policy = policy.model_copy(update={'max_volume_participation_pct': Decimal(exit_capacity)})
+    receipt = append_exit_event(tmp_path, *args, policy, packages)
+    def encode(value):
+        if isinstance(value, tuple):
+            return [item.model_dump(mode='json') for item in value]
+        return value.model_dump(mode='json')
+    (tmp_path / 'input.json').write_text(json.dumps({
+        'schema_version': 'shadow-ui-input-v1',
+        'watchlist': encode(args[0]), 'evidence_packages': encode(args[1]),
+    }))
+    document = dict(zip(
+        ('facts', 'fact_packages', 'fill_policy', 'fill_packages', 'exit_policy', 'exit_packages'),
+        map(encode, (*args[2:], policy, packages)), strict=True,
+    ))
+    document.update(schema_version='shadow-ui-execution-v1',
+                    evaluation_facts=None, evaluation_fact_packages=None)
+    path = tmp_path / 'execution.json'
+    path.write_text(json.dumps(document))
+    monkeypatch.setenv('EGX_SHADOW_DIRECTORY', str(tmp_path))
+    return path, receipt, document
+
+
+@pytest.mark.parametrize('high,status', [('101', 'OPEN'), ('110', 'CLOSED')])
+def test_execution_route_reaudits_without_writes(tmp_path, monkeypatch, high, status):
+    execution_input(tmp_path, monkeypatch, high)
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    state = main.shadow()
+    assert state['available']
+    view = state['execution']
+    assert view['position_status'] == status
+    assert view['performance']['nav'] is None
+    if status == 'OPEN':
+        assert view['open_paper_positions']['position']['unrealized_pnl'] is None
+    else:
+        assert view['closed_paper_trades']['trade']['net_pnl'] is not None
+    body = main.shadow_page().body.decode()
+    assert 'current position status UNKNOWN' in body
+    assert 'EXPERIMENTAL / PAPER ONLY' in body
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+
+
+@pytest.mark.parametrize('damage', ['missing', 'receipt', 'package', 'numeric', 'extra', 'duplicate', 'symlink'])
+def test_execution_damage_never_retains_result(tmp_path, monkeypatch, damage):
+    path, receipt, document = execution_input(tmp_path, monkeypatch)
+    assert main.shadow()['execution'] is not None
+    if damage == 'missing':
+        path.unlink()
+    elif damage == 'receipt':
+        receipt.write_text('{}')
+    elif damage == 'package':
+        document['exit_packages'][0]['review']['approved'] = False
+        path.write_text(json.dumps(document))
+    elif damage == 'numeric':
+        document['exit_policy']['cost_bps_per_side'] = 5
+        path.write_text(json.dumps(document))
+    elif damage == 'extra':
+        document['nav'] = '100'
+        path.write_text(json.dumps(document))
+    elif damage == 'duplicate':
+        path.write_text('{"schema_version":"a","schema_version":"b"}')
+    else:
+        path.unlink()
+        path.symlink_to(receipt)
+    state = main.shadow()
+    assert state['execution'] is None
+    assert str(tmp_path) not in json.dumps(state)
+    assert 'NO AUDITED EXECUTION' in main.shadow_page().body.decode()
+    if damage != 'symlink':
+        assert state['available']  # Candidate audit is independent of execution.
+
+
+def test_unknown_exit_capacity_exposes_no_trade_or_pnl(tmp_path, monkeypatch):
+    execution_input(tmp_path, monkeypatch, low='95', exit_capacity='0.001')
+    view = main.shadow()['execution']
+    assert view['position_status'] == 'UNKNOWN'
+    assert view['closed_paper_trades'] == {'status': 'NOT EVALUATED'}
+    assert view['open_paper_positions'] == {'status': 'NOT EVALUATED'}
+    assert all(value is None for key, value in view['performance'].items() if key != 'status')

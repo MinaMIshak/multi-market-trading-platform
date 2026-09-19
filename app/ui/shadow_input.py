@@ -69,11 +69,7 @@ def _decode(kind, value):
     raise ValueError("invalid transport type")
 
 
-def read_shadow_input(directory: Path):
-    """Read only the fixed local input file; callers must re-audit the ledger."""
-    from app.ui.shadow import ShadowWatchlistInput
-
-    path = directory / 'input.json'
+def _read_document(path: Path):
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(descriptor, 'rb') as stream:
         info = os.fstat(stream.fileno())
@@ -84,6 +80,14 @@ def read_shadow_input(directory: Path):
         raise ValueError("input too large")
     document = json.loads(content, object_pairs_hook=_unique,
                           parse_constant=lambda _: (_ for _ in ()).throw(ValueError("invalid number")))
+    return document
+
+
+def read_shadow_input(directory: Path):
+    """Read only the fixed local input file; callers must re-audit the ledger."""
+    from app.ui.shadow import ShadowWatchlistInput
+
+    document = _read_document(directory / 'input.json')
     if type(document) is not dict or set(document) != {'schema_version', 'watchlist', 'evidence_packages'}:
         raise ValueError("invalid shadow input envelope")
     if document['schema_version'] != 'shadow-ui-input-v1':
@@ -91,4 +95,31 @@ def read_shadow_input(directory: Path):
     return ShadowWatchlistInput(
         _decode(ShadowWatchlist, document['watchlist']),
         _decode(tuple[HistoricalEvidencePackage, ...], document['evidence_packages']),
+    )
+
+
+def read_shadow_execution(directory: Path, source):
+    """Decode one same-session evaluation and re-audit its complete ancestry."""
+    from app.paper.shadow_exits import ShadowExitPolicy
+    from app.paper.shadow_facts import ForwardFactBundle
+    from app.paper.shadow_fills import ShadowFillPolicy
+    from app.paper.shadow_report import exit_evaluation_view
+
+    fields = {
+        'facts': ForwardFactBundle,
+        'fact_packages': tuple[HistoricalEvidencePackage, ...],
+        'fill_policy': ShadowFillPolicy,
+        'fill_packages': tuple[HistoricalEvidencePackage, ...],
+        'exit_policy': ShadowExitPolicy,
+        'exit_packages': tuple[HistoricalEvidencePackage, ...],
+        'evaluation_facts': ForwardFactBundle | None,
+        'evaluation_fact_packages': tuple[HistoricalEvidencePackage, ...] | None,
+    }
+    document = _read_document(directory / 'execution.json')
+    if (type(document) is not dict or set(document) != {'schema_version', *fields}
+            or document['schema_version'] != 'shadow-ui-execution-v1'):
+        raise ValueError('invalid execution envelope')
+    decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}
+    return exit_evaluation_view(
+        directory, source.watchlist, source.evidence_packages, **decoded,
     )

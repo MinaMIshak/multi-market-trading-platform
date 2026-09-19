@@ -23,7 +23,7 @@ class ShadowWatchlistInput:
 
 
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
-    unavailable = {"available": False, "collection": None,
+    unavailable = {"available": False, "collection": None, "execution": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     try:
         if source is not None and type(source) is not ShadowWatchlistInput:
@@ -43,7 +43,13 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         # Never return exception details, partial candidates or stale cached views.
         return unavailable
-    return {"available": True, "collection": collection, "status": "AUDITED FROZEN RECORD"}
+    try:
+        from app.ui.shadow_input import read_shadow_execution
+        execution = read_shadow_execution(directory, source)
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
+        execution = None
+    return {"available": True, "collection": collection, "execution": execution,
+            "status": "AUDITED FROZEN RECORD"}
 
 
 def render_shadow_watchlist(state: dict) -> str:
@@ -84,4 +90,25 @@ def render_shadow_watchlist(state: dict) -> str:
                     value = "; ".join(map(str, value)) or "UNKNOWN"
                 body += f'<dt>{label}</dt><dd>{e("UNKNOWN" if value is None else value)}</dd>'
             body += '</dl>'
+    body += '<h2>Paper execution observation</h2>'
+    execution = state.get('execution')
+    if execution is None:
+        body += '<p>UNAVAILABLE / NO AUDITED EXECUTION</p>'
+    else:
+        body += ('<p>EXPERIMENTAL / PAPER ONLY. One same-session observation; '
+                 'current position status UNKNOWN. Portfolio NAV NOT EVALUATED.</p>')
+
+        def details(value):
+            if isinstance(value, dict):
+                return '<dl>' + ''.join(
+                    f'<dt>{e(key.replace("_", " "))}</dt><dd>{details(item)}</dd>'
+                    for key, item in value.items()
+                ) + '</dl>'
+            if isinstance(value, (list, tuple)):
+                return '; '.join(details(item) for item in value) or 'UNKNOWN'
+            return e('UNKNOWN' if value is None else value)
+
+        for key in ('position_status', 'exit_evaluation', 'open_paper_positions',
+                    'closed_paper_trades', 'audit_references'):
+            body += f'<h3>{e(key.replace("_", " "))}</h3>{details(execution[key])}'
     return '<!doctype html><html><head><title>Frozen paper candidates</title></head><body>' + body + '</body></html>'
