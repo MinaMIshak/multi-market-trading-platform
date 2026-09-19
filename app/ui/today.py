@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import os
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -24,60 +25,64 @@ def load_today_state() -> dict:
     }
 
     try:
-        con = sqlite3.connect(
-            f"file:{path}?mode=ro",
+        with closing(sqlite3.connect(
+            path.resolve().as_uri() + "?mode=ro",
             uri=True,
-        )
-        con.row_factory = sqlite3.Row
+        )) as con:
+            con.row_factory = sqlite3.Row
+            con.execute("BEGIN")
 
-        rows = con.execute(
-            """
-            SELECT
-                canonical_symbol,
-                provider,
-                provider_symbol,
-                source_snapshot_date,
-                oldest_market_date,
-                newest_market_date,
-                valid_bar_count,
-                quarantined_bar_count,
-                status
-            FROM daily_canonical_artifacts
-            WHERE status='VALIDATED'
-            ORDER BY canonical_symbol
-            """
-        ).fetchall()
+            rows = con.execute(
+                """
+                SELECT
+                    canonical_symbol,
+                    provider,
+                    provider_symbol,
+                    source_snapshot_date,
+                    oldest_market_date,
+                    newest_market_date,
+                    valid_bar_count,
+                    quarantined_bar_count,
+                    status
+                FROM daily_canonical_artifacts
+                WHERE status='VALIDATED'
+                ORDER BY canonical_symbol
+                """
+            ).fetchall()
 
-        state["symbols"] = [
-            dict(row) for row in rows
-        ]
+            symbols = [
+                dict(row) for row in rows
+            ]
 
-        state["counts"] = {
-            "ingestions": con.execute(
-                "SELECT COUNT(*) "
-                "FROM data_ingestions"
-            ).fetchone()[0],
-            "daily_artifacts": len(rows),
-            "daily_sources": con.execute(
-                "SELECT COUNT(*) "
-                "FROM daily_canonical_sources"
-            ).fetchone()[0],
-            "index_artifacts": con.execute(
-                "SELECT COUNT(*) "
-                "FROM canonical_data_artifacts"
-            ).fetchone()[0],
-            "quarantined": sum(
-                row["quarantined_bar_count"]
-                for row in rows
-            ),
-        }
+            counts = {
+                "ingestions": con.execute(
+                    "SELECT COUNT(*) "
+                    "FROM data_ingestions"
+                ).fetchone()[0],
+                "daily_artifacts": len(rows),
+                "daily_sources": con.execute(
+                    "SELECT COUNT(*) "
+                    "FROM daily_canonical_sources"
+                ).fetchone()[0],
+                "index_artifacts": con.execute(
+                    "SELECT COUNT(*) "
+                    "FROM canonical_data_artifacts"
+                ).fetchone()[0],
+                "quarantined": sum(
+                    row["quarantined_bar_count"]
+                    for row in rows
+                ),
+            }
 
-        state["integrity"] = con.execute(
-            "PRAGMA quick_check"
-        ).fetchone()[0]
+            integrity = con.execute(
+                "PRAGMA quick_check"
+            ).fetchone()[0]
 
-        state["available"] = True
-        con.close()
+            if integrity != "ok":
+                raise ValueError("database integrity check failed")
+
+        state.update(available=True, symbols=symbols, counts=counts,
+                     integrity=integrity)
 
     except Exception as exc:
         state["error"] = type(exc).__name__

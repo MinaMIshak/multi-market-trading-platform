@@ -185,3 +185,73 @@ def test_today_state_fails_closed(
     assert state["symbols"] == []
     assert state["counts"] == {}
     assert state["error"] is not None
+
+
+def test_late_query_failure_discards_partial_symbols(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    with sqlite3.connect(path) as con:
+        con.execute("DROP TABLE daily_canonical_sources")
+    monkeypatch.setenv("EGX_DB_PATH", str(path))
+    state = load_today_state()
+    assert state == {
+        "available": False, "symbols": [], "counts": {},
+        "error": "OperationalError",
+    }
+    assert "COMI" not in render_today_dashboard(state)
+
+
+def test_database_path_uri_characters_are_literal(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    renamed = path.with_name("paper?#%.db")
+    path.rename(renamed)
+    monkeypatch.setenv("EGX_DB_PATH", str(renamed))
+    assert load_today_state()["available"] is True
+
+
+def test_snapshot_is_consistent_during_concurrent_write(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    original_connect = sqlite3.connect
+    with original_connect(path) as writer:
+        writer.execute("PRAGMA journal_mode=WAL")
+
+    class ConcurrentConnection(sqlite3.Connection):
+        def execute(self, sql, *args, **kwargs):
+            if sql == "SELECT COUNT(*) FROM data_ingestions":
+                with original_connect(path) as writer:
+                    writer.execute("INSERT INTO data_ingestions VALUES ('i2')")
+                    writer.execute("DELETE FROM daily_canonical_artifacts")
+            return super().execute(sql, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", lambda *a, **kw:
+                        original_connect(*a, **kw, factory=ConcurrentConnection))
+    monkeypatch.setenv("EGX_DB_PATH", str(path))
+    state = load_today_state()
+    assert state["available"] is True
+    assert len(state["symbols"]) == 1
+    assert state["counts"]["ingestions"] == 1
+    with original_connect(path) as con:
+        assert con.execute("SELECT COUNT(*) FROM data_ingestions").fetchone()[0] == 2
+
+
+def test_integrity_failure_discards_snapshot_and_closes(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    original_connect = sqlite3.connect
+    closed = []
+
+    class BadIntegrityConnection(sqlite3.Connection):
+        def execute(self, sql, *args, **kwargs):
+            if sql == "PRAGMA quick_check":
+                return super().execute("SELECT 'integrity failure'")
+            return super().execute(sql, *args, **kwargs)
+
+        def close(self):
+            closed.append(True)
+            super().close()
+
+    monkeypatch.setattr(sqlite3, "connect", lambda *a, **kw:
+                        original_connect(*a, **kw, factory=BadIntegrityConnection))
+    monkeypatch.setenv("EGX_DB_PATH", str(path))
+    assert load_today_state() == {
+        "available": False, "symbols": [], "counts": {}, "error": "ValueError",
+    }
+    assert closed == [True]
