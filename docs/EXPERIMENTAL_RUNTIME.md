@@ -87,3 +87,28 @@ receipt ownership remains trusted. Concurrent operator mutation, hardlinks and
 post-verification edits are outside this integrity check's guarantees. A launcher
 must call it immediately before starting the candidate and enforce its HTTP
 promotion gate. No runtime or current-build pointer was created by this milestone.
+
+## Loopback launch and promotion component
+
+`python -m tools.experimental_runtime REPOSITORY CANDIDATE PRIVATE_RUNTIME_ROOT`
+verifies the committed candidate, reserves a new loopback socket (default ephemeral
+port; 8000 is rejected), and starts one Uvicorn child with that inherited socket.
+Use the authorized shared interpreter and `PYTHONDONTWRITEBYTECODE=1`. No Docker,
+service manager, scheduler, reload worker, provider environment or production data
+is used. Each launch creates a separate empty state directory; missing inputs
+remain unavailable rather than becoming fixture recommendations.
+
+HTTP checks cover health, TODAY JSON, TODAY HTML and M7 HTML, including full build
+identity and paper labels. Source is reverified before atomically replacing
+`current.json`; each run retains its own `runtime.json` and log. Failure stops
+only the newly created child and preserves the prior pointer and process. Previous
+successful processes are deliberately retained; automatic retirement, a stable
+proxy URL, remote reachability and automatic refresh are not implemented. The
+record's loopback URL is the inspection endpoint, not proof of remote access or
+continued process health. Runtime restart recovery is not yet implemented.
+
+This component is tested with stubbed transports/processes under the repository's
+unchanged offline test policy. An attempted real HTTP integration test was blocked
+by that policy; no successful live launch is claimed. After supervisor commit,
+exercise the committed launcher with the verified source candidate and inspect
+its actual loopback HTTP gate. Do not launch the uncommitted implementation.
