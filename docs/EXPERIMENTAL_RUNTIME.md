@@ -112,3 +112,54 @@ unchanged offline test policy. An attempted real HTTP integration test was block
 by that policy; no successful live launch is claimed. After supervisor commit,
 exercise the committed launcher with the verified source candidate and inspect
 its actual loopback HTTP gate. Do not launch the uncommitted implementation.
+
+## Actual launch exercise and current availability (2026-09-19)
+
+The committed launcher at `df28a7c65d3fa7b1f46aecb2db1d643ac60aba36` prepared
+a fresh committed candidate; its offline gate passed **21 tests in 0.92s**.
+Launch then passed real HTTP checks on all four routes and wrote the promotion
+receipt at `2026-09-19T09:22:07.393612+00:00`. It used a fresh empty state
+directory and loopback port **41291**, with no production state or port 8000 access.
+
+An independent subsequent tool invocation received **connection refused** at
+that URL. Therefore continuous staging and user reachability are **NOT
+ESTABLISHED**. The launch receipt is historical proof of that attempt's gate,
+not proof that a process remains accessible. It does not prove whether the child
+was cleaned up or lives in a different process/network context. Do not signal
+its recorded PID from another context; PID identity is not portable.
+
+Candidate source, its quality log, and the runtime receipt remain under the
+authorized autonomous state directory, in `experimental-builds` and
+`experimental-runtime`. They preserve the tested build for a later safe launch;
+there is no known continuously available staging process to claim as healthy.
+No repeat launch, service-manager change, host networking change or production
+workaround was attempted. A persistent permitted execution context, with verified
+cross-invocation and user reachability, is the remaining runtime blocker. The
+current tool execution path has not demonstrated that capability. Automatic
+refresh must wait for that capability; other software integration can continue.
+
+`tools.experimental_runtime.current_status(runtime_root)` now reads the owned
+private runtime pointer and performs fresh HTTP identity/paper-label checks.
+Missing, malformed, symlinked or unsafe records fail closed before HTTP access.
+Only a literal loopback URL with a valid non-8000 port is admitted. A stale or
+mismatched endpoint returns `available: false` without publishing a usable URL
+or build identity. The result is explicitly scoped to the caller's network
+context and observation time, not a guarantee of continued or remote health.
+Neither this observer nor a failed observation modifies the saved pointer or
+signals any process. Direct HTTP gate calls also reject port 8000 before transport
+construction. Offline tests retain the network prohibition and stub transports;
+the actual launch observation above was a separate integration exercise.
+
+Run the observer with the authorized interpreter, from the repository:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /home/egx-agent/work/egx-trading-platform/.venv/bin/python - <<'PY'
+from pathlib import Path
+from tools.experimental_runtime import current_status
+print(current_status(Path('/home/egx-agent/er1-autopilot/state/experimental-runtime')))
+PY
+```
+
+Continue with authenticated shadow-reader integration independently of this
+runtime limitation. Empty runtime state is not a frozen watchlist, paper trade,
+validated recommendation, NAV or empirical result.

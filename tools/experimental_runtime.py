@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import tempfile
@@ -37,6 +38,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def http_gate(port, commit):
+    if type(port) is not int or port == 8000 or not 1 <= port <= 65535:
+        raise ValueError('non-production port required')
     # Never inherit proxy configuration for local requests.
     opener = build_opener(ProxyHandler({}), NoRedirect())
     for route in ('/health', '/api/today', '/', '/performance'):
@@ -53,6 +56,45 @@ def http_gate(port, commit):
                 raise ValueError('HTTP health gate failed')
         elif commit not in body or MODE not in body:
             raise ValueError('HTML identity gate failed')
+
+
+def current_status(runtime_root: Path):
+    """Observe reachability in this network context, never infer it from a PID.
+
+    A successful promotion receipt is historical, not a liveness guarantee.
+    This check never mutates the pointer, starts a process, or signals a PID.
+    """
+    result = {'mode': MODE, 'available': False,
+              'empirical_validation': 'NOT YET VALIDATED',
+              'observed_at': datetime.now(timezone.utc).isoformat(),
+              'scope': 'current network context'}
+    try:
+        private_directory(runtime_root)
+        pointer = runtime_root / 'current.json'
+        if pointer.is_symlink() or not pointer.is_file():
+            raise ValueError('missing or unsafe runtime pointer')
+        record = json.loads(pointer.read_text())
+        if not isinstance(record, dict):
+            raise ValueError('invalid runtime record')
+        commit = record.get('commit')
+        url = record.get('url')
+        match = re.fullmatch(r'http://127\.0\.0\.1:([0-9]{1,5})', url or '')
+        if (record.get('schema') != 'experimental-runtime-v1'
+                or record.get('mode') != MODE or record.get('http_gate') != 'passed'
+                or not isinstance(commit, str)
+                or re.fullmatch('[0-9a-f]{40}', commit) is None or match is None):
+            raise ValueError('invalid runtime record')
+        port = int(match.group(1))
+        if port == 8000 or not 1 <= port <= 65535:
+            raise ValueError('non-production port required')
+    except (OSError, ValueError, TypeError):
+        return {**result, 'reason': 'MISSING_OR_INVALID_RUNTIME_RECORD'}
+    try:
+        http_gate(port, commit)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {**result, 'reason': 'HTTP_GATE_UNAVAILABLE_OR_MISMATCHED'}
+    return {**result, 'available': True, 'reason': 'HTTP_GATE_PASSED',
+            'build_commit': commit, 'url': url}
 
 
 def launch(repository: Path, candidate: Path, runtime_root: Path, port: int = 0):
