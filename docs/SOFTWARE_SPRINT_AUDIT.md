@@ -199,3 +199,27 @@ mixed schemas, caller-supplied cash flow and rejection of unsettled OPEN trades.
 No runtime/deployment or M7/M8 changes. Native portfolio snapshot integration is
 still outstanding and must audit the complete portfolio rather than aggregate
 these individual observations as if they were a complete ledger.
+
+## Existing UI native portfolio snapshots — 2026-09-19
+
+The existing shadow routes optionally read bounded canonical `portfolio.json`
+(schema `shadow-ui-portfolio-v1`). Exact fields are `schema_version`, `portfolio`
+(complete ShadowPortfolioPolicy), `snapshot_date_utc` and `requests`. Each request
+has exactly `kind` (SAME_SESSION or CONTINUATION) and `inputs`, containing every
+canonical field of the corresponding portfolio mark request, including explicit
+null optional fields and complete upstream watchlists/packages. Continuations use
+complete ordered bundles and matching nested package arrays. Decimal strings and
+UTC clocks follow the existing transport rules. No supplied valuation is accepted.
+
+Each read invokes the existing dated snapshot auditor. Nonempty requests require
+exactly one authenticated mark for each frozen active reservation; empty requests
+use the cash-only auditor and cannot omit active positions. Frozen ledger/policy
+bindings and mark ancestry remain mandatory. Invalid snapshots clear independently
+of valid candidate/execution observations. No snapshot is created by a UI read.
+The page exposes historical native cash, gross marks and snapshot provenance,
+explicitly without current NAV, liquidation value, FX aggregation or validated
+performance claims. M7/M8 semantics and production/runtime remain unchanged.
+
+Next: assess existing authenticated portfolio-series/M7 integration and genuine
+ETF/horizon/date-effective execution economics gaps. Authentic evidence and
+historical PIT admission remain separately unresolved; this is software integration.

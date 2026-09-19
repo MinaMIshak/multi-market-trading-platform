@@ -146,3 +146,45 @@ def read_shadow_execution(directory: Path, source):
     return reader(
         directory, source.watchlist, source.evidence_packages, **decoded,
     )
+
+
+def read_shadow_portfolio(directory: Path):
+    """Re-audit a dated native snapshot; never accept supplied valuation JSON."""
+    from typing import get_type_hints
+    from app.paper.shadow_continuations import ForwardContinuationBundle
+    from app.paper.shadow_daily_portfolio import SingleSessionMarkRequest, ContinuationMarkRequest
+    from app.paper.shadow_daily_snapshots import (
+        audit_cash_only_daily_portfolio_snapshot, audit_marked_daily_portfolio_snapshot,
+    )
+    from app.paper.shadow_portfolio import ShadowPortfolioPolicy
+
+    document = _read_document(directory / 'portfolio.json')
+    if (type(document) is not dict
+            or set(document) != {'schema_version', 'portfolio', 'snapshot_date_utc', 'requests'}
+            or document['schema_version'] != 'shadow-ui-portfolio-v1'
+            or type(document['requests']) is not list):
+        raise ValueError('invalid portfolio envelope')
+    portfolio = _decode(ShadowPortfolioPolicy, document['portfolio'])
+    snapshot_date = _decode(date, document['snapshot_date_utc'])
+    requests = []
+    for item in document['requests']:
+        if type(item) is not dict or set(item) != {'kind', 'inputs'}:
+            raise ValueError('invalid mark envelope')
+        if item['kind'] == 'SAME_SESSION':
+            kind = SingleSessionMarkRequest
+        elif item['kind'] == 'CONTINUATION':
+            kind = ContinuationMarkRequest
+        else:
+            raise ValueError('unsupported mark kind')
+        fields = get_type_hints(kind)
+        if kind is ContinuationMarkRequest:
+            fields['continuations'] = tuple[ForwardContinuationBundle, ...]
+            fields['continuation_packages'] = tuple[tuple[HistoricalEvidencePackage, ...], ...]
+        inputs = item['inputs']
+        if type(inputs) is not dict or set(inputs) != set(fields):
+            raise ValueError('complete exact mark inputs required')
+        requests.append(kind(**{key: _decode(annotation, inputs[key])
+                                for key, annotation in fields.items()}))
+    if requests:
+        return audit_marked_daily_portfolio_snapshot(directory, portfolio, snapshot_date, tuple(requests))
+    return audit_cash_only_daily_portfolio_snapshot(directory, portfolio, snapshot_date)

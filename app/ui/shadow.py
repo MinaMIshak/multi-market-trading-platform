@@ -23,7 +23,7 @@ class ShadowWatchlistInput:
 
 
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
-    unavailable = {"available": False, "collection": None, "execution": None,
+    unavailable = {"available": False, "collection": None, "execution": None, "portfolio": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     try:
         if source is not None and type(source) is not ShadowWatchlistInput:
@@ -48,7 +48,12 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
         execution = read_shadow_execution(directory, source)
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         execution = None
-    return {"available": True, "collection": collection, "execution": execution,
+    try:
+        from app.ui.shadow_input import read_shadow_portfolio
+        portfolio = read_shadow_portfolio(directory)
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
+        portfolio = None
+    return {"portfolio": portfolio, "available": True, "collection": collection, "execution": execution,
             "status": "AUDITED FROZEN RECORD"}
 
 
@@ -90,6 +95,16 @@ def render_shadow_watchlist(state: dict) -> str:
                     value = "; ".join(map(str, value)) or "UNKNOWN"
                 body += f'<dt>{label}</dt><dd>{e("UNKNOWN" if value is None else value)}</dd>'
             body += '</dl>'
+    def details(value):
+        if isinstance(value, dict):
+            return '<dl>' + ''.join(
+                f'<dt>{e(key.replace("_", " "))}</dt><dd>{details(item)}</dd>'
+                for key, item in value.items()
+            ) + '</dl>'
+        if isinstance(value, (list, tuple)):
+            return '; '.join(details(item) for item in value) or 'UNKNOWN'
+        return e('UNKNOWN' if value is None else value)
+
     body += '<h2>Paper execution observation</h2>'
     execution = state.get('execution')
     if execution is None:
@@ -98,20 +113,22 @@ def render_shadow_watchlist(state: dict) -> str:
         body += ('<p>EXPERIMENTAL / PAPER ONLY. One audited execution observation; '
                  'current position status UNKNOWN. Portfolio NAV NOT EVALUATED.</p>')
 
-        def details(value):
-            if isinstance(value, dict):
-                return '<dl>' + ''.join(
-                    f'<dt>{e(key.replace("_", " "))}</dt><dd>{details(item)}</dd>'
-                    for key, item in value.items()
-                ) + '</dl>'
-            if isinstance(value, (list, tuple)):
-                return '; '.join(details(item) for item in value) or 'UNKNOWN'
-            return e('UNKNOWN' if value is None else value)
-
         for key in ('collection_status', 'position_status', 'entry_session_exit_evaluation',
                     'continuation_evaluations', 'exit_evaluation', 'open_paper_positions',
                     'closed_paper_trades', 'capital_settlement', 'audit_references'):
             if key not in execution:
                 continue
             body += f'<h3>{e(key.replace("_", " "))}</h3>{details(execution[key])}'
+    body += '<h2>Historical native paper portfolio snapshot</h2>'
+    portfolio = state.get('portfolio')
+    if portfolio is None:
+        body += '<p>UNAVAILABLE / NO AUDITED PORTFOLIO SNAPSHOT</p>'
+    else:
+        body += ('<p>EXPERIMENTAL / PAPER ONLY. Historical gross valuation; '
+                 'not current NAV or liquidation value. FX aggregation and validated '
+                 'performance NOT EVALUATED. Freshness NOT ESTABLISHED.</p>')
+        for key in ('snapshot_date_utc', 'recorded_at', 'currency', 'scoring',
+                    'valuation_status', 'performance_status', 'valuation',
+                    'mark_provenance', 'snapshot_id', 'policy_id'):
+            body += f'<h3>{e(key.replace("_", " "))}</h3>{details(portfolio[key])}'
     return '<!doctype html><html><head><title>Frozen paper candidates</title></head><body>' + body + '</body></html>'
