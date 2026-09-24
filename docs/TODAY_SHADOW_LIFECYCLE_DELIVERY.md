@@ -31,7 +31,7 @@ regression: **2679 passed in 171.25s (0:02:51)**.
 | Pre-settlement reservation UI | REAL_SOFTWARE_GAP, closed here | Existing reservation auditor was not exposed before settlement or valuation |
 | Exit/continuation/settlement UI | ALREADY_DONE | Existing strict transport calls complete upstream auditors |
 | Portfolio snapshots and valuation series | ALREADY_DONE | Independently audited dated native-currency snapshots and actual interval series |
-| M7 | ALREADY_DONE analyzer/renderer/periodic bridge; PARTIALLY_DONE operational integration | Route still has no authenticated canonical observation source; Shadow/NAV cannot substitute |
+| M7 | ALREADY_DONE software; EVIDENCE_BLOCKED operational source | Legacy M7 requires canonical M6 input/result and independently reruns simulation; M7.1 preserves replay evidence separately; Shadow/NAV cannot be converted into canonical M6 evidence |
 | M8 and US8 | ALREADY_DONE engineering; EVIDENCE_BLOCKED validation | Purged/OOS/frozen-holdout evaluation exists, authentic admitted sample does not |
 | R1/ER1/ER1B/ER1C | ALREADY_DONE qualification/contracts; EVIDENCE_BLOCKED admission | Closed source paths remain NO_GO; original-byte availability/review/universe/session/action gaps remain |
 | Calendar/index/TODAY | ALREADY_DONE | Fail-closed retained official-index verification, gated refresh pipeline, persisted exact-date session rendering |
@@ -151,12 +151,18 @@ DELIBERATELY_DISABLED: real-money execution, broker orders, automatic M4 state
 promotion, automatic planning-float conversion, ungated refresh, production
 changes and separate Experimental product/runtime development.
 
-Remaining REAL_SOFTWARE_GAP/PARTIALLY_DONE work: an authenticated canonical M7
-observation-to-route adapter; evidence-bound security-type/stock/ETF comparison
-and broker-specific dated schedule contracts. A permissive report JSON loader
-would not close the M7 gap: structural M6 replay consistency is not independent
-source authentication. These contracts require further bounded software design
-against the existing evidence models, without inventing inputs or broker rates.
+The previously listed authenticated canonical M7 observation-to-route adapter is
+not a valid current software gap. Legacy M7 requires canonical M6
+`PaperSimulationInput`/`PaperSimulationResult` and independently reruns
+`simulate_paper()`. Shadow audited lifecycle facts do not supply that canonical
+M6 input, and M7.1 explicitly preserves replay observations without converting
+them into legacy M6 evidence. `/performance` must therefore remain fail-closed
+until a genuine canonical M6 or M6.1 observation source exists.
+
+Remaining REAL_SOFTWARE_GAP/PARTIALLY_DONE work: evidence-bound
+security-type/stock/ETF comparison and broker-specific dated schedule contracts,
+subject to the existing evidence boundaries and without inventing classifications,
+quotes, FX, fees or broker rates.
 
 The missed-collection existing-UI transport is now CLOSED in this milestone.
 Authenticated MISSED / NOT SCORED receipts remain distinct from zero-candidate
@@ -164,10 +170,11 @@ watchlists, and damaged receipts fail closed without candidate reconstruction.
 
 **TODAY_TARGET_STATUS: CONTINUE.** This milestone closes the remaining bounded
 Shadow lifecycle visibility gaps identified during this review, but the broad
-software target is not yet declared complete. The next software milestone should
-scope and, where the existing evidence contracts support it, implement the
-authenticated canonical M7 observation-to-route boundary. Do not add arbitrary
-report ingestion or derive M7 trades from NAV.
+software target is not yet declared complete. M7 operational wiring is now
+classified EVIDENCE_BLOCKED rather than a current software implementation gap.
+The next software review should scope the evidence-bound security-type/stock/ETF
+and broker-specific dated-schedule boundaries. Do not add arbitrary report
+ingestion, convert Shadow facts into M6 evidence, or derive M7 trades from NAV.
 
 Live readiness remains unestablished. Tests do not supply authentic data,
 profitability, empirical validation, operational validation or authorization for
