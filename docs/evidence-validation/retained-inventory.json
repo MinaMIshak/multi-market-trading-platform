@@ -1,0 +1,337 @@
+[
+  {
+    "bytes": 4702,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/evidence_manifest.json",
+    "sha256": "65f29e370f3b20330b00719247518f8242ae59c010f3bb4ecfdbe7041c01bea6"
+  },
+  {
+    "bytes": 89,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/evidence_manifest.sha256",
+    "sha256": "ab01d0814bbcede5fde7156ddb4f1ab8474db995d50395136ec1797ca7b18418"
+  },
+  {
+    "bytes": 43365,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/ibm_2022-04-26_dividend_notice.html",
+    "sha256": "6ca40db117ad3ff59dafed47bb3243085e6fbcf721d8f78018c07eb71cebdd3f"
+  },
+  {
+    "bytes": 42469,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/ibm_2022-07-25_dividend_notice.html",
+    "sha256": "4aa7e8979ea201d7f8a4e40fb80b62e9edc2a362963220eeb29dd24e0abe5670"
+  },
+  {
+    "bytes": 192501,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/ibm_cash_dividend_history.html",
+    "sha256": "aa76cc90983207600a952e25f7bb1eb36cf115f94ebc8ff1774e50769b519db5"
+  },
+  {
+    "bytes": 127573,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/ibm_stock_split_history.html",
+    "sha256": "8772be6e34091e6c9698286bf609461d76998c4d85a5cc1e1053754ed40d4d01"
+  },
+  {
+    "bytes": 111260,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/nyse_2022_trading_calendar.pdf",
+    "sha256": "2c2e63b780c4a373d8d546904ae46c8ba7e8070ad9357d23d2c92749985bb6c9"
+  },
+  {
+    "bytes": 6700677,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/sec_ibm_2022q2_10q.html",
+    "sha256": "3d2b1bed1ccf656b4aa7d158ee6af27c0147923e5f3b61238ee59ebfab0d68ec"
+  },
+  {
+    "bytes": 166091,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/sec_ibm_submissions.json",
+    "sha256": "0d698f754c7aa7f9373bc90b65d73d801e018ad176b6ffb5e4ec0f6d18fa984f"
+  },
+  {
+    "bytes": 1305,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/sec_nyse_twitter_removal_notice.html",
+    "sha256": "18274d241c402be1e12dee9ed181d4d89aa3460dcf6a65650c91d2dc78b4d215"
+  },
+  {
+    "bytes": 57366,
+    "path": "er1c-us-pilot/20260912T152213Z/evidence/sec_twitter_merger_8k.html",
+    "sha256": "60bfc50d97605692296877358a8150695e9ec7ae13a2df2bed331ddd1f33a653"
+  },
+  {
+    "bytes": 39306,
+    "path": "er1c-us-pilot/20260912T152213Z/ibm_2022-04-01_2022-11-04.json.raw",
+    "sha256": "7d943f73d068ab832c3eacf974e6224b78bdc3782bce7d4d2a491483b5332bd5"
+  },
+  {
+    "bytes": 1841,
+    "path": "er1c-us-pilot/20260912T152213Z/manifest.json",
+    "sha256": "8936272e0fcd855eed1e97d6a0361f4929211630e417e75ccbc2452e0885acd9"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/20260912T152213Z/manifest.sha256",
+    "sha256": "caaed2f6fca90ea4bd309b88220dcf8be5172a60054553e4c835455abeabee09"
+  },
+  {
+    "bytes": 32451,
+    "path": "er1c-us-pilot/20260912T152213Z/twtr_2022-04-01_2022-11-04.json.raw",
+    "sha256": "da33bb8bbf1ec381aa829176730762619a33a2e996b5a39bbaf2aa22a546ddd5"
+  },
+  {
+    "bytes": 13504,
+    "path": "er1c-us-pilot/closed-inventory-audit.json",
+    "sha256": "e30ecf7cd575043dba111b52ca4949fd4e9d80052932f6ebca4f795db6dd479c"
+  },
+  {
+    "bytes": 1089,
+    "path": "er1c-us-pilot/forward-session-truth-20260913T005146Z/manifest.json",
+    "sha256": "7716804d38c3a713be635cdb950831b46d9b29de92cd1eb6e11f26b0893c5239"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/forward-session-truth-20260913T005146Z/manifest.sha256",
+    "sha256": "86cfc92da750f2826901d797bec6f89ff2d15b61da39f0407da46248c7014a0f"
+  },
+  {
+    "bytes": 232670,
+    "path": "er1c-us-pilot/forward-session-truth-20260913T005146Z/nyse_2026_calendar.pdf",
+    "sha256": "70f5577eb43e60a9dbbecaae3cec23d0f02028c05c7f175013bb3e97816d394f"
+  },
+  {
+    "bytes": 109180,
+    "path": "er1c-us-pilot/forward-session-truth-20260913T005146Z/nyse_hours_calendars.html",
+    "sha256": "49ee8a651ec01ef2866e347842c0fb11309541f247d17aeaaf7ad9d6a513b1ed"
+  },
+  {
+    "bytes": 13504,
+    "path": "er1c-us-pilot/ibm-dividend-scope-audit.json",
+    "sha256": "e30ecf7cd575043dba111b52ca4949fd4e9d80052932f6ebca4f795db6dd479c"
+  },
+  {
+    "bytes": 13504,
+    "path": "er1c-us-pilot/ibm-table-role-audit.json",
+    "sha256": "e30ecf7cd575043dba111b52ca4949fd4e9d80052932f6ebca4f795db6dd479c"
+  },
+  {
+    "bytes": 73633,
+    "path": "er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z/field_definitions.html",
+    "sha256": "f3d84d5e2f84d88a49904f6132dade46abdd7199274bf6b86e89ec4d101493b6"
+  },
+  {
+    "bytes": 1343,
+    "path": "er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z/manifest.json",
+    "sha256": "32dffece0ea940ac4809d007546eb0c90ed0f59b2825b6247f95d1ee4a2769be"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z/manifest.sha256",
+    "sha256": "92b26df9a6ebbf14477e9756354db91b164b6651b44a3769fb43d592c8ddce15"
+  },
+  {
+    "bytes": 47392,
+    "path": "er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z/trading_halts.html",
+    "sha256": "2d5105fee27893b3b293527c3cdb28a12528571bdc7704f17818778201965b6d"
+  },
+  {
+    "bytes": 1899,
+    "path": "er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z/manifest.json",
+    "sha256": "394bf0ef04d55b9851fe1b018c8f5cd0e83f9d93016a4f9d6dee0c3c1f1b8e54"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z/manifest.sha256",
+    "sha256": "ada51a4d29b6fb83c6baa392201995ebc24669543e1409d57fc52f7350a3c73c"
+  },
+  {
+    "bytes": 50420,
+    "path": "er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z/rss_documentation.html",
+    "sha256": "7acea06e83f9d40cdd0cb95cd2ed9d04601cfa068fc414db213c0a3a38e761a2"
+  },
+  {
+    "bytes": 4369,
+    "path": "er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z/rss_queries.html",
+    "sha256": "bbe019d76538d86e84826b06b35da110f56ea3e709621828985e15422f8d3217"
+  },
+  {
+    "bytes": 75440,
+    "path": "er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z/rss_terms.pdf",
+    "sha256": "9f3e25671be08d33b81785dac0eae63fc374904debcf2452aa1752964b3751b1"
+  },
+  {
+    "bytes": 7381,
+    "path": "er1c-us-pilot/numeric-boundary-audit.json",
+    "sha256": "5f7938ce629d38cb9377dc2e0f68da5de835c1826a1374928085ed1f8fea237e"
+  },
+  {
+    "bytes": 735,
+    "path": "er1c-us-pilot/nyse-corporate-actions-scope-20260913T053527Z/manifest.json",
+    "sha256": "176a4ec8075ae06dfe877591e4fe37f8e832a8027f42490fa69471526bc3ab89"
+  },
+  {
+    "bytes": 65,
+    "path": "er1c-us-pilot/nyse-corporate-actions-scope-20260913T053527Z/manifest.sha256",
+    "sha256": "313f17b7e509621eebf835b75cd075d7fae95041898b150c8579c32b6eca7f7c"
+  },
+  {
+    "bytes": 141690,
+    "path": "er1c-us-pilot/nyse-corporate-actions-scope-20260913T053527Z/nyse_corporate_actions.html",
+    "sha256": "b1068aeffb373d4b25062086c1fd51443d602a72851c7fa243b81654bb52fba1"
+  },
+  {
+    "bytes": 1347,
+    "path": "er1c-us-pilot/nyse-corporate-actions-spec-20260913T053952Z/manifest.json",
+    "sha256": "4104f04d166f262b3a5bdb8d2b1f6db55c1787622ea35e6ce2a6e49fb9f43ff7"
+  },
+  {
+    "bytes": 65,
+    "path": "er1c-us-pilot/nyse-corporate-actions-spec-20260913T053952Z/manifest.sha256",
+    "sha256": "34c13fb8ffbca85caf9c05ec45fc356d2739a6d4cc9fdaccad2fa9a8bc41dd2e"
+  },
+  {
+    "bytes": 633447,
+    "path": "er1c-us-pilot/nyse-corporate-actions-spec-20260913T053952Z/nyse_corporate_actions_client_spec_v2.2.6.pdf",
+    "sha256": "f06a9cfd0f20a9d4f7d1ec8ba53c5700e5c8c7e39cebde684d2370be245b8df0"
+  },
+  {
+    "bytes": 84060,
+    "path": "er1c-us-pilot/nyse-corporate-actions-spec-20260913T053952Z/nyse_corporate_actions_product.html",
+    "sha256": "7d6ec1a310c0128aba8f5e7c5df5f68be29d252d06fd341353ab8b5d643a268f"
+  },
+  {
+    "bytes": 633,
+    "path": "er1c-us-pilot/nyse-removal-scope-20260913T053247Z/manifest.json",
+    "sha256": "d39c22b404a954767a26c593f200b805c585060ee0557f23307e7a6fc4b663fe"
+  },
+  {
+    "bytes": 65,
+    "path": "er1c-us-pilot/nyse-removal-scope-20260913T053247Z/manifest.sha256",
+    "sha256": "171fb3cc9c67e842d870231c6190bbb00d2c998241e6cf43c2d175e9d816e6c4"
+  },
+  {
+    "bytes": 71484,
+    "path": "er1c-us-pilot/nyse-removal-scope-20260913T053247Z/nyse_delistings.html",
+    "sha256": "d4c8b1a8c2d266b96543f6dec77a6c0df818b781cb95b5923eea498135fa234a"
+  },
+  {
+    "bytes": 2183,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/manifest.json",
+    "sha256": "6f51adae6c6ca6273fa54bb67f57c07f16f28a59c99af024a6d67ab5f5791fc6"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/manifest.sha256",
+    "sha256": "9fccd704a45fba2c55765fd00d38db97125d762450f6010b9177f17c355beef5"
+  },
+  {
+    "bytes": 222649,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/nyse_short_volume_20220701.txt",
+    "sha256": "397b1d7b6a8e76d0b09e89673562621ff9244a59702434f3a097500b1f549d53"
+  },
+  {
+    "bytes": 222134,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/nyse_short_volume_20221027.txt",
+    "sha256": "a66ffa0ee8ed1f6f8421d859d5ecce71b3a7153d7dbb9ffea5dddbca48af3e26"
+  },
+  {
+    "bytes": 221128,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/nyse_short_volume_20221028.txt",
+    "sha256": "c3c701ebe4a9f53a1004f599aa24ce99ee2af56f8c7a69da93d2570dfe2c3a33"
+  },
+  {
+    "bytes": 721,
+    "path": "er1c-us-pilot/nyse-roster-probe-20260912/nyse_symbol_mapping_index.html",
+    "sha256": "59ddf0c0795ac39df1921b4a1dc773c99c084edd49c13134cff81f7985fc375d"
+  },
+  {
+    "bytes": 1693,
+    "path": "er1c-us-pilot/nyse-symbol-mapping-spec-20260913T062754Z/manifest.json",
+    "sha256": "76052101b7cefd9755f3f244847d8543db8f78f0d95dbc99712b834b22c23b47"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/nyse-symbol-mapping-spec-20260913T062754Z/manifest.sha256",
+    "sha256": "3232e8d52e66439533672f9d9473d054917b33dfbdd9b2526bdb2c04720bebff"
+  },
+  {
+    "bytes": 679215,
+    "path": "er1c-us-pilot/nyse-symbol-mapping-spec-20260913T062754Z/nyse_bqt_common_client_spec_v2.2l.pdf",
+    "sha256": "ec8edcad77cd201fcd5645f706360185b73c95ca3b28c86a325a768c83690098"
+  },
+  {
+    "bytes": 131731,
+    "path": "er1c-us-pilot/nyse-symbol-mapping-spec-20260913T062754Z/nyse_symbol_mapping_filename_change_march2022.pdf",
+    "sha256": "94284ee3abc9328b2647b839e64b0d82cb1c9942b1b4938e6b565dea8ab67846"
+  },
+  {
+    "bytes": 733,
+    "path": "er1c-us-pilot/sec-form-sample-20260912T194500Z/acquisition_attempts.json",
+    "sha256": "c2e6ccd66470597b87637ead0723ea68b561ba2ec01c70e28d39d2ce61de0513"
+  },
+  {
+    "bytes": 4394,
+    "path": "er1c-us-pilot/sec-form-sample-20260912T194500Z/declaration.json",
+    "sha256": "cbe07c48d823755350f31ea0ac4384386451727f1919701567ff409375820a63"
+  },
+  {
+    "bytes": 83,
+    "path": "er1c-us-pilot/sec-form-sample-20260912T194500Z/declaration.sha256",
+    "sha256": "5e5755ad267e76bb31166ab9fc6c15dc3567978b57bd47f6bfff15a77fe07fc5"
+  },
+  {
+    "bytes": 587,
+    "path": "er1c-us-pilot/sec-form-sample-20260912T194500Z/direct_submission_attempt_20260913T010403Z.json",
+    "sha256": "6dd754aae8e489947e65a16ddf07c441f2892589c07dde1b90fdb121b1048d74"
+  },
+  {
+    "bytes": 2669,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/manifest.json",
+    "sha256": "a7f57a1ce1d7350d6e01848f8ed81f564d78ebc4a42ece1dc3d3613ee82db10b"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/manifest.sha256",
+    "sha256": "bb430d0aa6cac89710e4243a1d88b324adc40604ac66fab1bf51bde1af16a0b3"
+  },
+  {
+    "bytes": 45498480,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/sec_2022_q2_form.idx",
+    "sha256": "ff3985ef4a9c775ebb12b0a59738912477b929fc31539ae37b7716f9f95053c4"
+  },
+  {
+    "bytes": 37094765,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/sec_2022_q3_form.idx",
+    "sha256": "bce3e54373776e8038aa0007a37cc1680e12c98ca405d8318a2ae12d194ef7a9"
+  },
+  {
+    "bytes": 35987632,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/sec_2022_q4_form.idx",
+    "sha256": "e4fa292fcd6e15eb9d0f4552613ebc189ea3b166a8a3b5b550641785f69ec1c2"
+  },
+  {
+    "bytes": 79786,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/sec_accessing_edgar_data.html",
+    "sha256": "7b8a92147bae67dd2b5263884a3cfd8c88cc710c744d037dc2705cf3ba58b1c5"
+  },
+  {
+    "bytes": 128763,
+    "path": "er1c-us-pilot/sec-listing-ledger-probe-20260912/sec_exchange_delistings.html",
+    "sha256": "800f019096a63744e3d8613ecbeb6e098897416c929b6015e5f52c47ac8be7e9"
+  },
+  {
+    "bytes": 1183,
+    "path": "er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z/manifest.json",
+    "sha256": "b30a22b12f61977d5aa875b34f4a99968398261fcd2420d0d4c929280c85a1be"
+  },
+  {
+    "bytes": 80,
+    "path": "er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z/manifest.sha256",
+    "sha256": "87d9d28c77241c03d0a64d1b315d7e6e2049859521c55764ae0563e03b832e6a"
+  },
+  {
+    "bytes": 31494,
+    "path": "er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z/twitter_20220418_8a12b_submission.txt",
+    "sha256": "a67ec7426f92703e1a9bb543416d8f2487149b4d255f79554b9bb5f70977c129"
+  },
+  {
+    "bytes": 4160,
+    "path": "er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z/twitter_20221028_25nse_submission.txt",
+    "sha256": "d9d9e7719a52f31ce8b5e44efaad2bad3e275da4be5daffe998373f0e91f3aae"
+  }
+]

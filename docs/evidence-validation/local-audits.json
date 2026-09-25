@@ -1,0 +1,663 @@
+{
+  "audited_at": "2026-09-25T13:13:54.476978+00:00",
+  "audits": [
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/20260912T152213Z",
+        "docs/ER1C_US_PILOT_PREDECLARATION.md"
+      ],
+      "function": "audit_bundle",
+      "module": "tools.audit_er1c_us_pilot",
+      "result": {
+        "admission_blockers": [
+          "source historical availability is not proven",
+          "approved human review bindings are absent",
+          "complete exact-date XNYS universe evidence is absent",
+          "exact-date identity evidence across the interval is absent",
+          "complete bounded corporate-action coverage is absent",
+          "every-calendar-date evidenced XNYS session records are absent"
+        ],
+        "bundle": "/home/egx-agent/research-data/er1c-us-pilot/20260912T152213Z",
+        "canonical_pit_admission": "NO_GO",
+        "frozen_predeclaration_verified": true,
+        "ibm_2022q2_filing_scope": {
+          "canonical_us1_identity_evidence": "NO_GO",
+          "cik": "0000051143",
+          "dated_listing_statement_corroborated": true,
+          "exchange": "New York Stock Exchange",
+          "filing_date_from_sec_submission": "2022-07-25",
+          "form": "10-Q",
+          "issuer": "INTERNATIONAL BUSINESS MACHINES CORPORATION",
+          "limitations": [
+            "one filing statement does not prove identity continuity across the pilot interval",
+            "SEC CIK is an issuer identifier, not a stable listing or instrument identifier",
+            "the filing does not itself evidence the canonical XNYS MIC mapping",
+            "artifact historical availability and approved human review bindings are absent"
+          ],
+          "period_end": "2022-06-30",
+          "security": "Capital stock, par value $.20 per share",
+          "symbol": "IBM"
+        },
+        "ibm_cash_dividend_history_scope": {
+          "actual_payment_history_corroborated": true,
+          "canonical_us4_action_coverage": "NO_GO",
+          "complete_bounded_action_coverage": false,
+          "ex_dates_evidenced": false,
+          "limitations": [
+            "the current page does not prove its content was historically available",
+            "the page states record and payable dates but not ex-dates",
+            "cash-dividend history does not cover every required corporate-action type",
+            "approved human review bindings are absent"
+          ],
+          "payments": [
+            {
+              "actual_amount_usd_per_share": 1.65,
+              "dividend_number": 429,
+              "payable_date": "2022-06-10",
+              "record_date": "2022-05-10"
+            },
+            {
+              "actual_amount_usd_per_share": 1.65,
+              "dividend_number": 430,
+              "payable_date": "2022-09-10",
+              "record_date": "2022-08-10"
+            }
+          ],
+          "source_file": "ibm_cash_dividend_history.html",
+          "source_locator": "https://www.ibm.com/investor/governance/ibm-cash-dividends",
+          "symbol": "IBM"
+        },
+        "ibm_dividend_notice_scopes": [
+          {
+            "canonical_us4_action_coverage": "NO_GO",
+            "complete_bounded_action_coverage": false,
+            "ex_date": null,
+            "historical_available_at": null,
+            "limitations": [
+              "current capture of a dated issuer page does not prove historical availability",
+              "record and payable dates do not establish an ex-date or actual payment",
+              "matching vendor amount does not independently corroborate its ex-date",
+              "two issuer notices do not establish complete bounded actions or empty coverage",
+              "approved human review bindings are absent"
+            ],
+            "reported_amount_usd_per_common_share": "1.65",
+            "reported_announcement_date": "2022-04-26",
+            "reported_payable_date": "2022-06-10",
+            "reported_record_date": "2022-05-10",
+            "source_file": "ibm_2022-04-26_dividend_notice.html",
+            "source_locator": "https://newsroom.ibm.com/2022-04-26-IBM-BOARD-APPROVES-INCREASE-IN-QUARTERLY-CASH-DIVIDEND-FOR-THE-27th-CONSECUTIVE-YEAR",
+            "source_sha256": "6ca40db117ad3ff59dafed47bb3243085e6fbcf721d8f78018c07eb71cebdd3f",
+            "statement_locator": "press-release paragraph dated 2022-04-26",
+            "symbol": "IBM"
+          },
+          {
+            "canonical_us4_action_coverage": "NO_GO",
+            "complete_bounded_action_coverage": false,
+            "ex_date": null,
+            "historical_available_at": null,
+            "limitations": [
+              "current capture of a dated issuer page does not prove historical availability",
+              "record and payable dates do not establish an ex-date or actual payment",
+              "matching vendor amount does not independently corroborate its ex-date",
+              "two issuer notices do not establish complete bounded actions or empty coverage",
+              "approved human review bindings are absent"
+            ],
+            "reported_amount_usd_per_common_share": "1.65",
+            "reported_announcement_date": "2022-07-25",
+            "reported_payable_date": "2022-09-10",
+            "reported_record_date": "2022-08-10",
+            "source_file": "ibm_2022-07-25_dividend_notice.html",
+            "source_locator": "https://newsroom.ibm.com/2022-07-25-IBM-BOARD-APPROVES-REGULAR-QUARTERLY-CASH-DIVIDEND",
+            "source_sha256": "4aa7e8979ea201d7f8a4e40fb80b62e9edc2a362963220eeb29dd24e0abe5670",
+            "statement_locator": "press-release paragraph dated 2022-07-25",
+            "symbol": "IBM"
+          }
+        ],
+        "ibm_dividend_scope": {
+          "canonical_us4_action_coverage": "NO_GO",
+          "complete_bounded_action_coverage": false,
+          "ex_date": null,
+          "historical_available_at": null,
+          "limitations": [
+            "reported announcement date is not proven historical availability",
+            "record and payable dates do not establish an ex-date or actual payment",
+            "matching vendor amount does not independently corroborate its ex-date",
+            "one announcement does not establish complete bounded actions or empty coverage",
+            "artifact historical availability and approved human review bindings are absent"
+          ],
+          "reported_amount_usd_per_common_share": "1.65",
+          "reported_announcement_date": "2022-07-25",
+          "reported_payable_date": "2022-09-10",
+          "reported_record_date": "2022-08-10",
+          "source_file": "sec_ibm_2022q2_10q.html",
+          "source_locator": "https://www.sec.gov/Archives/edgar/data/51143/000155837022010985/ibm-20220630x10q.htm",
+          "source_sha256": "3d2b1bed1ccf656b4aa7d158ee6af27c0147923e5f3b61238ee59ebfab0d68ec",
+          "statement_locator": "page 52; paragraph beginning On July 25, 2022",
+          "symbol": "IBM"
+        },
+        "ibm_stock_split_history_scope": {
+          "canonical_us4_action_coverage": "NO_GO",
+          "complete_bounded_action_coverage": false,
+          "last_stock_dividend_year": 1967,
+          "last_stock_split_year": 1999,
+          "limitations": [
+            "the current page does not prove its content was historically available",
+            "the issuer statement covers splits and stock dividends only",
+            "approved human review bindings are absent"
+          ],
+          "no_split_or_stock_dividend_during_pilot_corroborated": true,
+          "source_file": "ibm_stock_split_history.html",
+          "source_locator": "https://www.ibm.com/investor/help/ibm-stock-splits-and-ibm-stock-dividends",
+          "symbol": "IBM"
+        },
+        "ibm_submission_scope": {
+          "canonical_us1_identity_evidence": "NO_GO",
+          "cik": "0000051143",
+          "current_submission_metadata_corroborated": true,
+          "exchange": "NYSE",
+          "issuer": "INTERNATIONAL BUSINESS MACHINES CORP",
+          "limitations": [
+            "the current SEC submission snapshot is not exact-date identity evidence",
+            "SEC CIK is an issuer identifier, not a stable listing or instrument identifier",
+            "artifact historical availability and approved human review bindings are absent"
+          ],
+          "symbol": "IBM",
+          "target_filing": {
+            "accession_number": "0001558370-22-010985",
+            "filing_date": "2022-07-25",
+            "form": "10-Q",
+            "primary_document": "ibm-20220630x10q.htm"
+          }
+        },
+        "manifest_sha256": "8936272e0fcd855eed1e97d6a0361f4929211630e417e75ccbc2452e0885acd9",
+        "nyse_2022_calendar_scope": {
+          "canonical_us2_session_evidence": "NO_GO",
+          "document_title": "2022 TRADING CALENDAR",
+          "limitations": [
+            "artifact says its dates are subject to change",
+            "calendar does not bind each date to the declared XNYS MIC",
+            "calendar does not state the regular session open",
+            "calendar does not supply exact UTC open and close clocks per open date"
+          ],
+          "pdf_creation_date": "20211213173946-05'00'",
+          "pdf_page_count": 1,
+          "states_dates_subject_to_change": true,
+          "states_early_close_is_1pm_eastern": true,
+          "states_exchange_holidays_are_closed": true
+        },
+        "pilot_identity_scope": {
+          "canonical_us1_identity_evidence": "NO_GO",
+          "exact_date_identity_interval_evidenced": false,
+          "frozen_acquisition_symbols": [
+            "IBM",
+            "TWTR"
+          ],
+          "ibm_current_submission_metadata_corroborated": true,
+          "ibm_dated_listing_statement_corroborated": true,
+          "ibm_issuer_identity_artifact_retained": true,
+          "limitations": [
+            "the retained Twitter filing corroborates one issuer, symbol, security, and exchange representation",
+            "the retained IBM filing corroborates one dated listing statement, not interval continuity",
+            "provider request symbols are mutable identifiers, not stable instrument IDs",
+            "NYSE exchange text does not itself evidence the canonical XNYS MIC mapping",
+            "no retained artifact proves exact-date identity on every required session date",
+            "artifact historical availability and approved human review bindings are absent"
+          ],
+          "listing_mic_evidenced": false,
+          "stable_instrument_ids_evidenced": false,
+          "twitter_cik": "0001418091",
+          "twitter_exchange_text": "New York Stock Exchange",
+          "twitter_filing_identity_corroborated": true,
+          "twitter_symbol": "TWTR"
+        },
+        "predeclaration_commit": "cf9b7bb5667365a89e8af4df222b513445095eb5",
+        "predeclaration_sha256": "78a705440912ae775aad0664e05f2b2930fe42dfe10dd0e8088479eb49273ffa",
+        "prices": {
+          "IBM": {
+            "first_market_date": "2022-04-01",
+            "last_market_date": "2022-11-04",
+            "raw_byte_size": 39306,
+            "raw_file": "ibm_2022-04-01_2022-11-04.json.raw",
+            "raw_sha256": "7d943f73d068ab832c3eacf974e6224b78bdc3782bce7d4d2a491483b5332bd5",
+            "row_count": 151,
+            "vendor_action_markers_not_action_coverage": [
+              {
+                "date": "2022-05-09",
+                "divCash": 1.65,
+                "row_number": 26,
+                "splitFactor": 1.0
+              },
+              {
+                "date": "2022-08-09",
+                "divCash": 1.65,
+                "row_number": 89,
+                "splitFactor": 1.0
+              }
+            ],
+            "zero_volume_dates_requiring_external_classification": []
+          },
+          "TWTR": {
+            "first_market_date": "2022-04-01",
+            "last_market_date": "2022-10-28",
+            "raw_byte_size": 32451,
+            "raw_file": "twtr_2022-04-01_2022-11-04.json.raw",
+            "raw_sha256": "da33bb8bbf1ec381aa829176730762619a33a2e996b5a39bbaf2aa22a546ddd5",
+            "row_count": 146,
+            "vendor_action_markers_not_action_coverage": [],
+            "zero_volume_dates_requiring_external_classification": [
+              "2022-10-28"
+            ]
+          }
+        },
+        "public_evidence": [
+          {
+            "byte_size": 57366,
+            "filename": "sec_twitter_merger_8k.html",
+            "historical_availability_proven": false,
+            "sha256": "60bfc50d97605692296877358a8150695e9ec7ae13a2df2bed331ddd1f33a653"
+          },
+          {
+            "byte_size": 1305,
+            "filename": "sec_nyse_twitter_removal_notice.html",
+            "historical_availability_proven": false,
+            "sha256": "18274d241c402be1e12dee9ed181d4d89aa3460dcf6a65650c91d2dc78b4d215"
+          },
+          {
+            "byte_size": 111260,
+            "filename": "nyse_2022_trading_calendar.pdf",
+            "historical_availability_proven": false,
+            "sha256": "2c2e63b780c4a373d8d546904ae46c8ba7e8070ad9357d23d2c92749985bb6c9"
+          },
+          {
+            "byte_size": 166091,
+            "filename": "sec_ibm_submissions.json",
+            "historical_availability_proven": false,
+            "sha256": "0d698f754c7aa7f9373bc90b65d73d801e018ad176b6ffb5e4ec0f6d18fa984f"
+          },
+          {
+            "byte_size": 6700677,
+            "filename": "sec_ibm_2022q2_10q.html",
+            "historical_availability_proven": false,
+            "sha256": "3d2b1bed1ccf656b4aa7d158ee6af27c0147923e5f3b61238ee59ebfab0d68ec"
+          },
+          {
+            "byte_size": 43365,
+            "filename": "ibm_2022-04-26_dividend_notice.html",
+            "historical_availability_proven": false,
+            "sha256": "6ca40db117ad3ff59dafed47bb3243085e6fbcf721d8f78018c07eb71cebdd3f"
+          },
+          {
+            "byte_size": 42469,
+            "filename": "ibm_2022-07-25_dividend_notice.html",
+            "historical_availability_proven": false,
+            "sha256": "4aa7e8979ea201d7f8a4e40fb80b62e9edc2a362963220eeb29dd24e0abe5670"
+          },
+          {
+            "byte_size": 192501,
+            "filename": "ibm_cash_dividend_history.html",
+            "historical_availability_proven": false,
+            "sha256": "aa76cc90983207600a952e25f7bb1eb36cf115f94ebc8ff1774e50769b519db5"
+          },
+          {
+            "byte_size": 127573,
+            "filename": "ibm_stock_split_history.html",
+            "historical_availability_proven": false,
+            "sha256": "8772be6e34091e6c9698286bf609461d76998c4d85a5cc1e1053754ed40d4d01"
+          }
+        ],
+        "public_evidence_manifest_sha256": "65f29e370f3b20330b00719247518f8242ae59c010f3bb4ecfdbe7041c01bea6",
+        "schema_version": "er1c-offline-audit-v1",
+        "twitter_corporate_event_scope": {
+          "canonical_us4_action_coverage": "NO_GO",
+          "cash_consideration_usd_per_share": 54.2,
+          "cik": "0001418091",
+          "exchange": "New York Stock Exchange",
+          "formal_removal_opening_of_business_date": "2022-11-08",
+          "independently_corroborated_by_retained_artifacts": true,
+          "issuer": "Twitter, Inc.",
+          "limitations": [
+            "artifacts prove this event but not complete action coverage for the acquisition interval",
+            "artifact historical availability is not proven",
+            "approved human review bindings are absent"
+          ],
+          "merger_effective_date": "2022-10-27",
+          "security": "Common Stock, par value $0.000005 per share",
+          "symbol": "TWTR",
+          "trading_suspended_before_open_date": "2022-10-28"
+        }
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nyse-roster-probe-20260912"
+      ],
+      "function": "audit_probe",
+      "module": "tools.audit_er1c_nyse_roster_probe",
+      "result": {
+        "historical_xnys_universe": "NO_GO",
+        "limitations": [
+          "short-sale volume reports contain reported trading activity, not complete listing rosters",
+          "absence from a report does not prove closure, suspension, delisting, or ineligibility",
+          "the retained current symbol-mapping index exposes no pilot-date edition",
+          "current receipt does not prove historical pre-decision availability"
+        ],
+        "observations": {
+          "20220701": {
+            "IBM": {
+              "line": 3375,
+              "total_volume": 1095021
+            },
+            "TWTR": {
+              "line": 6748,
+              "total_volume": 1250308
+            },
+            "rows": 7432
+          },
+          "20221027": {
+            "IBM": {
+              "line": 3347,
+              "total_volume": 1394495
+            },
+            "TWTR": {
+              "line": 6744,
+              "total_volume": 69368036
+            },
+            "rows": 7448
+          },
+          "20221028": {
+            "IBM": {
+              "line": 3347,
+              "total_volume": 1535486
+            },
+            "TWTR": null,
+            "rows": 7413
+          }
+        },
+        "source_classification": "AUTHORITATIVE_WITHIN_DAILY_SHORT_SALE_VOLUME_SCOPE"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-listing-ledger-probe-20260912"
+      ],
+      "function": "audit_probe",
+      "module": "tools.audit_er1c_sec_listing_ledger_probe",
+      "result": {
+        "complete_xnys_listing_change_ledger": "NO_GO",
+        "historical_xnys_universe": "NO_GO",
+        "index_target_form_counts": {
+          "sec_2022_q2_form.idx": {
+            "25-NSE": 344,
+            "8-A12B": 225,
+            "8-A12B/A": 13
+          },
+          "sec_2022_q3_form.idx": {
+            "25-NSE": 416,
+            "8-A12B": 226,
+            "8-A12B/A": 34
+          },
+          "sec_2022_q4_form.idx": {
+            "25-NSE": 780,
+            "8-A12B": 205,
+            "8-A12B/A": 26
+          }
+        },
+        "limitations": [
+          "Form 25-NSE enumerates exchange-removal filings, not every roster member or trading status",
+          "8-A12B filings do not alone establish initial trading date, security eligibility, or XNYS venue",
+          "form indexes identify filings but require submission-level parsing to determine exchange and class",
+          "EDGAR ticker/exchange associations are periodically updated and have no guaranteed accuracy or scope",
+          "current receipt does not prove historical pre-decision availability"
+        ],
+        "source_classification": "AUTHORITATIVE_WITHIN_EDGAR_FILING_INDEX_SCOPE",
+        "twitter_rows": [
+          {
+            "company": "TWITTER, INC.",
+            "date_filed": "2022-04-18",
+            "form": "8-A12B",
+            "line": 198015,
+            "submission_locator": "edgar/data/1418091/0001193125-22-107480.txt"
+          },
+          {
+            "company": "TWITTER, INC.",
+            "date_filed": "2022-10-28",
+            "form": "25-NSE",
+            "line": 22428,
+            "submission_locator": "edgar/data/1418091/0000876661-22-000890.txt"
+          }
+        ]
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-twitter-submission-probe-20260912T191134Z"
+      ],
+      "function": "audit_probe",
+      "module": "tools.audit_er1c_sec_twitter_submission_probe",
+      "result": {
+        "complete_xnys_listing_change_ledger": "NO_GO",
+        "historical_xnys_universe": "NO_GO",
+        "limitations": [
+          "the 8-A12B registers preferred-stock purchase rights, not Twitter common stock",
+          "the 25-NSE establishes this issue-specific removal and suspension only",
+          "filing, merger, suspension, and removal dates have distinct meanings",
+          "current receipt does not prove historical pre-decision availability"
+        ],
+        "registration_finding": {
+          "common_stock_listing_event": false,
+          "exchange": "New York Stock Exchange",
+          "filed_date": "2022-04-18",
+          "security_class": "Preferred Stock Purchase Rights"
+        },
+        "removal_finding": {
+          "exchange": "New York Stock Exchange LLC",
+          "filed_date": "2022-10-28",
+          "issuer_cik": "0001418091",
+          "merger_effective_date": "2022-10-27",
+          "removal_from_listing_and_registration": "2022-11-08",
+          "security_class": "Common Stock",
+          "trading_suspended_before_open": "2022-10-28"
+        },
+        "source_classification": "AUTHORITATIVE_WITHIN_EXACT_SEC_SUBMISSION_SCOPE"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-form-sample-20260912T194500Z",
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-listing-ledger-probe-20260912"
+      ],
+      "function": "audit_declaration",
+      "module": "tools.audit_er1c_sec_form_sample_declaration",
+      "result": {
+        "declaration_sha256": "cbe07c48d823755350f31ea0ac4384386451727f1919701567ff409375820a63",
+        "forms": [
+          "8-A12B",
+          "25-NSE"
+        ],
+        "quarters": 3,
+        "sample_size": 6,
+        "selection_verified": true,
+        "submission_contents_used_for_selection": false
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-form-sample-20260912T194500Z/direct_submission_attempt_20260913T010403Z.json",
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-form-sample-20260912T194500Z",
+        "/home/egx-agent/research-data/er1c-us-pilot/sec-listing-ledger-probe-20260912"
+      ],
+      "function": "audit_direct_attempt",
+      "module": "tools.audit_er1c_sec_direct_submission_attempt",
+      "result": {
+        "attempt_sha256": "6dd754aae8e489947e65a16ddf07c441f2892589c07dde1b90fdb121b1048d74",
+        "audited_at": "2026-09-25T13:13:53.033012+00:00",
+        "declaration_sha256": "cbe07c48d823755350f31ea0ac4384386451727f1919701567ff409375820a63",
+        "first_selected_record_bound": true,
+        "http_status": 403,
+        "result": "NO_SUBMISSION_BYTES_ACQUIRED",
+        "source_locator_kind": "SEC_QUARTERLY_INDEX_DIRECT_SUBMISSION"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/forward-session-truth-20260913T005146Z"
+      ],
+      "function": "audit_forward_session_truth",
+      "module": "tools.audit_er1c_forward_session_truth",
+      "result": {
+        "audited_at": "2026-09-25T13:13:54.438497+00:00",
+        "calendar_observation": "General holiday-scope, Labor Day and core-hours text anchors are present; target-date exception coverage has not been verified",
+        "canonical_us2_session_evidence": "NO_GO",
+        "latest_receipt_at": "2026-09-13T00:51:46+00:00",
+        "limitations": [
+          "these checks do not establish an exact per-date XNYS session assertion",
+          "the published clocks are Eastern Time rather than exact UTC timestamps",
+          "no approved review binds these receipts into a HistoricalEvidencePackage",
+          "this package contains no candidate, information cutoff, or frozen watchlist",
+          "current receipt time is not historical availability evidence"
+        ],
+        "market": "NYSE / XNYS",
+        "official_schedule_text_anchors_present": true,
+        "published_core_hours": "09:30-16:00 ET",
+        "requested_first_us_shadow_date": "2026-09-14",
+        "shadow_scoring": "NOT_READY",
+        "target_date_session_status": "UNKNOWN",
+        "watchlist_frozen_by_cutoff": "UNKNOWN"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nyse-corporate-actions-scope-20260913T053527Z"
+      ],
+      "function": "audit_scope",
+      "module": "tools.audit_er1c_nyse_corporate_actions_scope",
+      "result": {
+        "canonical_pit_admission": "NO_GO",
+        "complete_bounded_us4_action_coverage": "NO_GO",
+        "current_list_scope": "UPCOMING_EVENTS_DAILY",
+        "event_specific_info_notice_access": "MARKET_DATA_SUBSCRIPTION",
+        "historical_availability": "UNPROVEN",
+        "limitations": [
+          "the page describes issuer notice obligations and current publication policy",
+          "it does not expose a complete free historical archive for the pilot interval",
+          "notice obligations do not prove that every required action category is empty or complete",
+          "current receipt time cannot be represented as historical availability",
+          "subscription-only info notices were not acquired under the zero-budget constraint"
+        ],
+        "official_scope_anchors_present": true,
+        "source_classification": "AUTHORITATIVE_WITHIN_CURRENT_PUBLICATION_POLICY_SCOPE"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nyse-corporate-actions-spec-20260913T053952Z"
+      ],
+      "function": "audit_product",
+      "module": "tools.audit_er1c_nyse_corporate_actions_product",
+      "result": {
+        "canonical_pit_admission": "NO_GO",
+        "complete_bounded_us4_action_coverage": "NO_GO",
+        "documented_event_scope": "OVER_60_TYPES_ACROSS_NYSE_GROUP",
+        "event_files_acquired": false,
+        "historical_archive_access_proven_free": false,
+        "historical_availability": "UNPROVEN",
+        "limitations": [
+          "product and schema documentation are not corporate-action event records",
+          "the public product page describes current-day and programmatic products but does not provide the pilot event inventory",
+          "no complete 2022 event files or explicit empty coverage were acquired",
+          "current receipt time cannot be represented as historical availability",
+          "documentation of many action types does not establish completeness for IBM or TWTR"
+        ],
+        "source_classification": "AUTHORITATIVE_WITHIN_PRODUCT_DOCUMENTATION_SCOPE"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nasdaq-halt-fields-20260913T061742Z"
+      ],
+      "function": "audit_halt_fields",
+      "module": "tools.audit_er1c_nasdaq_halt_fields",
+      "result": {
+        "canonical_security_status": "NO_GO",
+        "documentation_integrity": "PASS",
+        "execution_resumption_proof": "NO_GO",
+        "feed_observations_acquired": 0,
+        "field_semantics": {
+          "halt_clock": "initial halt; displayed in Eastern Time",
+          "market_category": "NASDAQ or Non-NASDAQ only",
+          "quote_resumption_clock": "scheduled quotation resume",
+          "resumption_date": "date trading is resumed",
+          "trade_resumption_clock": "scheduled trading resume"
+        },
+        "latest_receipt_at": "2026-09-13T06:17:43.259300+00:00",
+        "limitations": [
+          "documentation contains no issue-specific feed observation",
+          "scheduled resumption times do not prove actual quoting or execution",
+          "Non-NASDAQ does not identify XNYS or bind a stable security identity",
+          "current receipts do not prove historical availability",
+          "absence from a query cannot clear an unresolved prior halt"
+        ],
+        "source": "Nasdaq Trader",
+        "xnys_identity_binding": "NO_GO"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nasdaq-halt-qualification-20260913T061309Z"
+      ],
+      "function": "audit_halt_terms",
+      "module": "tools.audit_er1c_nasdaq_halt_terms",
+      "result": {
+        "canonical_admission": "NO_GO",
+        "documentation_integrity": "PASS",
+        "feed_acquisition": "NO_GO",
+        "feed_requests_made": 0,
+        "latest_receipt_at": "2026-09-13T06:13:11.443263+00:00",
+        "raw_retention_permission": "UNRESOLVED",
+        "reason": "The reviewed terms do not expressly grant the archival retention and transformation required by the research protocol.",
+        "reviewed_terms_sha256": "9f3e25671be08d33b81785dac0eae63fc374904debcf2452aa1752964b3751b1",
+        "source": "Nasdaq Trader",
+        "transformation_permission": "UNRESOLVED"
+      }
+    },
+    {
+      "arguments": [
+        "/home/egx-agent/research-data/er1c-us-pilot/nyse-symbol-mapping-spec-20260913T062754Z"
+      ],
+      "function": "audit_symbol_mapping_spec",
+      "module": "tools.audit_er1c_nyse_symbol_mapping_spec",
+      "result": {
+        "archive_completeness_proven": false,
+        "canonical_us1_identity": "NO_GO",
+        "canonical_us5a_universe": "NO_GO",
+        "common_stock_field_documented_in_reviewed_layout": false,
+        "documentation_integrity": "PASS",
+        "latest_receipt_at": "2026-09-13T06:27:56.470678+00:00",
+        "mapping_data_requests_made": 0,
+        "market_and_listing_fields_documented": true,
+        "pilot_date_mapping_files_retained": false,
+        "predecision_availability_proven": false,
+        "retention_and_transformation_permission": "UNRESOLVED",
+        "stable_instrument_identity_proven": false
+      }
+    }
+  ],
+  "head": "3285a271db51289ec11c036194b4da2641282cc8",
+  "network": "DENIED",
+  "supplementary_removal_scope_check": {
+    "artifact_sha256": "d4c8b1a8c2d266b96543f6dec77a6c0df818b781cb95b5923eea498135fa234a",
+    "canonical_admission": "NO_GO",
+    "checks": [
+      "closed three-file inventory",
+      "regular unlinked custody",
+      "digest-only sidecar",
+      "artifact size and hash",
+      "ordered original receipt clocks",
+      "status and availability flags",
+      "four publication-policy anchors"
+    ],
+    "initial_check_error": "Ad hoc sidecar suffix assumption corrected; retained sidecar is digest-only.",
+    "manifest_sha256": "d39c22b404a954767a26c593f200b805c585060ee0557f23307e7a6fc4b663fe",
+    "result": "PASS"
+  }
+}
