@@ -411,7 +411,12 @@ def append_exit_event(directory: Path, watchlist: ShadowWatchlist,
     packages = _packages(exit_policy, exit_packages, watchlist.information_cutoff)
     basis = _basis(position, evaluation_facts, fact_event, exit_policy, sorted(packages))
     recorded_at = _utc(_now())
-    if recorded_at < _utc(datetime.fromisoformat(position["recorded_at"])) or recorded_at < evaluation_facts.bars[-1].available_at:
+    latest = max(
+        _utc(datetime.fromisoformat(position["recorded_at"])),
+        _utc(datetime.fromisoformat(fact_event["recorded_at"])),
+        evaluation_facts.bars[-1].available_at,
+    )
+    if recorded_at < latest:
         raise ValueError("exit publication precedes authenticated inputs")
     payload = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                        "recorded_at": recorded_at.isoformat()}
@@ -456,6 +461,11 @@ def audit_exit_event(directory: Path, watchlist: ShadowWatchlist,
     recorded_at = _utc(datetime.fromisoformat(event["recorded_at"]))
     expected = basis | {"event_id": hashlib.sha256(_canonical(basis)).hexdigest(),
                         "recorded_at": recorded_at.isoformat()}
-    if not max(_utc(datetime.fromisoformat(position["recorded_at"])), evaluation_facts.bars[-1].available_at) <= recorded_at <= _now() or event != expected:
+    latest = max(
+        _utc(datetime.fromisoformat(position["recorded_at"])),
+        _utc(datetime.fromisoformat(fact_event["recorded_at"])),
+        evaluation_facts.bars[-1].available_at,
+    )
+    if not latest <= recorded_at <= _now() or event != expected:
         raise ValueError("exit event does not bind authenticated inputs")
     return event

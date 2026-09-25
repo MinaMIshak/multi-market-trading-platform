@@ -51,10 +51,7 @@ def test_open_evaluation_is_durable_and_has_no_performance(tmp_path, monkeypatch
         shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
 
 
-def test_open_position_accepts_later_immutable_fact_evaluation(tmp_path, monkeypatch):
-    args, now, policy, evidence = prepared_exit(tmp_path, monkeypatch)
-    first_path = shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
-    first = json.loads(first_path.read_bytes())
+def admit_later_facts(tmp_path, monkeypatch, args, admitted_at):
     bar = args[2].bars[0]
     later_bar = bar.model_copy(update={
         "sequence": 2, "interval_start": bar.interval_end,
@@ -81,11 +78,21 @@ def test_open_position_accepts_later_immutable_fact_evaluation(tmp_path, monkeyp
         ),
     })
     later_packages = args[3] + (later_package,)
-    monkeypatch.setattr(shadow_facts, "_now", lambda: now + timedelta(minutes=1))
+    monkeypatch.setattr(shadow_facts, "_now", lambda: admitted_at)
     fact_path = shadow_facts.append_forward_fact_event(
         tmp_path, args[0], args[1], later_facts, later_packages,
     )
     fact_event = json.loads(fact_path.read_bytes())
+    return later_facts, later_packages, fact_event
+
+
+def test_open_position_accepts_later_immutable_fact_evaluation(tmp_path, monkeypatch):
+    args, now, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+    first_path = shadow_exits.append_exit_event(tmp_path, *args, policy, evidence)
+    first = json.loads(first_path.read_bytes())
+    later_facts, later_packages, fact_event = admit_later_facts(
+        tmp_path, monkeypatch, args, now + timedelta(minutes=1),
+    )
     monkeypatch.setattr(shadow_exits, "_now", lambda: now + timedelta(minutes=1))
 
     later_path = shadow_exits.append_exit_event(
@@ -263,3 +270,45 @@ def test_exit_participation_requires_evidence_before_publication(tmp_path, monke
     with pytest.raises(ValueError, match="cover exit-policy fields"):
         shadow_exits.append_exit_event(tmp_path, *args, bad, evidence[:2])
     assert not (tmp_path / "exit-events").exists()
+
+
+@pytest.mark.parametrize("offset_us", [-1, 0, 1])
+def test_exit_publication_respects_later_fact_admission(tmp_path, monkeypatch, offset_us):
+    args, now, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+    admitted_at = now + timedelta(minutes=2)
+    facts, packages, _ = admit_later_facts(tmp_path, monkeypatch, args, admitted_at)
+    monkeypatch.setattr(
+        shadow_exits, "_now", lambda: admitted_at + timedelta(microseconds=offset_us),
+    )
+    options = {"evaluation_facts": facts, "evaluation_fact_packages": packages}
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    if offset_us < 0:
+        with pytest.raises(ValueError, match="exit publication precedes authenticated inputs"):
+            shadow_exits.append_exit_event(tmp_path, *args, policy, evidence, **options)
+        assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before
+    else:
+        path = shadow_exits.append_exit_event(tmp_path, *args, policy, evidence, **options)
+        snapshot = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+        event = shadow_exits.audit_exit_event(tmp_path, *args, policy, evidence, **options)
+        assert event == json.loads(path.read_bytes())
+        assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == snapshot
+
+
+@pytest.mark.parametrize("consumer", ["audit", "report"])
+def test_backdated_exit_cannot_precede_later_fact_receipt(tmp_path, monkeypatch, consumer):
+    from app.paper.shadow_report import exit_evaluation_view
+
+    args, now, policy, evidence = prepared_exit(tmp_path, monkeypatch)
+    admitted_at = now + timedelta(minutes=2)
+    facts, packages, _ = admit_later_facts(tmp_path, monkeypatch, args, admitted_at)
+    monkeypatch.setattr(shadow_exits, "_now", lambda: admitted_at)
+    options = {"evaluation_facts": facts, "evaluation_fact_packages": packages}
+    path = shadow_exits.append_exit_event(tmp_path, *args, policy, evidence, **options)
+    event = json.loads(path.read_bytes())
+    event["recorded_at"] = (admitted_at - timedelta(microseconds=1)).isoformat()
+    path.write_text(json.dumps(event))
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    reader = shadow_exits.audit_exit_event if consumer == "audit" else exit_evaluation_view
+    with pytest.raises(ValueError, match="exit event does not bind authenticated inputs"):
+        reader(tmp_path, *args, policy, evidence, **options)
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before

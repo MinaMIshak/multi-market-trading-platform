@@ -267,3 +267,90 @@ Starting and ending HEAD for this cycle remain
 Worktree contains those three unstaged changes pending the supervisor bridge.
 Next milestone: resume whole-platform review from the committed result, including
 broker schedule contract classification and remaining operator/transport consumers.
+
+## Resumed software review — 2026-09-25: exit fact-admission chronology
+
+Starting clean HEAD: `fd0ddb0e0707380009e176b19e41de9ff7b5d174`, branch
+`agent/er1c-free-acquisition`. The supervisor committed the previous fill-policy
+chronology milestone as `fd0ddb0`; the older handoff above is historical.
+Inspected the latest 120 commits, execution plan, recovery/delivery documents,
+sprint audit, historical state, current entry/exit/position/fact implementations,
+exit tests and downstream report, settlement and UI consumers before coding.
+
+Classification before implementation: **REAL_SOFTWARE_GAP** in same-session
+exit receipt chronology. The writer and auditor checked position publication and
+bar availability but omitted the admission time of the referenced fact receipt.
+A later monotonic fact extension could therefore be admitted after the exit's
+claimed publication time. Existing hashes bind that receipt but do not validate
+this ordering. Continuation exit auditing already checks referenced continuation
+receipt clocks; no replacement continuation mechanism is needed.
+
+Both same-session writer and auditor now require the exit receipt time to be at
+least the maximum of position receipt time, evaluation fact receipt time and last
+bar availability. Existing future-clock, rollback, monotonic fact-extension and
+evidence checks remain. Receipt schemas and event IDs are unchanged. Existing
+report, UI and settlement consumers invoke this auditor and inherit rejection;
+no new transport, route, or synthetic execution/performance source was added.
+
+Five additional artificial cases exercise a writer clock one microsecond before,
+exactly at and one microsecond after fact admission, plus backdated receipt
+rejection by both the auditor and report reader. Invalid publication and audit
+paths assert unchanged JSON bytes; successful audit also asserts no writes.
+The existing later-fact fixture was extracted for reuse without removing its
+original immutable-history assertions.
+
+Red command (using the interpreter prefix below):
+`-m pytest -q tests/test_shadow_exits.py -k 'later_fact_admission or precede_later_fact_receipt'`.
+Result before implementation: **3 failed, 2 passed, 20 deselected in 1.21s**;
+all three failures were missing rejection of the demonstrated chronology defect.
+
+Focused offline command:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /home/egx-agent/work/egx-trading-platform/.venv/bin/python -m pytest -q tests/test_shadow_exits.py tests/test_shadow_continuations.py tests/test_shadow_allocations.py tests/test_shadow_report.py tests/test_main_shadow_execution_ui.py tests/test_main_shadow_settlement_ui.py
+```
+
+Result: **165 passed in 29.03s**. The repository socket-denial fixture applies.
+Full regression and final review results follow below.
+
+Generic economics were also inspected in `shadow_fills.py`, `shadow_exits.py`,
+`paper/models.py` and the existing UI adapter. Generic cost/slippage/participation
+contracts and explicit NOT ESTABLISHED IBKR labeling are **ALREADY_DONE**.
+Verified IBKR applicability remains **EVIDENCE_BLOCKED**. No broker schedule or
+rate was inferred from generic bps/fixed-cost fields. A missing broker-specific
+schema alone does not demonstrate a required implementation; this review has not
+established a smallest warranted broker contract. That candidate remains subject
+to the final whole-platform review rather than being declared implemented.
+
+Remaining **EVIDENCE_BLOCKED** items: authentic timely forward inputs;
+R1/ER1/ER1B/ER1C source admission, exact historical identity/universe, every-date
+sessions, complete bounded actions, edition availability and independent review;
+authentic execution bars and dated costs; canonical M7 observations; comparable
+ETF evidence; IBKR applicability and FX; validated predictive horizons; real
+OOS, untouched holdout and forward validation samples. Closed free-source paths
+remain closed. **DELIBERATELY_DISABLED**: live execution, broker orders,
+automatic promotion/geometry conversion, ungated refresh and production changes.
+Separate Experimental product/runtime work is **OBSOLETE_OR_SUPERSEDED**.
+
+No external API/network calls, acquisition, rights probing, production access,
+service/database/runtime changes, broker actions or secrets access occurred.
+No direct Git staging or commit commands were run. This closes the demonstrated
+exit chronology gap; final whole-platform review remains unfinished, so absence
+of all other REAL_SOFTWARE_GAP items is not claimed.
+**TODAY_TARGET_STATUS: CONTINUE. LIVE_READY: NO.**
+
+Final full regression command: the same interpreter/environment prefix above,
+with `-m pytest -q` and no path filters. Result: **2744 passed in 208.45s
+(0:03:28)**. In-memory Python `compile()` checks passed for both changed Python
+files without writing bytecode. `git diff --check` passed; the full three-file
+diff was reviewed. No tests were hidden or weakened. The Git index remains empty.
+
+Commit handoff: `fix: enforce shadow exit fact admission chronology`, exactly
+`app/paper/shadow_exits.py`, `tests/test_shadow_exits.py` and this delivery document.
+Starting and ending HEAD for this cycle remain
+`fd0ddb0e0707380009e176b19e41de9ff7b5d174`. Three unstaged paths await the
+supervisor commit bridge; no new commit ID is claimed. Next milestone: finish the
+whole-platform gap matrix and reconcile obsolete recovery backlog statements,
+checking any remaining candidate against current consumers/tests before coding.
+The broker schedule contract candidate still requires a justified classification;
+missing authentic broker evidence alone is not a software or orchestration blocker.
