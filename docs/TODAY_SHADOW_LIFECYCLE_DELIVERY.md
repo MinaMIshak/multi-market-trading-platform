@@ -35,7 +35,7 @@ regression: **2679 passed in 171.25s (0:02:51)**.
 | M8 and US8 | ALREADY_DONE engineering; EVIDENCE_BLOCKED validation | Purged/OOS/frozen-holdout evaluation exists, authentic admitted sample does not |
 | R1/ER1/ER1B/ER1C | ALREADY_DONE qualification/contracts; EVIDENCE_BLOCKED admission | Closed source paths remain NO_GO; original-byte availability/review/universe/session/action gaps remain |
 | Calendar/index/TODAY | ALREADY_DONE | Fail-closed retained official-index verification, gated refresh pipeline, persisted exact-date session rendering |
-| Stock/ETF/cash intelligence | PARTIALLY_DONE | Native cash/positions exist; no Shadow security-type binding or ETF comparison adapter |
+| Stock/ETF/cash intelligence | ALREADY_DONE exact-dated classification binding; EVIDENCE_BLOCKED comparison | Native cash/positions and audited exact-dated US security-type binding exist; comparable ETF evidence and allocation comparison remain unavailable |
 | IBKR paper economics | PARTIALLY_DONE | Audited generic costs/slippage/participation exist; no verified date-effective IBKR schedule binding |
 | Multiple horizons | PARTIALLY_DONE | Actual intraday, continuation and valuation intervals exist; validated predictive horizons do not |
 | Separate Experimental product/runtime | OBSOLETE_OR_SUPERSEDED | No implementation or runtime changes in this delivery |
@@ -125,6 +125,8 @@ Commands/results (append the listed test paths to that prefix):
   **133 passed in 9.41s**.
 - Final full repository suite after all lifecycle and missed-session changes:
   **2723 passed in 169.63s (0:02:49)**.
+- Security-type binding full repository regression:
+  **2732 passed in 192.97s (0:03:12)**.
 
 New tests cover read-only success, missing durable stages, tampered ancestry,
 rehashed false reservation economics, altered policy/evidence, unapproved review,
@@ -159,10 +161,16 @@ M6 input, and M7.1 explicitly preserves replay observations without converting
 them into legacy M6 evidence. `/performance` must therefore remain fail-closed
 until a genuine canonical M6 or M6.1 observation source exists.
 
-Remaining REAL_SOFTWARE_GAP/PARTIALLY_DONE work: evidence-bound
-security-type/stock/ETF comparison and broker-specific dated schedule contracts,
-subject to the existing evidence boundaries and without inventing classifications,
-quotes, FX, fees or broker rates.
+The Shadow exact-dated US security-type binding is now CLOSED as a software
+gap. It binds candidate ID, stable instrument identity, ticker, exact market date,
+listing MIC, reviewed historical evidence and the frozen watchlist completion.
+It does not infer security type and does not claim an ETF comparison.
+
+Stock-vs-ETF comparative evidence and allocation recommendations remain
+EVIDENCE_BLOCKED. Remaining software review must determine whether the
+broker-specific date-effective schedule boundary or any other platform-wide
+PARTIALLY_DONE area still contains a genuine software gap, without inventing
+quotes, FX, fees, broker rates, horizons or market evidence.
 
 The missed-collection existing-UI transport is now CLOSED in this milestone.
 Authenticated MISSED / NOT SCORED receipts remain distinct from zero-candidate
@@ -172,9 +180,12 @@ watchlists, and damaged receipts fail closed without candidate reconstruction.
 Shadow lifecycle visibility gaps identified during this review, but the broad
 software target is not yet declared complete. M7 operational wiring is now
 classified EVIDENCE_BLOCKED rather than a current software implementation gap.
-The next software review should scope the evidence-bound security-type/stock/ETF
-and broker-specific dated-schedule boundaries. Do not add arbitrary report
-ingestion, convert Shadow facts into M6 evidence, or derive M7 trades from NAV.
+The next step is a whole-platform completion review: prove any remaining
+REAL_SOFTWARE_GAP from current code, tests, docs and history, then close it in
+bounded milestones. Broker-specific dated-schedule contracts are a candidate,
+not a pre-approved implementation. Do not add arbitrary report ingestion,
+convert Shadow facts into M6 evidence, derive M7 trades from NAV, infer ETF
+comparisons, or fabricate broker economics.
 
 Live readiness remains unestablished. Tests do not supply authentic data,
 profitability, empirical validation, operational validation or authorization for

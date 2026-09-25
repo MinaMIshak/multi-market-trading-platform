@@ -1,6 +1,7 @@
 """Bounded local JSON transport for canonical shadow contracts, never admission."""
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from enum import Enum
 import json
 import math
 import os
@@ -42,6 +43,13 @@ def _decode(kind, value):
         if not any(type(value) is type(item) and value == item for item in args):
             raise ValueError("invalid literal")
         return value
+    if isinstance(kind, type) and issubclass(kind, Enum):
+        if type(value) is not str:
+            raise ValueError("canonical enum string required")
+        try:
+            return kind(value)
+        except ValueError as exc:
+            raise ValueError("invalid enum value") from exc
     if origin is tuple:
         if type(value) is not list or len(args) != 2 or args[1] is not Ellipsis:
             raise ValueError("JSON array required")
@@ -115,6 +123,44 @@ def read_shadow_missed(directory: Path):
     return missed_collection_view(
         directory, **{key: _decode(kind, document[key]) for key, kind in fields.items()},
     )
+
+
+def read_shadow_security_types(directory: Path, source):
+    """Re-audit explicit exact-dated candidate classifications; never infer ETF peers."""
+    from app.paper.shadow_security_type import audit_security_type_binding
+    from app.us.historical_identity import HistoricalUSListingFact
+
+    document = _read_document(directory / 'security-type.json')
+    if (type(document) is not dict
+            or set(document) != {'schema_version', 'bindings'}
+            or document['schema_version'] != 'shadow-ui-security-types-v1'
+            or type(document['bindings']) is not list
+            or not 1 <= len(document['bindings']) <= 512):
+        raise ValueError('invalid security-type envelope')
+
+    results = {}
+    for item in document['bindings']:
+        if (type(item) is not dict
+                or set(item) != {'candidate_id', 'fact'}
+                or type(item['candidate_id']) is not str
+                or not item['candidate_id']):
+            raise ValueError('invalid security-type binding input')
+        candidate_id = item['candidate_id']
+        if candidate_id in results:
+            raise ValueError('duplicate security-type candidate binding')
+        fact = _decode(HistoricalUSListingFact, item['fact'])
+        results[candidate_id] = audit_security_type_binding(
+            directory,
+            source.watchlist,
+            source.evidence_packages,
+            candidate_id,
+            fact,
+        )
+
+    return {
+        'status': 'AUDITED EXACT-DATED SECURITY TYPES / NOT AN ETF COMPARISON',
+        'bindings': results,
+    }
 
 
 def read_shadow_execution(directory: Path, source):

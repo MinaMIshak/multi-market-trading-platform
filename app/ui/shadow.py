@@ -23,7 +23,9 @@ class ShadowWatchlistInput:
 
 
 def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) -> dict:
-    unavailable = {"available": False, "collection": None, "missed": None, "execution": None, "portfolio": None, "series": None,
+    unavailable = {"available": False, "collection": None, "missed": None,
+                   "security_types": None, "execution": None,
+                   "portfolio": None, "series": None,
                    "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     try:
         # Isolated operator-owned state only; reject links before ledger reads.
@@ -52,6 +54,13 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         missed = None
     try:
+        from app.ui.shadow_input import read_shadow_security_types
+        if collection is None or source is None:
+            raise ValueError("security type requires an audited collection")
+        security_types = read_shadow_security_types(directory, source)
+    except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
+        security_types = None
+    try:
         from app.ui.shadow_input import read_shadow_execution
         if collection is None:
             raise ValueError("execution requires an audited collection")
@@ -68,7 +77,9 @@ def load_shadow_watchlist(directory: Path, source: ShadowWatchlistInput | None) 
         series = read_shadow_series(directory)
     except (OSError, ValueError, TypeError, KeyError, InvalidOperation, RecursionError):
         series = None
-    return {"series": series, "portfolio": portfolio, "missed": missed, "available": collection is not None,
+    return {"series": series, "portfolio": portfolio, "missed": missed,
+            "security_types": security_types,
+            "available": collection is not None,
             "collection": collection, "execution": execution,
             "status": "AUDITED FROZEN RECORD" if collection is not None else unavailable['status']}
 
@@ -94,8 +105,26 @@ def render_shadow_watchlist(state: dict) -> str:
         )
         if not view["candidates"]:
             body += '<p>Audited frozen watchlist contains zero candidates.</p>'
+        security_types = state.get("security_types")
+        bindings = (
+            security_types.get("bindings", {})
+            if isinstance(security_types, dict)
+            else {}
+        )
         for candidate in view["candidates"]:
             body += f'<h2>{e(candidate["ticker"])} · {e(candidate["decision_status"])}</h2><dl>'
+            binding = bindings.get(candidate.get("candidate_id"))
+            if binding is None:
+                body += (
+                    '<dt>Security type</dt>'
+                    '<dd>UNAVAILABLE / NOT AUTHENTICATED</dd>'
+                )
+            else:
+                body += (
+                    f'<dt>Security type</dt><dd>{e(binding["security_type"])}</dd>'
+                    f'<dt>Security type status</dt><dd>{e(binding["status"])}</dd>'
+                    f'<dt>Security type evidence</dt><dd>{e(binding["evidence_package_id"])}</dd>'
+                )
             for label, key in (
                 ("Thesis", "thesis"), ("Context", "context"),
                 ("Technical setup", "technical_setup"), ("Entry condition", "entry_condition"),
