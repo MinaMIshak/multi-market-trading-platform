@@ -171,15 +171,19 @@ def freeze_fill_policy_selection(
     completion = audit_completed_watchlist(directory, watchlist, watchlist_packages)
     packages = _packages(policy, fill_packages, watchlist.information_cutoff)
     selected_at = _utc(_now())
+    completed_at = _utc(datetime.fromisoformat(completion["completed_at"]))
+    if selected_at < completed_at:
+        raise ValueError("fill policy selection precedes watchlist completion")
     if selected_at >= watchlist.session.opens_at:
         raise ValueError("fill policy must be selected before session open")
     basis = _selection_basis(watchlist, completion, policy, sorted(packages))
     event_id = hashlib.sha256(_canonical(basis)).hexdigest()
     payload = basis | {"event_id": event_id, "selected_at": selected_at.isoformat()}
     path = _publish_once(_selection_path(directory, watchlist), payload)
-    if _now() < selected_at:
+    observed_at = _utc(_now())
+    if not selected_at <= observed_at < watchlist.session.opens_at:
         path.unlink()
-        raise ValueError("clock rollback during fill-policy selection")
+        raise ValueError("clock crossed fill-policy publication boundary")
     return path
 
 
@@ -211,8 +215,10 @@ def audit_fill_policy_selection(
     if type(event) is not dict or set(event) != set(basis) | {"event_id", "selected_at"}:
         raise ValueError("unexpected fill-policy-selection fields")
     selected_at = _utc(datetime.fromisoformat(event["selected_at"]))
+    completed_at = _utc(datetime.fromisoformat(completion["completed_at"]))
     expected = basis | {"event_id": event_id, "selected_at": selected_at.isoformat()}
-    if selected_at >= watchlist.session.opens_at or selected_at > _now() or event != expected:
+    if (not completed_at <= selected_at < watchlist.session.opens_at
+            or selected_at > _now() or event != expected):
         raise ValueError("fill policy does not bind pre-session selection")
     return event
 

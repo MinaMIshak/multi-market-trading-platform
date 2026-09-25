@@ -190,3 +190,80 @@ comparisons, or fabricate broker economics.
 Live readiness remains unestablished. Tests do not supply authentic data,
 profitability, empirical validation, operational validation or authorization for
 real-money execution.
+
+## Resumed software review — 2026-09-25: fill-policy chronology
+
+Starting clean HEAD: `1247371fd7497c54111bed95e0971574e305937d`, branch
+`agent/er1c-free-acquisition`. Reviewed the latest 120 commits, current recovery,
+this delivery document, sprint audit, execution plan and historical STATE notes.
+Current code and the explicit mission supersede historical next steps.
+
+Classification before implementation: **REAL_SOFTWARE_GAP** in the existing
+fill-policy chronology, demonstrated by `shadow_fills.py` and new failing tests.
+The selection writer checked only selection-before-open, and its post-publication
+check rejected rollback but permitted crossing session open. Both writer and
+reader permitted a selection clock earlier than the authenticated watchlist
+completion. Existing policy/evidence integrity checks did not close those gaps.
+
+The smallest correction preserves the immutable receipt schema and existing
+consumers. Selection now requires `completed_at <= selected_at < opens_at`, and
+successful publication requires `selected_at <= observed_at < opens_at`. A crossed
+publication boundary removes only the newly published selection, following the
+existing rollback behavior. Every selection audit now enforces completion ancestry,
+so downstream fill creation rejects a backdated selection. No UI or CLI adapter
+is necessary: existing fill, position and UI consumers already call this auditor.
+Hashes and local clocks remain integrity checks, not independent attestation.
+
+Seven added artificial cases cover rejection before completion, publication at
+and after open, rollback, tampered receipt rejection through audit and fill
+creation, and valid equality at completion / one microsecond before open.
+Success and tamper audits assert unchanged file bytes. Initial red run:
+**5 failed, 14 deselected in 0.94s**; four failures demonstrated missing rejection,
+and the rollback case already rejected but had the older error message.
+
+Focused command (offline network-denial fixture applies):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 /home/egx-agent/work/egx-trading-platform/.venv/bin/python -m pytest -q tests/test_shadow_fills.py tests/test_shadow_positions.py tests/test_main_shadow_entry_ui.py tests/test_main_shadow_execution_ui.py
+```
+
+Result: **98 passed in 18.83s**. Full-suite and final checks are recorded below.
+
+This closes a demonstrated defect in an implemented lifecycle; it does not reopen
+or recreate that lifecycle. Broker-specific schedule support remains a review
+candidate: generic entry/exit policy schemas bind costs, currency and historical
+packages but contain no broker/account/tier/date-effective applicability contract.
+The absence alone is not proof that an arbitrary new schedule schema is required.
+A next cycle must determine the smallest warranted contract before implementation;
+verified IBKR rates/applicability remain **EVIDENCE_BLOCKED**. No rate, schedule,
+FX assumption or source evidence was invented or acquired here.
+
+Remaining classifications from the current delivery remain in force: M7 source,
+R1/ER1/ER1B/ER1C admission, authentic timely forward inputs, historical identity/
+universe/session/action coverage and edition availability/review, actual execution
+bars and dated costs, comparable ETF evidence, FX, validated predictive horizons,
+and OOS/holdout/forward validation are **EVIDENCE_BLOCKED**. Live-money execution,
+broker orders, automatic promotion/geometry conversion, ungated refresh and
+production changes remain **DELIBERATELY_DISABLED**. Separate Experimental
+product/runtime work is **OBSOLETE_OR_SUPERSEDED**.
+
+No external API/network calls, acquisition, source-rights probing, production,
+services, databases, runtime, broker actions or secrets access occurred. Tests used
+isolated artificial fixtures and the existing read/execute-only interpreter.
+No direct Git staging or commit commands were run. The full-platform final review
+is still pending; no claim that all REAL_SOFTWARE_GAP items are closed is made.
+**TODAY_TARGET_STATUS: CONTINUE. LIVE_READY: NO.**
+
+Final full regression command: the same interpreter/environment prefix above,
+with `-m pytest -q` and no test path filters. Result:
+**2739 passed in 223.53s (0:03:43)**. In-memory Python `compile()` checks passed
+for both changed Python files without creating bytecode. `git diff --check`
+passed and the entire three-file milestone diff was reviewed. Index is empty.
+
+Commit handoff: `fix: enforce shadow fill policy chronology`, exactly
+`app/paper/shadow_fills.py`, `tests/test_shadow_fills.py` and this delivery document.
+Starting and ending HEAD for this cycle remain
+`1247371fd7497c54111bed95e0971574e305937d`; no new commit ID exists yet.
+Worktree contains those three unstaged changes pending the supervisor bridge.
+Next milestone: resume whole-platform review from the committed result, including
+broker schedule contract classification and remaining operator/transport consumers.

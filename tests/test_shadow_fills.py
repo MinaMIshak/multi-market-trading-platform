@@ -1,6 +1,6 @@
 """Artificial fill fixtures only; no market facts, orders, or recommendations."""
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -241,3 +241,66 @@ def test_policy_rejects_invalid_exact_economics(field, value):
     )
     with pytest.raises(ValidationError):
         ShadowFillPolicy(**(values | {field: value}))
+
+
+def test_selection_rejects_clock_before_collection_completion(tmp_path, monkeypatch):
+    item, packages, _, _, policy, fill_packages, _ = prepared(tmp_path, monkeypatch)
+    path = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    path.unlink()
+    completion = json.loads((tmp_path / "receipts" / f"{item.record_id}.json").read_bytes())
+    completed_at = datetime.fromisoformat(completion["completed_at"])
+    monkeypatch.setattr(shadow_fills, "_now", lambda: completed_at - timedelta(microseconds=1))
+    with pytest.raises(ValueError, match="completion"):
+        shadow_fills.freeze_fill_policy_selection(tmp_path, item, packages, policy, fill_packages)
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("publication_clock", ["open", "after_open", "rollback"])
+def test_selection_publication_must_finish_before_open(tmp_path, monkeypatch, publication_clock):
+    item, packages, _, _, policy, fill_packages, _ = prepared(tmp_path, monkeypatch)
+    path = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    path.unlink()
+    selected_at = item.session.opens_at - timedelta(microseconds=1)
+    observed = {
+        "open": item.session.opens_at,
+        "after_open": item.session.opens_at + timedelta(microseconds=1),
+        "rollback": selected_at - timedelta(microseconds=1),
+    }[publication_clock]
+    clocks = iter((selected_at, observed))
+    monkeypatch.setattr(shadow_fills, "_now", lambda: next(clocks))
+    with pytest.raises(ValueError, match="publication boundary"):
+        shadow_fills.freeze_fill_policy_selection(tmp_path, item, packages, policy, fill_packages)
+    assert not path.exists()
+
+
+def test_backdated_selection_blocks_fill_and_read_only_audit(tmp_path, monkeypatch):
+    item, packages, facts, fact_packages, policy, fill_packages, _ = prepared(tmp_path, monkeypatch)
+    path = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    completion = json.loads((tmp_path / "receipts" / f"{item.record_id}.json").read_bytes())
+    event = json.loads(path.read_bytes())
+    event["selected_at"] = (
+        datetime.fromisoformat(completion["completed_at"]) - timedelta(microseconds=1)
+    ).isoformat()
+    path.write_text(json.dumps(event))
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(ValueError, match="pre-session selection"):
+        shadow_fills.audit_fill_policy_selection(tmp_path, item, packages, policy, fill_packages)
+    with pytest.raises(ValueError, match="pre-session selection"):
+        shadow_fills.append_fill_event(tmp_path, item, packages, facts, fact_packages, policy, fill_packages)
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+
+@pytest.mark.parametrize("at_completion", [True, False])
+def test_selection_accepts_exact_chronology_boundaries_read_only(tmp_path, monkeypatch, at_completion):
+    item, packages, _, _, policy, fill_packages, _ = prepared(tmp_path, monkeypatch)
+    path = next((tmp_path / "fill-policy-selections").glob("*.json"))
+    path.unlink()
+    completion = json.loads((tmp_path / "receipts" / f"{item.record_id}.json").read_bytes())
+    selected_at = (datetime.fromisoformat(completion["completed_at"]) if at_completion
+                   else item.session.opens_at - timedelta(microseconds=1))
+    monkeypatch.setattr(shadow_fills, "_now", lambda: selected_at)
+    shadow_fills.freeze_fill_policy_selection(tmp_path, item, packages, policy, fill_packages)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    event = shadow_fills.audit_fill_policy_selection(tmp_path, item, packages, policy, fill_packages)
+    assert event["selected_at"] == selected_at.isoformat()
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
