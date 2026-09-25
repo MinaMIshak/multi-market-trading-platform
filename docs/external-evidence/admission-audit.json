@@ -1,0 +1,926 @@
+{
+  "audited_at_utc": "2026-09-25T16:21:14.994788+00:00",
+  "source_head": "9e8dab4fc03fd373e9f77d92b1dfd60da0542794",
+  "raw_response_hashes_verified": 24,
+  "direct_http_attempts": 25,
+  "http_200": 22,
+  "http_403": 2,
+  "transport_failures": 1,
+  "old_evidence_files_verified": 67,
+  "old_evidence_bytes_verified": 129416738,
+  "old_evidence_unchanged": true,
+  "manifest_sha256": "5031e650a7cb662a1147476aac0d0e4720512d33176ce69c205e30fb3f6441aa",
+  "canonical_admitted_count": 0,
+  "canonical_constructor_rejections": [
+    {
+      "artifact": "cboe_equity_etf_scope.html",
+      "raw_receipt_id": "baf3e166b25097d2b3bc411cace059d77480814e7154876cf8ba32bfbeafce49",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Cboe DataShop",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://datashop.cboe.com/equity-etf-quotes",
+        "sha256": "685ebede19ae0e5dc92552c3b923a059077ec056ab084d155adecc007e0fa782",
+        "byte_size": 61181,
+        "local_received_at": "2026-09-25T16:17:31.951827Z",
+        "source_edition": null,
+        "evidence_category": "comparable stock/ETF bars and spreads source qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "databento_account_scope.html",
+      "raw_receipt_id": "6a4e000c5cdbe0337d7eb569daf7bcbe9a8c10301e44e44392011f3bcba53503",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Databento",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://databento.com/blog/upcoming-changes-to-pricing-plans-in-january-2025",
+        "sha256": "d1e426247fa98729a6822f2abc00a3c81f7cb0302bf8319e3b782d79277bee79",
+        "byte_size": 129605,
+        "local_received_at": "2026-09-25T16:19:17.326423Z",
+        "source_edition": null,
+        "evidence_category": "account/subscription qualification; dated policy, not current-price proof"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "databento_pricing.html",
+      "raw_receipt_id": "9f59e5a78294f800c55e223e15033035c22a8fc07549d4bcf6c28e5e7bf8a0f6",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Databento",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://databento.com/pricing",
+        "sha256": "61f8c45b3d96a73d27dbb3ad0225b5210a6a371f30c9354b5a6d869270a43f1a",
+        "byte_size": 17781,
+        "local_received_at": "2026-09-25T16:16:10.587862Z",
+        "source_edition": null,
+        "evidence_category": "intraday/stress/security-master source qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "egx_beta_home.html",
+      "raw_receipt_id": "d4afedf9743bfe024da55fbf27d6676daf8c9b0273ace26266e0d9b7fcfb0bc3",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "EGX",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://beta.egx.com.eg/en",
+        "sha256": "54eb610f17368732f7f7022b4d00e10ea2a12892e8e659b83a329fe72dbafdbe",
+        "byte_size": 379800,
+        "local_received_at": "2026-09-25T16:17:34.306607Z",
+        "source_edition": null,
+        "evidence_category": "official archive and terms discovery"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "egx_beta_index.html",
+      "raw_receipt_id": "c812e55ceed83f7f85c7e0ea510d3c7a220c1a37b072e46dcf1221f94a182f3b",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "EGX",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://beta.egx.com.eg/en/market/indices/overview?index=CASE30",
+        "sha256": "5565c31fca1eb5cab7246c9f22623ee8bfdf4e1f21ed7aa645836c8984f9aa37",
+        "byte_size": 170532,
+        "local_received_at": "2026-09-25T16:17:35.329698Z",
+        "source_edition": null,
+        "evidence_category": "official index history and licensing scope"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "egx_beta_license.html",
+      "raw_receipt_id": "fcdc399a93ce356d4064c2a5ff83d27723b01b371f6cdc6f9bed9aa4dbf38652",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "EGX",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://beta.egx.com.eg/en/market/indices/license?index=CASE30",
+        "sha256": "874cd23a8bd59ec1fa68e5ce2a026a4b914696bdd45b01c0be0600bb74b16eca",
+        "byte_size": 169008,
+        "local_received_at": "2026-09-25T16:18:05.811979Z",
+        "source_edition": null,
+        "evidence_category": "new official index licensing terms qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "egx_news_pricing.html",
+      "raw_receipt_id": "ee6017e5b20d41edc926171e6428dbfc3079b6875d90389c73a14f4eabfa2cd2",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "EGX.news (third party, not the exchange)",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.egx.news/en/our-data",
+        "sha256": "e2893bf689be1d08ed11056901a60b1f7ce9f9800a8b1c5b3d1952e3a0b5bd53",
+        "byte_size": 110819,
+        "local_received_at": "2026-09-25T16:17:36.271275Z",
+        "source_edition": null,
+        "evidence_category": "EGX alternate historical source price qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "federalregister_fee_metadata.json",
+      "raw_receipt_id": "2cc24e7f9b4922425a03700579b8d4db44740604a2dd51878378ecaef42a2a52",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Office of the Federal Register",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.federalregister.gov/api/v1/documents/2022-07881.json",
+        "sha256": "c01bd14cdc9415885a50ef3497569046f4454180e0d08894b7962a390bc1d564",
+        "byte_size": 3639,
+        "local_received_at": "2026-09-25T16:18:04.862780Z",
+        "source_edition": "OFR current API metadata for 2022-07881; current receipt, not historical API edition",
+        "evidence_category": "publication metadata for fee-order corroboration"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "gleif_api.html",
+      "raw_receipt_id": "bd9585f60a06ca6aef7bb533f82777fd923e6b94647c79c0daba4d0f8ea4d3cd",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "GLEIF",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.gleif.org/en/lei-data/gleif-api",
+        "sha256": "e0f4e322aa9c2f6b9e04426bb22cc81d3b0712c72fd92f3db5608ab7caeb7d89",
+        "byte_size": 204407,
+        "local_received_at": "2026-09-25T16:16:05.598510Z",
+        "source_edition": null,
+        "evidence_category": "identity scope qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "gleif_terms.html",
+      "raw_receipt_id": "99db08f059dec5c410e68674c0a266d7053b23cc1562dfe33b1fd46c494b0f89",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "GLEIF",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.gleif.org/en/meta/lei-data-terms-of-use",
+        "sha256": "ec3349c0c8b5fc3cec794488b677c89eaece0b8f348b6f6e3bcda42a59ddbed3",
+        "byte_size": 193819,
+        "local_received_at": "2026-09-25T16:16:03.029408Z",
+        "source_edition": null,
+        "evidence_category": "identity source rights qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "govinfo_fee_order_2022.html",
+      "raw_receipt_id": "cf923cdf2da178ca04e314f714599ef68144bb3f5168ca48f84f0b9a049ea851",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "SEC via GPO Federal Register",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.govinfo.gov/content/pkg/FR-2022-04-13/html/2022-07881.htm",
+        "sha256": "7065dc5e97773e108eb8e07da3242f629be579bb534bd2600d696e5da9f5b384",
+        "byte_size": 53484,
+        "local_received_at": "2026-09-25T16:17:49.073141Z",
+        "source_edition": "Federal Register Vol. 87 No. 71, 87 FR 21931-21938, FR Doc. 2022-07881, SEC Release 34-94644",
+        "evidence_category": "2022 Section 31 regulatory charge component and dated publication evidence"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "govinfo_fee_order_print_2022.pdf",
+      "raw_receipt_id": "67f016d826442c6adc114bcc19f0375cb44e947c81cb80081e30c3530ee4d82d",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "SEC via GPO Federal Register",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.govinfo.gov/content/pkg/FR-2022-04-13/pdf/2022-07881.pdf",
+        "sha256": "09da44f8651bd1510f1dad7e78a40989dabf22c2ca3e177b382d6891467b185c",
+        "byte_size": 370383,
+        "local_received_at": "2026-09-25T16:18:04.304374Z",
+        "source_edition": "Federal Register Vol. 87 No. 71, 87 FR 21931-21938, FR Doc. 2022-07881, SEC Release 34-94644",
+        "evidence_category": "published fee-order edition for exact attachment review"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "govinfo_policy.html",
+      "raw_receipt_id": "490e029fdcefe7fe0d3c785d18ef80e7f334157d9249571b3adb9df7e7f8ba8c",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "US Government Publishing Office",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.govinfo.gov/about/policies",
+        "sha256": "d9e3a2f1cb4486ab4ecc4eff640f94f9a9bb8655ca71ff00694b236e7011ad1c",
+        "byte_size": 64169,
+        "local_received_at": "2026-09-25T16:17:31.068071Z",
+        "source_edition": null,
+        "evidence_category": "rights for government fee-order retention"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "ibkr_fx_pricing.html",
+      "raw_receipt_id": "b71b516ba537509931c25d4e257ac0ec1c4d3c545539b8c163730b1ebb53ea8f",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "IBKR",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.interactivebrokers.com/en/pricing/commissions-spot-currencies.php",
+        "sha256": "52dabdb926cc6513a7e6ba7d3e686a56847e57ce0f7928f685cc96710242903a",
+        "byte_size": 187082,
+        "local_received_at": "2026-09-25T16:16:11.779252Z",
+        "source_edition": null,
+        "evidence_category": "FX applicability qualification only"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "ibkr_stock_pricing.html",
+      "raw_receipt_id": "bcd081fe38a76a9b927319da5dba97da1926bc16de4999bf80d94ae421927d9b",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "IBKR",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+        "sha256": "d07de29dc5c8703ce25bda3a977de82abf8da6892f32afae0adbf3b7a2c7b7c9",
+        "byte_size": 588730,
+        "local_received_at": "2026-09-25T16:16:11.304999Z",
+        "source_edition": null,
+        "evidence_category": "account/tier and rates qualification only"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "ice_egx_scope.html",
+      "raw_receipt_id": "e5165fa8ec47736db20d9852f52e5be39267066134ccff81b856d11dc9cae873",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "ICE",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://developer.ice.com/fixed-income-data-services/catalog/egyptian-exchange-egx",
+        "sha256": "62545e802deaed7d45af4310d347b97e4d0c185ade5e021e1e7f9e39cff3c6be",
+        "byte_size": 34515,
+        "local_received_at": "2026-09-25T16:17:35.902440Z",
+        "source_edition": null,
+        "evidence_category": "EGX execution data product qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "norgate_packages.html",
+      "raw_receipt_id": "97533c0bee3598b535a602864ce6476723c2b2205ef8213c38a45aad75296ef0",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Norgate Data",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://norgatedata.com/stockmarketpackages.php",
+        "sha256": "be9e2586b4f32bf66f24ff887d938a14d425b6bff403290ab34448f3f7dd643a",
+        "byte_size": 24566,
+        "local_received_at": "2026-09-25T16:19:15.832813Z",
+        "source_edition": null,
+        "evidence_category": "historical survivorship/stress package qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "norgate_scope.html",
+      "raw_receipt_id": "85cc2bccf7a2ef5333a1f56c076d1e39ef819b3a3f8ede46962307961f6814b3",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "Norgate Data",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://norgatedata.com/data-content-tables.php",
+        "sha256": "45e1d1cbb4832ce3600ca8970c3ccb65b51e489003cd8dbe87097503165c9e83",
+        "byte_size": 183114,
+        "local_received_at": "2026-09-25T16:19:17.055935Z",
+        "source_edition": null,
+        "evidence_category": "delisted and historical constituent coverage qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "nyse_master_spec.pdf",
+      "raw_receipt_id": "0b4474426eb5efc0c858b6851fa9268604ce90a5f676792729907ec6a69774d2",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "NYSE",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.nyse.com/publicdocs/nyse/data/NYSE_Group_Security_Master_Client_Specification_v4.0.6.pdf",
+        "sha256": "bb9d6a4e08376f32f0572d3e67fcdf614d436e1bb9fe6c3fce2b6afb0ec63512",
+        "byte_size": 482486,
+        "local_received_at": "2026-09-25T16:16:13.721390Z",
+        "source_edition": "4.0.6",
+        "evidence_category": "new security-master product scope for identity/universe/stress"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "openfigi_api.html",
+      "raw_receipt_id": "2847d1e2270887570312fe7146aa38125f225a0a49a2eb09990d7e6bc22477a9",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "OpenFIGI/Bloomberg",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.openfigi.com/api/documentation",
+        "sha256": "d38d2062ad858d992a8777496f40a5b2870eb6437b29bd4be89d15fb50e1a05f",
+        "byte_size": 160656,
+        "local_received_at": "2026-09-25T16:16:07.572230Z",
+        "source_edition": null,
+        "evidence_category": "exact-date mapping API qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "openfigi_faq.html",
+      "raw_receipt_id": "1c50244cdd3f30c7f64851b07191b571e34a07963359b489cc9d67ecc9a66896",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "OpenFIGI/Bloomberg",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.openfigi.com/about/faq",
+        "sha256": "60c25ebac59f0370fd2571c153141149117ccbe394a0691392cfd3bbc266dae2",
+        "byte_size": 68315,
+        "local_received_at": "2026-09-25T16:16:06.498062Z",
+        "source_edition": null,
+        "evidence_category": "identity rights and historical scope qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    },
+    {
+      "artifact": "tradinghours_scope.html",
+      "raw_receipt_id": "a8ee1c33702e540e0854def5e6f77452e862eccee1997b1a3671f3b1f8a9159c",
+      "raw_receipt": {
+        "schema_version": "historical-raw-receipt-v1",
+        "provider": "TradingHours",
+        "source": "Phase-3 public source qualification",
+        "source_locator": "https://www.tradinghours.com/data",
+        "sha256": "95a4da97e94aabec7a0b96b88afe4f172cf09944e50f085eeca6711e3b0eedfd",
+        "byte_size": 306628,
+        "local_received_at": "2026-09-25T16:16:08.875716Z",
+        "source_edition": null,
+        "evidence_category": "exact-date session source qualification"
+      },
+      "canonical_constructor": "HistoricalEvidencePackage(raw_receipt=actual_raw_receipt)",
+      "result": "ACQUIRED_NO_GO",
+      "errors": [
+        {
+          "location": [
+            "evidence"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "review"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        },
+        {
+          "location": [
+            "attachments"
+          ],
+          "type": "missing",
+          "message": "Field required"
+        }
+      ],
+      "scope_note": "Constructor refusal of absent mandatory evidence only, not a semantic admission attempt with invented facts."
+    }
+  ],
+  "empirical_observations": 0,
+  "empirical_tests_run": [],
+  "focused_test_command": "PYTHONDONTWRITEBYTECODE=1 /home/egx-agent/work/egx-trading-platform/.venv/bin/python -m pytest -q tests/test_r1_historical_evidence.py tests/test_us1_historical_identity.py tests/test_us2_historical_session.py tests/test_us4_historical_actions.py tests/test_us5a_historical_universe.py",
+  "focused_test_result": "257 passed in 1.07s",
+  "focused_log_path": "/home/egx-agent/er1-autopilot/state/phase3-focused-tests.log",
+  "focused_log_sha256": "718af5380b12fce1054b2883e6b95c0db85e4c6671fc5543d2a3afd17e956975",
+  "full_suite_rerun": false,
+  "full_suite_note": "Documentation/metadata only; no repository behavior changed. Phase-2 approved result remains historical: 2744 passed in 212.31s."
+}
