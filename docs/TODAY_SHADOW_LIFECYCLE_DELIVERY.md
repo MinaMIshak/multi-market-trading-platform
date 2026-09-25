@@ -1,5 +1,10 @@
 # Existing-platform lifecycle delivery — 2026-09-19
 
+> Current status (2026-09-25): [the final platform gap matrix](PLATFORM_SOFTWARE_COMPLETION.md)
+> supersedes the historical PARTIALLY_DONE classifications and review-next steps
+> below. Both chronology fixes are committed. No further authorized software gap
+> was demonstrated; the final documentation commit and clean-worktree gate remain.
+
 ## Repository recovery and scope
 
 Requested starting HEAD: `97b918cb1355dd0f6237a92edcf3bdac7e465c17`.

@@ -1,5 +1,10 @@
 # Software sprint forensic baseline
 
+> Current status (2026-09-25): see [the final platform gap matrix](PLATFORM_SOFTWARE_COMPLETION.md).
+> This baseline and its cumulative next-step notes are historical. Existing UI
+> integrations are complete; separate Experimental runtime work is superseded;
+> closed source/rights paths must not be re-probed.
+
 Audited checkout: `agent/er1c-free-acquisition`, HEAD
 `0d05914288ce3f5f11612388e9db5de9e1d59f8b`; user `egx-agent`; initial tree clean.
 Repository: `/home/egx-agent/work/egx-trading-platform-us`.

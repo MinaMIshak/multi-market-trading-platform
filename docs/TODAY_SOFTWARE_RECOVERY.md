@@ -1,5 +1,11 @@
 # Existing-platform software recovery — 2026-09-19
 
+> Current status (2026-09-25): see [the final platform gap matrix](PLATFORM_SOFTWARE_COMPLETION.md).
+> This file is a historical milestone report. Its future-work statements below
+> are superseded: collection/lifecycle/security-type integrations are implemented;
+> M7 operational source, ETF comparisons and verified IBKR applicability are
+> evidence-blocked. A speculative unused broker schema is not a current software gap.
+
 Starting branch: `agent/er1c-free-acquisition`.
 Starting HEAD: `97b918cb1355dd0f6237a92edcf3bdac7e465c17`.
 Initial worktree: clean. The mission's explicit repository/branch and commit-bridge
