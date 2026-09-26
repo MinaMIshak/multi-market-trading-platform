@@ -1,6 +1,8 @@
 """Artificial clock fixtures verify liveness, not operational market evidence."""
 from datetime import datetime, timedelta, timezone
 import json
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +13,35 @@ from app.ui.system import load_system_state
 
 
 class HeartbeatTests(unittest.TestCase):
+    def test_compose_shares_heartbeat_between_worker_and_api_processes(self):
+        root = Path(__file__).resolve().parents[1]
+        compose = (root / 'docker-compose.yml').read_text()
+        api, scheduler = compose.split('  scheduler:', 1)
+        for service in (api, scheduler):
+            self.assertIn('EGX_SCHEDULER_HEARTBEAT_PATH: /app/data/scheduler-heartbeat.json', service)
+            self.assertIn('- ./data:/app/data', service)
+        self.assertIn('EGX_SCHEDULER_MODE: observe', scheduler)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scheduler-heartbeat.json'
+            env = {'EGX_SCHEDULER_HEARTBEAT_PATH': str(path)}
+            subprocess.run(
+                [sys.executable, '-c',
+                 'from app.scheduler_heartbeat import write_heartbeat; '
+                 'write_heartbeat(mode="observe", poll_seconds=30)'],
+                cwd=root, env=env, check=True, capture_output=True)
+            before = path.read_bytes()
+            result = subprocess.run(
+                [sys.executable, '-c',
+                 'import json; from app.ui.system import load_system_state; '
+                 'print(json.dumps(load_system_state()))'],
+                cwd=root, env=env, check=True, capture_output=True, text=True)
+            state = json.loads(result.stdout)
+            self.assertEqual(state['scheduler']['status'], 'RECENT_POLL')
+            self.assertEqual(state['scheduler']['mode'], 'observe')
+            self.assertIsNone(state['markets']['EGX']['scanned'])
+            self.assertIsNone(state['markets']['US']['scanned'])
+            self.assertEqual(before, path.read_bytes())
+
     def test_completed_poll_expires_and_system_reads_without_writing(self):
         now = datetime(2026, 9, 26, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as directory:

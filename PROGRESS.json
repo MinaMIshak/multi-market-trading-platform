@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SYSTEM_SCHEDULER_HEARTBEAT_IMPLEMENTED",
-  "current_capability": "SYSTEM reads optional expiring EGX worker heartbeat; mode and liveness remain separate from job success and scan coverage",
+  "phase": "SYSTEM_SCHEDULER_HEARTBEAT_WIRED",
+  "current_capability": "Compose shares EGX scheduler heartbeat with SYSTEM; separate-process writer/reader verified; deployed worker remains unverified",
   "starting_head": "e55fbbc",
-  "head": "8b026db47393c8e5cb27b09f264bf24c88de7371",
+  "head": "a1ae120c5f24bb707cb9a874141a6c3910c38a24",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,10 +32,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "7 stdlib heartbeat/SYSTEM regressions PASS; git diff --check PASS. Initial import regression fixed by keeping heartbeat module independent of core package dependencies. FastAPI/worker integration and full suite pending unavailable pytest/pydantic dependencies.",
-  "deployment": "No deployment performed. Heartbeat runtime wiring and safe deployment validation pending.",
-  "scheduler": "Optional EGX_SCHEDULER_HEARTBEAT_PATH writer/reader implemented; runtime configuration and running worker unverified; defaults remain OBSERVE.",
-  "next_action": "M2: provision test dependencies; validate worker heartbeat and FastAPI routes, then wire shared heartbeat path through safe deployment mechanism. Continue universe/scanner work independently.",
+  "tests": "8 stdlib heartbeat/SYSTEM regressions PASS, including separate-process heartbeat writer/reader; git diff --check PASS. Full worker/FastAPI integration and full suite pending unavailable dependencies.",
+  "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
+  "scheduler": "Compose API and scheduler share /app/data/scheduler-heartbeat.json; OBSERVE default preserved. Running worker unverified.",
+  "next_action": "M2: validate full worker/API integration when dependencies become available and deploy through authorized safe mechanism. Independently implement universe-driven EGX scan coordination with per-symbol fail-closed outcomes.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
