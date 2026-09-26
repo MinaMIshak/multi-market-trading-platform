@@ -55,7 +55,7 @@ def load_system_state():
                     'source': 'load_operational_state: current verified receipts; expired receipts excluded from ready/eligible/scanned',
                     'receipts': [{key: item.get(key) for key in (
                         'symbol', 'status', 'provider', 'decision_at', 'valid_until',
-                        'last_verified_session')} for item in operational['symbols']]},
+                        'last_verified_session', 'reason')} for item in operational['symbols']]},
             'US': {'configured_universe': None, 'data_ready': None, 'eligible': None,
                    'scanned': None, 'candidates': None, 'status': 'UNKNOWN',
                    'reason': 'No configured operational universe connected'}},

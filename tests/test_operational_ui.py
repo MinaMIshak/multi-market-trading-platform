@@ -45,7 +45,11 @@ def test_verified_runtime_dashboard(launch, monkeypatch, scenario):
     assert main.today() == state
     assert before == (runtime / 'platform.db').read_bytes()
     if scenario == 'tampered':
-        assert state['status'] == 'EVIDENCE_BLOCKED' and not state['symbols']
+        assert state['status'] == 'EVIDENCE_BLOCKED'
+        assert state['available'] is True
+        assert state['symbols']
+        assert all(item['status'] == 'EVIDENCE_BLOCKED' and item['trade_plan'] is None
+                   for item in state['symbols'])
     elif scenario == 'other_symbol':
         assert state['symbols'][0]['symbol'] == 'OTHER'
         assert state['symbols'][0]['status'] == 'NOT_READY'

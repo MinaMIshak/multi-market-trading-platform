@@ -12,6 +12,54 @@ from app.ui.system import load_system_state, render_system
 
 
 class SystemVisibilityTests(unittest.TestCase):
+    def test_invalid_receipt_isolated_without_hiding_verified_symbols(self):
+        # Classification fixtures only; no real scans or market data are created.
+        now = datetime.now(timezone.utc)
+        valid = dict(market='EGX', status='READY_NO_SIGNAL', live='DISABLED',
+                     mode='SHADOW', pit_audit_id='pit',
+                     decision_at=(now - timedelta(hours=1)).isoformat(),
+                     valid_until=(now + timedelta(hours=1)).isoformat())
+        invalid = ['invalid json', '[]', '{}',
+                   json.dumps(valid | {'symbol': 'BAD', 'pit_audit_id': {}}),
+                   json.dumps(valid | {'symbol': 'OTHER'}),
+                   json.dumps(valid | {'symbol': 'BAD', 'decision_at': 'invalid'})]
+        for bad_payload in invalid:
+            with self.subTest(payload=bad_payload), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'platform.db'
+                with sqlite3.connect(path) as db:
+                    db.executescript('CREATE TABLE daily_canonical_artifacts(canonical_symbol TEXT); CREATE TABLE audit_events(event_id TEXT, event_type TEXT, entity_id TEXT, created_at TEXT, payload_json TEXT);')
+                    db.execute('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?)',
+                               ('pit', 'PIT_DATA_VALIDATED', '', '', '{}'))
+                    for symbol, payload in [('GOOD', json.dumps(valid | {'symbol': 'GOOD'})),
+                                            ('BAD', bad_payload)]:
+                        db.execute('INSERT INTO daily_canonical_artifacts VALUES (?)', (symbol,))
+                        db.execute('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?)',
+                                   (sha256(payload.encode()).hexdigest(), 'PAPER_SIGNAL_VERIFIED',
+                                    symbol, now.isoformat(), payload))
+                before = path.read_bytes()
+                with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
+                    state = load_system_state()
+                egx = state['markets']['EGX']
+                self.assertEqual(egx['status'], 'PARTIAL')
+                self.assertEqual((egx['scanned'], egx['ready_no_signal'], egx['evidence_blocked']),
+                                 (1, 1, 1))
+                self.assertEqual(len(egx['receipts']), 2)
+                self.assertEqual(egx['receipts'][0]['reason'], 'invalid verification receipt')
+                self.assertEqual(before, path.read_bytes())
+                # With no valid neighbor, preserve the blocked symbol and report
+                # zero verified scans, not unknown database availability.
+                with sqlite3.connect(path) as db:
+                    db.execute("DELETE FROM daily_canonical_artifacts WHERE canonical_symbol='GOOD'")
+                with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
+                    state = load_system_state()
+                    from app.ui.operational import load_operational_state, render_operational
+                    operational = load_operational_state()
+                self.assertEqual(state['markets']['EGX']['status'], 'EVIDENCE_BLOCKED')
+                self.assertEqual(state['markets']['EGX']['scanned'], 0)
+                self.assertEqual(state['markets']['EGX']['evidence_blocked'], 1)
+                self.assertIsNone(operational['symbols'][0]['trade_plan'])
+                self.assertIn('invalid verification receipt', render_operational(operational))
+
     def test_packaged_checkpoint_and_build_revision_remain_separate(self):
         # Mirror the Docker image layout using only explicitly copied files.
         import shutil

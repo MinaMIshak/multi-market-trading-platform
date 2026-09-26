@@ -29,22 +29,35 @@ def load_operational_state():
                 item = {'symbol': symbol, 'market': 'EGX', 'status': 'NOT_READY', 'trade_plan': None}
                 row = con.execute("SELECT event_id, payload_json FROM audit_events WHERE event_type='PAPER_SIGNAL_VERIFIED' AND entity_id=? ORDER BY created_at DESC, event_id DESC LIMIT 1", (symbol,)).fetchone()
                 if row:
-                    payload = row['payload_json']
-                    receipt = json.loads(payload)
-                    audit = con.execute("SELECT 1 FROM audit_events WHERE event_id=? AND event_type='PIT_DATA_VALIDATED'", (receipt['pit_audit_id'],)).fetchone()
-                    if (sha256(payload.encode()).hexdigest() != row['event_id'] or not audit
-                            or receipt['symbol'] != symbol or receipt['market'] != 'EGX'
-                            or receipt['status'] not in ('WATCH', 'READY_NO_SIGNAL')
-                            or receipt['live'] != 'DISABLED' or receipt['mode'] != 'SHADOW'):
-                        raise ValueError('invalid verification receipt')
-                    item = receipt
-                    now = datetime.now(timezone.utc)
-                    if datetime.fromisoformat(receipt['decision_at']) > now:
-                        raise ValueError('future verification receipt')
-                    if now >= datetime.fromisoformat(receipt['valid_until']):
-                        item = receipt | {'status': 'DATA_STALE', 'market_data': 'DATA_STALE', 'trade_plan': None}
+                    try:
+                        payload = row['payload_json']
+                        receipt = json.loads(payload)
+                        if (not isinstance(receipt, dict)
+                                or not isinstance(receipt.get('pit_audit_id'), str)
+                                or not receipt['pit_audit_id']):
+                            raise ValueError('invalid verification receipt')
+                        audit = con.execute("SELECT 1 FROM audit_events WHERE event_id=? AND event_type='PIT_DATA_VALIDATED'", (receipt['pit_audit_id'],)).fetchone()
+                        if (sha256(payload.encode()).hexdigest() != row['event_id'] or not audit
+                                or receipt['symbol'] != symbol or receipt['market'] != 'EGX'
+                                or receipt['status'] not in ('WATCH', 'READY_NO_SIGNAL')
+                                or receipt['live'] != 'DISABLED' or receipt['mode'] != 'SHADOW'):
+                            raise ValueError('invalid verification receipt')
+                        item = receipt
+                        now = datetime.now(timezone.utc)
+                        if datetime.fromisoformat(receipt['decision_at']) > now:
+                            raise ValueError('future verification receipt')
+                        if now >= datetime.fromisoformat(receipt['valid_until']):
+                            item = receipt | {'status': 'DATA_STALE', 'market_data': 'DATA_STALE', 'trade_plan': None}
+                    except (ValueError, TypeError, KeyError):
+                        item = {'symbol': symbol, 'market': 'EGX',
+                                'status': 'EVIDENCE_BLOCKED', 'trade_plan': None,
+                                'reason': 'invalid verification receipt'}
                 state['symbols'].append(item)
-        return state | {'available': True, 'status': 'OPERATIONAL'}
+        blocked = sum(item['status'] == 'EVIDENCE_BLOCKED' for item in state['symbols'])
+        status = 'OPERATIONAL'
+        if blocked:
+            status = 'EVIDENCE_BLOCKED' if blocked == len(state['symbols']) else 'PARTIAL'
+        return state | {'available': True, 'status': status}
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error):
         return state | {'symbols': [], 'status': 'EVIDENCE_BLOCKED'}
 
@@ -56,6 +69,8 @@ def render_operational(state):
     content += '<p>' + text(state['status']) + '</p>'
     for item in state['symbols']:
         content += '<article><h3>' + text(item['symbol']) + ' · ' + text(item['market']) + ' · ' + text(item['status']) + '</h3>'
+        if item.get('reason'):
+            content += '<p>' + text(item['reason']) + '</p>'
         if 'decision_at' in item:
             content += '<p>Signal session: ' + text(item['last_verified_session']) + ' · Expected entry session: ' + text(item['entry_session']) + '</p>'
             content += '<p>Admitted source: ' + text(item['provider']) + ' · Fresh at verification: ' + text(item['decision_at']) + '</p>'
