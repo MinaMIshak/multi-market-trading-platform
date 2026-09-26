@@ -327,6 +327,30 @@ def run_signal(database, data_root, source, directory: Path, *, publish: bool):
               'decision_at': candidate.decision_time.isoformat(), 'strategy_id': 'SWING',
               'strategy_version': '1', 'mode': 'SHADOW', 'live': 'DISABLED',
               'empirical_status': 'NOT VALIDATED', 'execution_status': 'NO EXECUTION INFERENCE'}
+    operational = result | {
+        'status': 'WATCH' if candidate.state == 'WATCH' else 'READY_NO_SIGNAL',
+        'symbol': source.symbol, 'market': 'EGX',
+        'entry_session': source.entry_session.market_date.isoformat(),
+        'valid_until': source.entry_session.opens_at.isoformat(),
+        'provider': source.daily_package.raw_receipt.provider,
+        'raw_sha256': source.daily_package.raw_receipt.sha256,
+        'history_start': source.history_start.isoformat(), 'bar_count': len(data.rows),
+        'pit_audit_id': data.audit_id,
+        'trade_plan': plan.model_dump(mode='json') if candidate.state == 'WATCH' else None,
+    }
+    if candidate.state not in ('WATCH', 'NO_CONFIRMATION'):
+        raise RuntimeError('unexpected SWING v1 state')
+    payload = json.dumps(operational, sort_keys=True)
+    event_id = hashlib.sha256(payload.encode()).hexdigest()
+    with database.connect() as con:
+        con.execute(
+            "INSERT OR IGNORE INTO audit_events "
+            "(event_id,event_key,event_type,entity_type,entity_id,market_date,created_at,payload_json) "
+            "VALUES (?,?,'PAPER_SIGNAL_VERIFIED','paper_signal',?,?,?,?)",
+            (event_id, event_id, source.symbol, source.signal_session.market_date.isoformat(),
+             candidate.decision_time.isoformat(), payload),
+        )
+    result['signal_status'] = operational['status']
     if not publish:
         return result | {'operation': 'VERIFIED_SIGNAL_NOT_PUBLISHED'}
     if directory.exists():

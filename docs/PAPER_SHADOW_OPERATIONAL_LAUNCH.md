@@ -226,3 +226,36 @@ required.
 
 Software readiness is separate from authentic runtime readiness, empirical
 validation, and live-money readiness.
+
+## Operational dashboard binding
+
+Configure the FastAPI dashboard component (`app.main:app`) with
+`EGX_PAPER_RUNTIME=/home/egx-agent/research-data/paper-shadow-operational`.
+This explicitly selects the isolated Paper/Shadow `platform.db` for `/`,
+`/api/today`, and `/api/paper-operational`. When configured, missing or invalid
+operational evidence displays `EVIDENCE_BLOCKED`; it never falls back to legacy
+canonical data as the active signal view. Without this setting, existing routes
+retain their prior behavior. US trading logic is unchanged.
+
+The existing `tools/paper_shadow_launch.py verify` path now records a hash-bound
+`PAPER_SIGNAL_VERIFIED` audit receipt and returns `signal_status` (`WATCH` or
+`READY_NO_SIGNAL`). Receipts retain the PIT audit reference, admitted source,
+operational window, decision time, and expected entry session. The dashboard
+reads these receipts in a read-only SQLite transaction; it does not evaluate
+strategies or call providers. Freshness is explicitly **at verification**, not a
+claim of continuous source monitoring. At the expected entry opening, the
+receipt displays `DATA_STALE` and hides plan levels until a new verification.
+A symbol with canonical history but no verification displays `NOT_READY`.
+
+A WATCH receipt is an unsized candidate, not a published collection or fill.
+Publication still uses the existing `publish` command and audited collection
+contracts. Configure `EGX_SHADOW_DIRECTORY` separately for the specific published
+collection when one exists. `READY_NO_SIGNAL` needs no collection publication.
+The immutable full source remains intact; `history_start` scopes only the
+operational evaluation. No receipt establishes empirical validation or enables
+live money.
+
+Deployment remains an operator action: deploy the validated revision and set
+`EGX_PAPER_RUNTIME` on the dashboard component, then restart that component using
+the established operator procedure. No deployment, port changes, scheduler
+changes, or production restart are performed by this workflow.

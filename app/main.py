@@ -13,6 +13,7 @@ from app.ui.today import (
     load_today_state,
     render_today_dashboard,
 )
+from app.ui.operational import load_operational_state, render_operational
 
 
 app = FastAPI(
@@ -25,6 +26,9 @@ app = FastAPI(
 
 @app.get("/", response_class=HTMLResponse)
 def root() -> HTMLResponse:
+    operational = load_operational_state()
+    if operational['configured']:
+        return HTMLResponse(render_operational(operational))
     state = load_today_state()
     return HTMLResponse(
         render_today_dashboard(state, shadow_state=shadow())
@@ -33,7 +37,15 @@ def root() -> HTMLResponse:
 
 @app.get("/api/today")
 def today() -> dict:
+    operational = load_operational_state()
+    if operational['configured']:
+        return operational
     return load_today_state()
+
+
+@app.get('/api/paper-operational')
+def paper_operational() -> dict:
+    return load_operational_state()
 
 
 @app.get("/performance", response_class=HTMLResponse)
