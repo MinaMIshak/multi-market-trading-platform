@@ -13,6 +13,7 @@ from app.ui.today import (
     load_today_state,
     render_today_dashboard,
 )
+from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state, render_operational
 
 
@@ -91,3 +92,13 @@ def health() -> dict:
         "timezone": settings.timezone,
         "server_time": now.isoformat(),
     }
+
+
+@app.get("/api/system")
+def system() -> dict:
+    return load_system_state()
+
+
+@app.get("/system", response_class=HTMLResponse)
+def system_page() -> HTMLResponse:
+    return HTMLResponse(render_system(load_system_state()))

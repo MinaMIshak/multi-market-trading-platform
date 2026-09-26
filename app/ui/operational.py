@@ -69,4 +69,4 @@ def render_operational(state):
             'body{background:#071019;color:#e9f0f5;font:16px Arial,sans-serif;max-width:1100px;margin:32px auto;padding:20px}'
             'article{background:#0d1b26;border:1px solid #1e3241;border-radius:10px;padding:20px;margin:20px 0}'
             'a{color:#8bd5b0}p{line-height:1.6}</style></head><body>'
-            '<nav><a href="/shadow">Audited collection</a></nav>' + content + '</body></html>')
+            '<nav><a href="/system">SYSTEM</a> · <a href="/shadow">Audited collection</a></nav>' + content + '</body></html>')

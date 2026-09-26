@@ -369,7 +369,7 @@ th{{color:#758a9a;font-weight:600}}
   <a class="tab" href="/performance">PERFORMANCE</a>
   <a class="tab" href="/shadow">PAPER CANDIDATES</a>
   <div class="tab">RESEARCH</div>
-  <div class="tab">SYSTEM</div>
+  <a class="tab" href="/system">SYSTEM</a>
 </nav>
 
 <main>
