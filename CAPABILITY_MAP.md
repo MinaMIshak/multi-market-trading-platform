@@ -129,3 +129,16 @@ identity, missing history and unmapped refresh without provider calls; these are
 pending pytest/pydantic availability. Syntax checks and git diff --check pass.
 No deployment or fresh market observation occurred. Broad refresh integration,
 authoritative dated membership and actual scheduled scans remain pending.
+
+## Incremental checkpoint: preserve admitted scan history
+
+The history writer and SYSTEM reader now share the existing summary admission
+contract. Invalid counts, identities, market, safety state or scope are rejected
+before creating a temporary file or replacing the previous admitted run. Valid
+replacement and legacy schema reads remain supported. This prevents malformed
+producer output from destroying the last usable operator-visible scan summary.
+
+44 affected dependency-free regressions pass, including ten invalid-write cases
+and successful replacement. Runtime launch integration and full release testing
+remain pending unavailable pytest/pydantic; isolated package installation returned
+no matching distributions. No new scans, market data or deployment are claimed.

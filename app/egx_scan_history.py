@@ -18,6 +18,8 @@ def write_scan_history(report, path):
     summary.update(schema_version=2, completed_at=datetime.now(timezone.utc).isoformat(),
                    symbols=[{key: row[key] for key in ('symbol', 'status', 'scanned', 'reason')}
                             for row in report['symbols']])
+    if not _valid_summary(summary):
+        raise ValueError('invalid EGX scan history summary')
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as stream:
@@ -29,13 +31,9 @@ def write_scan_history(report, path):
             os.unlink(temporary)
 
 
-def load_scan_history():
-    unknown = {'status': 'UNKNOWN', 'reason': 'No valid EGX scan history connected'}
-    configured = os.getenv('EGX_SCAN_HISTORY_PATH')
-    if not configured or not Path(configured).is_absolute():
-        return unknown
+def _valid_summary(raw):
+    """Share admission between persistence and operator-visible history."""
     try:
-        raw = json.loads(Path(configured).read_text())
         completed = datetime.fromisoformat(raw['completed_at'])
         rows = raw['symbols']
         statuses = SCAN_STATUSES if raw['schema_version'] == 2 else SCAN_STATUSES[:3]
@@ -56,6 +54,20 @@ def load_scan_history():
                 or not isinstance(raw['status_counts'], dict)
                 or any(type(raw['status_counts'].get(s)) is not int for s in statuses)
                 or raw['status_counts'] != {s: sum(row['status'] == s for row in rows) for s in statuses}):
+            return False
+        return True
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
+def load_scan_history():
+    unknown = {'status': 'UNKNOWN', 'reason': 'No valid EGX scan history connected'}
+    configured = os.getenv('EGX_SCAN_HISTORY_PATH')
+    if not configured or not Path(configured).is_absolute():
+        return unknown
+    try:
+        raw = json.loads(Path(configured).read_text())
+        if not _valid_summary(raw):
             return unknown
         return {'status': 'HISTORICAL_RUN',
                 'reason': 'Last completed explicit-scope run; not current readiness, fills or universe coverage',

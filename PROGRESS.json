@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "BROAD_EXPLICIT_VERIFICATION_SCOPE",
-  "current_capability": "EGX explicit verification no longer has a five-symbol allowlist. Canonical symbol spelling and existing equity identity, calendar, reviewed source and PIT gates remain mandatory. Refresh without an existing provider mapping fails closed before provider invocation. Actual broad runtime coverage remains unverified.",
+  "phase": "SCAN_HISTORY_WRITE_ADMISSION",
+  "current_capability": "EGX last-run summaries are validated against the same contract used by SYSTEM before atomic replacement. Invalid reports preserve the previous admitted history. Broad explicit verification remains implemented but runtime coverage and integration remain unverified.",
   "starting_head": "e55fbbc",
-  "head": "1452b12e5ead84477e0a457ecc506c90874ee4aa",
+  "head": "a8e87cbd0529563d0db1737ee69758ea70d46519",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,15 +47,15 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "42 stdlib scope/identity/scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; changed launch and integration-test syntax PASS; git diff --check PASS. New real launch integration regressions and full suite pending: /tmp/egx-mission-venv/bin/python -m pytest reports No module named pytest; system Python also lacks pydantic.",
+  "tests": "44 dependency-free scope/identity/scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS, including rejected-write preservation and valid replacement; git diff --check PASS. Launch integration and full release suite pending: pytest/pydantic absent; isolated pip installation found no available distributions.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Validate broadened launch transport and admission integration when dependencies are available. Expand refresh with explicit reviewed provider identity mappings and free-source composition; establish authoritative dated EGX membership, preserving 224 baseline. Safe deployment remains pending.",
+  "next_action": "Expand refresh with explicit reviewed provider identity mappings and free-source composition; establish authoritative dated EGX membership while preserving the 224 baseline. Validate broadened launch transport/admission and scheduled runtime integration once dependencies are available. Safe deployment remains pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "pytest and pydantic unavailable; 42 dependency-free regressions pass, real launch integration and full release suite pending.",
+    "test_execution": "pytest/pydantic unavailable in checked authorized test environments; package installation returned no matching distributions. 44 dependency-free regressions pass; launch/runtime integration and full release validation pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

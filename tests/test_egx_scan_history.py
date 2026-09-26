@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.egx_scan import ScanBlocked, scan_egx_scope
-from app.egx_scan_history import load_scan_history
+from app.egx_scan_history import load_scan_history, write_scan_history
 from app.ui.system import load_system_state, render_system
 
 
@@ -117,3 +117,40 @@ class ScanHistoryTests(unittest.TestCase):
                         state = load_system_state()
                         self.assertEqual(state['egx_scan_history']['status'], 'UNKNOWN')
                         self.assertIsNone(state['markets']['EGX']['scanned'])
+
+    def test_invalid_write_preserves_last_admitted_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scan.json'
+            report = scan_egx_scope(symbols=['A'], sources={}, database=None,
+                                    data_root=directory, scope_reference='fixture', history_path=path)
+            previous = path.read_bytes()
+            invalid = [report | {'scanned': 1}, report | {'requested': True},
+                       report | {'market': 'US'}, report | {'live_money': True},
+                       report | {'scope_reference': ' '}, report | {'symbols': []},
+                       report | {'symbols': report['symbols'] * 2},
+                       report | {'status_counts': report['status_counts'] | {'WATCH': True}},
+                       report | {'symbols': [report['symbols'][0] | {'scanned': True}]},
+                       report | {'symbols': [report['symbols'][0] | {'symbol': ' A'}]}]
+            with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
+                for value in invalid:
+                    with self.subTest(value=value), patch('app.egx_scan_history.os.replace') as replace:
+                        with self.assertRaisesRegex(ValueError, 'invalid EGX scan history summary'):
+                            write_scan_history(value, path)
+                        replace.assert_not_called()
+                        self.assertEqual(path.read_bytes(), previous)
+                        self.assertEqual(load_scan_history()['status'], 'HISTORICAL_RUN')
+                        self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_valid_write_replaces_last_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scan.json'
+            scan_egx_scope(symbols=['A'], sources={}, database=None,
+                           data_root=directory, scope_reference='first fixture', history_path=path)
+            scan_egx_scope(symbols=['B', 'C'], sources={}, database=None,
+                           data_root=directory, scope_reference='second fixture', history_path=path)
+            with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
+                history = load_scan_history()
+            self.assertEqual(history['status'], 'HISTORICAL_RUN')
+            self.assertEqual(history['run']['scope_reference'], 'second fixture')
+            self.assertEqual(history['run']['requested'], 2)
+            self.assertEqual(history['run']['scanned'], 0)
