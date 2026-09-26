@@ -52,3 +52,23 @@ class ScanHistoryTests(unittest.TestCase):
                                    data_root=directory, scope_reference='fixture', history_path=path)
             self.assertEqual(path.read_text(), 'previous')
             self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_noninteger_counts_and_untrimmed_identity_are_not_displayed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scan.json'
+            scan_egx_scope(symbols=['A'], sources={}, database=None,
+                           data_root=directory, scope_reference='fixture', history_path=path)
+            valid = json.loads(path.read_text())
+            invalid = [valid | {'schema_version': value} for value in (True, 1.0)]
+            for status, count in valid['status_counts'].items():
+                for value in (bool(count), float(count)):
+                    invalid.append(valid | {'status_counts': valid['status_counts'] | {status: value}})
+            invalid.append(valid | {'symbols': [valid['symbols'][0] | {'symbol': ' A '}]})
+            with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
+                self.assertEqual(load_scan_history()['status'], 'HISTORICAL_RUN')
+                for value in invalid:
+                    with self.subTest(value=value):
+                        path.write_text(json.dumps(value))
+                        state = load_system_state()
+                        self.assertEqual(state['egx_scan_history']['status'], 'UNKNOWN')
+                        self.assertIsNone(state['markets']['EGX']['scanned'])

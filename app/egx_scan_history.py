@@ -37,19 +37,23 @@ def load_scan_history():
         completed = datetime.fromisoformat(raw['completed_at'])
         rows = raw['symbols']
         statuses = ('WATCH', 'READY_NO_SIGNAL', 'EVIDENCE_BLOCKED')
-        if (raw['schema_version'] != 1 or raw['market'] != 'EGX'
+        if (type(raw['schema_version']) is not int or raw['schema_version'] != 1
+                or raw['market'] != 'EGX'
                 or raw['live_money'] is not False
                 or raw['scope_kind'] != 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE'
                 or not isinstance(raw['scope_reference'], str) or not raw['scope_reference'].strip()
                 or completed.tzinfo is None or completed > datetime.now(timezone.utc)
                 or not isinstance(rows, list) or not rows
                 or any(not isinstance(row['symbol'], str) or not row['symbol'].strip()
+                       or row['symbol'] != row['symbol'].strip()
                        or row['status'] not in statuses or not isinstance(row['reason'], str)
                        or row['scanned'] is not (row['status'] in statuses[:2]) for row in rows)
                 or len({row['symbol'] for row in rows}) != len(rows)
                 or type(raw['requested']) is not int or raw['requested'] != len(rows)
                 or type(raw['scanned']) is not int
                 or raw['scanned'] != sum(row['scanned'] for row in rows)
+                or not isinstance(raw['status_counts'], dict)
+                or any(type(raw['status_counts'].get(s)) is not int for s in statuses)
                 or raw['status_counts'] != {s: sum(row['status'] == s for row in rows) for s in statuses}):
             return unknown
         return {'status': 'HISTORICAL_RUN',
