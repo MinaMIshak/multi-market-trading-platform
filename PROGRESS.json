@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EGX_SCAN_HISTORY_VISIBILITY",
-  "current_capability": "Explicit-scope EGX coordinator optionally persists atomic last-run summaries; SYSTEM exposes historical run scope separately from current verified receipt counts",
+  "phase": "EGX_EXPLICIT_SCAN_CONFIGURATION",
+  "current_capability": "Explicit EGX scan config validates scope and decodes launch inputs through the existing strict contract; missing or invalid per-symbol input remains blocked. Compose shares historical scan path; scheduled scan execution not yet wired.",
   "starting_head": "e55fbbc",
-  "head": "d92f75a063e9051645ff5a711b5aa5b0a843d659",
+  "head": "a0b5f63d56170e12a700c263a74f623dc1d60f49",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,10 +32,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "16 stdlib coordinator/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Actual verifier integration and full suite remain pending unavailable dependencies.",
+  "tests": "20 stdlib configuration/coordinator/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Tests mock launch decoding; actual decoder/verifier integration and full suite pending unavailable dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
-  "scheduler": "Compose API and scheduler share /app/data/scheduler-heartbeat.json; OBSERVE default preserved. Running worker unverified.",
-  "next_action": "Wire decoded explicit EGX launch inputs and scan history path into scheduler configuration; preserve OBSERVE default, dated-universe blocker and launch admission restrictions. Validate actual verifier integration when dependencies are available.",
+  "scheduler": "OBSERVE default preserved. Compose shares heartbeat and scan-history paths. Scheduled scan dispatch not wired; running worker unverified.",
+  "next_action": "Add opt-in free local scan dispatch with verified-calendar gating, durable checkpoint/retry semantics and fresh configuration loading; preserve OBSERVE default and existing launch admission. Validate real decoder/verifier integration when dependencies are available.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

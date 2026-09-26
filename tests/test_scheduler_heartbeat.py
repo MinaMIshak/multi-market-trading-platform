@@ -20,6 +20,7 @@ class HeartbeatTests(unittest.TestCase):
         for service in (api, scheduler):
             self.assertIn('EGX_SCHEDULER_HEARTBEAT_PATH: /app/data/scheduler-heartbeat.json', service)
             self.assertIn('- ./data:/app/data', service)
+            self.assertIn('EGX_SCAN_HISTORY_PATH: /app/data/egx-scan-history.json', service)
         self.assertIn('EGX_SCHEDULER_MODE: observe', scheduler)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'scheduler-heartbeat.json'

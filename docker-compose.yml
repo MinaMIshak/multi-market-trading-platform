@@ -17,6 +17,7 @@ services:
       TZ: Africa/Cairo
       EGX_DB_PATH: /app/data/platform.db
       EGX_SCHEDULER_HEARTBEAT_PATH: /app/data/scheduler-heartbeat.json
+      EGX_SCAN_HISTORY_PATH: /app/data/egx-scan-history.json
 
     volumes:
       - ./data:/app/data
@@ -59,6 +60,7 @@ services:
       TZ: Africa/Cairo
       EGX_DB_PATH: /app/data/platform.db
       EGX_SCHEDULER_HEARTBEAT_PATH: /app/data/scheduler-heartbeat.json
+      EGX_SCAN_HISTORY_PATH: /app/data/egx-scan-history.json
       EGX_SCHEDULER_MODE: observe
       EGX_SCHEDULER_POLL_SECONDS: "30"
       EGX_CALENDAR_TRUTH: UNVERIFIED
