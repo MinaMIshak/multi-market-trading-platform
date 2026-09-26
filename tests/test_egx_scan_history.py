@@ -63,7 +63,8 @@ class ScanHistoryTests(unittest.TestCase):
             for status, count in valid['status_counts'].items():
                 for value in (bool(count), float(count)):
                     invalid.append(valid | {'status_counts': valid['status_counts'] | {status: value}})
-            invalid.append(valid | {'symbols': [valid['symbols'][0] | {'symbol': ' A '}]})
+            invalid.extend(valid | {'symbols': [valid['symbols'][0] | {'symbol': symbol}]}
+                           for symbol in (' A ', 'comi', 'A/B', 'A\n', 'Ａ', 'A' * 65))
             with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
                 self.assertEqual(load_scan_history()['status'], 'HISTORICAL_RUN')
                 for value in invalid:

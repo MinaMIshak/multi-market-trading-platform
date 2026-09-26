@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SCAN_COVERAGE_BLOCKER_DIAGNOSTICS",
-  "current_capability": "Explicit EGX scan configuration preserves distinct missing, invalid-contract and identity-mismatch blockers through scheduled verification and historical reports. Rejected inputs remain EVIDENCE_BLOCKED and unscanned; decoder details are redacted. No new runtime coverage claimed.",
+  "phase": "SCAN_SCOPE_IDENTITY_VALIDATION",
+  "current_capability": "EGX scan configuration, coordinator and historical reports reject malformed ticker identities; bare strings cannot become character-level scopes. A synthetic 224-symbol scope is fully classified as blocked without verification or coverage claims. Existing five-symbol launch admission remains unchanged.",
   "starting_head": "e55fbbc",
-  "head": "6037e4840afcc36f5f7f578399699b53fc696939",
+  "head": "f4bc5646be47bb77b593e45fa48d40c36c804ef3",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "22 stdlib scanner/configuration/dispatcher/history regressions PASS; 9 SYSTEM/heartbeat regressions PASS; git diff --check PASS. Full runtime integration remains pending previously recorded missing dependencies; no full suite or deployment validation this cycle.",
+  "tests": "33 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Full runtime integration and release suite pending missing dependencies; research tooling interpreter also lacks pydantic.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Establish authoritative dated EGX membership from admissible existing evidence; assess safe expansion beyond the five-symbol launch contract while preserving security-master identity, source review and calendar/action admission. Run pending runtime integration when dependencies are available.",
+  "next_action": "Continue authoritative dated EGX membership evidence assessment and safe launch-scope expansion; preserve 224 baseline and source/calendar/action admission. Runtime integration awaits dependencies. MISSION.txt is absent; supplied supervisor mission remains authoritative.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

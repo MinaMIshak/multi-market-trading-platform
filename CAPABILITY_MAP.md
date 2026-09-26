@@ -70,3 +70,13 @@ which preserves EVIDENCE_BLOCKED and zero scanned contribution for rejected inpu
 Missing inputs remain distinguishable; raw decoder details are never reported.
 22 focused stdlib scanner/configuration/dispatcher/history regressions pass.
 No authoritative membership, newly ready symbols or runtime scans were established.
+
+## Incremental checkpoint: explicit scan scope identity
+
+Configuration, coordinator and historical reporting now share the existing
+UniverseMember lexical identity rules. Bare strings, mappings and unordered sets
+cannot become scanner scope; malformed symbols are rejected before verification.
+A synthetic 224-symbol regression preserves every requested member as blocked
+with zero scans; it is capacity testing, not actual EGX membership or coverage.
+33 affected stdlib regressions pass. Five-symbol launch restriction, authoritative
+membership evidence, runtime dependencies and deployment remain unresolved.

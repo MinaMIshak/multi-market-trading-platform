@@ -6,6 +6,8 @@ failed verification are classified, never counted as completed strategy scans.
 from collections import Counter
 from pathlib import Path
 
+from app.egx_scope import valid_scope_symbol
+
 
 class ScanBlocked(ValueError):
     """Reviewed admission failure from the operational verifier."""
@@ -30,9 +32,11 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
     caller. This does not acquire data, establish membership, rank or infer fills.
     Returned counts describe this invocation only, not current market readiness.
     """
+    if not isinstance(symbols, (list, tuple)):
+        raise ValueError('explicit symbol list or tuple required')
     scope = tuple(symbols)
     if (not isinstance(scope_reference, str) or not scope_reference.strip()
-            or not scope or any(not isinstance(s, str) or not s or s != s.strip() for s in scope)
+            or not scope or any(not valid_scope_symbol(s) for s in scope)
             or len(set(scope)) != len(scope)):
         raise ValueError('unique nonempty explicit scope and reference required')
     outcomes = []

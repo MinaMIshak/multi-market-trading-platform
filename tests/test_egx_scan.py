@@ -71,8 +71,28 @@ class EgxScanTests(unittest.TestCase):
                 self.assertEqual(report['scanned'], 0)
                 self.assertEqual(report['symbols'][0]['status'], 'EVIDENCE_BLOCKED')
 
+    def test_baseline_sized_fixture_is_fully_classified_without_scans(self):
+        # Synthetic scope tests capacity only, never the actual EGX universe.
+        symbols = [f'FIXTURE{i:03d}' for i in range(224)]
+        with patch('app.egx_scan._verify') as verify:
+            report = self.run_scope(symbols, {})
+        verify.assert_not_called()
+        self.assertEqual([row['symbol'] for row in report['symbols']], symbols)
+        self.assertEqual(report['requested'], 224)
+        self.assertEqual(report['scanned'], 0)
+        self.assertEqual(report['status_counts']['EVIDENCE_BLOCKED'], 224)
+        self.assertEqual(report['scope_kind'], 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE')
+
+    def test_valid_contract_spellings_preserve_exact_identity(self):
+        symbols = ['A', '1A', 'A.B', 'A-B', 'A_B', 'A' * 64]
+        report = self.run_scope(symbols, {})
+        self.assertEqual([row['symbol'] for row in report['symbols']], symbols)
+        self.assertEqual(report['scanned'], 0)
+
     def test_invalid_scope_rejected_before_any_work(self):
-        for scope in ((), ('A', 'A'), (' A',), (None,)):
+        for scope in ((), ('A', 'A'), (' A',), (None,), 'COMI', b'COMI',
+                      None, {'COMI': {}}, {'COMI'}, ('comi',), ('A/B',),
+                      ('A\n',), ('Ａ',), ('A' * 65,)):
             with self.subTest(scope=scope), patch('app.egx_scan._verify') as verify:
                 with self.assertRaises(ValueError):
                     self.run_scope(scope, {})

@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import tempfile
 
+from app.egx_scope import valid_scope_symbol
+
 
 def write_scan_history(report, path):
     path = Path(path)
@@ -44,8 +46,7 @@ def load_scan_history():
                 or not isinstance(raw['scope_reference'], str) or not raw['scope_reference'].strip()
                 or completed.tzinfo is None or completed > datetime.now(timezone.utc)
                 or not isinstance(rows, list) or not rows
-                or any(not isinstance(row['symbol'], str) or not row['symbol'].strip()
-                       or row['symbol'] != row['symbol'].strip()
+                or any(not valid_scope_symbol(row['symbol'])
                        or row['status'] not in statuses or not isinstance(row['reason'], str)
                        or row['scanned'] is not (row['status'] in statuses[:2]) for row in rows)
                 or len({row['symbol'] for row in rows}) != len(rows)

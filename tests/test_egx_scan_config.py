@@ -51,6 +51,8 @@ class ScanConfigurationTests(unittest.TestCase):
                  valid | {'symbols': [' A']}, valid | {'symbols': [None]},
                  valid | {'scope_reference': ''}, valid | {'schema_version': 'future'},
                  valid | {'launch_inputs': {'OTHER': {}}}, valid | {'extra': True}]
+        cases.extend(valid | {'symbols': [symbol]} for symbol in
+                     ('comi', 'A/B', 'A\n', 'Ａ', 'A' * 65))
         for raw in cases:
             with self.subTest(raw=raw), patch('app.egx_scan_config._read', return_value=raw), patch(
                     'app.egx_scan_config._decode_launch') as decode:

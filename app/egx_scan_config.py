@@ -2,6 +2,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.egx_scope import valid_scope_symbol
+
 
 def _read(path):
     from app.ui.shadow_input import _read_document
@@ -38,7 +40,7 @@ def load_scan_configuration(path):
             or raw['schema_version'] != 'egx-explicit-scan-v1'
             or type(raw['scope_reference']) is not str or not raw['scope_reference'].strip()
             or type(raw['symbols']) is not list or not raw['symbols']
-            or any(type(s) is not str or not s or s != s.strip() for s in raw['symbols'])
+            or any(not valid_scope_symbol(s) for s in raw['symbols'])
             or len(set(raw['symbols'])) != len(raw['symbols'])
             or type(raw['launch_inputs']) is not dict
             or not set(raw['launch_inputs']) <= set(raw['symbols'])):
