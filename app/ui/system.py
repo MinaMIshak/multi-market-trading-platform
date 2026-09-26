@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from app.ui.operational import load_operational_state
+from app.scheduler_heartbeat import load_heartbeat
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -43,7 +44,7 @@ def load_system_state():
                   'source': 'deployment-injected EGX_BUILD_REVISION; unverified if absent'},
         'checkpoint': checkpoint,
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
-        'scheduler': {'status': 'UNKNOWN', 'reason': 'No verified heartbeat connected'},
+        'scheduler': load_heartbeat(),
         'markets': {
             'EGX': {'baseline_universe': 224, 'authoritative_universe': None,
                     'status': operational['status'], **counts,

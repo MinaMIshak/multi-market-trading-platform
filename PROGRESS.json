@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SYSTEM_IMAGE_PACKAGING_FIXED_VALIDATION_PENDING",
-  "current_capability": "Read-only SYSTEM visibility with checkpoint packaged in image and optional explicit build revision; runtime integration pending",
+  "phase": "SYSTEM_SCHEDULER_HEARTBEAT_IMPLEMENTED",
+  "current_capability": "SYSTEM reads optional expiring EGX worker heartbeat; mode and liveness remain separate from job success and scan coverage",
   "starting_head": "e55fbbc",
-  "head": "f13a0f25e85e9a4b2c4f2dd4be1fb1358e43b533",
+  "head": "8b026db47393c8e5cb27b09f264bf24c88de7371",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,10 +32,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "4 stdlib SYSTEM visibility regressions PASS, including isolated packaged checkpoint/build identity; docker compose config --quiet PASS; git diff --check PASS. FastAPI integration/full suite and image build pending dependencies/safe execution.",
-  "deployment": "No deployment performed; image checkpoint and build-argument wiring validated statically and by isolated Python regression only. Safe deployment mechanism pending.",
-  "scheduler": "Repository defaults OBSERVE; isolated runtime has 0 scheduled-job rows. Running scheduler/heartbeat not verified.",
-  "next_action": "M2: obtain available test dependencies and validate FastAPI SYSTEM routes/affected UI suites; validate image through safe deployment mechanism and connect scheduler heartbeat. Continue broad universe work independently.",
+  "tests": "7 stdlib heartbeat/SYSTEM regressions PASS; git diff --check PASS. Initial import regression fixed by keeping heartbeat module independent of core package dependencies. FastAPI/worker integration and full suite pending unavailable pytest/pydantic dependencies.",
+  "deployment": "No deployment performed. Heartbeat runtime wiring and safe deployment validation pending.",
+  "scheduler": "Optional EGX_SCHEDULER_HEARTBEAT_PATH writer/reader implemented; runtime configuration and running worker unverified; defaults remain OBSERVE.",
+  "next_action": "M2: provision test dependencies; validate worker heartbeat and FastAPI routes, then wire shared heartbeat path through safe deployment mechanism. Continue universe/scanner work independently.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

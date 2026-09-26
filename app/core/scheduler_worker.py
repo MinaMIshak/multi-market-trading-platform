@@ -32,6 +32,9 @@ from app.core.scheduler_execution_context import (
 )
 
 
+from app.scheduler_heartbeat import write_heartbeat
+
+
 stop_event = threading.Event()
 
 
@@ -376,6 +379,8 @@ def main() -> None:
             )
 
             last_signature = signature
+
+        write_heartbeat(mode=mode.value, poll_seconds=poll_seconds)
 
         stop_event.wait(
             poll_seconds
