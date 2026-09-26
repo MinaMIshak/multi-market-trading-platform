@@ -200,13 +200,38 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
     current = [r for r in rows if r['newest_market_date'] == day.isoformat()]
     if not current:
         _blocked('canonical history does not reach authenticated session', 'DATA_STALE')
-    if len(current) != 1:
-        _blocked('ambiguous current canonical daily source')
-    artifact = current[0]
+    package = source.daily_package
+    if package is None:
+        _blocked('reviewed daily evidence package required')
+    _package(package, DAILY_EVIDENCE_FIELDS, at)
+
+    references = ReferenceRepository(
+        database,
+        ImmutableRawStore(Path(data_root) / 'raw'),
+    )
+
+    # Multiple validated canonical editions may coexist in the immutable ledger.
+    # Operational verify/publish must select the one bound by the reviewed
+    # evidence package; never choose by insertion order or silently demote history.
+    bound = []
+    for row in current:
+        manifest = references.ingestions.get_manifest_by_raw_path(row['raw_path'])
+        if (
+            package.raw_receipt.sha256 == manifest.sha256
+            and package.raw_receipt.provider == manifest.provider
+            and package.raw_receipt.byte_size == manifest.byte_size
+            and package.raw_receipt.local_received_at == manifest.received_at
+            and package.raw_receipt.source_locator == row['source_uri']
+        ):
+            bound.append((row, manifest))
+
+    if len(bound) != 1:
+        _blocked('daily evidence must uniquely bind current canonical source')
+
+    artifact, manifest = bound[0]
     if (artifact['instrument_id'] != str(source.instrument_id)
             or datetime.fromisoformat(artifact['validated_at']) > at):
         _blocked('canonical artifact identity/availability mismatch')
-    references = ReferenceRepository(database, ImmutableRawStore(Path(data_root) / 'raw'))
     repository = PointInTimeDailyRepository(
         references,
         selection_context="OPERATIONAL_EXPLICIT_SYMBOL",
@@ -243,10 +268,8 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
         or artifact['serialization_format'] != DAILY_SERIALIZATION_FORMAT
     ):
         _blocked('validated artifact ledger does not match PIT materialization')
-    package = source.daily_package
-    if package is None:
-        _blocked('reviewed daily evidence package required')
-    _package(package, DAILY_EVIDENCE_FIELDS, at)
+    # Re-read the admitted source manifest after PIT materialization so the
+    # evidence-to-source binding is checked again at the consumer boundary.
     manifest = references.ingestions.get_manifest_by_raw_path(artifact['raw_path'])
     if (package.raw_receipt.sha256 != manifest.sha256
             or package.raw_receipt.provider != manifest.provider

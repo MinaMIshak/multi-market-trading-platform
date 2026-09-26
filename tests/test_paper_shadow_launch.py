@@ -131,6 +131,51 @@ def launch(tmp_path, monkeypatch, request):
     return db, root, source, destination, path, provider, at
 
 
+def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
+    db, root, source, _, path, provider, _ = launch
+
+    # A second legitimately validated edition may coexist for the same
+    # symbol/signal date. It must not replace or demote the original ledger row.
+    alternate = EngineeringProvider(provider.records)
+    alternate.name = 'fixture-alternate'
+
+    refreshed = refresh_once(
+        db,
+        root,
+        source,
+        provider=alternate,
+        cost=VerifiedQuotaCost(1, LABEL),
+    )
+    assert refreshed['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
+
+    with db.connect() as con:
+        current = con.execute(
+            """
+            SELECT a.artifact_id, a.provider, a.newest_market_date
+            FROM daily_canonical_artifacts a
+            WHERE a.canonical_symbol='COMI'
+              AND a.status='VALIDATED'
+              AND a.newest_market_date=?
+            ORDER BY a.provider
+            """,
+            (source.signal_session.market_date.isoformat(),),
+        ).fetchall()
+
+    assert len(current) == 2
+    assert {row['provider'] for row in current} == {
+        'fixture',
+        'fixture-alternate',
+    }
+
+    # The reviewed daily package was created from the original 'fixture'
+    # ingestion. Verify must select that exact provenance rather than reject
+    # merely because another validated edition exists.
+    assert main(['verify', '--input', str(path)]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result['status'] == 'NOT_RUN'
+    assert result['market_data'] == 'FRESH'
+
+
 def test_refresh_pit_swing_planning_admission_publication_ui(launch, monkeypatch, capsys):
     db, root, source, directory, path, provider, at = launch
     assert len(provider.calls) == 1
