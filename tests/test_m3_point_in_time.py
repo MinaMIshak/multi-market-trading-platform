@@ -421,3 +421,137 @@ def test_unknown_ingestion_status_fails_closed(repo):
                     (str(m.ingestion_id),))
     with pytest.raises(ValueError, match='source rejected'):
         load(repo, m)
+
+
+def test_explicit_action_effect_semantics_and_audit(repo):
+    # Explicit CASH-like dividend semantics: known/provenanced action,
+    # but no split-adjustment transformation.
+    dividend = dict(
+        event_id="explicit-cash-dividend",
+        effective_date=str(DAY),
+        action_type="DIVIDEND",
+        adjustment_effect="NONE",
+        details="explicit reviewed no-share-ratio effect",
+    )
+    m = ready(repo, events=[dividend])
+    dataset = load(repo, m)
+
+    assert dataset.split_adjusted[0].close == Decimal("10")
+    assert dataset.split_adjusted[0].volume == Decimal("100")
+    assert dataset.split_adjusted[0].event_ids == ()
+
+    with repo.database.connect() as con:
+        payload = con.execute(
+            "SELECT payload_json FROM audit_events "
+            "WHERE event_type='PIT_DATA_VALIDATED' "
+            "ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()[0]
+
+    assert "explicit-action-effect-v2-decimal34" in payload
+    assert "STRICT_DATED_UNIVERSE" in payload
+
+
+def test_explicit_share_ratio_non_split_adjusts(repo):
+    bonus = dict(
+        event_id="explicit-bonus-shares",
+        effective_date=str(DAY),
+        action_type="CAPITAL_INCREASE",
+        adjustment_effect="SHARE_RATIO",
+        new_shares="11",
+        old_shares="10",
+        details="one bonus share for every ten existing shares",
+    )
+
+    m = ready(repo, events=[bonus])
+    dataset = load(repo, m)
+
+    first = dataset.split_adjusted[0]
+    second = dataset.split_adjusted[1]
+
+    assert first.price_factor == Decimal(
+        "0.9090909090909090909090909090909091"
+    )
+    assert first.volume_factor == Decimal("1.1")
+    assert first.event_ids == ("explicit-bonus-shares",)
+
+    assert second.price_factor == Decimal("1")
+    assert second.volume_factor == Decimal("1")
+    assert second.event_ids == ()
+
+
+def test_operational_explicit_symbol_context_does_not_require_historical_universe(repo):
+    # Paper/Shadow current-signal evaluation receives the symbol explicitly;
+    # it is not a historical cross-sectional universe-selection operation.
+    action_manifest = ingest(repo, actions())
+    review(repo, action_manifest, "egx-actions-v1")
+
+    daily_manifest = daily(repo)
+    review(repo, daily_manifest, "egx-daily-semantic-v1")
+
+    dataset = PointInTimeDailyRepository(
+        repo,
+        selection_context="OPERATIONAL_EXPLICIT_SYMBOL",
+    ).load(
+        raw_path=daily_manifest.raw_path,
+        universe_date=DAY,
+        expected_market_date=DAY,
+        as_of=cutoff(),
+    )
+
+    assert dataset.dq_status == "VALIDATED"
+    assert tuple(row.market_date for row in dataset.rows) == (
+        PREVIOUS,
+        DAY,
+    )
+
+    with repo.database.connect() as con:
+        payload = con.execute(
+            "SELECT payload_json FROM audit_events "
+            "WHERE event_type='PIT_DATA_VALIDATED' "
+            "ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()[0]
+
+    assert "OPERATIONAL_EXPLICIT_SYMBOL" in payload
+
+
+def test_invalid_pit_selection_context_is_rejected(repo):
+    with pytest.raises(ValueError, match="selection context"):
+        PointInTimeDailyRepository(
+            repo,
+            selection_context="BYPASS",
+        )
+
+
+@pytest.mark.parametrize("terms", [
+    {"action_type": "SPLIT", "adjustment_effect": "NONE", "new_shares": "2", "old_shares": "1"},
+    {"adjustment_effect": "SHARE_RATIO"},
+    {"adjustment_effect": "SHARE_RATIO", "new_shares": "2"},
+    {"adjustment_effect": "NONE", "new_shares": "2", "old_shares": "1"},
+    {"new_shares": "2", "old_shares": "1"},
+    {"adjustment_effect": "UNKNOWN"},
+    {"adjustment_effect": "SHARE_RATIO", "new_shares": "NaN", "old_shares": "1"},
+    {"adjustment_effect": "SHARE_RATIO", "new_shares": "0", "old_shares": "1"},
+])
+def test_invalid_explicit_action_effects_fail_closed(repo, terms):
+    event = dict(event_id="invalid-effect", effective_date=str(DAY),
+                 action_type="CAPITAL_INCREASE", details="synthetic invalid terms") | terms
+    with pytest.raises(ValueError, match="invalid reference"):
+        ingest(repo, actions([event]))
+
+
+@pytest.mark.parametrize("missing", ["daily_review", "action_review", "coverage", "semantics"])
+def test_operational_context_preserves_reference_gates(repo, missing):
+    m = daily(repo)
+    if missing != "daily_review":
+        review(repo, m, "egx-daily-semantic-v1")
+    if missing != "coverage":
+        events = [dict(event_id="unknown", effective_date=str(DAY),
+                       action_type="DIVIDEND", details="effect unspecified")] if missing == "semantics" else []
+        a = ingest(repo, actions(events))
+        if missing != "action_review":
+            review(repo, a, "egx-actions-v1")
+    message = {"coverage": "action coverage", "semantics": "explicit semantics"}.get(
+        missing, "validation evidence unavailable")
+    with pytest.raises(ValueError, match=message):
+        PointInTimeDailyRepository(repo, selection_context="OPERATIONAL_EXPLICIT_SYMBOL").load(
+            raw_path=m.raw_path, universe_date=DAY, expected_market_date=DAY, as_of=cutoff())

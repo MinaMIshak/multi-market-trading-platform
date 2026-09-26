@@ -52,18 +52,40 @@ class ActionEvidenceRow(ReferenceModel):
         "SPLIT", "DIVIDEND", "RIGHTS", "CAPITAL_INCREASE",
         "CAPITAL_REDUCTION", "SYMBOL_CHANGE", "DELISTING", "OTHER",
     ]
-    # Explicit new shares / old shares; never inferred from price jumps.
+    # Explicit transformation semantics. Legacy non-split rows remain
+    # unsupported unless reviewed evidence states their split-adjustment effect.
+    adjustment_effect: Literal["NONE", "SHARE_RATIO"] | None = None
     new_shares: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     old_shares: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
     details: str = Field(min_length=1)
 
     @model_validator(mode="after")
     def split_terms(self):
+        has_new = self.new_shares is not None
+        has_old = self.old_shares is not None
+
+        if has_new != has_old:
+            raise ValueError(
+                "share-ratio adjustment requires explicit new and old shares"
+            )
+
         if self.action_type == "SPLIT":
-            if self.new_shares is None or self.old_shares is None:
+            if not has_new:
                 raise ValueError("split requires explicit new and old shares")
-        elif self.new_shares is not None or self.old_shares is not None:
-            raise ValueError("share ratio is supported only for explicit splits")
+            if self.adjustment_effect not in (None, "SHARE_RATIO"):
+                raise ValueError("split cannot declare a NONE adjustment effect")
+
+        elif self.adjustment_effect == "SHARE_RATIO":
+            if not has_new:
+                raise ValueError(
+                    "share-ratio adjustment requires explicit new and old shares"
+                )
+
+        elif has_new:
+            raise ValueError(
+                "share ratio requires SPLIT or explicit SHARE_RATIO adjustment"
+            )
+
         return self
 
 

@@ -42,8 +42,21 @@ class PointInTimeDailyDataset:
 
 
 class PointInTimeDailyRepository:
-    def __init__(self, references: ReferenceRepository):
+    _SELECTION_CONTEXTS = {
+        "STRICT_DATED_UNIVERSE",
+        "OPERATIONAL_EXPLICIT_SYMBOL",
+    }
+
+    def __init__(
+        self,
+        references: ReferenceRepository,
+        *,
+        selection_context: str = "STRICT_DATED_UNIVERSE",
+    ):
+        if selection_context not in self._SELECTION_CONTEXTS:
+            raise ValueError("unsupported PIT selection context")
         self.references = references
+        self.selection_context = selection_context
 
     def load(self, *, raw_path: str, universe_date: date, expected_market_date: date,
              as_of: datetime) -> PointInTimeDailyDataset:
@@ -102,14 +115,27 @@ class PointInTimeDailyRepository:
         reviews = self.references.require_review(
             manifest, "egx-daily-semantic-v1", as_of=as_of,
         )
-        universe_row, universe, universe_reviews = self.references.universe(
-            market_date=universe_date, as_of=as_of,
-        )
-        members = [m for m in universe.members
-                   if m.instrument_id == UUID(ingestion.instrument_id)]
-        if (len(members) != 1 or not members[0].eligible
-                or members[0].symbol != ingestion.canonical_symbol):
-            raise ValueError("instrument is not eligible in dated universe")
+        current_universe_provenance = set()
+
+        if self.selection_context == "STRICT_DATED_UNIVERSE":
+            universe_row, universe, universe_reviews = self.references.universe(
+                market_date=universe_date, as_of=as_of,
+            )
+            members = [
+                m for m in universe.members
+                if m.instrument_id == UUID(ingestion.instrument_id)
+            ]
+            if (
+                len(members) != 1
+                or not members[0].eligible
+                or members[0].symbol != ingestion.canonical_symbol
+            ):
+                raise ValueError("instrument is not eligible in dated universe")
+
+            current_universe_provenance.update(
+                (universe_row["ingestion_id"], *universe_reviews)
+            )
+
         rows = DailyCanonicalPipeline(raw_store=self.references.raw_store).canonicalize_ingestion(ingestion).rows
         rows = tuple(sorted(rows, key=lambda r: r.market_date))
         dates = [r.market_date for r in rows]
@@ -125,27 +151,68 @@ class PointInTimeDailyRepository:
         if any(r.semantic_class != DailyBarSemanticClass.VALID_EXECUTABLE for r in rows):
             raise ValueError("quarantined daily observation")
         historical_provenance = set()
-        for day in sorted(set(dates) - {universe_date}):
-            row, history, history_reviews = self.references.universe(market_date=day, as_of=as_of)
-            members_on_day = [m for m in history.members
-                              if m.instrument_id == UUID(ingestion.instrument_id)]
-            if (len(members_on_day) != 1 or not members_on_day[0].eligible
-                    or members_on_day[0].symbol != ingestion.canonical_symbol):
-                raise ValueError("historical membership or symbol mapping unavailable")
-            historical_provenance.update((row["ingestion_id"], *history_reviews))
+
+        if self.selection_context == "STRICT_DATED_UNIVERSE":
+            for day in sorted(set(dates) - {universe_date}):
+                row, history, history_reviews = self.references.universe(
+                    market_date=day,
+                    as_of=as_of,
+                )
+                members_on_day = [
+                    m for m in history.members
+                    if m.instrument_id == UUID(ingestion.instrument_id)
+                ]
+                if (
+                    len(members_on_day) != 1
+                    or not members_on_day[0].eligible
+                    or members_on_day[0].symbol != ingestion.canonical_symbol
+                ):
+                    raise ValueError(
+                        "historical membership or symbol mapping unavailable"
+                    )
+                historical_provenance.update(
+                    (row["ingestion_id"], *history_reviews)
+                )
         action_row, actions, action_reviews = self.references.actions(
             instrument_id=UUID(ingestion.instrument_id), start=dates[0],
             end=universe_date, as_of=as_of,
         )
-        relevant = [a for a in actions.actions if dates[0] <= a.effective_date <= universe_date]
-        if any(a.action_type != "SPLIT" for a in relevant):
-            raise ValueError("unsupported corporate action requires explicit semantics")
+        relevant = [
+            a for a in actions.actions
+            if dates[0] <= a.effective_date <= universe_date
+        ]
+
+        unsupported = [
+            a for a in relevant
+            if (
+                a.action_type != "SPLIT"
+                and a.adjustment_effect is None
+            )
+        ]
+        if unsupported:
+            raise ValueError(
+                "unsupported corporate action requires explicit semantics"
+            )
+
+        ratio_actions = [
+            a for a in relevant
+            if (
+                a.action_type == "SPLIT"
+                or a.adjustment_effect == "SHARE_RATIO"
+            )
+        ]
+
         adjusted = []
         # Explicit precision makes output independent of ambient Decimal context.
         with localcontext(Context(prec=34)):
             for bar in rows:
-                events = sorted((a for a in relevant if bar.market_date < a.effective_date),
-                                key=lambda a: (a.effective_date, a.event_id))
+                events = sorted(
+                    (
+                        a for a in ratio_actions
+                        if bar.market_date < a.effective_date
+                    ),
+                    key=lambda a: (a.effective_date, a.event_id),
+                )
                 price_factor = Decimal(1)
                 volume_factor = Decimal(1)
                 for event in events:
@@ -160,11 +227,25 @@ class PointInTimeDailyRepository:
                     price_factor=price_factor, volume_factor=volume_factor,
                     event_ids=tuple(a.event_id for a in events),
                 ))
-        provenance = tuple(sorted({str(manifest.ingestion_id), universe_row["ingestion_id"],
-                                   action_row["ingestion_id"], *reviews,
-                                   *universe_reviews, *action_reviews, *historical_provenance}))
+        provenance = tuple(sorted({
+            str(manifest.ingestion_id),
+            action_row["ingestion_id"],
+            *reviews,
+            *action_reviews,
+            *current_universe_provenance,
+            *historical_provenance,
+        }))
+
+        transformation = (
+            "explicit-action-effect-v2-decimal34"
+            if any(a.adjustment_effect is not None for a in relevant)
+            else "split-only-v1-decimal34"
+        )
+
         audit = {
-            "contract": "egx-pit-daily-v1", "transformation": "split-only-v1-decimal34",
+            "contract": "egx-pit-daily-v1",
+            "transformation": transformation,
+            "selection_context": self.selection_context,
             "as_of": as_of.isoformat(), "universe_date": str(universe_date),
             "expected_market_date": str(expected_market_date),
             "provenance_ids": provenance, "raw_sha256": manifest.sha256,

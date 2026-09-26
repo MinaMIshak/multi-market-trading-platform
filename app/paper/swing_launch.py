@@ -207,7 +207,10 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
             or datetime.fromisoformat(artifact['validated_at']) > at):
         _blocked('canonical artifact identity/availability mismatch')
     references = ReferenceRepository(database, ImmutableRawStore(Path(data_root) / 'raw'))
-    repository = PointInTimeDailyRepository(references)
+    repository = PointInTimeDailyRepository(
+        references,
+        selection_context="OPERATIONAL_EXPLICIT_SYMBOL",
+    )
     data = repository.load(raw_path=artifact['raw_path'], universe_date=day,
                            expected_market_date=day, as_of=at)
     if len(data.rows) < 260:
