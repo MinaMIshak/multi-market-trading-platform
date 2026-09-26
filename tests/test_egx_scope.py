@@ -2,7 +2,7 @@
 import unittest
 from uuid import UUID
 
-from app.egx_scope import require_equity_identity
+from app.egx_scope import require_equity_identity, valid_scope_symbol
 
 
 class EquityIdentityTests(unittest.TestCase):
@@ -45,3 +45,13 @@ class EquityIdentityTests(unittest.TestCase):
             self.admit(self.master() | {'instrument_id': None}, instrument_id=None)
         with self.assertRaisesRegex(ValueError, 'identity mismatch'):
             self.admit(self.master() | {'canonical_ticker': 'comi'}, symbol='comi')
+
+
+class ScopeSymbolTests(unittest.TestCase):
+    def test_broad_spelling_without_membership_inference(self):
+        for symbol in ('FIXTURE', 'OTHER.A', 'TEST_1', 'A-B', 'A' * 64):
+            with self.subTest(symbol=symbol):
+                self.assertTrue(valid_scope_symbol(symbol))
+        for symbol in ('comi', ' COMI', 'COMI\n', 'A/B', '', 'A' * 65, 1, None):
+            with self.subTest(symbol=symbol):
+                self.assertFalse(valid_scope_symbol(symbol))

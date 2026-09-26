@@ -9,7 +9,7 @@ from typing import Literal
 from uuid import UUID, NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.core.daily_refresh_runtime import build_daily_refresh_runtime, DEFAULT_EODHD_TARGETS
 from app.data.daily_canonical import (
@@ -23,7 +23,7 @@ from app.data.point_in_time import PointInTimeDailyRepository
 from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
-from app.egx_scope import LaunchSymbol, require_equity_identity
+from app.egx_scope import valid_scope_symbol, require_equity_identity
 from app.paper.shadow_candidate_admission import ShadowCandidateAdmission
 from app.paper.shadow_facts import ForwardSessionFact, SESSION_FIELDS, _require_fields
 from app.paper.shadow_producer import StrategyShadowRequest, StrategyShadowSelection, produce_strategy_watchlist
@@ -45,7 +45,7 @@ class LaunchBlocked(ValueError):
 
 class SwingLaunchInput(Contract):
     schema_version: Literal['swing-paper-launch-v1']
-    symbol: LaunchSymbol
+    symbol: str
     instrument_id: UUID
     # Explicit human selection, never derived from an M4 state.
     decision_status: Literal['WATCH']
@@ -57,6 +57,14 @@ class SwingLaunchInput(Contract):
     clock_packages: tuple[HistoricalEvidencePackage, ...]
     # May be absent for refresh; required for verify/publish after source review.
     daily_package: HistoricalEvidencePackage | None
+
+    @field_validator('symbol')
+    @classmethod
+    def validate_symbol(cls, value):
+        # Spelling is not dated membership or source identity evidence.
+        if not valid_scope_symbol(value):
+            raise ValueError('canonical EGX symbol required')
+        return value
 
 
 class Q03Rule(Contract):
@@ -170,7 +178,9 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
     _identity(database, source)
     if type(cost) is not VerifiedQuotaCost or type(cost.units) is not int or cost.units <= 0 or not cost.evidence.strip():
         _blocked('verified quota cost required')
-    target = next(t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol)
+    target = next((t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol), None)
+    if target is None:
+        _blocked('reviewed provider refresh mapping unavailable')
     runtime = build_daily_refresh_runtime(
         database=database, scheduler_repository=SchedulerRepository(database), data_root=data_root,
         api_token=api_token, provider=provider, targets=(target,),

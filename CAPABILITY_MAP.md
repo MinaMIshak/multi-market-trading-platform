@@ -22,7 +22,7 @@ a specific unavailable mandatory input, not a global mission stop.
 | Free-source coverage/rights/health | PARTIAL | Historical qualifications and source-bound review exist; no autonomous health/fallback integration | Reuse prior findings, expose precise failures and rights limits |
 | EGX calendar software | WORKING | app/core calendar/evidence/promotion modules and calendar tests | Maintain actual dated evidence and expose freshness |
 | EGX manual SWING verification | WORKING | swing_launch.py, launch/UI tests; one accepted READY_NO_SIGNAL receipt | Preserve source binding, 260 bars and no-fill semantics |
-| EGX broad operational scanner (M4) | PARTIAL | app/egx_scan.py coordinates explicit scope through existing non-publishing verifier, isolates failures and counts only accepted results; coordinator/history/SYSTEM/heartbeat suite: 16 stdlib regressions pass. Atomic optional last-run summaries are visible in SYSTEM as historical scope, never current readiness. History admission rejects boolean/fractional counts and schema versions plus untrimmed identities; 29 related stdlib regressions pass. Scanner now binds returned verification symbol/market to requested scope; real launch identity regression awaits dependencies. Launch remains restricted to five symbols; no real broad run claimed | Explicit config loader added (strict existing launch decoder; invalid inputs remain blocked); Compose history path shared. Opt-in scheduler invocation now wired (disabled by default); dated scope and runtime integration still pending; actual decoder/verifier integration test pending dependencies |
+| EGX broad operational scanner (M4) | PARTIAL | app/egx_scan.py coordinates explicit scope through existing non-publishing verifier, isolates failures and counts only accepted results; coordinator/history/SYSTEM/heartbeat suite: 16 stdlib regressions pass. Atomic optional last-run summaries are visible in SYSTEM as historical scope, never current readiness. History admission rejects boolean/fractional counts and schema versions plus untrimmed identities; 29 related stdlib regressions pass. Scanner now binds returned verification symbol/market to requested scope; real launch identity regression awaits dependencies. Launch verification now accepts canonical lexical symbols with all existing admission gates; refresh remains restricted to existing mappings; real launch integration pending and no real broad run claimed | Explicit config loader added (strict existing launch decoder; invalid inputs remain blocked); Compose history path shared. Opt-in scheduler invocation now wired (disabled by default); dated scope and runtime integration still pending; actual decoder/verifier integration test pending dependencies |
 | EGX scan data-failure classification | WORKING | Coordinator preserves verifier DATA_STALE and maps DATA_INSUFFICIENT to NOT_READY; both remain unscanned. SYSTEM history schema v2 retains v1 compatibility. 36 related stdlib tests pass; real launch adapter test pending missing pytest/runtime dependencies | Validate real runtime adapter and scheduled invocation when dependencies are available |
 | Valid operational candidate ranking (M5) | MISSING | PRE_SURGE ranking is legacy research scoring only | Rank only independently valid, risk-admitted setups |
 | Intraday patterns | NOT_OPERATIONAL | FIRST15/ORB/VWAP/momentum engines and test_m4_engines.py | Require market-specific data and empirical validation before wiring |
@@ -111,3 +111,21 @@ uncaught key errors. All 41 affected stdlib tests pass; actual launch integratio
 and the full suite still require unavailable pytest/pydantic dependencies.
 Package installation retry returned no matching distributions. No new universe,
 data readiness, scan execution or deployment is claimed.
+
+
+## Incremental checkpoint: broadened explicit verification scope
+
+Removed the five-symbol verification allowlist. The launch model now validates
+canonical symbol spelling using the same predicate as scanner scope; identity,
+EQUITY classification, calendar, reviewed source and PIT admission still apply.
+Refresh retains existing explicit provider mappings and returns EVIDENCE_BLOCKED
+before runtime/provider invocation when no mapping exists. It never manufactures
+a provider symbol from a ticker. This expands software input scope, not verified
+market coverage or authoritative membership.
+
+42 dependency-free regressions pass, including additional-symbol decoding and
+blocked evidence accounting. New real launch tests cover transport, missing
+identity, missing history and unmapped refresh without provider calls; these are
+pending pytest/pydantic availability. Syntax checks and git diff --check pass.
+No deployment or fresh market observation occurred. Broad refresh integration,
+authoritative dated membership and actual scheduled scans remain pending.

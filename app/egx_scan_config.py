@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.egx_scope import LAUNCH_SYMBOLS, valid_scope_symbol
+from app.egx_scope import valid_scope_symbol
 
 
 def _read(path):
@@ -48,9 +48,6 @@ def load_scan_configuration(path):
     sources = {}
     source_errors = {}
     for symbol, document in raw['launch_inputs'].items():
-        if symbol not in LAUNCH_SYMBOLS:
-            source_errors[symbol] = 'LAUNCH_SYMBOL_UNSUPPORTED'
-            continue
         try:
             source = _decode_launch(document)
             if source.symbol == symbol:

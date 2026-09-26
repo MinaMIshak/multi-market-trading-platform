@@ -489,3 +489,38 @@ def test_operator_reference_import_preserves_bytes_without_auto_review(tmp_path,
     assert refs.raw_store.read_verified(manifest) == payload
     with pytest.raises(ValueError, match='validation evidence unavailable'):
         refs.require_review(manifest, 'egx-universe-v1', as_of=datetime.now(timezone.utc))
+
+
+@pytest.mark.parametrize('symbol', ['FIXTURE', 'OTHER.A', 'TEST_1', 'A-B'])
+def test_broad_symbol_transport_keeps_identity_admission(launch, symbol):
+    db, root, source, directory, _, _, _ = launch
+    document = source.model_dump(mode='json') | {'symbol': symbol}
+    expanded = _decode(SwingLaunchInput, document)
+    assert expanded.symbol == symbol
+    with pytest.raises(LaunchBlocked, match='security-master identity unavailable'):
+        run_signal(db, root, expanded, directory, publish=False)
+    assert not directory.exists()
+
+
+@pytest.mark.parametrize('symbol', ['comi', ' COMI', 'COMI\n', 'A/B', '', 'A' * 65, 1])
+def test_launch_symbol_spelling_is_strict(launch, symbol):
+    _, _, source, _, _, _, _ = launch
+    with pytest.raises(ValueError):
+        _decode(SwingLaunchInput, source.model_dump(mode='json') | {'symbol': symbol})
+
+
+def test_new_equity_refresh_blocks_without_provider_mapping(launch):
+    db, root, source, directory, _, provider, _ = launch
+    SecurityMasterRepository(db).replace_provider_snapshot(provider='fixture', instruments=[
+        CanonicalInstrument(instrument_id=ID, instrument_type=InstrumentType.EQUITY,
+                            canonical_ticker='FIXTURE', source_provider='fixture',
+                            source_symbol_code='fixture-explicit-code', source_sha256='a'*64)])
+    expanded = _decode(SwingLaunchInput, source.model_dump(mode='json') | {'symbol': 'FIXTURE'})
+    calls_before = len(provider.calls)
+    with pytest.raises(LaunchBlocked, match='reviewed provider refresh mapping unavailable'):
+        refresh_once(db, root, expanded, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
+    assert len(provider.calls) == calls_before
+    assert not directory.exists()
+    with pytest.raises(LaunchBlocked, match='admitted daily history missing') as caught:
+        run_signal(db, root, expanded, directory, publish=False)
+    assert caught.value.status == 'DATA_INSUFFICIENT'
