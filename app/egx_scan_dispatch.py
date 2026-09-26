@@ -32,6 +32,14 @@ def dispatch_scan(*, evaluation, repository, database, data_root,
                 symbols=config.symbols, sources=config.sources,
                 scope_reference=config.scope_reference, database=database,
                 data_root=data_root, history_path=history_path)
+            # Validate completion before persisting success. A malformed report
+            # must leave the fallback available, not a successful ledger entry.
+            if (not isinstance(report, dict)
+                    or type(report.get('requested')) is not int
+                    or report['requested'] != len(config.symbols)
+                    or type(report.get('scanned')) is not int
+                    or not 0 <= report['scanned'] <= report['requested']):
+                raise ValueError('invalid scan completion counts')
         except Exception as exc:
             error = 'EGX_SCAN_FAILED:' + type(exc).__name__
             if not repository.mark_failed(**key, error=error):

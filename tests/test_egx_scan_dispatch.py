@@ -72,6 +72,22 @@ class ScanDispatchTests(unittest.TestCase):
         self.assertIsNone(self.run_dispatch())
         self.repo.claim_job.assert_not_called()
 
+    def test_malformed_completion_fails_before_success_is_persisted(self):
+        for report in (None, {}, {'requested': 1},
+                       {'requested': True, 'scanned': 0},
+                       {'requested': 1, 'scanned': False},
+                       {'requested': 2, 'scanned': 1},
+                       {'requested': 1, 'scanned': -1},
+                       {'requested': 1, 'scanned': 2}):
+            with self.subTest(report=report):
+                self.repo.reset_mock()
+                self.scan.return_value = report
+                result = self.run_dispatch()
+                self.assertFalse(result['succeeded'])
+                self.assertEqual(result['error'], 'EGX_SCAN_FAILED:ValueError')
+                self.repo.mark_failed.assert_called_once()
+                self.repo.mark_succeeded.assert_not_called()
+
     def test_ledger_write_failure_is_not_reported_as_success(self):
         self.repo.mark_succeeded.return_value = False
         with self.assertRaises(RuntimeError):

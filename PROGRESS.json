@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EGX_OPT_IN_SCAN_DISPATCH",
-  "current_capability": "Opt-in local EGX scan dispatch wired to worker with verified-calendar gating, durable claims, separate fallback and fresh configuration loading; defaults disabled. Runtime integration not yet validated.",
+  "phase": "EGX_SCAN_COMPLETION_LEDGER_HARDENING",
+  "current_capability": "Opt-in EGX scheduler dispatch rejects malformed completion counts before persisting success, preserving failure/fallback semantics. Defaults disabled; real scheduler integration remains unvalidated.",
   "starting_head": "e55fbbc",
-  "head": "fb785b3d24769e449cd72a9d26d7be98daa2b791",
+  "head": "8290232cea5c0e0ff2ade7bea42abf3ba8ba1f66",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,15 +32,15 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "26 stdlib dispatcher/configuration/coordinator/history/SYSTEM/heartbeat regressions PASS; syntax parsing and git diff --check PASS. New real SQLite integration regression authored but not executed: pytest/runtime dependencies unavailable.",
+  "tests": "27 stdlib dispatcher/configuration/coordinator/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. SQLite integration attempted but import blocked by missing pydantic. pytest installation retry found no available distribution; worker/decoder/verifier/full suite pending. Initial unittest command referenced nonexistent test_system_progress; corrected to test_system_visibility and all 27 passed.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Run new SQLite scheduler integration and existing worker/decoder/verifier suites when dependencies are available; validate isolated local scan runtime before opt-in deployment. Continue authoritative universe and free data coverage work.",
+  "next_action": "Run SQLite scheduler integration and worker/decoder/verifier suites when dependencies are available; validate isolated runtime before opt-in deployment. Continue authoritative EGX universe and free-data coverage work without repeating completed provider investigations.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "System Python lacks pip/pytest; existing temporary venv has pip but package installation found no available pytest distribution. FastAPI integration/full suite pending.",
+    "test_execution": "System Python lacks pydantic and pytest; temporary venv pip retry found no pytest distribution. SQLite scheduler and FastAPI integration/full suite pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",
