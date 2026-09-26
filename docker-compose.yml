@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        EGX_BUILD_REVISION: ${EGX_BUILD_REVISION:-}
 
     container_name: egx-platform-api
 
@@ -38,6 +40,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        EGX_BUILD_REVISION: ${EGX_BUILD_REVISION:-}
 
     container_name: egx-platform-scheduler
 

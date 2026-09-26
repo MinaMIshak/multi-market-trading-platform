@@ -6,6 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+ARG EGX_BUILD_REVISION=""
+ENV EGX_BUILD_REVISION=${EGX_BUILD_REVISION}
+
 RUN groupadd --system egx \
     && useradd --system --gid egx --create-home egx
 
@@ -15,6 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY PROGRESS.json ./PROGRESS.json
 
 RUN chown -R egx:egx /app
 

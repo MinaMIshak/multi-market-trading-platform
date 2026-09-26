@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SYSTEM_VISIBILITY_IMPLEMENTED_VALIDATION_PENDING",
-  "current_capability": "Read-only SYSTEM API/page with separated checkpoint/build identity and timestamped isolated receipt counts",
+  "phase": "SYSTEM_IMAGE_PACKAGING_FIXED_VALIDATION_PENDING",
+  "current_capability": "Read-only SYSTEM visibility with checkpoint packaged in image and optional explicit build revision; runtime integration pending",
   "starting_head": "e55fbbc",
-  "head": "017c6f3cd74a583dc60a967588c81288800047ba",
+  "head": "f13a0f25e85e9a4b2c4f2dd4be1fb1358e43b533",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,15 +32,15 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "3 stdlib unittest system visibility regressions PASS; changed Python AST parse PASS; git diff --check PASS. pytest and FastAPI integration/full-suite validation pending unavailable dependencies.",
-  "deployment": "Baseline deployment operator-reported; not verified in this cycle. No production access or deployment performed; safe deployment mechanism pending.",
+  "tests": "4 stdlib SYSTEM visibility regressions PASS, including isolated packaged checkpoint/build identity; docker compose config --quiet PASS; git diff --check PASS. FastAPI integration/full suite and image build pending dependencies/safe execution.",
+  "deployment": "No deployment performed; image checkpoint and build-argument wiring validated statically and by isolated Python regression only. Safe deployment mechanism pending.",
   "scheduler": "Repository defaults OBSERVE; isolated runtime has 0 scheduled-job rows. Running scheduler/heartbeat not verified.",
-  "next_action": "M2: provision test dependencies, validate FastAPI SYSTEM routes and affected UI suites; connect verified scheduler heartbeat/build revision through safe deployment configuration. Continue broad universe work independently.",
+  "next_action": "M2: obtain available test dependencies and validate FastAPI SYSTEM routes/affected UI suites; validate image through safe deployment mechanism and connect scheduler heartbeat. Continue broad universe work independently.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "pytest/Pydantic/FastAPI unavailable in active test environment; package-host DNS prevents installation",
+    "test_execution": "System Python lacks pip/pytest; existing temporary venv has pip but package installation found no available pytest distribution. FastAPI integration/full suite pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

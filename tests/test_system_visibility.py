@@ -12,6 +12,34 @@ from app.ui.system import load_system_state, render_system
 
 
 class SystemVisibilityTests(unittest.TestCase):
+    def test_packaged_checkpoint_and_build_revision_remain_separate(self):
+        # Mirror the Docker image layout using only explicitly copied files.
+        import shutil
+        import subprocess
+        import sys
+
+        root = Path(__file__).resolve().parents[1]
+        dockerfile = (root / 'Dockerfile').read_text()
+        self.assertIn('COPY PROGRESS.json ./PROGRESS.json', dockerfile)
+        self.assertIn('ENV EGX_BUILD_REVISION=${EGX_BUILD_REVISION}', dockerfile)
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            shutil.copytree(root / 'app', target / 'app',
+                            ignore=shutil.ignore_patterns('__pycache__'))
+            shutil.copy(root / 'PROGRESS.json', target / 'PROGRESS.json')
+            result = subprocess.run(
+                [sys.executable, '-c',
+                 'import json; from app.ui.system import load_system_state; '
+                 'print(json.dumps(load_system_state()))'],
+                cwd=target, env={'EGX_BUILD_REVISION': 'fixture-build'},
+                capture_output=True, text=True, check=True)
+            state = json.loads(result.stdout)
+            self.assertEqual(state['checkpoint_status'], 'AVAILABLE')
+            self.assertEqual(state['build']['revision'], 'fixture-build')
+            self.assertEqual(state['checkpoint']['head'],
+                             json.loads((root / 'PROGRESS.json').read_text())['head'])
+            self.assertIsNone(state['markets']['EGX']['scanned'])
+
     def test_absent_runtime_does_not_reuse_checkpoint_counts(self):
         with tempfile.TemporaryDirectory() as directory:
             checkpoint = Path(directory) / 'progress.json'

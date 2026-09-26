@@ -44,7 +44,7 @@ a specific unavailable mandatory input, not a global mission stop.
 | Operational receipt API/UI | WORKING | main.py, ui/operational.py, test_operational_ui.py; isolated reader accepted COMI | Preserve fail-closed expiry and source binding |
 | Explainable stock reports | PARTIAL | State/source/session/window and WATCH plan; no complete explanation pipeline | Expose evaluated gates, reasons, confirmation/invalidation |
 | Unified EGX/US/ALL dashboard | PARTIAL | Active TODAY/Shadow/Performance; remaining tabs largely labels | Connect market-specific operational views |
-| SYSTEM progress UI (M2) | PARTIAL | Read-only /system and /api/system implemented; 3 stdlib regressions pass for scoped receipt counts, expiry, missing/corrupt evidence and escaping | FastAPI integration validation and safe deployment pending; connect verified heartbeat/build identity |
+| SYSTEM progress UI (M2) | PARTIAL | Read-only /system and /api/system implemented; 4 stdlib regressions pass for scoped receipt counts, expiry, missing/corrupt evidence and escaping | FastAPI integration validation and safe deployment pending; checkpoint now packaged and explicit build argument wired; connect verified heartbeat and validate deployed build identity |
 | Scheduler components | WORKING | EGX worker, orchestration, claims/recovery and dispatch tests | Reuse durable ledger |
 | Autonomous both-market operation (M8) | NOT_OPERATIONAL | Compose defaults OBSERVE; no strategy/lifecycle/both-market schedule | Free refresh + scans + heartbeat/failure reporting |
 | Deployment/release verification | PARTIAL | Docker/Compose exists; baseline deployment operator-reported only | Use safe deployment mechanism; pre/post validation and rollback |
