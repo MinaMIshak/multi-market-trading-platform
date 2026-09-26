@@ -4,6 +4,7 @@ import json
 import os
 import signal
 import threading
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -105,6 +106,15 @@ def main() -> None:
         )
 
 
+    scan_mode = os.getenv("EGX_SCAN_MODE", "disabled").strip().lower()
+    if scan_mode not in {"disabled", "local"}:
+        raise ValueError("unsupported EGX scan mode")
+    scan_config_path = os.getenv("EGX_SCAN_CONFIG_PATH", "")
+    scan_history_path = os.getenv("EGX_SCAN_HISTORY_PATH", "")
+    if scan_mode == "local":
+        if not all(Path(p).is_absolute() for p in (scan_config_path, scan_history_path)):
+            raise ValueError("local scan requires absolute config and history paths")
+
     secret_path = os.getenv(
         "EODHD_API_TOKEN_FILE",
         "/run/secrets/eodhd_api_token",
@@ -169,6 +179,19 @@ def main() -> None:
         MarketSessionOrchestrator()
     )
 
+    if scan_mode == "local":
+        from datetime import time
+        from app.core.schedule import CheckpointName, ScheduledCheckpoint
+        orchestrator.policy.checkpoints.extend([
+            ScheduledCheckpoint(name=CheckpointName.EGX_SCAN_PRIMARY,
+                                at=time(18, 30), max_lateness_minutes=15,
+                                requires_verified_trading_day=True),
+            ScheduledCheckpoint(name=CheckpointName.EGX_SCAN_FALLBACK,
+                                at=time(19, 0), max_lateness_minutes=15,
+                                requires_verified_trading_day=True,
+                                fallback_for=CheckpointName.EGX_SCAN_PRIMARY),
+        ])
+
     timezone = ZoneInfo(
         orchestrator.policy.timezone
     )
@@ -180,6 +203,7 @@ def main() -> None:
         "calendar_truth_source=market_sessions "
         f"calendar_maintenance={calendar_maintenance_mode} "
         f"calendar_live={calendar_live_mode} "
+        f"local_scan={scan_mode} "
         "execution_enabled="
         f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
@@ -341,6 +365,16 @@ def main() -> None:
                     ),
                     flush=True,
                 )
+
+        if scan_mode == "local":
+            from app.egx_scan_dispatch import dispatch_scan
+            scan_outcome = dispatch_scan(
+                evaluation=evaluation, repository=repository, database=database,
+                data_root=Path(db_path).parent,
+                config_path=scan_config_path, history_path=scan_history_path)
+            if scan_outcome is not None:
+                print("EGX_SCAN_DISPATCH " + json.dumps(scan_outcome, sort_keys=True),
+                      flush=True)
 
         summary = (
             repository.status_summary(
