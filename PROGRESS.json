@@ -1,21 +1,29 @@
 {
   "schema_version": 1,
   "milestone": "M1",
-  "phase": "PROJECT_AUDIT",
-  "current_capability": "complete_project_audit",
+  "phase": "PROJECT_AUDIT_COMPLETE",
+  "current_capability": "one_time_architectural_audit_and_capability_classification_with_isolated_runtime_receipt_observation",
   "starting_head": "e55fbbc",
-  "head": "e55fbbc",
+  "head": "829676d7d6c508fccfc2fc841dbde6172a6f7cb2",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
-    "data_ready": null,
-    "eligible": null,
-    "scanned": null,
-    "watch": null,
-    "ready_no_signal": null,
+    "data_ready": 1,
+    "eligible": 1,
+    "scanned": 1,
+    "watch": 0,
+    "ready_no_signal": 1,
     "not_ready": null,
-    "data_stale": null,
-    "evidence_blocked": null
+    "data_stale": 0,
+    "evidence_blocked": null,
+    "counts_scope": "One distinct verified symbol in isolated paper runtime, not full 224-target coverage; unclassified target remainder is unknown.",
+    "observed_at": "2026-09-26T19:40:20.181437+00:00",
+    "valid_until": "2026-09-27T07:00:00+00:00",
+    "last_verified_session": "2026-09-24",
+    "source": "existing PAPER_SIGNAL_VERIFIED receipt accepted by app.ui.operational.load_operational_state",
+    "security_master_equities": 312,
+    "security_master_indices": 7,
+    "security_master_is_authoritative_universe": false
   },
   "us": {
     "configured_universe": null,
@@ -24,10 +32,20 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "baseline previously validated; current mission has not started",
-  "deployment": "current operational baseline deployed",
-  "scheduler": "preserve current state until required by validated milestone",
-  "next_action": "perform one-time project audit and create PROJECT_AUDIT.md and CAPABILITY_MAP.md",
+  "tests": "All project-owned Python source/test files AST-parse successfully; stdlib operational reader accepted isolated COMI receipt. Current pytest suite NOT RUN: dependencies absent and package-host DNS unavailable. Prior baseline green is historical evidence only.",
+  "deployment": "Baseline deployment operator-reported; not verified in this cycle. No production access or deployment performed; safe deployment mechanism pending.",
+  "scheduler": "Repository defaults OBSERVE; isolated runtime has 0 scheduled-job rows. Running scheduler/heartbeat not verified.",
+  "next_action": "M2: implement read-only /api/system and /system in app.main, exposing checkpoint/build identity separately, timestamped scoped receipt counts, provider freshness and unknown scheduler health; add focused regressions. Provision authorized test dependencies before release validation.",
   "hard_blocker": null,
-  "live_money": false
+  "live_money": false,
+  "head_semantics": "Audited source revision; new audit/checkpoint files remain uncommitted because Git metadata is read-only.",
+  "capability_blockers": {
+    "test_execution": "pytest/Pydantic/FastAPI unavailable in active test environment; package-host DNS prevents installation",
+    "deployment": "No safe deployment mechanism established in this cycle",
+    "egx_universe": "Current authoritative dated membership not established; retain 224 target",
+    "us_universe": "No configured operational universe found",
+    "performance": "Authentic canonical lifecycle observation source not connected",
+    "commit": "Git worktree index is read-only; cannot create index.lock under current permissions."
+  },
+  "commit_status": "PENDING: git add rejected because this worktree Git metadata is on a read-only filesystem. Audit/checkpoint files preserved; no commit created."
 }

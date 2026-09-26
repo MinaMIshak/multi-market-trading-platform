@@ -256,3 +256,26 @@ At each cycle/milestone report concise factual state:
 - LIVE_MONEY=DISABLED
 
 Claims must be supported by implementation, tests or operational evidence.
+
+## Commit Bridge Protocol
+
+Codex must not directly stage or commit when repository Git metadata is
+read-only.
+
+For any successful cycle that leaves repository changes, write the exact
+commit request to:
+
+  /home/egx-agent/er1-autopilot/state/COMMIT_REQUEST.json
+
+Required JSON:
+
+  {
+    "message": "one-line conventional commit message",
+    "paths": ["every exact changed repository-relative path"]
+  }
+
+The path list must exactly equal all tracked changes plus untracked files.
+
+The external supervisor runs commit_bridge.py.
+
+A read-only Git index is expected sandbox behavior and is NOT a hard blocker.
