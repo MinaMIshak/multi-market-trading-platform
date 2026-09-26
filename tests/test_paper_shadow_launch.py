@@ -311,6 +311,7 @@ def test_refresh_pit_swing_planning_admission_publication_ui(launch, monkeypatch
 
 @pytest.mark.parametrize('damage,expected', [
     ('stale', 'DATA_STALE'), ('insufficient', 'DATA_INSUFFICIENT'),
+    ('index_identity', 'EVIDENCE_BLOCKED'), ('unknown_identity', 'EVIDENCE_BLOCKED'),
     ('identity', 'EVIDENCE_BLOCKED'), ('session', 'EVIDENCE_BLOCKED'),
     ('daily_package', 'EVIDENCE_BLOCKED'), ('review', 'EVIDENCE_BLOCKED'),
     ('calendar_gap', 'EVIDENCE_BLOCKED'), ('tamper', 'EVIDENCE_BLOCKED'),
@@ -318,7 +319,7 @@ def test_refresh_pit_swing_planning_admission_publication_ui(launch, monkeypatch
 ])
 def test_rejections(launch, damage, expected, monkeypatch, capsys):
     db, root, source, directory, path, _, at = launch
-    if damage in ('stale', 'insufficient', 'identity', 'review'):
+    if damage in ('stale', 'insufficient', 'identity', 'review', 'index_identity', 'unknown_identity'):
         with db.connect() as con:
             if damage == 'stale':
                 con.execute("UPDATE daily_canonical_artifacts SET newest_market_date='2000-01-01'")
@@ -326,6 +327,9 @@ def test_rejections(launch, damage, expected, monkeypatch, capsys):
                 con.execute('DELETE FROM daily_canonical_sources')
             elif damage == 'identity':
                 con.execute('DELETE FROM instrument_aliases')
+            elif damage in ('index_identity', 'unknown_identity'):
+                con.execute('UPDATE canonical_instruments SET instrument_type=?',
+                            ('INDEX' if damage == 'index_identity' else 'UNKNOWN',))
             else:
                 con.execute("UPDATE data_ingestions SET status='REJECTED' WHERE asset_type='SECURITY_MASTER'")
     elif damage == 'tamper':

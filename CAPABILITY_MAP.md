@@ -90,3 +90,13 @@ in scope as EVIDENCE_BLOCKED with zero scanned contribution. The configuration
 and launch model share one Literal contract. Refresh target expansion and dated
 membership evidence remain pending; no market coverage increase is claimed.
 37 affected stdlib tests pass; real launch integration awaits dependencies.
+
+## Incremental checkpoint: equity identity admission
+
+The shared EGX launch identity gate now also requires security-master EQUITY
+classification before refresh or signal preparation. Matching ticker and UUID
+alone previously admitted INDEX/UNKNOWN rows. Added launch rejection regressions
+for both types; these remain unexecuted because pytest/runtime dependencies are
+unavailable. The 37 stdlib scanner and visibility regressions pass. This guard
+does not establish dated membership or increase coverage; broad scope expansion
+and real launch integration remain pending.

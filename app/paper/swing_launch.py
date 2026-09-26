@@ -160,6 +160,8 @@ def _identity(database, source):
     if (str(resolved['instrument_id']) != str(source.instrument_id)
             or resolved['canonical_ticker'] != source.symbol):
         _blocked('security-master identity mismatch')
+    if resolved.get('instrument_type') != 'EQUITY':
+        _blocked('security-master equity classification required')
 
 
 def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_token=None, provider=None):

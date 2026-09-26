@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EXPLICIT_LAUNCH_COVERAGE_BLOCKERS",
-  "current_capability": "Explicit EGX scan configuration distinguishes unsupported launch symbols from malformed evidence. All requested symbols remain classified; unsupported supplied inputs remain EVIDENCE_BLOCKED and unscanned. Shared launch symbol contract preserves existing five-symbol admission.",
+  "phase": "EQUITY_IDENTITY_ADMISSION",
+  "current_capability": "EGX launch identity admission now requires an explicit EQUITY security-master classification in addition to matching ticker and instrument ID, before refresh or signal preparation. INDEX, UNKNOWN and missing classifications fail closed. Broad coverage remains pending.",
   "starting_head": "e55fbbc",
-  "head": "c80ef50fab089bf3fe4ee58c8d14d72e1298af55",
+  "head": "56a95d7605a27a77be91b22b2e3193ddaaeeb90c",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "37 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Initial suite command used nonexistent test_system_status; corrected to test_system_visibility and all tests passed. Runtime launch integration and full release suite remain pending dependencies.",
+  "tests": "37 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Added INDEX and UNKNOWN launch rejection regressions; execution attempted but pytest unavailable in /tmp/egx-mission-venv, with pydantic also confirmed absent. Launch integration/full release suite pending dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Assess authoritative dated EGX membership and expand launch/refresh scope together with security identity and source/calendar/action admission regression coverage. Preserve 224 baseline. Runtime integration and safe deployment remain pending.",
+  "next_action": "Validate launch identity regressions when dependencies are available. Assess authoritative dated EGX membership and expand launch/refresh scope together with source/calendar/action admission coverage; preserve 224 baseline. Runtime integration and safe deployment remain pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
