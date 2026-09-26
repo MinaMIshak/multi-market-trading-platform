@@ -22,7 +22,7 @@ def _verify(database, data_root, source):
         raise ScanBlocked(exc.reason) from exc
 
 
-def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference):
+def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, history_path=None):
     """Verify each distinct configured symbol; preserve existing admission gates.
 
     sources maps symbols to SwingLaunchInput objects already decoded by the
@@ -61,8 +61,13 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference):
                     item['reason'] = 'verification failed: ' + from_exception
         outcomes.append(item)
     counts = Counter(item['status'] for item in outcomes)
-    return {'market': 'EGX', 'scope_reference': scope_reference,
+    report = {'market': 'EGX', 'scope_reference': scope_reference,
             'scope_kind': 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE',
             'requested': len(scope), 'scanned': sum(item['scanned'] for item in outcomes),
             'status_counts': {s: counts[s] for s in ('WATCH', 'READY_NO_SIGNAL', 'EVIDENCE_BLOCKED')},
             'symbols': outcomes, 'live_money': False}
+
+    if history_path is not None:
+        from app.egx_scan_history import write_scan_history
+        write_scan_history(report, history_path)
+    return report

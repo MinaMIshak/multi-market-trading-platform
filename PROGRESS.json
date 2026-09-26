@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EGX_SCAN_COORDINATOR_FOUNDATION",
-  "current_capability": "Explicit-scope EGX coordinator calls existing non-publishing SWING verifier, isolates symbol failures, and counts only accepted verification results; operational universe wiring pending",
+  "phase": "EGX_SCAN_HISTORY_VISIBILITY",
+  "current_capability": "Explicit-scope EGX coordinator optionally persists atomic last-run summaries; SYSTEM exposes historical run scope separately from current verified receipt counts",
   "starting_head": "e55fbbc",
-  "head": "a2e0a549f0b8ba2ea2933aaf1a87c2be4f4611d9",
+  "head": "d92f75a063e9051645ff5a711b5aa5b0a843d659",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,10 +32,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "5 coordinator stdlib regressions and 8 existing SYSTEM/heartbeat regressions PASS; git diff --check PASS. Full strategy/API integration and full suite remain pending unavailable dependencies.",
+  "tests": "16 stdlib coordinator/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Actual verifier integration and full suite remain pending unavailable dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "Compose API and scheduler share /app/data/scheduler-heartbeat.json; OBSERVE default preserved. Running worker unverified.",
-  "next_action": "Wire explicit EGX scan inputs and persisted run outcomes into scheduler/SYSTEM; retain dated-universe blocker and existing launch admission restrictions. Validate actual verifier integration when dependencies are available.",
+  "next_action": "Wire decoded explicit EGX launch inputs and scan history path into scheduler configuration; preserve OBSERVE default, dated-universe blocker and launch admission restrictions. Validate actual verifier integration when dependencies are available.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

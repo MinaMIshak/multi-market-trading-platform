@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.ui.operational import load_operational_state
 from app.scheduler_heartbeat import load_heartbeat
+from app.egx_scan_history import load_scan_history
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -45,6 +46,7 @@ def load_system_state():
         'checkpoint': checkpoint,
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': load_heartbeat(),
+        'egx_scan_history': load_scan_history(),
         'markets': {
             'EGX': {'baseline_universe': 224, 'authoritative_universe': None,
                     'status': operational['status'], **counts,
@@ -74,5 +76,6 @@ def render_system(state):
             + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler', 'providers')})
             + block('EGX — isolated receipt scope', state['markets']['EGX'])
             + block('US', state['markets']['US'])
+            + block('EGX last completed scan — historical scope only', state['egx_scan_history'])
             + block('Project checkpoint — reported history, not runtime verification', state['checkpoint'])
             + '</body></html>')
