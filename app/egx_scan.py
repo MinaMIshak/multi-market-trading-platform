@@ -6,11 +6,19 @@ failed verification are classified, never counted as completed strategy scans.
 from collections import Counter
 from pathlib import Path
 
-from app.egx_scope import valid_scope_symbol
+from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 
 
 class ScanBlocked(ValueError):
     """Reviewed admission failure from the operational verifier."""
+
+    def __init__(self, reason, status="EVIDENCE_BLOCKED"):
+        super().__init__(reason)
+        self.status = {
+            "DATA_STALE": "DATA_STALE",
+            "DATA_INSUFFICIENT": "NOT_READY",
+            "EVIDENCE_BLOCKED": "EVIDENCE_BLOCKED",
+        }.get(status, "EVIDENCE_BLOCKED")
 
 
 def _verify(database, data_root, source):
@@ -21,7 +29,7 @@ def _verify(database, data_root, source):
     try:
         return run_signal(database, data_root, source, Path(data_root), publish=False)
     except LaunchBlocked as exc:
-        raise ScanBlocked(exc.reason) from exc
+        raise ScanBlocked(exc.reason, exc.status) from exc
 
 
 def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, history_path=None,
@@ -68,7 +76,7 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
                     item.update(status=result['signal_status'], scanned=True,
                                 reason='existing SWING verification completed', verification=result)
                 except ScanBlocked as exc:
-                    item['reason'] = str(exc)
+                    item.update(status=exc.status, reason=str(exc))
                 except Exception as exc:
                     # Exception text may contain provider credentials or paths.
                     # Only known launch failures expose their reviewed reason.
@@ -79,7 +87,7 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
     report = {'market': 'EGX', 'scope_reference': scope_reference,
             'scope_kind': 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE',
             'requested': len(scope), 'scanned': sum(item['scanned'] for item in outcomes),
-            'status_counts': {s: counts[s] for s in ('WATCH', 'READY_NO_SIGNAL', 'EVIDENCE_BLOCKED')},
+            'status_counts': {s: counts[s] for s in SCAN_STATUSES},
             'symbols': outcomes, 'live_money': False}
 
     if history_path is not None:

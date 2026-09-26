@@ -23,7 +23,8 @@ class EgxScanTests(unittest.TestCase):
         self.assertEqual(verify.call_count, 3)
         self.assertEqual(result['requested'], 4)
         self.assertEqual(result['scanned'], 2)
-        self.assertEqual(result['status_counts'], {'WATCH': 1, 'READY_NO_SIGNAL': 1, 'EVIDENCE_BLOCKED': 2})
+        self.assertEqual(result['status_counts'], {'WATCH': 1, 'READY_NO_SIGNAL': 1, 'EVIDENCE_BLOCKED': 2,
+                                                   'DATA_STALE': 0, 'NOT_READY': 0})
         self.assertNotIn('private provider detail', str(result))
         self.assertFalse(result['live_money'])
 
@@ -61,6 +62,19 @@ class EgxScanTests(unittest.TestCase):
             result = self.run_scope(('A',), {'A': SimpleNamespace(symbol='A')})
         self.assertEqual(result['symbols'][0]['reason'], 'required calendar evidence unavailable')
         self.assertEqual(result['scanned'], 0)
+
+    def test_data_failures_keep_status_without_counting_as_scans(self):
+        cases = [('DATA_STALE', 'DATA_STALE'), ('DATA_INSUFFICIENT', 'NOT_READY'),
+                 ('EVIDENCE_BLOCKED', 'EVIDENCE_BLOCKED'), ('WATCH', 'EVIDENCE_BLOCKED'),
+                 ('UNKNOWN', 'EVIDENCE_BLOCKED')]
+        for admission, expected in cases:
+            with self.subTest(admission=admission), patch(
+                    'app.egx_scan._verify', side_effect=ScanBlocked('reviewed reason', admission)):
+                report = self.run_scope(('A',), {'A': SimpleNamespace(symbol='A')})
+                self.assertEqual(report['symbols'][0]['status'], expected)
+                self.assertFalse(report['symbols'][0]['scanned'])
+                self.assertEqual(report['scanned'], 0)
+                self.assertEqual(report['status_counts'][expected], 1)
 
     def test_incomplete_or_unsafe_result_is_not_a_scan(self):
         for result in ({}, {'signal_status': 'WATCH'}, {'operation': 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'},

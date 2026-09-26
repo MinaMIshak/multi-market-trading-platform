@@ -202,6 +202,23 @@ def test_nonpublishing_verification_returns_scope_identity(launch):
     assert not directory.exists()
 
 
+@pytest.mark.parametrize('status, expected', [
+    ('DATA_STALE', 'DATA_STALE'), ('DATA_INSUFFICIENT', 'NOT_READY'),
+    ('EVIDENCE_BLOCKED', 'EVIDENCE_BLOCKED'),
+])
+def test_scanner_adapter_preserves_launch_rejection_status(monkeypatch, status, expected):
+    from app.egx_scan import ScanBlocked, _verify
+
+    def reject(*args, **kwargs):
+        raise LaunchBlocked(status, 'reviewed admission reason')
+
+    monkeypatch.setattr(swing_launch, 'run_signal', reject)
+    with pytest.raises(ScanBlocked) as caught:
+        _verify(None, '/unused', None)
+    assert caught.value.status == expected
+    assert str(caught.value) == 'reviewed admission reason'
+
+
 def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
     db, root, source, _, path, provider, _ = launch
 

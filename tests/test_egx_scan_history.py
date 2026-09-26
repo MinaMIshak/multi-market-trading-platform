@@ -3,9 +3,10 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.egx_scan import scan_egx_scope
+from app.egx_scan import ScanBlocked, scan_egx_scope
 from app.egx_scan_history import load_scan_history
 from app.ui.system import load_system_state, render_system
 
@@ -25,6 +26,49 @@ class ScanHistoryTests(unittest.TestCase):
             self.assertIsNone(state['markets']['EGX']['scanned'])
             self.assertIn('fixture &lt;scope&gt;', render_system(state))
             self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_data_statuses_survive_history_and_system_without_current_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scan.json'
+            with patch('app.egx_scan._verify', side_effect=[
+                    ScanBlocked('stale history', 'DATA_STALE'),
+                    ScanBlocked('short history', 'DATA_INSUFFICIENT')]):
+                scan_egx_scope(symbols=['A', 'B'],
+                               sources={s: SimpleNamespace(symbol=s) for s in ('A', 'B')},
+                               database=None, data_root=directory,
+                               scope_reference='fixture', history_path=path)
+            with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
+                state = load_system_state()
+                history = state['egx_scan_history']
+                self.assertEqual(history['status'], 'HISTORICAL_RUN')
+                self.assertEqual(history['run']['scanned'], 0)
+                self.assertEqual(history['run']['status_counts']['DATA_STALE'], 1)
+                self.assertEqual(history['run']['status_counts']['NOT_READY'], 1)
+                self.assertIsNone(state['markets']['EGX']['scanned'])
+                self.assertIn('DATA_STALE', render_system(state))
+                raw = json.loads(path.read_text())
+                raw['symbols'][0]['scanned'] = True
+                raw['scanned'] = 1
+                path.write_text(json.dumps(raw))
+                self.assertEqual(load_scan_history()['status'], 'UNKNOWN')
+
+    def test_legacy_history_remains_readable_but_cannot_claim_new_statuses(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'scan.json'
+            scan_egx_scope(symbols=['A'], sources={}, database=None,
+                           data_root=directory, scope_reference='fixture', history_path=path)
+            raw = json.loads(path.read_text())
+            raw['schema_version'] = 1
+            del raw['status_counts']['DATA_STALE']
+            del raw['status_counts']['NOT_READY']
+            path.write_text(json.dumps(raw))
+            with patch.dict('os.environ', {'EGX_SCAN_HISTORY_PATH': str(path)}, clear=True):
+                self.assertEqual(load_scan_history()['status'], 'HISTORICAL_RUN')
+                raw['symbols'][0]['status'] = 'DATA_STALE'
+                raw['status_counts']['EVIDENCE_BLOCKED'] = 0
+                raw['status_counts']['DATA_STALE'] = 1
+                path.write_text(json.dumps(raw))
+                self.assertEqual(load_scan_history()['status'], 'UNKNOWN')
 
     def test_corrupt_inconsistent_and_future_history_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -59,7 +103,7 @@ class ScanHistoryTests(unittest.TestCase):
             scan_egx_scope(symbols=['A'], sources={}, database=None,
                            data_root=directory, scope_reference='fixture', history_path=path)
             valid = json.loads(path.read_text())
-            invalid = [valid | {'schema_version': value} for value in (True, 1.0)]
+            invalid = [valid | {'schema_version': value} for value in (True, 1.0, 2.0, 3)]
             for status, count in valid['status_counts'].items():
                 for value in (bool(count), float(count)):
                     invalid.append(valid | {'status_counts': valid['status_counts'] | {status: value}})

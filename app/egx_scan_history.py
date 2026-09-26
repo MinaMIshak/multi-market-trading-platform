@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 
-from app.egx_scope import valid_scope_symbol
+from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 
 
 def write_scan_history(report, path):
@@ -15,7 +15,7 @@ def write_scan_history(report, path):
     summary = {key: report[key] for key in (
         'market', 'scope_reference', 'scope_kind', 'requested', 'scanned',
         'status_counts', 'live_money')}
-    summary.update(schema_version=1, completed_at=datetime.now(timezone.utc).isoformat(),
+    summary.update(schema_version=2, completed_at=datetime.now(timezone.utc).isoformat(),
                    symbols=[{key: row[key] for key in ('symbol', 'status', 'scanned', 'reason')}
                             for row in report['symbols']])
     temporary = None
@@ -38,8 +38,8 @@ def load_scan_history():
         raw = json.loads(Path(configured).read_text())
         completed = datetime.fromisoformat(raw['completed_at'])
         rows = raw['symbols']
-        statuses = ('WATCH', 'READY_NO_SIGNAL', 'EVIDENCE_BLOCKED')
-        if (type(raw['schema_version']) is not int or raw['schema_version'] != 1
+        statuses = SCAN_STATUSES if raw['schema_version'] == 2 else SCAN_STATUSES[:3]
+        if (type(raw['schema_version']) is not int or raw['schema_version'] not in (1, 2)
                 or raw['market'] != 'EGX'
                 or raw['live_money'] is not False
                 or raw['scope_kind'] != 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE'
