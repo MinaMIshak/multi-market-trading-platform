@@ -16,3 +16,14 @@ SCAN_STATUSES = ("WATCH", "READY_NO_SIGNAL", "EVIDENCE_BLOCKED", "DATA_STALE", "
 # Supported launch/refresh scope, never authoritative universe evidence.
 LaunchSymbol = Literal["COMI", "EAST", "FWRY", "ORAS", "SWDY"]
 LAUNCH_SYMBOLS = get_args(LaunchSymbol)
+
+
+def require_equity_identity(resolved, *, symbol, instrument_id):
+    """Admit an exact master identity; this does not prove dated membership."""
+    if (not isinstance(resolved, dict)
+            or not valid_scope_symbol(symbol) or instrument_id is None
+            or str(resolved.get('instrument_id')) != str(instrument_id)
+            or resolved.get('canonical_ticker') != symbol):
+        raise ValueError('security-master identity mismatch')
+    if resolved.get('instrument_type') != 'EQUITY':
+        raise ValueError('security-master equity classification required')

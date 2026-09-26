@@ -100,3 +100,14 @@ for both types; these remain unexecuted because pytest/runtime dependencies are
 unavailable. The 37 stdlib scanner and visibility regressions pass. This guard
 does not establish dated membership or increase coverage; broad scope expansion
 and real launch integration remain pending.
+
+## Incremental checkpoint: independently validated identity admission
+
+The launch equity identity gate now delegates to a dependency-free production
+predicate. Four regression tests cover matching UUID/text identities, wrong or
+missing identity fields, INDEX/UNKNOWN/missing classification and malformed
+master rows. Missing fields now produce reviewed admission failures rather than
+uncaught key errors. All 41 affected stdlib tests pass; actual launch integration
+and the full suite still require unavailable pytest/pydantic dependencies.
+Package installation retry returned no matching distributions. No new universe,
+data readiness, scan execution or deployment is claimed.

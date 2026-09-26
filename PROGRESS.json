@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EQUITY_IDENTITY_ADMISSION",
-  "current_capability": "EGX launch identity admission now requires an explicit EQUITY security-master classification in addition to matching ticker and instrument ID, before refresh or signal preparation. INDEX, UNKNOWN and missing classifications fail closed. Broad coverage remains pending.",
+  "phase": "EQUITY_IDENTITY_REGRESSION_VALIDATION",
+  "current_capability": "Shared EGX launch equity identity admission has dependency-free regression coverage for exact ticker/UUID, INDEX/UNKNOWN/missing classification, and malformed master rows. Missing identity fields fail closed with reviewed diagnostics. Broad coverage remains pending.",
   "starting_head": "e55fbbc",
-  "head": "56a95d7605a27a77be91b22b2e3193ddaaeeb90c",
+  "head": "a33d71407d86e2570498a2e42ffef54ca3dfb1b9",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,15 +47,15 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "37 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Added INDEX and UNKNOWN launch rejection regressions; execution attempted but pytest unavailable in /tmp/egx-mission-venv, with pydantic also confirmed absent. Launch integration/full release suite pending dependencies.",
+  "tests": "41 stdlib equity identity/scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Real launch integration and full release suite remain pending missing pytest/pydantic; package installation retry returned no matching distributions.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Validate launch identity regressions when dependencies are available. Assess authoritative dated EGX membership and expand launch/refresh scope together with source/calendar/action admission coverage; preserve 224 baseline. Runtime integration and safe deployment remain pending.",
+  "next_action": "Expand explicit EGX launch/refresh scope together with provider identity admission and focused integration tests when dependencies are available. Establish authoritative dated membership without treating the undated master as a universe; preserve 224 baseline. Runtime integration and safe deployment remain pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "System Python and /tmp/egx-mission-venv lack runtime/test dependencies; pip installation failed because package-host DNS is unavailable. Integration/full suite pending.",
+    "test_execution": "pytest/pydantic remain unavailable in /tmp/egx-mission-venv; package installation retry returned no matching distributions. Shared production identity predicate validated independently; launch integration/full suite pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

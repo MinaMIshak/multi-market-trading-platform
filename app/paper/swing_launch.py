@@ -23,7 +23,7 @@ from app.data.point_in_time import PointInTimeDailyRepository
 from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
-from app.egx_scope import LaunchSymbol
+from app.egx_scope import LaunchSymbol, require_equity_identity
 from app.paper.shadow_candidate_admission import ShadowCandidateAdmission
 from app.paper.shadow_facts import ForwardSessionFact, SESSION_FIELDS, _require_fields
 from app.paper.shadow_producer import StrategyShadowRequest, StrategyShadowSelection, produce_strategy_watchlist
@@ -157,11 +157,10 @@ def _identity(database, source):
         resolved = SecurityMasterRepository(database).resolve(source.symbol, provider='canonical')
     except (KeyError, ValueError):
         _blocked('required security-master identity unavailable')
-    if (str(resolved['instrument_id']) != str(source.instrument_id)
-            or resolved['canonical_ticker'] != source.symbol):
-        _blocked('security-master identity mismatch')
-    if resolved.get('instrument_type') != 'EQUITY':
-        _blocked('security-master equity classification required')
+    try:
+        require_equity_identity(resolved, symbol=source.symbol, instrument_id=source.instrument_id)
+    except ValueError as exc:
+        _blocked(str(exc))
 
 
 def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_token=None, provider=None):
