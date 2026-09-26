@@ -1,4 +1,5 @@
 """Manual EGX SWING v1 WATCH composition. No scheduler or execution inference."""
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from decimal import Context, Decimal, localcontext
 import hashlib
@@ -182,6 +183,26 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
             'valid_bar_count': result.items[0].valid_bar_count}
 
 
+class _OperationalWindowRepository(PointInTimeDailyRepository):
+    """Windowed consumer view retaining the full admitted source's PIT audit."""
+
+    def __init__(self, references, history_start):
+        super().__init__(references, selection_context="OPERATIONAL_EXPLICIT_SYMBOL")
+        self.history_start = history_start
+
+    def window(self, data, signal_date):
+        return replace(
+            data,
+            rows=tuple(b for b in data.rows
+                       if self.history_start <= b.market_date <= signal_date),
+            split_adjusted=tuple(b for b in data.split_adjusted
+                                 if self.history_start <= b.market_date <= signal_date),
+        )
+
+    def load(self, **kwargs):
+        return self.window(super().load(**kwargs), kwargs['expected_market_date'])
+
+
 def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
     at = _now()
     source = admit_calendar(source, at)
@@ -238,15 +259,8 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
     )
     data = repository.load(raw_path=artifact['raw_path'], universe_date=day,
                            expected_market_date=day, as_of=at)
-    if len(data.rows) < 260:
-        _blocked('refresh admission requires 260 valid bars; SWING requires 50', 'DATA_INSUFFICIENT')
-    DailyRefreshAdmissionPolicy().validate_rows(data.rows, expected_market_date=day)
     if any(b.instrument_id != source.instrument_id or b.canonical_symbol != source.symbol for b in data.rows):
         _blocked('canonical history identity mismatch')
-    expected_days = {s.market_date for s in source.sessions
-                     if s.market_date <= day and s.instrument_state == 'EXPECTED_OBSERVATION'}
-    if {b.market_date for b in data.rows} != expected_days:
-        _blocked('bar dates differ from authenticated eligible history', 'DATA_INSUFFICIENT')
     # Consumer layers never read canonical artifact files or their paths.
     # Re-materialize deterministically from the admitted immutable raw/PIT
     # boundary and bind that materialization to the validated artifact ledger.
@@ -277,11 +291,29 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
             or package.raw_receipt.local_received_at != manifest.received_at
             or package.raw_receipt.source_locator != artifact['source_uri']):
         _blocked('daily evidence must bind exact admitted raw bytes')
-    candidate = SwingEngine(repository, swing_config()).evaluate(
+    window_repository = _OperationalWindowRepository(references, source.history_start)
+    data = window_repository.window(data, day)
+    if len(data.rows) < 260:
+        _blocked('refresh admission requires 260 valid bars; SWING requires 50', 'DATA_INSUFFICIENT')
+    DailyRefreshAdmissionPolicy().validate_rows(data.rows, expected_market_date=day)
+    expected_days = {s.market_date for s in source.sessions
+                     if s.market_date <= day and s.instrument_state == 'EXPECTED_OBSERVATION'}
+    if {b.market_date for b in data.rows} != expected_days:
+        _blocked('bar dates differ from authenticated eligible history', 'DATA_INSUFFICIENT')
+    candidate = SwingEngine(window_repository, swing_config()).evaluate(
         raw_path=artifact['raw_path'], signal_date=day, decision_time=at)
     # Both loads must agree; never mix two PIT editions in a signal/plan.
     if json.loads(candidate.evidence_json)['source_audit_id'] != data.audit_id:
         _blocked('PIT snapshot changed during evaluation')
+    evidence = json.loads(candidate.evidence_json)
+    evidence['operational_history_window'] = {
+        'history_start': source.history_start.isoformat(),
+        'signal_date': day.isoformat(),
+        'bar_count': len(data.rows),
+    }
+    candidate = candidate.model_copy(update={
+        'evidence_json': json.dumps(evidence, sort_keys=True, separators=(',', ':')),
+    })
     plan = build_q03_plan(canonical_close=data.rows[-1].close, symbol=source.symbol,
                           instrument_id=source.instrument_id, decision_at=at,
                           entry_session=source.entry_session, source_audit_id=data.audit_id)

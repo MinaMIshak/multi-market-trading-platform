@@ -101,8 +101,21 @@ def launch(tmp_path, monkeypatch, request):
     if getattr(request, 'param', None) == 'no_signal':
         for bar in bars:
             bar.update(open=100, high=101, low=99, close=100, adjusted_close=100)
+    if getattr(request, 'param', None) == 'long_source':
+        bars = [dict(date=str(start-timedelta(days=140-i)), open=1000+i,
+                     high=1001+i, low=999+i, close=1000+i,
+                     adjusted_close=1000+i, volume=10000) for i in range(140)] + bars
     provider = EngineeringProvider(bars)
-    refreshed = refresh_once(db, root, source, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
+    refresh_source = source
+    if getattr(request, 'param', None) == 'long_source':
+        earlier = tuple(HistoricalSessionRecord(
+            market_date=start-timedelta(days=140-i), market_state='TRADING_SESSION',
+            instrument_state='EXPECTED_OBSERVATION', evidence=shared,
+        ) for i in range(140))
+        refresh_source = source.model_copy(update={
+            'history_start': start-timedelta(days=140), 'sessions': (*earlier, *records),
+        })
+    refreshed = refresh_once(db, root, refresh_source, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
     assert refreshed['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
     refs = ReferenceRepository(db, ImmutableRawStore(root/'raw'))
     for bar in bars:
@@ -111,7 +124,7 @@ def launch(tmp_path, monkeypatch, request):
                    members=[dict(instrument_id=str(ID), symbol='COMI', eligible=True)])
         m = ingest(refs, doc)
         review(refs, m, doc['contract'])
-    actions = dict(contract='egx-actions-v1', instrument_id=str(ID), coverage_start=str(start),
+    actions = dict(contract='egx-actions-v1', instrument_id=str(ID), coverage_start=bars[0]['date'],
                    coverage_end=str(day), published_at=(at-timedelta(days=400)).isoformat(),
                    complete=True, actions=[])
     m = ingest(refs, actions)
@@ -129,6 +142,55 @@ def launch(tmp_path, monkeypatch, request):
     path = tmp_path/'engineering-input.json'
     path.write_text(source.model_dump_json())
     return db, root, source, destination, path, provider, at
+
+
+@pytest.mark.parametrize('launch', ['long_source'], indirect=True)
+@pytest.mark.parametrize('damage', [None, 'short_window', 'missing_session', 'ledger'])
+def test_operational_window_preserves_full_source_binding(launch, damage):
+    from app.strategies.eod import evaluate_swing_series
+
+    db, root, source, directory, _, provider, _ = launch
+    assert len(provider.records) == 400
+    if damage == 'short_window':
+        source = source.model_copy(update={
+            'history_start': source.history_start + timedelta(days=1),
+            'sessions': source.sessions[1:],
+        })
+    elif damage == 'missing_session':
+        first = source.sessions[0].model_copy(update={
+            'market_state': 'NON_SESSION', 'instrument_state': 'NOT_APPLICABLE',
+        })
+        source = source.model_copy(update={'sessions': (first, *source.sessions[1:])})
+    elif damage == 'ledger':
+        with db.connect() as con:
+            con.execute("UPDATE daily_canonical_artifacts SET sha256=?", ('f'*64,))
+    if damage:
+        with pytest.raises(LaunchBlocked) as error:
+            swing_launch.prepare_signal(db, root, source)
+        assert error.value.status == ('EVIDENCE_BLOCKED' if damage == 'ledger' else 'DATA_INSUFFICIENT')
+        return
+
+    _, candidate, plan, data = swing_launch.prepare_signal(db, root, source)
+    assert len(data.rows) == len(data.split_adjusted) == 260
+    assert data.rows[0].market_date == source.history_start
+    assert data.rows[-1].market_date == source.signal_session.market_date
+    expected = evaluate_swing_series(
+        closes=tuple(float(b['close']) for b in provider.records[-260:]),
+        highs=tuple(float(b['high']) for b in provider.records[-260:]),
+        config=swing_launch.swing_config(),
+    )
+    evidence = json.loads(candidate.evidence_json)
+    assert evidence['fast_ema'] == expected.fast_ema
+    assert evidence['slow_ema'] == expected.slow_ema
+    assert evidence['source_audit_id'] == data.audit_id
+    assert evidence['operational_history_window'] == {
+        'history_start': str(source.history_start),
+        'signal_date': str(source.signal_session.market_date), 'bar_count': 260,
+    }
+    assert plan.entry_reference == data.rows[-1].close
+    assert run_signal(db, root, source, directory, publish=True)['status'] == 'PUBLISHED_PAPER_SIGNAL'
+    with db.connect() as con:
+        assert con.execute('SELECT record_count FROM daily_canonical_artifacts').fetchone()[0] == 400
 
 
 def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
