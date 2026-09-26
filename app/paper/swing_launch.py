@@ -23,6 +23,7 @@ from app.data.point_in_time import PointInTimeDailyRepository
 from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
+from app.egx_scope import LaunchSymbol
 from app.paper.shadow_candidate_admission import ShadowCandidateAdmission
 from app.paper.shadow_facts import ForwardSessionFact, SESSION_FIELDS, _require_fields
 from app.paper.shadow_producer import StrategyShadowRequest, StrategyShadowSelection, produce_strategy_watchlist
@@ -44,7 +45,7 @@ class LaunchBlocked(ValueError):
 
 class SwingLaunchInput(Contract):
     schema_version: Literal['swing-paper-launch-v1']
-    symbol: Literal['COMI', 'EAST', 'FWRY', 'ORAS', 'SWDY']
+    symbol: LaunchSymbol
     instrument_id: UUID
     # Explicit human selection, never derived from an M4 state.
     decision_status: Literal['WATCH']

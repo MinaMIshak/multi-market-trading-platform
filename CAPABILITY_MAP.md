@@ -81,3 +81,12 @@ A synthetic 224-symbol regression preserves every requested member as blocked
 with zero scans; it is capacity testing, not actual EGX membership or coverage.
 33 affected stdlib regressions pass. Five-symbol launch restriction, authoritative
 membership evidence, runtime dependencies and deployment remain unresolved.
+
+## Incremental checkpoint: launch coverage diagnostics
+
+Explicit configuration now distinguishes supplied inputs outside the supported
+five-symbol launch contract from malformed evidence. Unsupported symbols remain
+in scope as EVIDENCE_BLOCKED with zero scanned contribution. The configuration
+and launch model share one Literal contract. Refresh target expansion and dated
+membership evidence remain pending; no market coverage increase is claimed.
+37 affected stdlib tests pass; real launch integration awaits dependencies.

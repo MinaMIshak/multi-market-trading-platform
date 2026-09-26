@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SCAN_DATA_STATUS_PRESERVATION",
-  "current_capability": "EGX explicit-scope scanner preserves DATA_STALE and maps DATA_INSUFFICIENT to NOT_READY without counting either as scanned. SYSTEM historical summaries accept schema v2 statuses and retain v1 compatibility. Five-symbol launch admission and all source/calendar/action gates remain unchanged.",
+  "phase": "EXPLICIT_LAUNCH_COVERAGE_BLOCKERS",
+  "current_capability": "Explicit EGX scan configuration distinguishes unsupported launch symbols from malformed evidence. All requested symbols remain classified; unsupported supplied inputs remain EVIDENCE_BLOCKED and unscanned. Shared launch symbol contract preserves existing five-symbol admission.",
   "starting_head": "e55fbbc",
-  "head": "54ae7176047f97617de8dbbb82323986f4dba618",
+  "head": "c80ef50fab089bf3fe4ee58c8d14d72e1298af55",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "36 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. New real launch adapter regression added but not executed: /tmp/egx-mission-venv lacks pytest. Full runtime integration/release suite remains pending dependencies.",
+  "tests": "37 stdlib scanner/configuration/dispatcher/history/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Initial suite command used nonexistent test_system_status; corrected to test_system_visibility and all tests passed. Runtime launch integration and full release suite remain pending dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue authoritative dated EGX membership assessment and safe launch-scope expansion; preserve 224 baseline and source/calendar/action admission. Run launch adapter and scheduler integration tests when dependencies are available. MISSION.txt absent; supplied supervisor mission remains authoritative.",
+  "next_action": "Assess authoritative dated EGX membership and expand launch/refresh scope together with security identity and source/calendar/action admission regression coverage. Preserve 224 baseline. Runtime integration and safe deployment remain pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

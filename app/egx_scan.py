@@ -51,6 +51,7 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
     # Only fixed diagnostic codes cross the configuration boundary; never echo
     # decoder exceptions or caller-supplied text into operator-visible reports.
     reasons = {
+        'LAUNCH_SYMBOL_UNSUPPORTED': 'symbol outside supported launch scope; coverage expansion pending',
         'INVALID_LAUNCH_EVIDENCE': 'launch evidence failed contract validation',
         'LAUNCH_IDENTITY_MISMATCH': 'launch identity does not match requested symbol',
     }

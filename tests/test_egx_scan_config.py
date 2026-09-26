@@ -10,7 +10,7 @@ from app.egx_scan import scan_egx_scope
 class ScanConfigurationTests(unittest.TestCase):
     def envelope(self):
         return dict(schema_version='egx-explicit-scan-v1', scope_reference='fixture',
-                    symbols=['A', 'B', 'C'], launch_inputs={})
+                    symbols=['COMI', 'EAST', 'FWRY'], launch_inputs={})
 
     def test_missing_inputs_remain_in_scope_and_blocked(self):
         with patch('app.egx_scan_config._read', return_value=self.envelope()):
@@ -25,16 +25,16 @@ class ScanConfigurationTests(unittest.TestCase):
         self.assertEqual(result['status_counts']['EVIDENCE_BLOCKED'], 3)
 
     def test_invalid_and_mismatched_documents_do_not_drop_symbols(self):
-        raw = self.envelope() | {'launch_inputs': {'A': {}, 'B': {}, 'C': {}}}
-        source = SimpleNamespace(symbol='A')
+        raw = self.envelope() | {'launch_inputs': {'COMI': {}, 'EAST': {}, 'FWRY': {}}}
+        source = SimpleNamespace(symbol='COMI')
         with patch('app.egx_scan_config._read', return_value=raw), patch(
                 'app.egx_scan_config._decode_launch', side_effect=[
-                    source, ValueError('private content'), SimpleNamespace(symbol='A')]):
+                    source, ValueError('private content'), SimpleNamespace(symbol='COMI')]):
             config = load_scan_configuration('/tmp/fixture.json')
-        self.assertEqual(config.symbols, ('A', 'B', 'C'))
-        self.assertEqual(config.sources, {'A': source})
-        self.assertEqual(config.source_errors, {'B': 'INVALID_LAUNCH_EVIDENCE',
-                                               'C': 'LAUNCH_IDENTITY_MISMATCH'})
+        self.assertEqual(config.symbols, ('COMI', 'EAST', 'FWRY'))
+        self.assertEqual(config.sources, {'COMI': source})
+        self.assertEqual(config.source_errors, {'EAST': 'INVALID_LAUNCH_EVIDENCE',
+                                               'FWRY': 'LAUNCH_IDENTITY_MISMATCH'})
         with patch('app.egx_scan._verify', side_effect=ValueError('private content')):
             report = scan_egx_scope(symbols=config.symbols, sources=config.sources,
                                    source_errors=config.source_errors,
@@ -47,7 +47,7 @@ class ScanConfigurationTests(unittest.TestCase):
 
     def test_invalid_envelopes_fail_before_decode(self):
         valid = self.envelope()
-        cases = [None, [], valid | {'symbols': []}, valid | {'symbols': ['A', 'A']},
+        cases = [None, [], valid | {'symbols': []}, valid | {'symbols': ['COMI', 'COMI']},
                  valid | {'symbols': [' A']}, valid | {'symbols': [None]},
                  valid | {'scope_reference': ''}, valid | {'schema_version': 'future'},
                  valid | {'launch_inputs': {'OTHER': {}}}, valid | {'extra': True}]
@@ -59,6 +59,24 @@ class ScanConfigurationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     load_scan_configuration('/tmp/fixture.json')
                 decode.assert_not_called()
+
+    def test_unsupported_input_is_explicit_and_never_decoded(self):
+        raw = self.envelope() | {'symbols': ['COMI', 'FIXTURE'],
+                                 'launch_inputs': {'FIXTURE': {}}}
+        with patch('app.egx_scan_config._read', return_value=raw), patch(
+                'app.egx_scan_config._decode_launch') as decode:
+            config = load_scan_configuration('/tmp/fixture.json')
+        decode.assert_not_called()
+        self.assertEqual(config.source_errors, {'FIXTURE': 'LAUNCH_SYMBOL_UNSUPPORTED'})
+        report = scan_egx_scope(symbols=config.symbols, sources=config.sources,
+                               source_errors=config.source_errors,
+                               scope_reference=config.scope_reference,
+                               database=None, data_root='/tmp')
+        self.assertEqual(report['requested'], 2)
+        self.assertEqual(report['scanned'], 0)
+        self.assertEqual(report['status_counts']['EVIDENCE_BLOCKED'], 2)
+        self.assertIn('outside supported launch scope', report['symbols'][1]['reason'])
+        self.assertEqual(report['symbols'][0]['reason'], 'launch evidence unavailable')
 
     def test_relative_path_rejected_without_read(self):
         with patch('app.egx_scan_config._read') as read:
