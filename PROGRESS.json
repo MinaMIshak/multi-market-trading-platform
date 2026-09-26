@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "milestone": "M1",
+  "phase": "PROJECT_AUDIT",
+  "current_capability": "complete_project_audit",
+  "starting_head": "e55fbbc",
+  "head": "e55fbbc",
+  "egx": {
+    "baseline_universe": 224,
+    "authoritative_universe": null,
+    "data_ready": null,
+    "eligible": null,
+    "scanned": null,
+    "watch": null,
+    "ready_no_signal": null,
+    "not_ready": null,
+    "data_stale": null,
+    "evidence_blocked": null
+  },
+  "us": {
+    "configured_universe": null,
+    "data_ready": null,
+    "eligible": null,
+    "scanned": null,
+    "candidates": null
+  },
+  "tests": "baseline previously validated; current mission has not started",
+  "deployment": "current operational baseline deployed",
+  "scheduler": "preserve current state until required by validated milestone",
+  "next_action": "perform one-time project audit and create PROJECT_AUDIT.md and CAPABILITY_MAP.md",
+  "hard_blocker": null,
+  "live_money": false
+}
