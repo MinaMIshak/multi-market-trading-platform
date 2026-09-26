@@ -46,6 +46,7 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
                 try:
                     result = _verify(database, data_root, source)
                     if (result.get('operation') != 'VERIFIED_SIGNAL_NOT_PUBLISHED'
+                            or result.get('symbol') != symbol or result.get('market') != 'EGX'
                             or result.get('signal_status') not in ('WATCH', 'READY_NO_SIGNAL')
                             or result.get('mode') != 'SHADOW' or result.get('live') != 'DISABLED'
                             or result.get('market_data') != 'FRESH'):

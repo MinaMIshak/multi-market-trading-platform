@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SCAN_HISTORY_COUNT_CONTRACT_HARDENING",
-  "current_capability": "SYSTEM rejects malformed scan-history schema versions, noninteger status counts and untrimmed symbol identities; valid historical runs remain separate from current readiness. Scheduler integration and deployment remain unvalidated.",
+  "phase": "SCAN_VERIFICATION_IDENTITY_BINDING",
+  "current_capability": "EGX scanner requires verifier-returned symbol and market to match the requested scope before counting a scan. Verifier now returns explicit identity. Scheduler integration and deployment remain unvalidated.",
   "starting_head": "e55fbbc",
-  "head": "de387e70631cd11bc5eaf9e34e1d346571e3b822",
+  "head": "6711ceaf635d7d48a290de218db22102614ba32a",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -32,10 +32,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "28 stdlib scanner/history/dispatcher/configuration/SYSTEM/heartbeat regressions PASS; git diff --check PASS. System Python still lacks pydantic, pytest and fastapi; integration/full suite pending.",
+  "tests": "29 stdlib scanner/history/dispatcher/configuration/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Real launch identity regression added but execution pending: system Python has no pytest; integration/full suite remain pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Run SQLite scheduler and worker/decoder/verifier integration when dependencies are available. Continue authoritative EGX universe and free-data coverage work; preserve existing completed audit and provider investigations.",
+  "next_action": "Run launch identity and SQLite scheduler integration regressions when dependencies are available. Continue authoritative EGX universe and free-data coverage work; preserve completed audit and provider investigations.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

@@ -193,6 +193,15 @@ def test_operational_window_preserves_full_source_binding(launch, damage):
         assert con.execute('SELECT record_count FROM daily_canonical_artifacts').fetchone()[0] == 400
 
 
+def test_nonpublishing_verification_returns_scope_identity(launch):
+    db, root, source, directory, _, _, _ = launch
+    result = run_signal(db, root, source, directory, publish=False)
+    assert result['operation'] == 'VERIFIED_SIGNAL_NOT_PUBLISHED'
+    assert result['symbol'] == source.symbol
+    assert result['market'] == 'EGX'
+    assert not directory.exists()
+
+
 def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
     db, root, source, _, path, provider, _ = launch
 

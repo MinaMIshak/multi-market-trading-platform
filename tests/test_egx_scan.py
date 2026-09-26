@@ -14,11 +14,11 @@ class EgxScanTests(unittest.TestCase):
     def test_every_symbol_classified_and_failure_does_not_abort_scope(self):
         sources = {s: SimpleNamespace(symbol=s) for s in ('A', 'B', 'D')}
         verified = {'operation': 'VERIFIED_SIGNAL_NOT_PUBLISHED', 'mode': 'SHADOW',
-                    'live': 'DISABLED', 'market_data': 'FRESH'}
+                    'live': 'DISABLED', 'market_data': 'FRESH', 'market': 'EGX'}
         with patch('app.egx_scan._verify', side_effect=[
                 RuntimeError('private provider detail'),
-                verified | {'signal_status': 'READY_NO_SIGNAL'},
-                verified | {'signal_status': 'WATCH'}]) as verify:
+                verified | {'signal_status': 'READY_NO_SIGNAL', 'symbol': 'B'},
+                verified | {'signal_status': 'WATCH', 'symbol': 'D'}]) as verify:
             result = self.run_scope(('A', 'B', 'C', 'D'), sources)
         self.assertEqual(verify.call_count, 3)
         self.assertEqual(result['requested'], 4)
@@ -32,6 +32,18 @@ class EgxScanTests(unittest.TestCase):
             result = self.run_scope(('A',), {'A': SimpleNamespace(symbol='B')})
         verify.assert_not_called()
         self.assertEqual(result['scanned'], 0)
+
+    def test_result_identity_must_match_requested_market_and_symbol(self):
+        verified = {'operation': 'VERIFIED_SIGNAL_NOT_PUBLISHED', 'mode': 'SHADOW',
+                    'live': 'DISABLED', 'market_data': 'FRESH', 'signal_status': 'WATCH'}
+        for identity in ({}, {'symbol': 'B', 'market': 'EGX'},
+                         {'symbol': 'A', 'market': 'US'},
+                         {'symbol': ' A', 'market': 'EGX'}):
+            with self.subTest(identity=identity), patch(
+                    'app.egx_scan._verify', return_value=verified | identity):
+                report = self.run_scope(('A',), {'A': SimpleNamespace(symbol='A')})
+                self.assertEqual(report['scanned'], 0)
+                self.assertEqual(report['status_counts']['EVIDENCE_BLOCKED'], 1)
 
     def test_reviewed_admission_reason_is_preserved(self):
         with patch('app.egx_scan._verify', side_effect=ScanBlocked('required calendar evidence unavailable')):

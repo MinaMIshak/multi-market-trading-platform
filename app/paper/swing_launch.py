@@ -323,6 +323,7 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
 def run_signal(database, data_root, source, directory: Path, *, publish: bool):
     source, candidate, plan, data = prepare_signal(database, data_root, source)
     result = {'status': 'NOT_RUN', 'market_data': 'FRESH',
+              'symbol': source.symbol, 'market': 'EGX',
               'last_verified_session': source.signal_session.market_date.isoformat(),
               'decision_at': candidate.decision_time.isoformat(), 'strategy_id': 'SWING',
               'strategy_version': '1', 'mode': 'SHADOW', 'live': 'DISABLED',
