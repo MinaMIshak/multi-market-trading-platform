@@ -1,5 +1,5 @@
 """Explicit local scan configuration; loading never authorizes execution."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -19,6 +19,7 @@ class ScanConfiguration:
     symbols: tuple[str, ...]
     scope_reference: str
     sources: dict
+    source_errors: dict = field(default_factory=dict)
 
 
 def load_scan_configuration(path):
@@ -43,13 +44,16 @@ def load_scan_configuration(path):
             or not set(raw['launch_inputs']) <= set(raw['symbols'])):
         raise ValueError('invalid explicit scan configuration')
     sources = {}
+    source_errors = {}
     for symbol, document in raw['launch_inputs'].items():
         try:
             source = _decode_launch(document)
             if source.symbol == symbol:
                 sources[symbol] = source
+            else:
+                source_errors[symbol] = 'LAUNCH_IDENTITY_MISMATCH'
         except ValueError:
             # Invalid per-symbol evidence stays in scope with no launch input.
             # Never expose raw document/validation errors (may contain secrets).
-            continue
-    return ScanConfiguration(tuple(raw['symbols']), raw['scope_reference'], sources)
+            source_errors[symbol] = 'INVALID_LAUNCH_EVIDENCE'
+    return ScanConfiguration(tuple(raw['symbols']), raw['scope_reference'], sources, source_errors)

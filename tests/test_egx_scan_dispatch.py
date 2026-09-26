@@ -20,7 +20,8 @@ class ScanDispatchTests(unittest.TestCase):
         self.evaluation = NS(calendar_truth='VERIFIED_TRADING_DAY', market_date='fixture',
                              due=[NS(name=Checkpoint.PRIMARY)])
         self.config = patch('app.egx_scan_dispatch.load_scan_configuration',
-                            return_value=NS(symbols=('A',), sources={}, scope_reference='fixture')).start()
+                            return_value=NS(symbols=('A',), sources={}, scope_reference='fixture',
+                                            source_errors={'A': 'INVALID_LAUNCH_EVIDENCE'})).start()
         self.scan = patch('app.egx_scan_dispatch.scan_egx_scope',
                           return_value={'requested': 1, 'scanned': 0}).start()
         self.addCleanup(patch.stopall)
@@ -55,6 +56,8 @@ class ScanDispatchTests(unittest.TestCase):
         self.assertEqual(result['scanned'], 0)
         self.repo.mark_succeeded.assert_called_once()
         self.scan.assert_called_once()
+        self.assertEqual(self.scan.call_args.kwargs['source_errors'],
+                         {'A': 'INVALID_LAUNCH_EVIDENCE'})
 
     def test_failure_is_redacted_and_fallback_reloads(self):
         self.config.side_effect = ValueError('sensitive content')

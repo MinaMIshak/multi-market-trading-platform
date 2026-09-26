@@ -33,6 +33,17 @@ class EgxScanTests(unittest.TestCase):
         verify.assert_not_called()
         self.assertEqual(result['scanned'], 0)
 
+    def test_configuration_rejection_overrides_source_and_redacts_unknown_code(self):
+        with patch('app.egx_scan._verify') as verify:
+            result = scan_egx_scope(
+                symbols=('A', 'B'), sources={'A': SimpleNamespace(symbol='A')},
+                source_errors={'A': 'INVALID_LAUNCH_EVIDENCE', 'B': 'private content'},
+                database=None, data_root='/unused', scope_reference='fixture')
+        verify.assert_not_called()
+        self.assertEqual(result['scanned'], 0)
+        self.assertEqual(result['status_counts']['EVIDENCE_BLOCKED'], 2)
+        self.assertNotIn('private content', str(result))
+
     def test_result_identity_must_match_requested_market_and_symbol(self):
         verified = {'operation': 'VERIFIED_SIGNAL_NOT_PUBLISHED', 'mode': 'SHADOW',
                     'live': 'DISABLED', 'market_data': 'FRESH', 'signal_status': 'WATCH'}

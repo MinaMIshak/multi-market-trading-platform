@@ -30,6 +30,7 @@ def dispatch_scan(*, evaluation, repository, database, data_root,
             config = load_scan_configuration(config_path)
             report = scan_egx_scope(
                 symbols=config.symbols, sources=config.sources,
+                source_errors=config.source_errors,
                 scope_reference=config.scope_reference, database=database,
                 data_root=data_root, history_path=history_path)
             # Validate completion before persisting success. A malformed report

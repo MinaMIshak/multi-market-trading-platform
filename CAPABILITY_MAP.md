@@ -61,3 +61,12 @@ to current ready/scanned/candidate totals. An isolated receipt count is not a
 full-universe scan run. U.S. fields remain unknown until actual scope is supplied.
 Expose scheduler state independently from API health. A source-control HEAD or
 checkpoint revision is not the deployed build revision.
+
+## Incremental checkpoint: scan coverage blockers
+
+Explicit scan configuration now retains safe diagnostic codes for invalid launch
+contracts and symbol mismatches. The scheduler forwards these to the coordinator,
+which preserves EVIDENCE_BLOCKED and zero scanned contribution for rejected inputs.
+Missing inputs remain distinguishable; raw decoder details are never reported.
+22 focused stdlib scanner/configuration/dispatcher/history regressions pass.
+No authoritative membership, newly ready symbols or runtime scans were established.

@@ -22,7 +22,8 @@ def _verify(database, data_root, source):
         raise ScanBlocked(exc.reason) from exc
 
 
-def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, history_path=None):
+def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, history_path=None,
+                   source_errors=None):
     """Verify each distinct configured symbol; preserve existing admission gates.
 
     sources maps symbols to SwingLaunchInput objects already decoded by the
@@ -35,11 +36,20 @@ def scan_egx_scope(*, symbols, sources, database, data_root, scope_reference, hi
             or len(set(scope)) != len(scope)):
         raise ValueError('unique nonempty explicit scope and reference required')
     outcomes = []
+    # Only fixed diagnostic codes cross the configuration boundary; never echo
+    # decoder exceptions or caller-supplied text into operator-visible reports.
+    reasons = {
+        'INVALID_LAUNCH_EVIDENCE': 'launch evidence failed contract validation',
+        'LAUNCH_IDENTITY_MISMATCH': 'launch identity does not match requested symbol',
+    }
+    source_errors = source_errors or {}
     for symbol in scope:
         item = {'symbol': symbol, 'market': 'EGX', 'status': 'EVIDENCE_BLOCKED',
                 'scanned': False, 'reason': 'launch evidence unavailable'}
         source = sources.get(symbol)
-        if source is not None:
+        if symbol in source_errors:
+            item['reason'] = reasons.get(source_errors[symbol], 'launch evidence rejected')
+        elif source is not None:
             if getattr(source, 'symbol', None) != symbol:
                 item['reason'] = 'launch identity does not match requested symbol'
             else:

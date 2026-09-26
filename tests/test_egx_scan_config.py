@@ -33,6 +33,17 @@ class ScanConfigurationTests(unittest.TestCase):
             config = load_scan_configuration('/tmp/fixture.json')
         self.assertEqual(config.symbols, ('A', 'B', 'C'))
         self.assertEqual(config.sources, {'A': source})
+        self.assertEqual(config.source_errors, {'B': 'INVALID_LAUNCH_EVIDENCE',
+                                               'C': 'LAUNCH_IDENTITY_MISMATCH'})
+        with patch('app.egx_scan._verify', side_effect=ValueError('private content')):
+            report = scan_egx_scope(symbols=config.symbols, sources=config.sources,
+                                   source_errors=config.source_errors,
+                                   scope_reference=config.scope_reference,
+                                   database=None, data_root='/tmp')
+        self.assertEqual(report['scanned'], 0)
+        self.assertEqual(report['symbols'][1]['reason'], 'launch evidence failed contract validation')
+        self.assertEqual(report['symbols'][2]['reason'], 'launch identity does not match requested symbol')
+        self.assertNotIn('private content', str(report))
 
     def test_invalid_envelopes_fail_before_decode(self):
         valid = self.envelope()

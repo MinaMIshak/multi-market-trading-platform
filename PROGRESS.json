@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "PER_SYMBOL_RECEIPT_FAILURE_ISOLATION",
-  "current_capability": "Operational UI isolates malformed verification receipts per symbol; valid neighbors retain verified states, blocked symbols expose a reason and no trade plan. SYSTEM counts preserve this distinction. Scheduler integration and deployment remain unvalidated.",
+  "phase": "SCAN_COVERAGE_BLOCKER_DIAGNOSTICS",
+  "current_capability": "Explicit EGX scan configuration preserves distinct missing, invalid-contract and identity-mismatch blockers through scheduled verification and historical reports. Rejected inputs remain EVIDENCE_BLOCKED and unscanned; decoder details are redacted. No new runtime coverage claimed.",
   "starting_head": "e55fbbc",
-  "head": "b668f6111708e1fc467e7a2999b6bf7355d5392a",
+  "head": "6037e4840afcc36f5f7f578399699b53fc696939",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "30 stdlib scanner/history/dispatcher/configuration/SYSTEM/heartbeat regressions PASS; git diff --check PASS. Updated operational FastAPI regression, launch identity and SQLite scheduler integration execution pending missing pytest/pydantic/fastapi. Isolated dependency install failed: package-host DNS unavailable; full suite not run.",
+  "tests": "22 stdlib scanner/configuration/dispatcher/history regressions PASS; 9 SYSTEM/heartbeat regressions PASS; git diff --check PASS. Full runtime integration remains pending previously recorded missing dependencies; no full suite or deployment validation this cycle.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue authoritative EGX universe and free-data coverage from existing evidence. Run pending launch identity, operational UI and SQLite scheduler integration regressions once dependencies are available; do not repeat the completed audit.",
+  "next_action": "Establish authoritative dated EGX membership from admissible existing evidence; assess safe expansion beyond the five-symbol launch contract while preserving security-master identity, source review and calendar/action admission. Run pending runtime integration when dependencies are available.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
