@@ -197,3 +197,13 @@ These malformed inputs now fail closed before payload canonicalization.
 Added 15 parametrized regression cases; execution awaits pytest/pydantic.
 48 existing dependency-free scope/scan/heartbeat regressions and changed-file
 syntax checks pass. No new market observation or deployment is claimed.
+
+## Incremental checkpoint: scheduler heartbeat contract
+
+SYSTEM rejects boolean and fractional heartbeat schema versions. The optional
+writer validates supported modes, positive integer polling intervals and aware
+timestamps before creating a temporary file or replacing previous evidence.
+Malformed input preserves the last valid heartbeat, which still expires normally.
+54 dependency-free heartbeat/SYSTEM/scope/mapping/scanner/configuration/dispatcher/
+history tests pass, including separate-process reader/writer coverage. No runtime
+scheduler operation, deployment or current market coverage is inferred.

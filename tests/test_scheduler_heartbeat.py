@@ -69,6 +69,7 @@ class HeartbeatTests(unittest.TestCase):
                 valid = json.loads(path.read_text())
                 damaged = ['[]', 'null', '{']
                 for key, value in [('mode', 'live'), ('market', 'US'), ('schema_version', 2),
+                                   ('schema_version', True), ('schema_version', 1.0),
                                    ('observed_at', (now + timedelta(seconds=1)).isoformat()),
                                    ('observed_at', now.replace(tzinfo=None).isoformat()),
                                    ('valid_until', now.isoformat())]:
@@ -76,6 +77,27 @@ class HeartbeatTests(unittest.TestCase):
                 for payload in damaged:
                     path.write_text(payload)
                     self.assertEqual(load_heartbeat(now=now)['status'], 'UNKNOWN')
+
+    def test_invalid_writer_input_preserves_previous_heartbeat(self):
+        now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'heartbeat.json'
+            with patch.dict('os.environ', {'EGX_SCHEDULER_HEARTBEAT_PATH': str(path)}, clear=True):
+                valid = dict(mode='observe', poll_seconds=30, now=now)
+                write_heartbeat(**valid)
+                before = path.read_bytes()
+                invalid = [('mode', 'live'), ('mode', None),
+                           ('now', now.replace(tzinfo=None)), ('now', '2026-09-26'),
+                           ('now', False), ('now', 0)]
+                invalid.extend(('poll_seconds', value) for value in
+                               (True, False, 0, -1, 1.0, float('nan'), float('inf'), '30', None))
+                for key, value in invalid:
+                    with self.subTest(key=key, value=value):
+                        with self.assertRaises(ValueError):
+                            write_heartbeat(**{**valid, key: value})
+                        self.assertEqual(before, path.read_bytes())
+                        self.assertEqual(load_heartbeat(now=now)['status'], 'RECENT_POLL')
+                        self.assertEqual(list(Path(directory).iterdir()), [path])
 
     def test_unconfigured_disabled_and_relative_path_rejected(self):
         with patch.dict('os.environ', {}, clear=True):

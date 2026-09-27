@@ -13,7 +13,13 @@ def write_heartbeat(*, mode, poll_seconds, now=None):
     path = Path(configured)
     if not path.is_absolute():
         raise ValueError('heartbeat path must be absolute')
-    now = now or datetime.now(timezone.utc)
+    if mode not in ('observe', 'paper_refresh'):
+        raise ValueError('unsupported heartbeat mode')
+    if type(poll_seconds) is not int or poll_seconds <= 0:
+        raise ValueError('heartbeat poll interval must be a positive integer')
+    now = datetime.now(timezone.utc) if now is None else now
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError('heartbeat timestamp must be timezone aware')
     payload = {'schema_version': 1, 'market': 'EGX', 'mode': mode,
                'observed_at': now.isoformat(),
                'valid_until': (now + timedelta(seconds=max(60, poll_seconds * 3))).isoformat()}
@@ -35,7 +41,8 @@ def load_heartbeat(*, now=None):
         return unknown
     try:
         raw = json.loads(Path(configured).read_text())
-        if (raw['schema_version'] != 1 or raw['market'] != 'EGX'
+        if (type(raw['schema_version']) is not int or raw['schema_version'] != 1
+                or raw['market'] != 'EGX'
                 or raw['mode'] not in ('observe', 'paper_refresh')):
             return unknown
         observed = datetime.fromisoformat(raw['observed_at'])
