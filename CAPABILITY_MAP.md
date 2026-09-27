@@ -460,3 +460,16 @@ invalid-window subcases. Dependency-backed ingestion tests were attempted but
 pytest is unavailable. These are engineering fixtures, not market evidence.
 No acquisition, new coverage, deployment or scheduled operation is claimed.
 Reviewed free-provider composition and runtime integration remain pending.
+
+## Incremental checkpoint: direct index ingestion date admission
+
+Direct index ingestion now rejects non-calendar-date window inputs, reversed
+bounds and snapshot dates before the requested end before provider or storage
+access. Valid single-day windows and later snapshots remain accepted. This closes
+the index counterpart of the daily equity chronology gap without changing market
+calendars, provider payloads or canonical promotion.
+
+38 focused offline stdlib tests pass, including 14 invalid index-window subcases
+and valid fetch-boundary checks. Dependency-backed index ingestion and official
+refresh suites were attempted but pytest is unavailable. No market acquisition,
+coverage increase, deployment or scheduled operation is claimed.

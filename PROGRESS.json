@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "DIRECT_INGESTION_WINDOW_ADMISSION",
-  "current_capability": "Direct daily ingestion now requires calendar-date request windows and a snapshot on or after the requested end date before identity resolution, acquisition or persistence. Existing alias and history admission remain enforced.",
+  "phase": "INDEX_INGESTION_WINDOW_ADMISSION",
+  "current_capability": "Direct index ingestion now rejects non-calendar-date windows, reversed bounds and snapshots before the requested end date before provider acquisition or persistence, matching daily equity chronology admission.",
   "starting_head": "e55fbbc",
-  "head": "7aaef8c3cb87f7c882acb70c07e5c10b7b4b0bde",
+  "head": "a367c2f43b7d7e27845ce2adf74a90c92dea54f5",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "36 offline stdlib ingestion, admission, refresh execution and result contract tests PASS; git diff --check PASS. Dependency-backed ingestion suite attempted but pytest unavailable; full integration pending.",
+  "tests": "38 focused offline stdlib index/daily ingestion, admission, execution and result tests PASS; git diff --check PASS. Dependency-backed index ingestion and official refresh suites attempted but pytest unavailable; integration pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
