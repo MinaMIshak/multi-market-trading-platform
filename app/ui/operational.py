@@ -58,10 +58,15 @@ def load_operational_state():
                                 'status': 'EVIDENCE_BLOCKED', 'trade_plan': None,
                                 'reason': 'invalid verification receipt'}
                 state['symbols'].append(item)
-        blocked = sum(item['status'] == 'EVIDENCE_BLOCKED' for item in state['symbols'])
-        status = 'OPERATIONAL'
-        if blocked:
-            status = 'EVIDENCE_BLOCKED' if blocked == len(state['symbols']) else 'PARTIAL'
+        statuses = {item['status'] for item in state['symbols']}
+        if not statuses:
+            status = 'NOT_READY'
+        elif statuses <= {'WATCH', 'READY_NO_SIGNAL'}:
+            status = 'OPERATIONAL'
+        elif len(statuses) == 1:
+            status = next(iter(statuses))
+        else:
+            status = 'PARTIAL'
         return state | {'available': True, 'status': status}
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error):
         return state | {'symbols': [], 'status': 'EVIDENCE_BLOCKED'}

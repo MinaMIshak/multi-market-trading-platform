@@ -432,3 +432,18 @@ and an admitted alias reaching the exact fetch request. Existing integration
 fixtures now declare explicit aliases. Four dependency-backed suites were
 attempted but pytest is unavailable. No acquisition, coverage increase, deployment
 or scheduled operation is claimed; reviewed free-provider composition remains pending.
+
+## Incremental checkpoint: operational aggregate readiness
+
+The operational reader and SYSTEM now classify empty and wholly unverified
+receipt scopes as NOT_READY, stale-only scopes as DATA_STALE, and mixed states
+as PARTIAL. OPERATIONAL requires a nonempty scope consisting entirely of current
+WATCH/READY_NO_SIGNAL receipts. Availability still means the database was readable;
+counts retain their isolated receipt scope and do not imply universe coverage.
+
+42 affected stdlib SYSTEM, heartbeat, scanner, history, configuration and dispatch
+tests pass, including SQLite aggregate-state cases and read-only verification.
+FastAPI UI validation was attempted but pytest remains unavailable; package
+installation returned no matching distribution. No fresh acquisition, coverage,
+scheduled operation or deployment is claimed. Free-provider composition remains
+pending.

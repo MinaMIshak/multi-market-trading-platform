@@ -12,6 +12,44 @@ from app.ui.system import load_system_state, render_system
 
 
 class SystemVisibilityTests(unittest.TestCase):
+    def test_aggregate_status_requires_current_verified_symbols(self):
+        # Real SQLite reader, synthetic receipts: no market observations.
+        cases = [([], 'NOT_READY', 0),
+                 (['NOT_READY'], 'NOT_READY', 0),
+                 (['DATA_STALE'], 'DATA_STALE', 0),
+                 (['NOT_READY', 'DATA_STALE'], 'PARTIAL', 0),
+                 (['WATCH', 'DATA_STALE'], 'PARTIAL', 1),
+                 (['READY_NO_SIGNAL', 'NOT_READY'], 'PARTIAL', 1),
+                 (['WATCH', 'READY_NO_SIGNAL'], 'OPERATIONAL', 2)]
+        now = datetime.now(timezone.utc)
+        for statuses, expected, scanned in cases:
+            with self.subTest(statuses=statuses), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'platform.db'
+                with sqlite3.connect(path) as db:
+                    db.executescript('CREATE TABLE daily_canonical_artifacts(canonical_symbol TEXT); CREATE TABLE audit_events(event_id TEXT, event_type TEXT, entity_id TEXT, created_at TEXT, payload_json TEXT);')
+                    db.execute('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?)',
+                               ('pit', 'PIT_DATA_VALIDATED', '', '', '{}'))
+                    for index, status in enumerate(statuses):
+                        symbol = 'FIXTURE' + str(index)
+                        db.execute('INSERT INTO daily_canonical_artifacts VALUES (?)', (symbol,))
+                        if status == 'NOT_READY':
+                            continue
+                        expiry = now + timedelta(hours=-1 if status == 'DATA_STALE' else 1)
+                        payload = json.dumps(dict(
+                            symbol=symbol, market='EGX', live='DISABLED', mode='SHADOW',
+                            status='READY_NO_SIGNAL' if status == 'DATA_STALE' else status,
+                            pit_audit_id='pit', decision_at=(now - timedelta(days=1)).isoformat(),
+                            valid_until=expiry.isoformat()))
+                        db.execute('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?)',
+                                   (sha256(payload.encode()).hexdigest(), 'PAPER_SIGNAL_VERIFIED',
+                                    symbol, now.isoformat(), payload))
+                before = path.read_bytes()
+                with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
+                    state = load_system_state()
+                self.assertEqual(state['markets']['EGX']['status'], expected)
+                self.assertEqual(state['markets']['EGX']['scanned'], scanned)
+                self.assertEqual(before, path.read_bytes())
+
     def test_invalid_receipt_isolated_without_hiding_verified_symbols(self):
         # Classification fixtures only; no real scans or market data are created.
         now = datetime.now(timezone.utc)
