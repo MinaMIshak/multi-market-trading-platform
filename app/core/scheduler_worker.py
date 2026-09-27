@@ -33,6 +33,7 @@ from app.core.scheduler_execution_context import (
 )
 
 
+from app.core.scheduler_acquisition_config import worker_acquisition_options
 from app.scheduler_heartbeat import write_heartbeat
 
 
@@ -115,6 +116,8 @@ def main() -> None:
         if not all(Path(p).is_absolute() for p in (scan_config_path, scan_history_path)):
             raise ValueError("local scan requires absolute config and history paths")
 
+    acquisition_options = worker_acquisition_options(mode.value, os.environ)
+
     secret_path = os.getenv(
         "EODHD_API_TOKEN_FILE",
         "/run/secrets/eodhd_api_token",
@@ -172,6 +175,7 @@ def main() -> None:
             scheduler_repository=repository,
             db_path=db_path,
             secret_path=secret_path,
+            **acquisition_options,
         )
     )
 
