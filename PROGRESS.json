@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "SOURCE_BOUND_ACQUISITION_COST",
-  "current_capability": "Unified read-only product shell at / and /api/product with TODAY, LIVE, PRE-SURGE, SWING, PERFORMANCE, RESEARCH and SYSTEM views across EGX, US and ALL. EGX uses existing operational receipts; disconnected US and unsupported coverage/performance remain UNKNOWN/null. Root no longer falls back to legacy signals. Existing evidence pages and compatibility endpoints preserved. Explicit refresh acquisition now binds caller-supplied quota cost evidence to the exact provider, alias and date window through an immutable DailyQuotaCostContract. Scope mismatch fails before quota reservation/transport; repeated and failed attempts retain durable charges. Legacy deterministic runtime cost callbacks remain supported. This is software contract validation, not provider rights or health evidence.",
+  "phase": "SCHEDULER_BATCH_ACQUISITION_COST",
+  "current_capability": "Unified read-only product shell at / and /api/product with TODAY, LIVE, PRE-SURGE, SWING, PERFORMANCE, RESEARCH and SYSTEM views across EGX, US and ALL. EGX uses existing operational receipts; disconnected US and unsupported coverage/performance remain UNKNOWN/null. Root no longer falls back to legacy signals. Existing evidence pages and compatibility endpoints preserved. Explicit refresh acquisition now binds caller-supplied quota cost evidence to the exact provider, alias and date window through an immutable DailyQuotaCostContract. Scope mismatch fails before quota reservation/transport; repeated and failed attempts retain durable charges. Legacy deterministic runtime cost callbacks remain supported. This is software contract validation, not provider rights or health evidence. Scheduler execution-context API now accepts an explicit injected provider, multi-target scope and immutable exact cost-contract collection without reading legacy secrets. Runtime preflights all request costs after alias admission before any fetch or charge. Each actual attempt remains independently charged; partial failures preserve charges and fallback eligibility. Later sessions require matching dated contracts. Worker environment configuration is not yet connected to this API; no production cost evidence supplied.",
   "starting_head": "e55fbbc",
-  "head": "c7abf6079c0076315c56fe646410e58c3c9bc896",
+  "head": "9e124b3467f761217bf0cf768fa114b3de7129a6",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "90 focused offline stdlib tests PASS across quota contracts/real SQLite ledger, launch composition, alias admission, ingestion windows/results, execution and mapping. git diff --check PASS. Dependency-backed integration/full suite remains pending under unchanged known package blockers; no retries or network/provider observations.",
+  "tests": "64 focused offline stdlib tests PASS covering actual scheduler context/runtime composition with fixture dependencies, refresh execution/job, exact cost contracts, real SQLite quota ledger, source continuity and launch selection. git diff --check PASS. Dependency-backed integration/full suite pending under unchanged package blockers; no dependency/network retries or provider observations.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
-  "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue free-provider acquisition composition by integrating exact source/request cost contracts into scheduler-driven explicit multi-target acquisition, preserving alias preflight and per-attempt durable charging. Bind only genuine provider-specific cost evidence; no production cost contract supplied by this cycle. Preserve existing source-review/data/calendar/action gates and 224 EGX baseline. Dependency-backed integration and safe deployment remain pending.",
+  "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Explicit multi-target provider/cost injection implemented in execution-context API; worker configuration wiring and actual scheduled operation remain pending.",
+  "next_action": "Connect scheduler worker opt-in configuration to explicit provider/target/batch-cost composition using existing provider construction and reviewed evidence interfaces. Inspect only relevant worker/config/provider code; do not invent production cost evidence or infer future-session costs. Preserve OBSERVE default, alias/data/calendar/action gates, zero-paid operation and 224 EGX baseline. Dependency-backed integration and safe deployment remain pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

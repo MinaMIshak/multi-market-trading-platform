@@ -114,6 +114,7 @@ class DailyRefreshJob:
             ...,
         ],
         target_admission: Any | None = None,
+        request_admission: Any | None = None,
     ) -> None:
         # Validate and execute the same scope, including when callers supply
         # a mutable list or a one-shot iterable instead of a tuple.
@@ -160,6 +161,7 @@ class DailyRefreshJob:
         )
         self.targets = targets
         self.target_admission = target_admission
+        self.request_admission = request_admission
 
     def run(
         self,
@@ -198,6 +200,10 @@ class DailyRefreshJob:
 
         if self.target_admission is not None:
             self.target_admission(provider_name=provider_name, targets=self.targets)
+
+        if self.request_admission is not None:
+            self.request_admission(provider_name=provider_name, targets=self.targets,
+                                   start_date=start_date, end_date=end_date)
 
         completed: list[
             DailyRefreshItemResult

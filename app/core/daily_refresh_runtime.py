@@ -27,7 +27,9 @@ from app.data.ingestion_repository import (
     DataIngestionRepository,
 )
 from app.data.provider import MarketDataProvider
-from app.data.quota import QuotaGuard, QuotaPolicy, QuotaLimitedDailyProvider
+from app.data.quota import (
+    DailyQuotaCostContracts, QuotaGuard, QuotaLimitedDailyProvider, QuotaPolicy,
+)
 from app.data.providers.eodhd import (
     EODHDProvider,
 )
@@ -186,6 +188,8 @@ def build_daily_refresh_runtime(
         ),
         targets=targets,
         target_admission=partial(require_refresh_targets, resolver),
+        request_admission=(quota_cost_contract.require_requests
+                           if type(quota_cost_contract) is DailyQuotaCostContracts else None),
     )
 
     execution_adapter = (

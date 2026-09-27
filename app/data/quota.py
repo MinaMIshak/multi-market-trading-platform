@@ -93,6 +93,35 @@ class DailyQuotaCostContract:
         return self.cost
 
 
+@dataclass(frozen=True)
+class DailyQuotaCostContracts:
+    """Finite reviewed requests; never extrapolate costs to later sessions."""
+    contracts: tuple[DailyQuotaCostContract, ...]
+
+    def __post_init__(self):
+        contracts = tuple(self.contracts)
+        if not contracts or any(type(c) is not DailyQuotaCostContract for c in contracts):
+            raise QuotaRejected('exact daily cost contracts required')
+        keys = [(c.provider_name, c.symbol, c.start_date, c.end_date) for c in contracts]
+        if len(keys) != len(set(keys)):
+            raise QuotaRejected('duplicate daily cost scope')
+        object.__setattr__(self, 'contracts', contracts)
+
+    def resolve(self, *, provider_name, symbol, start_date, end_date):
+        for contract in self.contracts:
+            if (contract.provider_name == provider_name and contract.symbol == symbol
+                    and contract.start_date == start_date and contract.end_date == end_date):
+                return contract.resolve(provider_name=provider_name, symbol=symbol,
+                                        start_date=start_date, end_date=end_date)
+        raise QuotaRejected('quota request does not match reviewed cost scope')
+
+    def require_requests(self, *, provider_name, targets, start_date, end_date):
+        # Preflight all costs without reserving; each actual attempt charges later.
+        for target in targets:
+            self.resolve(provider_name=provider_name, symbol=target.provider_symbol,
+                         start_date=start_date, end_date=end_date)
+
+
 class QuotaGuard:
     def __init__(self, database: Database, *, policy: QuotaPolicy = QuotaPolicy(),
                  clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
@@ -148,7 +177,8 @@ class QuotaGuard:
 class QuotaLimitedDailyProvider:
     """Only the currently supported automatic operation is exposed.
 
-    cost_contract is an exact DailyQuotaCostContract or a local, deterministic
+    cost_contract is an exact DailyQuotaCostContract, a DailyQuotaCostContracts batch,
+    or a local, deterministic
     callback that performs no network I/O and receives exact request inputs.
     Legacy callbacks remain supported; they must verify their own cost scope.
     """
@@ -165,7 +195,7 @@ class QuotaLimitedDailyProvider:
         provider_name = self.name
         inputs = dict(symbol=symbol, start_date=start_date, end_date=end_date)
         try:
-            if type(self._cost_contract) is DailyQuotaCostContract:
+            if type(self._cost_contract) in (DailyQuotaCostContract, DailyQuotaCostContracts):
                 cost = self._cost_contract.resolve(provider_name=provider_name, **inputs)
             else:
                 cost = (self._cost_contract(**inputs)
