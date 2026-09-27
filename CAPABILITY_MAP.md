@@ -567,3 +567,18 @@ stdlib tests pass afterward. Dependency-backed job/runtime integration was
 attempted but pytest is unavailable. No acquisition, coverage increase,
 scheduled operation or deployment is claimed. Reviewed free-provider
 composition remains pending.
+
+## Incremental checkpoint: quota callback source continuity
+
+The daily quota wrapper now rejects provider identity changes during cost
+calculation before reservation and during quota admission before transport.
+Committed reservations remain consumed on rejection. This closes the callback
+gap between refresh alias preflight and the provider request; it adds no source
+rights, market evidence or operational coverage.
+
+Validation: two new regressions failed before the fix; 60 affected offline
+stdlib tests pass afterward, including unchanged request forwarding, quota
+rejection and sanitized transport failures. Dependency-backed quota/runtime
+suites were attempted but pytest is unavailable. No acquisition, fresh coverage,
+scheduled execution or deployment is claimed. Reviewed free-provider composition
+and runtime integration remain pending.

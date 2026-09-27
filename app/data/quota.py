@@ -122,13 +122,20 @@ class QuotaLimitedDailyProvider:
         return self._provider.name
 
     def fetch_daily_bars(self, *, symbol, start_date, end_date):
+        provider_name = self.name
         inputs = dict(symbol=symbol, start_date=start_date, end_date=end_date)
         try:
             cost = (self._cost_contract(**inputs)
                     if self._cost_contract is not None else None)
         except Exception:
             raise QuotaRejected("quota cost contract unavailable") from None
+        if self.name != provider_name:
+            raise QuotaRejected("provider identity changed during quota admission")
         self._guard.admit(cost)
+        # Admission callbacks must not switch the alias-bound source before
+        # transport. A committed reservation is never refunded on rejection.
+        if self.name != provider_name:
+            raise QuotaRejected("provider identity changed during quota admission")
         try:
             return self._provider.fetch_daily_bars(**inputs)
         except Exception:
