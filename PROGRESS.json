@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "QUOTA_LEDGER_OFFLINE_VALIDATION",
-  "current_capability": "Preserved quota module isolation completed; full quota and Database implementations validated offline for durable reservations, source continuity, concurrent budget enforcement, UTC resets, fail-closed ledger errors and opt-in schema upgrades.",
+  "phase": "UNIFIED_PRODUCT_SHELL",
+  "current_capability": "Unified read-only product shell at / and /api/product with TODAY, LIVE, PRE-SURGE, SWING, PERFORMANCE, RESEARCH and SYSTEM views across EGX, US and ALL. EGX uses existing operational receipts; disconnected US and unsupported coverage/performance remain UNKNOWN/null. Root no longer falls back to legacy signals. Existing evidence pages and compatibility endpoints preserved.",
   "starting_head": "e55fbbc",
-  "head": "b0ebc08b5babea6b25a24078a54bfae163ab8f78",
+  "head": "5d083f0f4dded5d65df5066f864887d97261be81",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "70 focused offline stdlib tests PASS, including 10 new actual SQLite quota ledger contracts and 60 existing source/refresh/mapping/launch/window/execution contracts. git diff --check PASS. Known unavailable dependency-backed suites not retried; no runtime/provider evidence inferred.",
+  "tests": "88 focused offline stdlib contracts PASS, including 10 product shell contracts covering all 21 market/section combinations and actual route bodies isolated from unavailable dependencies. git diff --check PASS. FastAPI HTTP integration/full dependency-backed suite pending; known package blockers not retried. No runtime/provider observations.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Preserved quota WIP now completed with actual SQLite validation; dependency-backed runtime/FastAPI integration remains pending package availability. Unified Product Shell is the next near-term product slice per CYCLE_CONTEXT after integrity commit. Retain 224 EGX baseline pending authoritative dated membership; safe deployment pending.",
+  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence, using completed durable quota controls. Unified Product Shell initial integration complete; connect further views only to validated operational evidence. Run dependency-backed HTTP integration when packages become available. Retain 224 EGX baseline pending authoritative dated membership; safe deployment pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

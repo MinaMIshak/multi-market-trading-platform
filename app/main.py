@@ -3,18 +3,16 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
 from app.core.config import settings
 from app.ui.performance import render_performance_dashboard
 from app.ui.shadow import load_shadow_watchlist, render_shadow_watchlist
-from app.ui.today import (
-    load_today_state,
-    render_today_dashboard,
-)
+from app.ui.today import load_today_state
 from app.ui.system import load_system_state, render_system
-from app.ui.operational import load_operational_state, render_operational
+from app.ui.operational import load_operational_state
+from app.ui.product import product_state, render_product
 
 
 app = FastAPI(
@@ -26,14 +24,16 @@ app = FastAPI(
 
 
 @app.get("/", response_class=HTMLResponse)
-def root() -> HTMLResponse:
-    operational = load_operational_state()
-    if operational['configured']:
-        return HTMLResponse(render_operational(operational))
-    state = load_today_state()
-    return HTMLResponse(
-        render_today_dashboard(state, shadow_state=shadow())
-    )
+def root(market: str = 'ALL', section: str = 'TODAY') -> HTMLResponse:
+    return HTMLResponse(render_product(product(market, section)))
+
+
+@app.get('/api/product')
+def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
+    try:
+        return product_state(load_operational_state(), market, section)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail='Unknown product view') from exc
 
 
 @app.get("/api/today")

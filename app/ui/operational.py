@@ -72,7 +72,7 @@ def load_operational_state():
         return state | {'symbols': [], 'status': 'EVIDENCE_BLOCKED'}
 
 
-def render_operational(state):
+def render_operational(state, *, fragment=False):
     def text(value):
         return escape(str(value))
     content = '<h2>Operational Paper/Shadow</h2><p>LIVE MONEY DISABLED · Candidate != fill · No execution or performance inference</p>'
@@ -89,6 +89,8 @@ def render_operational(state):
             plan = item['trade_plan']
             content += '<p>Unsized WATCH · Entry band: ' + text(plan['entry_low']) + '–' + text(plan['entry_high']) + ' · Stop: ' + text(plan['stop_price']) + ' · Target: ' + text(plan['target_1']) + '</p>'
         content += '</article>'
+    if fragment:
+        return content
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Paper/Shadow operational dashboard</title><style>'
             'body{background:#071019;color:#e9f0f5;font:16px Arial,sans-serif;max-width:1100px;margin:32px auto;padding:20px}'
