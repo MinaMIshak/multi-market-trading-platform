@@ -13,6 +13,36 @@ from app.egx_scan_history import load_scan_history
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
 
 
+def provider_receipt_summary(operational):
+    """Group admitted receipt states; receipt freshness is not provider uptime."""
+    groups = {}
+    unattributed = 0
+    if operational['available']:
+        for item in operational['symbols']:
+            provider = item.get('provider')
+            if not isinstance(provider, str) or not provider.strip():
+                unattributed += 1
+                continue
+            group = groups.setdefault(provider, {
+                'market': 'EGX', 'provider': provider, 'health': 'UNKNOWN',
+                'current_verified_symbols': 0, 'stale_receipt_symbols': 0,
+                'other_symbols': 0,
+            })
+            status = item['status']
+            key = ('current_verified_symbols' if status in ('WATCH', 'READY_NO_SIGNAL')
+                   else 'stale_receipt_symbols' if status == 'DATA_STALE'
+                   else 'other_symbols')
+            group[key] += 1
+    return {
+        'status': 'UNKNOWN',
+        'reason': 'No live provider health probe connected; receipt counts do not establish availability or source rights',
+        'receipt_scope': 'Distinct symbols in configured EGX isolated runtime only; no US provider observation',
+        'receipt_observation': 'AVAILABLE' if operational['available'] else 'UNAVAILABLE',
+        'unattributed_symbols': unattributed if operational['available'] else None,
+        'sources': [groups[key] for key in sorted(groups)],
+    }
+
+
 def load_system_state():
     checkpoint = None
     try:
@@ -59,8 +89,7 @@ def load_system_state():
             'US': {'configured_universe': None, 'data_ready': None, 'eligible': None,
                    'scanned': None, 'candidates': None, 'status': 'UNKNOWN',
                    'reason': 'No configured operational universe connected'}},
-        'providers': {'status': 'UNKNOWN',
-                      'reason': 'Receipt source/freshness is shown per symbol; no live provider health probe connected'},
+        'providers': provider_receipt_summary(operational),
     }
 
 

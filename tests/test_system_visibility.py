@@ -99,6 +99,9 @@ class SystemVisibilityTests(unittest.TestCase):
             self.assertIsNone(state['build']['revision'])
             self.assertEqual(state['checkpoint']['head'], 'historical')
             self.assertEqual(state['scheduler']['status'], 'UNKNOWN')
+            self.assertEqual(state['providers']['receipt_observation'], 'UNAVAILABLE')
+            self.assertIsNone(state['providers']['unattributed_symbols'])
+            self.assertEqual(state['providers']['sources'], [])
 
     def test_current_expired_and_unverified_symbols_have_distinct_counts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -121,10 +124,40 @@ class SystemVisibilityTests(unittest.TestCase):
             self.assertEqual(egx['baseline_universe'], 224)
             self.assertIsNone(egx['authoritative_universe'])
             self.assertEqual(before, path.read_bytes())
+            providers = state['providers']
+            self.assertEqual(providers['status'], 'UNKNOWN')
+            self.assertEqual(providers['receipt_observation'], 'AVAILABLE')
+            self.assertEqual(providers['unattributed_symbols'], 1)
+            self.assertEqual(providers['sources'], [{
+                'market': 'EGX', 'provider': '<script>fixture</script>',
+                'health': 'UNKNOWN', 'current_verified_symbols': 1,
+                'stale_receipt_symbols': 1, 'other_symbols': 0,
+            }])
             html = render_system(state)
             self.assertNotIn('<script>', html)
             self.assertIn('&lt;script&gt;', html)
             self.assertIn('LIVE MONEY DISABLED', html)
+
+    def test_provider_sources_remain_separate_and_missing_identity_is_explicit(self):
+        from app.ui.system import provider_receipt_summary
+
+        symbols = [dict(provider='second', status='WATCH'),
+                   dict(provider='first', status='READY_NO_SIGNAL'),
+                   dict(provider='first', status='DATA_STALE'),
+                   dict(provider='second', status='EVIDENCE_BLOCKED')]
+        symbols.extend(dict(provider=value, status='NOT_READY')
+                       for value in (None, '', ' ', {}, []))
+        result = provider_receipt_summary({'available': True, 'symbols': symbols})
+        self.assertEqual(result['unattributed_symbols'], 5)
+        first, second = result['sources']
+        self.assertEqual((first['provider'], second['provider']), ('first', 'second'))
+        self.assertEqual((first['current_verified_symbols'], first['stale_receipt_symbols']), (1, 1))
+        self.assertEqual((second['current_verified_symbols'], second['other_symbols']), (1, 1))
+        self.assertTrue(all(source['health'] == 'UNKNOWN' for source in result['sources']))
+        empty = provider_receipt_summary({'available': True, 'symbols': []})
+        self.assertEqual(empty['unattributed_symbols'], 0)
+        self.assertEqual(empty['receipt_observation'], 'AVAILABLE')
+        self.assertEqual(empty['status'], 'UNKNOWN')
 
     def test_corrupt_checkpoint_and_runtime_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:

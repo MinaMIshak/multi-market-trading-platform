@@ -389,3 +389,18 @@ checks. A real canonical-parser response regression was added but remains
 unrun because pytest is unavailable. No acquisition, coverage, deployment or
 full integration validation is claimed. Reviewed free-provider composition
 remains pending.
+
+## Incremental checkpoint: provider receipt visibility
+
+SYSTEM now groups admitted EGX receipt states by exact provider identity,
+separating current verified symbols from stale receipts and other states. Missing
+source identity is counted explicitly; unavailable observations stay unknown.
+Live provider health remains UNKNOWN, and neither receipt freshness nor source
+identity certifies source rights or availability. No US observations are inferred.
+
+19 affected stdlib visibility/heartbeat/scan-history tests pass, including SQLite
+receipt classification, source separation, missing identity and HTML escaping.
+No fresh market observation, acquisition or deployment occurred. Dependency-backed
+integration remains pending: isolated dependency installation failed because the
+package host could not be resolved. Reviewed free-provider composition remains
+pending; this checkpoint advances M2 operator visibility only.
