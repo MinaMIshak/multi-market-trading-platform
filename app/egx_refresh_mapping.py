@@ -40,8 +40,7 @@ def require_refresh_mapping(resolver, *, canonical_symbol, provider_symbol, prov
         raise ValueError('provider refresh alias unavailable or ambiguous') from exc
     require_equity_identity(resolved, symbol=symbol, instrument_id=instrument_id)
     if (resolved.get('matched_provider') != provider_name
-            or str(resolved.get('matched_alias_value', '')).strip().upper()
-            != provider_symbol):
+            or resolved.get('matched_alias_value') != provider_symbol):
         raise ValueError('provider refresh alias mismatch')
 
 

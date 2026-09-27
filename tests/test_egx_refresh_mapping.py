@@ -78,6 +78,17 @@ class RefreshMappingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.admit()
 
+    def test_returned_alias_must_match_without_normalization_or_coercion(self):
+        for value in ('explicit-code', ' EXPLICIT-CODE ', None, 123, True):
+            self.resolver.resolve.return_value = self.row | {'matched_alias_value': value}
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'alias mismatch'):
+                self.admit()
+
+    def test_numeric_returned_alias_cannot_match_string_provider_code(self):
+        self.resolver.resolve.return_value = self.row | {'matched_alias_value': 123}
+        with self.assertRaisesRegex(ValueError, 'alias mismatch'):
+            self.admit(provider_symbol='123')
+
     def test_matching_malformed_identity_cannot_authorize_refresh_alias(self):
         self.resolver.resolve.return_value = self.row | {'instrument_id': 'invalid'}
         with self.assertRaisesRegex(ValueError, 'identity mismatch'):

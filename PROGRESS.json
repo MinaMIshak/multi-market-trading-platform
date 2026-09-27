@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "DAILY_INGESTION_INSTRUMENT_ID_ADMISSION",
-  "current_capability": "Direct daily ingestion rejects missing or malformed canonical instrument IDs before alias lookup and requires exact alias ID equality without string coercion.",
+  "phase": "REFRESH_ALIAS_EXACT_MATCH_ADMISSION",
+  "current_capability": "EGX refresh preflight requires exact returned provider alias equality, matching direct daily ingestion; malformed aliases cannot pass through case, whitespace or numeric normalization.",
   "starting_head": "e55fbbc",
-  "head": "9cc29ec797b187cddd79389fa65f6b7dd76ed5bd",
+  "head": "7740ae4eb5d49e0bf0a181550b7591fc03ff3187",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "49 focused offline stdlib daily/index ingestion and refresh contract tests PASS; git diff --check PASS. Dependency-backed validation pending: python3 has no pytest.",
+  "tests": "73 affected offline stdlib refresh, scope, ingestion and launch-selection tests PASS; new regressions reproduced three failures before fix. git diff --check PASS. Dependency-backed runtime/job tests pending: python3 has no pytest.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

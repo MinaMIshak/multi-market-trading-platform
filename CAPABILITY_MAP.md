@@ -539,3 +539,17 @@ missing, blank, padded, boolean and numeric identity cases. Dependency-backed
 validation remains pending because python3 lacks pytest. No fresh acquisition,
 market coverage, scheduled operation or deployment is claimed. Reviewed free-
 provider composition remains pending.
+
+## Incremental checkpoint: exact refresh alias admission
+
+EGX refresh preflight now requires exact equality between the returned provider
+alias and the explicit target. Lowercase, padded and numeric aliases no longer
+pass via normalization or string coercion, aligning preflight with direct daily
+ingestion. This binds identity only; it does not establish source rights or
+dated universe membership.
+
+Validation: new regressions reproduced three invalid admissions before the fix;
+73 affected offline stdlib refresh, scope, ingestion and launch-selection tests
+pass afterward. Runtime/job pytest validation remains pending because pytest is
+unavailable. No new acquisition, coverage, scheduled operation or deployment is
+claimed. Reviewed free-provider composition remains the next action.
