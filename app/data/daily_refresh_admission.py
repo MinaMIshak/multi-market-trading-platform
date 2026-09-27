@@ -50,7 +50,14 @@ class DailyRefreshAdmissionPolicy:
         ],
         *,
         expected_market_date: date,
+        requested_start_date: date | None = None,
     ) -> DailyRefreshAdmissionSummary:
+        if requested_start_date is not None:
+            if (type(requested_start_date) is not date
+                    or type(expected_market_date) is not date
+                    or requested_start_date > expected_market_date):
+                raise DailyRefreshAdmissionError("invalid requested daily window")
+
         if not rows:
             raise DailyRefreshAdmissionError(
                 "daily history is empty"
@@ -74,6 +81,9 @@ class DailyRefreshAdmissionPolicy:
             raise DailyRefreshAdmissionError(
                 "duplicate daily market date"
             )
+
+        if requested_start_date is not None and dates[0] < requested_start_date:
+            raise DailyRefreshAdmissionError("daily history outside requested window")
 
         valid = tuple(
             row
@@ -139,6 +149,7 @@ class DailyRefreshAdmissionPolicy:
         provider: str,
         snapshot_date: date,
         expected_market_date: date,
+        requested_start_date: date | None = None,
     ) -> DailyRefreshAdmissionSummary:
         if response.record_count is None:
             raise DailyRefreshAdmissionError(
@@ -216,4 +227,5 @@ class DailyRefreshAdmissionPolicy:
             expected_market_date=(
                 expected_market_date
             ),
+            requested_start_date=requested_start_date,
         )

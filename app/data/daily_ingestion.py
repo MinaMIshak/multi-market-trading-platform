@@ -124,6 +124,7 @@ class DailyBarIngestor:
                 provider=provider.name,
                 snapshot_date=snapshot_date,
                 expected_market_date=end_date,
+                requested_start_date=start_date,
             )
 
         manifest = self.raw_store.store_bytes(

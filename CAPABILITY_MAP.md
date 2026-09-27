@@ -375,3 +375,17 @@ integration remains pending because pytest is unavailable. No acquisition,
 market coverage or deployment is claimed. The existing COMI daily source review
 binds one ingestion and explicitly does not assert source rights; it cannot be
 generalized into authorization for fresh multi-symbol acquisition.
+
+## Incremental checkpoint: requested daily history window
+
+DailyBarIngestor now passes the requested start date to refresh admission.
+Admission rejects rows before that date, preventing out-of-window rows from
+satisfying the minimum executable history requirement. End-date freshness and
+existing semantic gates remain enforced. Legacy direct policy callers may omit
+the lower bound; the runtime ingestion path supplies it.
+
+43 focused offline regressions pass, including six new boundary and persistence
+checks. A real canonical-parser response regression was added but remains
+unrun because pytest is unavailable. No acquisition, coverage, deployment or
+full integration validation is claimed. Reviewed free-provider composition
+remains pending.

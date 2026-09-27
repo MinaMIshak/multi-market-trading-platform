@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_LAUNCH_PROVIDER_SCOPE",
-  "current_capability": "Paper/Shadow refresh launch now shares runtime target selection: non-EODHD providers require explicit targets before alias admission or runtime construction; EODHD defaults remain supported. Reviewed free-provider acquisition remains pending.",
+  "phase": "REFRESH_RESPONSE_WINDOW_ADMISSION",
+  "current_capability": "Daily refresh admission now rejects provider rows older than the requested start date before persistence; out-of-window history cannot satisfy the executable-bar minimum. Free-provider acquisition composition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "df9787d7c1bc0fd5c50be6a46213f08b417d4c3c",
+  "head": "f03d9590288531ea1f85ecbc43535a0710e84add",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "45 focused offline launch-selection/execution/result/mapping tests PASS, including four new launch composition regressions. git diff --check PASS. Dependency-backed integration unavailable: system Python lacks pytest. No runtime/database integration or full-suite validation claimed.",
+  "tests": "43 focused offline window/result/launch/mapping regressions PASS, including six new window regressions. git diff --check PASS. New real canonical-parser regression added but not run: system Python lacks pytest. No dependency-backed integration or full-suite validation claimed.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Implement reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Existing COMI review is ingestion-bound, not blanket acquisition authorization. Run runtime/quota/launch integration when dependencies are available; establish authoritative dated EGX membership preserving 224 baseline. Safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
+  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Run canonical-parser window regression and runtime/quota/launch integration when dependencies are available; establish authoritative dated EGX membership preserving 224 baseline. Safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

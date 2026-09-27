@@ -313,3 +313,24 @@ def test_minimum_must_be_positive():
         DailyRefreshAdmissionPolicy(
             minimum_valid_bars=0
         )
+
+
+def test_response_outside_requested_window_is_rejected():
+    """A provider's extra older rows cannot inflate requested history coverage."""
+    rows = make_rows(count=3, end_date=EXPECTED)
+    policy = DailyRefreshAdmissionPolicy(minimum_valid_bars=3)
+    arguments = dict(
+        instrument_id=str(uuid4()), canonical_symbol='COMI',
+        provider_symbol='COMI.EGX', provider='eodhd',
+        snapshot_date=EXPECTED, expected_market_date=EXPECTED,
+    )
+    with pytest.raises(DailyRefreshAdmissionError, match='outside requested window'):
+        policy.validate_provider_response(
+            make_response(rows), requested_start_date=EXPECTED - timedelta(days=1),
+            **arguments,
+        )
+    summary = policy.validate_provider_response(
+        make_response(rows), requested_start_date=EXPECTED - timedelta(days=2),
+        **arguments,
+    )
+    assert summary.valid_bar_count == 3
