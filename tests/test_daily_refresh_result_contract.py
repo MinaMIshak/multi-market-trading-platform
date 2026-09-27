@@ -16,7 +16,7 @@ SPEC.loader.exec_module(job_module)
 
 
 class RefreshResultContractTests(unittest.TestCase):
-    def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture", target_admission=None):
+    def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture", target_admission=None, target_container=tuple):
         ingestor, pipeline = Mock(), Mock()
         self.ingestor = ingestor
         self.pipeline = pipeline
@@ -35,11 +35,49 @@ class RefreshResultContractTests(unittest.TestCase):
         job = job_module.DailyRefreshJob(
             ingestor=ingestor, pipeline=pipeline, canonical_store=object(),
             target_admission=target_admission,
-            artifact_repository=object(), targets=tuple(
+            artifact_repository=object(), targets=target_container(
                 job_module.DailyRefreshTarget(f'FIXTURE{i}', f'CODE{i}')
                 for i in range(len(values))))
         return job.run(provider=SimpleNamespace(name=provider_name), start_date=date(2026, 1, 1),
                        end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2))
+
+    def test_one_shot_scope_is_preflighted_and_executed_in_full(self):
+        admission = Mock()
+        result = self.run_counts((3, 3, 0), second_counts=(3, 2, 1),
+                                target_container=iter, target_admission=admission)
+        self.assertEqual([item.canonical_symbol for item in result.items],
+                         ['FIXTURE0', 'FIXTURE1'])
+        scope = admission.call_args.kwargs['targets']
+        self.assertIsInstance(scope, tuple)
+        self.assertEqual(len(scope), 2)
+        self.assertEqual(self.ingestor.ingest.call_count, 2)
+
+    def test_caller_mutation_during_preflight_cannot_change_execution_scope(self):
+        original = []
+
+        def collect(items):
+            original.extend(items)
+            return original
+
+        def admit(**kwargs):
+            original.clear()
+            self.assertEqual(len(kwargs['targets']), 2)
+
+        result = self.run_counts((3, 3, 0), second_counts=(3, 3, 0),
+                                target_container=collect, target_admission=admit)
+        self.assertEqual(len(result.items), 2)
+        self.assertEqual(self.ingestor.ingest.call_count, 2)
+
+    def test_empty_or_duplicate_one_shot_scope_fails_at_construction(self):
+        target = job_module.DailyRefreshTarget('FIXTURE', 'CODE')
+        duplicate_code = job_module.DailyRefreshTarget('OTHER', 'CODE')
+        for items, error in (([], 'cannot be empty'),
+                             ([target, target], 'duplicate canonical_symbol'),
+                             ([target, duplicate_code], 'duplicate provider_symbol')):
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                job_module.DailyRefreshJob(
+                    ingestor=Mock(), pipeline=Mock(), canonical_store=object(),
+                    artifact_repository=object(), targets=iter(items))
 
     def test_scope_rejection_precedes_all_ingestion_and_promotion(self):
         admission = Mock(side_effect=ValueError('unbound later target'))

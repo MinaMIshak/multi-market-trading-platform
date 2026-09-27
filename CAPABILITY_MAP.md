@@ -308,3 +308,13 @@ scope validator and a rejected second target. Runtime end-to-end fixtures now
 register their explicit EODHD alias. Runtime/quota/launch integration was attempted
 but system Python lacks pytest; those suites remain pending. No acquisition,
 market scan, scheduled execution or deployment is claimed.
+
+## Incremental checkpoint: immutable refresh scope
+
+DailyRefreshJob snapshots the supplied targets before empty/duplicate checks.
+Preflight and execution now consume the same tuple: a one-shot iterable cannot
+be exhausted by validation and a caller-owned list cannot change the run during
+admission. 39 focused offline job/mapping/equity-scope regressions pass, including
+three new scope regressions. Runtime integration remains pending because pytest
+is unavailable and dependency installation returned no matching distribution.
+No acquisition, market coverage, scheduled operation or deployment is claimed.

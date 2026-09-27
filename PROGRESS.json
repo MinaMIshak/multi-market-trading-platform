@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_SCOPE_ALIAS_PREFLIGHT",
-  "current_capability": "Daily refresh runtime preflights all canonical equity identities and provider-specific aliases before any ingestion. Unbound later targets prevent earlier requests. Free-provider acquisition integration remains pending.",
+  "phase": "REFRESH_SCOPE_SNAPSHOT",
+  "current_capability": "Daily refresh snapshots targets before validation so preflight and execution share one immutable scope; one-shot iterables no longer disappear during validation and caller list mutation cannot change the run. Free-provider acquisition integration remains pending.",
   "starting_head": "e55fbbc",
-  "head": "56f5f3cc51988503a6abdaddb74157a38561769f",
+  "head": "e878e25a5fee35c48ac46dbe1f8d436d2edb2bc0",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "29 offline regressions PASS: 13 actual-job result/preflight tests and 16 mapping/selection tests. Changed Python files parse; git diff --check PASS. Runtime/quota/launch pytest integration attempted but unavailable: system Python lacks pytest. No runtime market observation or deployment.",
+  "tests": "39 focused offline regressions PASS: actual refresh job, alias mapping and equity scope. Three new regressions cover one-shot scope execution, caller mutation, and empty/duplicate iterable rejection. git diff --check PASS. Runtime/quota/launch integration remains pending: pytest unavailable and installation returned no matching distribution. No runtime market observation or deployment.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Run runtime/quota/launch integration when dependencies are available; compose reviewed free-provider acquisition with explicit alias-bound targets. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending.",

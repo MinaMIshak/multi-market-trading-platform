@@ -115,6 +115,9 @@ class DailyRefreshJob:
         ],
         target_admission: Any | None = None,
     ) -> None:
+        # Validate and execute the same scope, including when callers supply
+        # a mutable list or a one-shot iterable instead of a tuple.
+        targets = tuple(targets)
         if not targets:
             raise ValueError(
                 "daily refresh targets "
