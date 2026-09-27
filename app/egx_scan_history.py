@@ -1,5 +1,5 @@
 """Local last-run summary, explicitly not current readiness or universe evidence."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -8,7 +8,7 @@ import tempfile
 from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 
 
-def write_scan_history(report, path):
+def write_scan_history(report, path, *, scheduler_attempt=None):
     path = Path(path)
     if not path.is_absolute():
         raise ValueError('scan history path must be absolute')
@@ -18,6 +18,8 @@ def write_scan_history(report, path):
     summary.update(schema_version=2, completed_at=datetime.now(timezone.utc).isoformat(),
                    symbols=[{key: row[key] for key in ('symbol', 'status', 'scanned', 'reason')}
                             for row in report['symbols']])
+    if scheduler_attempt is not None:
+        summary.update(schema_version=3, scheduler_attempt=dict(scheduler_attempt))
     if not _valid_summary(summary):
         raise ValueError('invalid EGX scan history summary')
     temporary = None
@@ -31,13 +33,34 @@ def write_scan_history(report, path):
             os.unlink(temporary)
 
 
+def valid_scheduler_attempt(attempt):
+    """A dated ledger snapshot, never evidence of current worker health."""
+    try:
+        if not isinstance(attempt, dict) or set(attempt) != {
+                'market_date', 'checkpoint', 'attempt_count', 'started_at', 'status', 'finished_at'}:
+            return False
+        started = datetime.fromisoformat(attempt['started_at'])
+        if (date.fromisoformat(attempt['market_date']).isoformat() != attempt['market_date']
+                or attempt['checkpoint'] not in ('EGX_SCAN_PRIMARY', 'EGX_SCAN_FALLBACK')
+                or type(attempt['attempt_count']) is not int or attempt['attempt_count'] < 1
+                or started.tzinfo is None or started > datetime.now(timezone.utc)
+                or attempt['status'] not in ('RUNNING', 'SUCCEEDED')):
+            return False
+        if attempt['status'] == 'RUNNING':
+            return attempt['finished_at'] is None
+        finished = datetime.fromisoformat(attempt['finished_at'])
+        return finished.tzinfo is not None and started <= finished <= datetime.now(timezone.utc)
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
 def _valid_summary(raw):
     """Share admission between persistence and operator-visible history."""
     try:
         completed = datetime.fromisoformat(raw['completed_at'])
         rows = raw['symbols']
-        statuses = SCAN_STATUSES if raw['schema_version'] == 2 else SCAN_STATUSES[:3]
-        if (type(raw['schema_version']) is not int or raw['schema_version'] not in (1, 2)
+        statuses = SCAN_STATUSES if raw['schema_version'] in (2, 3) else SCAN_STATUSES[:3]
+        if (type(raw['schema_version']) is not int or raw['schema_version'] not in (1, 2, 3)
                 or raw['market'] != 'EGX'
                 or raw['live_money'] is not False
                 or raw['scope_kind'] != 'EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE'
@@ -54,6 +77,16 @@ def _valid_summary(raw):
                 or not isinstance(raw['status_counts'], dict)
                 or any(type(raw['status_counts'].get(s)) is not int for s in statuses)
                 or raw['status_counts'] != {s: sum(row['status'] == s for row in rows) for s in statuses}):
+            return False
+        if raw['schema_version'] == 3:
+            attempt = raw['scheduler_attempt']
+            if not valid_scheduler_attempt(attempt):
+                return False
+            if datetime.fromisoformat(attempt['started_at']) > completed:
+                return False
+            if attempt['status'] == 'SUCCEEDED' and datetime.fromisoformat(attempt['finished_at']) > completed:
+                return False
+        elif 'scheduler_attempt' in raw:
             return False
         return True
     except (ValueError, KeyError, TypeError):

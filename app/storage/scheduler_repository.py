@@ -247,6 +247,7 @@ class SchedulerRepository:
         *,
         market_date: date,
         checkpoint_name: CheckpointName,
+        expected_attempt: tuple[int, str] | None = None,
     ) -> bool:
         now = _utc_iso()
 
@@ -264,12 +265,16 @@ class SchedulerRepository:
                 WHERE market_date = ?
                   AND checkpoint_name = ?
                   AND status = 'RUNNING'
+                  AND (? IS NULL OR (attempt_count = ? AND started_at = ?))
                 """,
                 (
                     now,
                     now,
                     market_date.isoformat(),
                     checkpoint_name.value,
+                    expected_attempt[0] if expected_attempt else None,
+                    expected_attempt[0] if expected_attempt else None,
+                    expected_attempt[1] if expected_attempt else None,
                 ),
             )
 
@@ -281,6 +286,7 @@ class SchedulerRepository:
         market_date: date,
         checkpoint_name: CheckpointName,
         error: str,
+        expected_attempt: tuple[int, str] | None = None,
     ) -> bool:
         now = _utc_iso()
 
@@ -298,6 +304,7 @@ class SchedulerRepository:
                 WHERE market_date = ?
                   AND checkpoint_name = ?
                   AND status = 'RUNNING'
+                  AND (? IS NULL OR (attempt_count = ? AND started_at = ?))
                 """,
                 (
                     now,
@@ -305,6 +312,9 @@ class SchedulerRepository:
                     error[:2000],
                     market_date.isoformat(),
                     checkpoint_name.value,
+                    expected_attempt[0] if expected_attempt else None,
+                    expected_attempt[0] if expected_attempt else None,
+                    expected_attempt[1] if expected_attempt else None,
                 ),
             )
 

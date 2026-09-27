@@ -39,13 +39,17 @@ def scan_run_state(history):
             or not _valid_summary(history.get('run'))):
         return unknown
     raw = history['run']
-    # A history file proves classification, not a scheduler ledger transition.
+    # Legacy classification has no scheduler result. Version 3 includes a
+    # recorded ledger snapshot, not a live query of current scheduler health.
     run = {key: raw[key] for key in ('completed_at', 'scope_reference', 'scope_kind',
                                     'requested', 'scanned')}
     run['status_counts'] = dict(raw['status_counts'])
     run['symbols'] = [{key: row[key] for key in ('symbol', 'status', 'scanned')}
                       for row in raw['symbols']]
-    return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': None}
+    attempt = dict(raw['scheduler_attempt']) if raw['schema_version'] == 3 else None
+    run['scheduler_attempt'] = attempt
+    completion = attempt if attempt and attempt['status'] == 'SUCCEEDED' else None
+    return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': completion}
 
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None):
@@ -113,8 +117,12 @@ def render_product(state):
             run = history['run']
             if run is None:
                 continue
+            completion = history['scheduler_completion']
+            label = ('Recorded SUCCEEDED · ' + completion['market_date'] + ' · '
+                     + completion['checkpoint'] + ' · attempt ' + str(completion['attempt_count'])
+                     if completion else 'UNKNOWN')
             content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
-                        'Scheduler completion: UNKNOWN.</p><p>Completed at: '
+                        'Scheduler completion: ' + escape(label) + '.</p><p>Completed at: '
                         + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
                         + f' · Requested: {run["requested"]} · Verified scans: {run["scanned"]}</p>')
             content += '<table><caption>Historical per-target outcomes</caption><tr><th>Symbol</th><th>Status</th><th>Scanned</th></tr>'

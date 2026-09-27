@@ -1,4 +1,5 @@
 """Dispatcher contract fixtures; no live scan or market evidence implied."""
+from datetime import date
 from enum import StrEnum
 from types import SimpleNamespace as NS
 import unittest
@@ -14,17 +15,29 @@ class Checkpoint(StrEnum):
 class ScanDispatchTests(unittest.TestCase):
     def setUp(self):
         self.repo = Mock()
-        self.repo.get_job.return_value = {'status': 'PENDING'}
-        self.repo.claim_job.return_value = True
+        self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
+        self.repo.claim_job.side_effect = self.claim
+        self.repo.mark_succeeded.side_effect = self.succeed
         self.repo.successful_checkpoints.return_value = set()
-        self.evaluation = NS(calendar_truth='VERIFIED_TRADING_DAY', market_date='fixture',
+        self.evaluation = NS(calendar_truth='VERIFIED_TRADING_DAY', market_date=date(2026, 9, 24),
                              due=[NS(name=Checkpoint.PRIMARY)])
         self.config = patch('app.egx_scan_dispatch.load_scan_configuration',
                             return_value=NS(symbols=('A',), sources={}, scope_reference='fixture',
                                             source_errors={'A': 'INVALID_LAUNCH_EVIDENCE'})).start()
         self.scan = patch('app.egx_scan_dispatch.scan_egx_scope',
                           return_value={'requested': 1, 'scanned': 0}).start()
+        self.writer = patch('app.egx_scan_dispatch.write_scan_history').start()
         self.addCleanup(patch.stopall)
+
+    def claim(self, **kwargs):
+        self.repo.get_job.return_value = dict(status='RUNNING', attempt_count=1,
+            started_at='2026-09-24T10:00:00+00:00', finished_at=None)
+        return True
+
+    def succeed(self, **kwargs):
+        self.repo.get_job.return_value = self.repo.get_job.return_value | dict(
+            status='SUCCEEDED', finished_at='2026-09-24T11:00:00+00:00')
+        return True
 
     def run_dispatch(self):
         return dispatch_scan(evaluation=self.evaluation, repository=self.repo,
@@ -45,7 +58,8 @@ class ScanDispatchTests(unittest.TestCase):
         for status in ('FAILED', 'RUNNING', 'SUCCEEDED', 'BLOCKED'):
             self.repo.get_job.return_value = {'status': status}
             self.assertIsNone(self.run_dispatch())
-        self.repo.get_job.return_value = {'status': 'PENDING'}
+        self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
+        self.repo.claim_job.side_effect = None
         self.repo.claim_job.return_value = False
         self.assertIsNone(self.run_dispatch())
         self.config.assert_not_called()
@@ -64,6 +78,7 @@ class ScanDispatchTests(unittest.TestCase):
         result = self.run_dispatch()
         self.assertEqual(result['error'], 'EGX_SCAN_FAILED:ValueError')
         self.repo.mark_succeeded.assert_not_called()
+        self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
         self.config.side_effect = None
         self.evaluation.due = [NS(name=Checkpoint.FALLBACK)]
         self.assertTrue(self.run_dispatch()['succeeded'])
@@ -84,6 +99,7 @@ class ScanDispatchTests(unittest.TestCase):
                        {'requested': 1, 'scanned': 2}):
             with self.subTest(report=report):
                 self.repo.reset_mock()
+                self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
                 self.scan.return_value = report
                 result = self.run_dispatch()
                 self.assertFalse(result['succeeded'])
@@ -92,9 +108,11 @@ class ScanDispatchTests(unittest.TestCase):
                 self.repo.mark_succeeded.assert_not_called()
 
     def test_ledger_write_failure_is_not_reported_as_success(self):
+        self.repo.mark_succeeded.side_effect = None
         self.repo.mark_succeeded.return_value = False
         with self.assertRaises(RuntimeError):
             self.run_dispatch()
+        self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
         self.config.side_effect = OSError('private path')
         self.repo.mark_failed.return_value = False
         with self.assertRaises(RuntimeError):
