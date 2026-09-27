@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "REFRESH_ALIAS_EXACT_MATCH_ADMISSION",
-  "current_capability": "EGX refresh preflight requires exact returned provider alias equality, matching direct daily ingestion; malformed aliases cannot pass through case, whitespace or numeric normalization.",
+  "phase": "REFRESH_PREFLIGHT_SOURCE_CONTINUITY",
+  "current_capability": "Daily refresh checks the preflighted provider identity before every ingestion attempt; source changes in preflight or between targets fail closed while preserving prior completed results.",
   "starting_head": "e55fbbc",
-  "head": "7740ae4eb5d49e0bf0a181550b7591fc03ff3187",
+  "head": "3e3297dbee04b62562ec24284ad8cfd0daa8a892",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "73 affected offline stdlib refresh, scope, ingestion and launch-selection tests PASS; new regressions reproduced three failures before fix. git diff --check PASS. Dependency-backed runtime/job tests pending: python3 has no pytest.",
+  "tests": "55 affected offline stdlib refresh result, alias mapping, launch selection, window and execution contract tests PASS; two new regressions failed before the fix. git diff --check PASS. Dependency-backed job/runtime integration attempted but python3 has no pytest.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

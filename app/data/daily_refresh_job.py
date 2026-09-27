@@ -205,6 +205,10 @@ class DailyRefreshJob:
 
         for target in self.targets:
             try:
+                # Every attempt must use the source whose aliases were
+                # preflighted, including after callbacks for earlier targets.
+                if getattr(provider, "name", None) != provider_name:
+                    raise ValueError("refresh provider identity changed after preflight")
                 ingestion = (
                     self.ingestor.ingest(
                         provider=provider,

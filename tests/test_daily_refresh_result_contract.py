@@ -132,6 +132,55 @@ class RefreshResultContractTests(unittest.TestCase):
         self.ingestor.ingest.assert_not_called()
         self.pipeline.finalize_ingestion.assert_not_called()
 
+    def test_provider_change_during_preflight_prevents_ingestion(self):
+        provider = SimpleNamespace(name='fixture')
+        ingestor, pipeline = Mock(), Mock()
+
+        def admit(**kwargs):
+            provider.name = 'other'
+
+        job = job_module.DailyRefreshJob(
+            ingestor=ingestor, pipeline=pipeline, canonical_store=object(),
+            artifact_repository=object(), target_admission=admit,
+            targets=(job_module.DailyRefreshTarget('FIXTURE', 'CODE'),))
+        with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+            job.run(provider=provider, start_date=date(2026, 1, 1),
+                    end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2))
+        self.assertEqual(caught.exception.completed, ())
+        self.assertEqual(caught.exception.cause_type, 'ValueError')
+        ingestor.ingest.assert_not_called()
+        pipeline.finalize_ingestion.assert_not_called()
+
+    def test_provider_change_between_targets_prevents_later_ingestion(self):
+        provider = SimpleNamespace(name='fixture')
+        ingestion = SimpleNamespace(
+            provider='fixture', canonical_symbol='FIRST', provider_symbol='CODE1',
+            requested_start_date=date(2026, 1, 1), requested_end_date=date(2026, 1, 2),
+            snapshot_date=date(2026, 1, 2), record_count=3,
+            manifest=SimpleNamespace(ingestion_id='fixture'))
+        ingestor = Mock()
+        ingestor.ingest.return_value = ingestion
+
+        def promote(*args, **kwargs):
+            provider.name = 'other'
+            return SimpleNamespace(artifact_id='fixture', canonical_manifest=SimpleNamespace(
+                valid_bar_count=3, quarantined_bar_count=0))
+
+        pipeline = Mock()
+        pipeline.finalize_ingestion.side_effect = promote
+        job = job_module.DailyRefreshJob(
+            ingestor=ingestor, pipeline=pipeline, canonical_store=object(),
+            artifact_repository=object(), targets=(
+                job_module.DailyRefreshTarget('FIRST', 'CODE1'),
+                job_module.DailyRefreshTarget('SECOND', 'CODE2')))
+        with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+            job.run(provider=provider, start_date=date(2026, 1, 1),
+                    end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2))
+        self.assertEqual(caught.exception.canonical_symbol, 'SECOND')
+        self.assertEqual([item.canonical_symbol for item in caught.exception.completed], ['FIRST'])
+        self.assertEqual(ingestor.ingest.call_count, 1)
+        self.assertEqual(pipeline.finalize_ingestion.call_count, 1)
+
     def test_admitted_scope_runs_normally(self):
         admission = Mock()
         result = self.run_counts((3, 3, 0), target_admission=admission)

@@ -553,3 +553,17 @@ Validation: new regressions reproduced three invalid admissions before the fix;
 pass afterward. Runtime/job pytest validation remains pending because pytest is
 unavailable. No new acquisition, coverage, scheduled operation or deployment is
 claimed. Reviewed free-provider composition remains the next action.
+
+## Incremental checkpoint: refresh preflight source continuity
+
+Daily refresh now rechecks the preflighted provider namespace before every
+symbol ingestion. Provider changes during alias admission or between targets
+cannot reach another ingestion attempt under an unreviewed alias scope. Earlier
+completed results remain available on a later failure. Direct ingestion retains
+its separate fetch-time source binding.
+
+Validation: two new regressions failed before the fix; 55 affected offline
+stdlib tests pass afterward. Dependency-backed job/runtime integration was
+attempted but pytest is unavailable. No acquisition, coverage increase,
+scheduled operation or deployment is claimed. Reviewed free-provider
+composition remains pending.
