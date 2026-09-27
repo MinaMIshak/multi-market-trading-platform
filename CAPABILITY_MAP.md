@@ -404,3 +404,16 @@ No fresh market observation, acquisition or deployment occurred. Dependency-back
 integration remains pending: isolated dependency installation failed because the
 package host could not be resolved. Reviewed free-provider composition remains
 pending; this checkpoint advances M2 operator visibility only.
+
+## Incremental checkpoint: receipt validity chronology
+
+Operational receipt admission now rejects zero-length and reversed validity
+windows as EVIDENCE_BLOCKED instead of misclassifying them as DATA_STALE.
+Both timestamps must be timezone-aware and decisions cannot be future-dated.
+Valid expired receipts remain stale; invalid symbols do not hide valid neighbors.
+
+19 affected stdlib SYSTEM/heartbeat/scan-history tests pass, including five new
+invalid-window subcases using SQLite fixtures. The pytest operational UI suite
+was attempted but pytest is unavailable. No new market observations, acquisition,
+scheduled execution or deployment are claimed. Reviewed free-provider composition
+and dependency-backed runtime validation remain pending.

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "PROVIDER_RECEIPT_VISIBILITY",
-  "current_capability": "SYSTEM groups current verified and stale EGX receipt symbols by exact provider identity, reports unattributed symbols, and keeps provider health UNKNOWN. Receipt counts do not establish live source availability or rights.",
+  "phase": "RECEIPT_WINDOW_ADMISSION",
+  "current_capability": "Operational receipt visibility rejects empty or reversed validity windows as EVIDENCE_BLOCKED; aware timestamps and nonfuture decisions are required. Valid expired receipts remain DATA_STALE, and valid neighboring symbols remain visible.",
   "starting_head": "e55fbbc",
-  "head": "524ce1339fb3758216f7cf05671e206e6912abcc",
+  "head": "356c23d38c1326675ab4756e0355db5217861e3e",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "19 affected stdlib SYSTEM visibility, scheduler heartbeat and scan-history tests PASS; git diff --check PASS. Dependency installation failed with package-host DNS resolution errors; canonical-parser/runtime integration and full suite remain pending.",
+  "tests": "19 affected stdlib SYSTEM visibility, scheduler heartbeat and scan-history tests PASS, including five additional invalid-window subcases; git diff --check PASS. Pytest operational UI suite attempted but pytest unavailable; dependency-backed integration and full suite remain pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Dependency-backed canonical-parser/runtime/quota/launch validation pending package access. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
@@ -55,7 +55,7 @@
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "pytest unavailable; fresh isolated dependency installation failed with package-host DNS resolution errors. Dependency-backed integration remains pending; stdlib affected suites ran successfully.",
+    "test_execution": "System Python lacks pytest; operational UI pytest suite could not run. Prior package-host DNS failure remains unresolved; dependency-backed integration pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

@@ -23,6 +23,16 @@ class SystemVisibilityTests(unittest.TestCase):
                    json.dumps(valid | {'symbol': 'BAD', 'pit_audit_id': {}}),
                    json.dumps(valid | {'symbol': 'OTHER'}),
                    json.dumps(valid | {'symbol': 'BAD', 'decision_at': 'invalid'})]
+        invalid_windows = [
+            # An expired receipt is only stale if its original window was valid.
+            {'valid_until': (now - timedelta(hours=2)).isoformat()},
+            {'valid_until': valid['decision_at']},
+            {'decision_at': (now - timedelta(hours=1)).replace(tzinfo=None).isoformat()},
+            {'valid_until': (now + timedelta(hours=1)).replace(tzinfo=None).isoformat()},
+            {'decision_at': (now + timedelta(minutes=30)).isoformat()},
+        ]
+        invalid.extend(json.dumps(valid | {'symbol': 'BAD'} | window)
+                       for window in invalid_windows)
         for bad_payload in invalid:
             with self.subTest(payload=bad_payload), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'platform.db'

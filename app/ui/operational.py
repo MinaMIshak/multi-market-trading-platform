@@ -42,11 +42,16 @@ def load_operational_state():
                                 or receipt['status'] not in ('WATCH', 'READY_NO_SIGNAL')
                                 or receipt['live'] != 'DISABLED' or receipt['mode'] != 'SHADOW'):
                             raise ValueError('invalid verification receipt')
-                        item = receipt
                         now = datetime.now(timezone.utc)
-                        if datetime.fromisoformat(receipt['decision_at']) > now:
+                        decision_at = datetime.fromisoformat(receipt['decision_at'])
+                        valid_until = datetime.fromisoformat(receipt['valid_until'])
+                        if (decision_at.utcoffset() is None or valid_until.utcoffset() is None
+                                or valid_until <= decision_at):
+                            raise ValueError('invalid verification window')
+                        if decision_at > now:
                             raise ValueError('future verification receipt')
-                        if now >= datetime.fromisoformat(receipt['valid_until']):
+                        item = receipt
+                        if now >= valid_until:
                             item = receipt | {'status': 'DATA_STALE', 'market_data': 'DATA_STALE', 'trade_plan': None}
                     except (ValueError, TypeError, KeyError):
                         item = {'symbol': symbol, 'market': 'EGX',
