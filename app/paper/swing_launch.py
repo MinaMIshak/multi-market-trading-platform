@@ -24,7 +24,7 @@ from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
 from app.egx_scope import valid_scope_symbol, require_equity_identity
-from app.egx_refresh_mapping import require_refresh_mapping
+from app.egx_refresh_mapping import require_refresh_mapping, select_refresh_targets
 from app.data.daily_refresh_job import DailyRefreshTarget
 from app.paper.shadow_candidate_admission import ShadowCandidateAdmission
 from app.paper.shadow_facts import ForwardSessionFact, SESSION_FIELDS, _require_fields
@@ -180,8 +180,17 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
     _identity(database, source)
     if type(cost) is not VerifiedQuotaCost or type(cost.units) is not int or cost.units <= 0 or not cost.evidence.strip():
         _blocked('verified quota cost required')
+    provider_name = getattr(provider, 'name', None) if provider is not None else 'eodhd'
+    try:
+        targets = select_refresh_targets(
+            provider_name=provider_name,
+            targets=(target,) if target is not None else None,
+            eodhd_defaults=DEFAULT_EODHD_TARGETS,
+        )
+    except ValueError as exc:
+        _blocked(str(exc))
     if target is None:
-        target = next((t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol), None)
+        target = next((t for t in targets if t.canonical_symbol == source.symbol), None)
     if target is None:
         _blocked('reviewed provider refresh mapping unavailable')
     try:
@@ -190,7 +199,7 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
         require_refresh_mapping(
             SecurityMasterRepository(database), canonical_symbol=target.canonical_symbol,
             provider_symbol=target.provider_symbol,
-            provider_name=getattr(provider, 'name', None) if provider is not None else 'eodhd',
+            provider_name=provider_name,
             symbol=source.symbol, instrument_id=source.instrument_id,
         )
     except ValueError as exc:

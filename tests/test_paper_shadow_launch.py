@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 
 from app.data.provider import ProviderResponse
+from app.data.daily_refresh_job import DailyRefreshTarget
 from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.data.security_master import CanonicalInstrument, InstrumentType
@@ -115,7 +116,8 @@ def launch(tmp_path, monkeypatch, request):
         refresh_source = source.model_copy(update={
             'history_start': start-timedelta(days=140), 'sessions': (*earlier, *records),
         })
-    refreshed = refresh_once(db, root, refresh_source, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
+    refreshed = refresh_once(db, root, refresh_source, provider=provider, cost=VerifiedQuotaCost(1, LABEL),
+                             target=DailyRefreshTarget('COMI', 'COMI.EGX'))
     assert refreshed['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
     refs = ReferenceRepository(db, ImmutableRawStore(root/'raw'))
     for bar in bars:
@@ -236,6 +238,7 @@ def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
         root,
         source,
         provider=alternate,
+        target=DailyRefreshTarget('COMI', 'COMI.EGX'),
         cost=VerifiedQuotaCost(1, LABEL),
     )
     assert refreshed['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
@@ -437,7 +440,8 @@ def test_short_history_refresh_rejected(launch):
     from app.data.daily_refresh_job import DailyRefreshJobError
     from app.data.daily_refresh_admission import DailyRefreshAdmissionError
     with pytest.raises(DailyRefreshJobError) as error:
-        refresh_once(db, root, source, provider=short, cost=VerifiedQuotaCost(1, LABEL))
+        refresh_once(db, root, source, provider=short, cost=VerifiedQuotaCost(1, LABEL),
+                     target=DailyRefreshTarget('COMI', 'COMI.EGX'))
     assert isinstance(error.value.__cause__, DailyRefreshAdmissionError)
     assert 'insufficient' in str(error.value.__cause__)
     assert not directory.exists()
@@ -521,7 +525,7 @@ def test_new_equity_refresh_blocks_without_provider_mapping(launch):
                             source_symbol_code='fixture-explicit-code', source_sha256='a'*64)])
     expanded = _decode(SwingLaunchInput, source.model_dump(mode='json') | {'symbol': 'FIXTURE'})
     calls_before = len(provider.calls)
-    with pytest.raises(LaunchBlocked, match='reviewed provider refresh mapping unavailable'):
+    with pytest.raises(LaunchBlocked, match='explicit refresh targets required'):
         refresh_once(db, root, expanded, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
     assert len(provider.calls) == calls_before
     assert not directory.exists()
@@ -530,7 +534,7 @@ def test_new_equity_refresh_blocks_without_provider_mapping(launch):
     assert caught.value.status == 'DATA_INSUFFICIENT'
 
 
-@pytest.mark.parametrize('provider_name', ['unregistered-provider', None, 'canonical'])
+@pytest.mark.parametrize('provider_name', ['fixture', 'unregistered-provider', None, 'canonical'])
 def test_default_refresh_mapping_rejects_unbound_provider_before_runtime(launch, monkeypatch, provider_name):
     db, root, source, _, _, provider, _ = launch
     provider.name = provider_name

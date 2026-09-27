@@ -359,3 +359,19 @@ execution tests. These use engineering fixtures, not runtime scheduler evidence.
 The dependency-backed job suite cannot import because pytest is unavailable;
 full integration remains pending. No acquisition, fresh coverage or deployment
 is claimed. Reviewed free-provider composition remains the next integration task.
+
+## Incremental checkpoint: launch provider scope consistency
+
+Paper/Shadow refresh launch now uses the runtime's shared target selector. An
+injected non-EODHD provider must receive an explicit target, even if an alias
+matching an EODHD default happens to be registered. Previously launch supplied
+the default as an explicit runtime target and bypassed that selection rule.
+Provider-specific alias admission still runs before runtime construction. Legacy
+EODHD defaults remain available; alternate-provider fixtures now specify targets.
+
+45 focused offline regressions pass, including four tests exercising the actual
+launch function with runtime dependencies isolated. Dependency-backed launch
+integration remains pending because pytest is unavailable. No acquisition,
+market coverage or deployment is claimed. The existing COMI daily source review
+binds one ingestion and explicitly does not assert source rights; it cannot be
+generalized into authorization for fresh multi-symbol acquisition.

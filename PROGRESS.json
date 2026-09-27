@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_SCHEDULER_RESULT_FINALIZATION",
-  "current_capability": "Daily refresh computes its result count before recording scheduler success; unreadable results enter failure handling so false success cannot suppress fallback. Reviewed free-provider integration remains pending.",
+  "phase": "REFRESH_LAUNCH_PROVIDER_SCOPE",
+  "current_capability": "Paper/Shadow refresh launch now shares runtime target selection: non-EODHD providers require explicit targets before alias admission or runtime construction; EODHD defaults remain supported. Reviewed free-provider acquisition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "f3a08013caa9b8a84af5a440e47ce82face43cb6",
+  "head": "df9787d7c1bc0fd5c50be6a46213f08b417d4c3c",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "41 focused offline execution/result/mapping tests PASS (8 execution, 17 result contract, 16 mapping). Three new regressions cover unreadable primary/fallback results, failure persistence errors and count evaluation before success. git diff --check PASS. Dependency-backed daily refresh job suite failed to import: pytest unavailable. No runtime/database integration or full-suite validation claimed.",
+  "tests": "45 focused offline launch-selection/execution/result/mapping tests PASS, including four new launch composition regressions. git diff --check PASS. Dependency-backed integration unavailable: system Python lacks pytest. No runtime/database integration or full-suite validation claimed.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Compose reviewed free-provider acquisition with explicit alias-bound targets; run runtime/quota/launch and scheduler integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
+  "next_action": "Implement reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Existing COMI review is ingestion-bound, not blanket acquisition authorization. Run runtime/quota/launch integration when dependencies are available; establish authoritative dated EGX membership preserving 224 baseline. Safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
