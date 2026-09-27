@@ -280,3 +280,14 @@ Runtime/quota integration regressions were updated but remain unexecuted because
 pytest/pydantic are unavailable; the isolated install retry found no pytest
 distribution. No new market observation or deployment occurred. Reusable reviewed
 free-provider acquisition and broader runtime integration remain pending.
+
+
+## Incremental checkpoint: refresh source identity binding
+
+Daily refresh now requires a canonical provider name before ingestion and binds
+the returned ingestion provider to that name before canonical promotion. A source
+mismatch fails the current target while retaining only earlier completed results.
+24 dependency-free job/mapping regressions pass. Pytest job fixtures were updated,
+but that suite remains unexecuted because system Python lacks pytest. This is
+source-contract validation using engineering fixtures, not free-source acquisition,
+market coverage, scheduled operation or deployment evidence.

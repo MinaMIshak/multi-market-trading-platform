@@ -33,6 +33,7 @@ class FakeIngestor:
         symbol = kwargs["canonical_symbol"]
 
         return SimpleNamespace(
+            provider=kwargs["provider"].name,
             canonical_symbol=symbol,
             provider_symbol=kwargs["provider_symbol"],
             requested_start_date=kwargs["start_date"],
@@ -112,7 +113,7 @@ def make_job(pipeline=None):
 
 def run_job(job):
     return job.run(
-        provider=object(),
+        provider=SimpleNamespace(name="fixture"),
         start_date=START,
         end_date=END,
         snapshot_date=SNAPSHOT,
@@ -217,7 +218,7 @@ def test_invalid_dates_fail_closed():
         match="end_date",
     ):
         job.run(
-            provider=object(),
+            provider=SimpleNamespace(name="fixture"),
             start_date=END,
             end_date=START,
             snapshot_date=SNAPSHOT,
@@ -228,7 +229,7 @@ def test_invalid_dates_fail_closed():
         match="snapshot_date",
     ):
         job.run(
-            provider=object(),
+            provider=SimpleNamespace(name="fixture"),
             start_date=START,
             end_date=END,
             snapshot_date=date(

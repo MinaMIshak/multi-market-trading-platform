@@ -16,14 +16,14 @@ SPEC.loader.exec_module(job_module)
 
 
 class RefreshResultContractTests(unittest.TestCase):
-    def run_counts(self, counts, *, second_counts=None, identity_changes=None):
+    def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture"):
         ingestor, pipeline = Mock(), Mock()
         self.ingestor = ingestor
         self.pipeline = pipeline
         values = [counts] if second_counts is None else [counts, second_counts]
         ingestor.ingest.side_effect = [
             SimpleNamespace(**(dict(
-                canonical_symbol=f'FIXTURE{i}', provider_symbol=f'CODE{i}',
+                provider='fixture', canonical_symbol=f'FIXTURE{i}', provider_symbol=f'CODE{i}',
                 requested_start_date=date(2026, 1, 1),
                 requested_end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2),
                 record_count=value[0], manifest=SimpleNamespace(ingestion_id='fixture'))
@@ -37,7 +37,7 @@ class RefreshResultContractTests(unittest.TestCase):
             artifact_repository=object(), targets=tuple(
                 job_module.DailyRefreshTarget(f'FIXTURE{i}', f'CODE{i}')
                 for i in range(len(values))))
-        return job.run(provider=object(), start_date=date(2026, 1, 1),
+        return job.run(provider=SimpleNamespace(name=provider_name), start_date=date(2026, 1, 1),
                        end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2))
 
     def test_valid_and_quarantined_counts_are_preserved(self):
@@ -47,7 +47,7 @@ class RefreshResultContractTests(unittest.TestCase):
 
     def test_mismatched_or_missing_identity_never_promotes(self):
         for field, wrong in (
-            ('canonical_symbol', 'OTHER'), ('provider_symbol', 'OTHER-CODE'),
+            ('provider', 'other'), ('canonical_symbol', 'OTHER'), ('provider_symbol', 'OTHER-CODE'),
             ('requested_start_date', date(2025, 1, 1)),
             ('requested_end_date', date(2026, 1, 1)),
             ('snapshot_date', date(2026, 1, 3)),
@@ -59,6 +59,20 @@ class RefreshResultContractTests(unittest.TestCase):
                     self.assertEqual(caught.exception.completed, ())
                     self.assertEqual(caught.exception.cause_type, 'ValueError')
                     self.pipeline.finalize_ingestion.assert_not_called()
+
+    def test_invalid_provider_identity_rejected_before_ingestion(self):
+        for value in (None, '', ' ', ' fixture', 'FIXTURE', True, 42):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.run_counts((3, 3, 0), provider_name=value)
+            self.ingestor.ingest.assert_not_called()
+            self.pipeline.finalize_ingestion.assert_not_called()
+
+    def test_later_source_mismatch_retains_only_prior_promotion(self):
+        with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+            self.run_counts((3, 3, 0), second_counts=(3, 3, 0),
+                            identity_changes={'provider': 'other'})
+        self.assertEqual([item.canonical_symbol for item in caught.exception.completed], ['FIXTURE0'])
+        self.assertEqual(self.pipeline.finalize_ingestion.call_count, 1)
 
     def test_later_identity_mismatch_retains_only_prior_promotion(self):
         with self.assertRaises(job_module.DailyRefreshJobError) as caught:

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_PROVIDER_TARGET_ISOLATION",
-  "current_capability": "Daily refresh composition requires explicit targets for non-EODHD providers before quota/storage construction; EODHD defaults are isolated to its provider namespace. Reviewed free-provider acquisition integration remains pending.",
+  "phase": "REFRESH_SOURCE_IDENTITY_BINDING",
+  "current_capability": "Daily refresh binds returned ingestion provider to the requested canonical provider namespace before promotion; malformed provider names fail before ingestion. Reviewed free-provider acquisition integration remains pending.",
   "starting_head": "e55fbbc",
-  "head": "e2d417ceb3dde5a128324a6914aeaaba105173fd",
+  "head": "067bd953f56aeb471f5448eeac8031e76d610367",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "32 offline regressions PASS: 14 mapping/target-selection, 8 actual-job result-contract, 10 scanner tests. Changed Python files parse; git diff --check PASS. Runtime/quota integration regressions updated but not executed: pytest/pydantic unavailable; isolated installation retry found no matching pytest distribution.",
+  "tests": "24 offline regressions PASS: 10 actual-job result-contract and 14 mapping/target-selection tests. Changed Python files parse; git diff --check PASS. Pytest-based job/runtime integration remains pending: system python3 has no pytest. No runtime observation or deployment this cycle.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Compose reviewed free-provider acquisition with explicit alias-bound targets; run runtime/quota/provider/admission/launch integration once dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending.",

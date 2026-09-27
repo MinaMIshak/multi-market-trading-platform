@@ -176,6 +176,11 @@ class DailyRefreshJob:
                 "before end_date"
             )
 
+        provider_name = getattr(provider, "name", None)
+        if (not isinstance(provider_name, str) or not provider_name.strip()
+                or provider_name != provider_name.strip().lower()):
+            raise ValueError("refresh provider name must be canonical")
+
         completed: list[
             DailyRefreshItemResult
         ] = []
@@ -202,6 +207,7 @@ class DailyRefreshJob:
                 )
 
                 expected_identity = {
+                    "provider": provider_name,
                     "canonical_symbol": target.canonical_symbol,
                     "provider_symbol": target.provider_symbol,
                     "requested_start_date": start_date,
