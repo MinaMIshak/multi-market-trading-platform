@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "REFRESH_QUOTA_SOURCE_CONTINUITY",
-  "current_capability": "Quota-wrapped daily refresh rejects provider identity changes during cost evaluation and quota reservation before transport; committed quota reservations remain consumed on rejection.",
+  "phase": "QUOTA_LEDGER_OFFLINE_VALIDATION",
+  "current_capability": "Preserved quota module isolation completed; full quota and Database implementations validated offline for durable reservations, source continuity, concurrent budget enforcement, UTC resets, fail-closed ledger errors and opt-in schema upgrades.",
   "starting_head": "e55fbbc",
-  "head": "70eb890534e98ae77b60c798a060cd9d88ec53a6",
+  "head": "b0ebc08b5babea6b25a24078a54bfae163ab8f78",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "60 affected offline stdlib quota source, refresh result, mapping, launch selection, window and execution contract tests PASS; two new regressions failed before the fix. git diff --check PASS. Dependency-backed quota/runtime suites attempted but python3 has no pytest.",
+  "tests": "70 focused offline stdlib tests PASS, including 10 new actual SQLite quota ledger contracts and 60 existing source/refresh/mapping/launch/window/execution contracts. git diff --check PASS. Known unavailable dependency-backed suites not retried; no runtime/provider evidence inferred.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
+  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Preserved quota WIP now completed with actual SQLite validation; dependency-backed runtime/FastAPI integration remains pending package availability. Unified Product Shell is the next near-term product slice per CYCLE_CONTEXT after integrity commit. Retain 224 EGX baseline pending authoritative dated membership; safe deployment pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

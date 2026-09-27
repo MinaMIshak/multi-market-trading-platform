@@ -11,9 +11,10 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import sqlite3
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-from app.storage import Database
+if TYPE_CHECKING:
+    from app.storage import Database
 
 
 class QuotaRejected(RuntimeError):

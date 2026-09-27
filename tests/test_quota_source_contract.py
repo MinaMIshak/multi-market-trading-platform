@@ -1,20 +1,20 @@
 """Offline quota-wrapper source continuity, not provider operational evidence."""
-import ast
+import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
 
-# Exercise the actual wrapper without importing optional runtime dependencies.
+# Load the complete module without app.data's optional runtime imports.
 path = Path(__file__).parents[1] / 'app/data/quota.py'
-tree = ast.parse(path.read_text())
-namespace = {'QuotaGuard': object}
-nodes = [node for node in tree.body if isinstance(node, ast.ClassDef)
-         and node.name in ('QuotaRejected', 'QuotaLimitedDailyProvider')]
-exec(compile(ast.Module(body=nodes, type_ignores=[]), str(path), 'exec'), namespace)
-Wrapper = namespace['QuotaLimitedDailyProvider']
-Rejected = namespace['QuotaRejected']
+spec = importlib.util.spec_from_file_location('quota_source_contract', path)
+quota = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = quota
+spec.loader.exec_module(quota)
+Wrapper = quota.QuotaLimitedDailyProvider
+Rejected = quota.QuotaRejected
 
 
 class QuotaSourceContractTests(unittest.TestCase):
