@@ -169,6 +169,16 @@ class DailyRefreshJob:
         end_date: date,
         snapshot_date: date,
     ) -> DailyRefreshResult:
+        # Daily windows are session dates, never timestamps or lexical strings.
+        # Validate before alias admission or any provider/storage side effects.
+        for field, value in (
+            ("start_date", start_date),
+            ("end_date", end_date),
+            ("snapshot_date", snapshot_date),
+        ):
+            if type(value) is not date:
+                raise ValueError(f"{field} must be a calendar date")
+
         if end_date < start_date:
             raise ValueError(
                 "end_date cannot be "

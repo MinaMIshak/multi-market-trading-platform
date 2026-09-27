@@ -318,3 +318,16 @@ admission. 39 focused offline job/mapping/equity-scope regressions pass, includi
 three new scope regressions. Runtime integration remains pending because pytest
 is unavailable and dependency installation returned no matching distribution.
 No acquisition, market coverage, scheduled operation or deployment is claimed.
+
+## Incremental checkpoint: refresh calendar-date windows
+
+Daily refresh now requires actual calendar dates for start, end and snapshot
+windows before alias preflight or acquisition. Strings and timestamps previously
+passed same-type ordering checks; they now fail before provider/storage effects.
+Existing reversed-window and snapshot chronology guards remain in place.
+
+40 focused offline job/mapping/equity-scope regressions pass, including 11 invalid
+window subcases. Runtime/quota/launch integration remains pending: isolated pytest
+installation returned no matching distribution. No new acquisition, coverage,
+scheduled execution or deployment is claimed. Free-provider composition remains
+the next integration objective.

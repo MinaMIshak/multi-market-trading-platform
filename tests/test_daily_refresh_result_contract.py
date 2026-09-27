@@ -1,6 +1,6 @@
 """Offline job-result checks using engineering fixtures, never market evidence."""
 import importlib.util
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -16,6 +16,30 @@ SPEC.loader.exec_module(job_module)
 
 
 class RefreshResultContractTests(unittest.TestCase):
+    def test_invalid_windows_fail_before_admission_or_acquisition(self):
+        valid = dict(start_date=date(2026, 1, 1), end_date=date(2026, 1, 2),
+                     snapshot_date=date(2026, 1, 2))
+        windows = [
+            dict.fromkeys(valid, value) for value in (
+                '2026-01-02', datetime(2026, 1, 2),
+                datetime(2026, 1, 2, tzinfo=timezone.utc), True, 1, None)
+        ]
+        windows.extend(valid | {field: '2026-01-02'} for field in valid)
+        windows.extend((valid | {'end_date': date(2025, 12, 31)},
+                        valid | {'snapshot_date': date(2026, 1, 1)}))
+        for window in windows:
+            with self.subTest(window=window):
+                ingestor, pipeline, admission = Mock(), Mock(), Mock()
+                job = job_module.DailyRefreshJob(
+                    ingestor=ingestor, pipeline=pipeline, canonical_store=object(),
+                    artifact_repository=object(), target_admission=admission,
+                    targets=(job_module.DailyRefreshTarget('FIXTURE', 'CODE'),))
+                with self.assertRaises(ValueError):
+                    job.run(provider=SimpleNamespace(name='fixture'), **window)
+                admission.assert_not_called()
+                ingestor.ingest.assert_not_called()
+                pipeline.finalize_ingestion.assert_not_called()
+
     def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture", target_admission=None, target_container=tuple):
         ingestor, pipeline = Mock(), Mock()
         self.ingestor = ingestor

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_SCOPE_SNAPSHOT",
-  "current_capability": "Daily refresh snapshots targets before validation so preflight and execution share one immutable scope; one-shot iterables no longer disappear during validation and caller list mutation cannot change the run. Free-provider acquisition integration remains pending.",
+  "phase": "REFRESH_CALENDAR_DATE_ADMISSION",
+  "current_capability": "Daily refresh rejects string, timestamp, boolean and other non-date windows before alias admission or acquisition; valid calendar-date execution and window ordering remain covered. Free-provider integration remains pending.",
   "starting_head": "e55fbbc",
-  "head": "e878e25a5fee35c48ac46dbe1f8d436d2edb2bc0",
+  "head": "2d70a76735afc9c6d799fa2ee2e0f90fd9df8d0c",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "39 focused offline regressions PASS: actual refresh job, alias mapping and equity scope. Three new regressions cover one-shot scope execution, caller mutation, and empty/duplicate iterable rejection. git diff --check PASS. Runtime/quota/launch integration remains pending: pytest unavailable and installation returned no matching distribution. No runtime market observation or deployment.",
+  "tests": "40 focused offline job/mapping/equity-scope regressions PASS, including 11 invalid-window subcases proving no admission, ingestion or promotion occurs. Initial test command named a nonexistent scope module; corrected invocation passes. git diff --check PASS. Runtime/quota/launch integration remains pending: pytest unavailable and isolated installation returned no matching distribution. No runtime observation or deployment.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Run runtime/quota/launch integration when dependencies are available; compose reviewed free-provider acquisition with explicit alias-bound targets. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending.",
