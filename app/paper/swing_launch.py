@@ -24,6 +24,8 @@ from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
 from app.egx_scope import valid_scope_symbol, require_equity_identity
+from app.egx_refresh_mapping import require_refresh_mapping
+from app.data.daily_refresh_job import DailyRefreshTarget
 from app.paper.shadow_candidate_admission import ShadowCandidateAdmission
 from app.paper.shadow_facts import ForwardSessionFact, SESSION_FIELDS, _require_fields
 from app.paper.shadow_producer import StrategyShadowRequest, StrategyShadowSelection, produce_strategy_watchlist
@@ -171,14 +173,27 @@ def _identity(database, source):
         _blocked(str(exc))
 
 
-def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_token=None, provider=None):
+def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_token=None, provider=None, target=None):
     """Explicit operator invocation; keep original 260-bar admission and quota gates."""
     at = _now()
     source = admit_calendar(source, at)
     _identity(database, source)
     if type(cost) is not VerifiedQuotaCost or type(cost.units) is not int or cost.units <= 0 or not cost.evidence.strip():
         _blocked('verified quota cost required')
-    target = next((t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol), None)
+    if target is not None:
+        try:
+            if type(target) is not DailyRefreshTarget:
+                raise ValueError("explicit provider refresh mapping required")
+            require_refresh_mapping(
+                SecurityMasterRepository(database), canonical_symbol=target.canonical_symbol,
+                provider_symbol=target.provider_symbol,
+                provider_name=getattr(provider, 'name', None) if provider is not None else 'eodhd',
+                symbol=source.symbol, instrument_id=source.instrument_id,
+            )
+        except ValueError as exc:
+            _blocked(str(exc))
+    else:
+        target = next((t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol), None)
     if target is None:
         _blocked('reviewed provider refresh mapping unavailable')
     runtime = build_daily_refresh_runtime(

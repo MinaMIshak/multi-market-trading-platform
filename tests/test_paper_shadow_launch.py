@@ -524,3 +524,25 @@ def test_new_equity_refresh_blocks_without_provider_mapping(launch):
     with pytest.raises(LaunchBlocked, match='admitted daily history missing') as caught:
         run_signal(db, root, expanded, directory, publish=False)
     assert caught.value.status == 'DATA_INSUFFICIENT'
+
+
+def test_explicit_refresh_mapping_rejects_wrong_alias_before_runtime(launch, monkeypatch):
+    from app.data.daily_refresh_job import DailyRefreshTarget
+    db, root, source, _, _, provider, _ = launch
+    def forbidden_runtime(**kwargs):
+        pytest.fail('unbound alias must not construct refresh runtime')
+    monkeypatch.setattr(swing_launch, 'build_daily_refresh_runtime', forbidden_runtime)
+    calls_before = len(provider.calls)
+    with pytest.raises(LaunchBlocked, match='alias unavailable'):
+        refresh_once(db, root, source, provider=provider, cost=VerifiedQuotaCost(1, LABEL),
+                     target=DailyRefreshTarget('COMI', 'UNREGISTERED'))
+    assert len(provider.calls) == calls_before
+
+
+def test_explicit_refresh_mapping_accepts_registered_alias(launch):
+    from app.data.daily_refresh_job import DailyRefreshTarget
+    db, root, source, _, _, provider, _ = launch
+    result = refresh_once(db, root, source, provider=provider, cost=VerifiedQuotaCost(1, LABEL),
+                          target=DailyRefreshTarget('COMI', 'COMI.EGX'))
+    assert result['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
+    assert provider.calls[-1]['symbol'] == 'COMI.EGX'

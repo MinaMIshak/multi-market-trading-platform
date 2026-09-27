@@ -142,3 +142,19 @@ producer output from destroying the last usable operator-visible scan summary.
 and successful replacement. Runtime launch integration and full release testing
 remain pending unavailable pytest/pydantic; isolated package installation returned
 no matching distributions. No new scans, market data or deployment are claimed.
+
+## Incremental checkpoint: explicit refresh alias admission
+
+`refresh_once` now accepts an optional explicit `DailyRefreshTarget`. Before
+runtime construction, its provider-specific registered alias must resolve to the
+requested equity UUID and ticker. Missing, ambiguous, cross-provider and wrong
+instrument mappings fail closed. Existing default targets remain compatible;
+provider symbols are never generated from tickers. Alias registration does not
+establish licensing, source review, dated membership or usable history; existing
+calendar, quota, canonical admission and subsequent signal gates remain required.
+
+49 dependency-free regressions pass. Two added real launch integration tests and
+full release validation remain pending missing pytest/pydantic. This is a Python
+composition capability only: CLI configuration, reviewed free-provider composition,
+authoritative membership and broad operational refresh remain pending. No market
+observations, source rights, scans or deployment are newly claimed.
