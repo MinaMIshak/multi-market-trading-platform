@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock
 from uuid import UUID
 
-from app.egx_refresh_mapping import require_refresh_mapping
+from app.egx_refresh_mapping import configured_refresh_mapping, require_refresh_mapping
 
 
 class RefreshMappingTests(unittest.TestCase):
@@ -50,3 +50,28 @@ class RefreshMappingTests(unittest.TestCase):
             self.resolver.resolve.return_value = row
             with self.assertRaises(ValueError):
                 self.admit()
+
+    def configure(self, provider_symbol):
+        return configured_refresh_mapping(
+            self.resolver, provider_symbol=provider_symbol, provider_name='fixture',
+            symbol='FIXTURE', instrument_id=UUID(int=1))
+
+    def test_absent_configuration_preserves_default_selection(self):
+        self.assertIsNone(self.configure(None))
+        self.resolver.resolve.assert_not_called()
+
+    def test_configured_target_preserves_explicit_identity(self):
+        target = self.configure('EXPLICIT-CODE')
+        self.assertEqual(target['canonical_symbol'], 'FIXTURE')
+        self.assertEqual(target['provider_symbol'], 'EXPLICIT-CODE')
+
+    def test_configuration_rejects_noncanonical_values_without_normalizing(self):
+        for value in ('', ' explicit-code ', 'explicit-code', 42, True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.configure(value)
+        self.resolver.resolve.assert_not_called()
+
+    def test_configuration_cannot_rebind_another_equity(self):
+        self.resolver.resolve.return_value = self.row | {'instrument_id': str(UUID(int=2))}
+        with self.assertRaises(ValueError):
+            self.configure('EXPLICIT-CODE')

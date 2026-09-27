@@ -158,3 +158,17 @@ full release validation remain pending missing pytest/pydantic. This is a Python
 composition capability only: CLI configuration, reviewed free-provider composition,
 authoritative membership and broad operational refresh remain pending. No market
 observations, source rights, scans or deployment are newly claimed.
+
+## Incremental checkpoint: explicit refresh CLI mapping
+
+The local refresh CLI accepts `--provider-symbol` for an explicitly registered
+EODHD alias. Configuration validates the requested equity identity before token
+access, then forwards a `DailyRefreshTarget` into the existing runtime admission.
+The option is rejected on other operations; omission preserves default targets.
+No provider symbol is inferred and no source rights are implied by alias registration.
+This extends the existing EODHD configuration path only; reviewed free-provider
+composition remains pending and zero-paid-subscription operation is not claimed.
+
+53 dependency-free regressions pass, including four new configuration checks.
+Two CLI regressions were added but execution remains pending missing pytest and
+pydantic; syntax validation passes. No fresh market observations, scans or deployment.

@@ -105,9 +105,12 @@ def main(argv=None):
     parser.add_argument('--quota-units', type=int)
     parser.add_argument('--quota-evidence', help='nonsecret verified per-invocation quota-cost reference')
     parser.add_argument('--provider', help='actual reference evidence provider identity')
+    parser.add_argument('--provider-symbol', help='explicit registered EODHD alias for refresh only; no ticker inference')
     parser.add_argument('--source-uri', help='nonsecret original reference evidence locator')
     args = parser.parse_args(argv)
     try:
+        if args.provider_symbol is not None and args.operation != 'refresh':
+            raise LaunchBlocked('CONFIG_MISSING', '--provider-symbol is only valid for refresh')
         if args.operation == 'schema':
             print(json.dumps(SwingLaunchInput.model_json_schema(), sort_keys=True))
             return 0
@@ -168,9 +171,17 @@ def main(argv=None):
                 from app.paper.swing_launch import admit_calendar, _identity, _now
                 admit_calendar(source, _now())
                 _identity(database, source)
+                from app.egx_refresh_mapping import configured_refresh_mapping
+                from app.storage.security_master_repository import SecurityMasterRepository
+                mapping = configured_refresh_mapping(
+                    SecurityMasterRepository(database), provider_symbol=args.provider_symbol,
+                    provider_name='eodhd', symbol=source.symbol, instrument_id=source.instrument_id,
+                )
+                from app.data.daily_refresh_job import DailyRefreshTarget
+                target = DailyRefreshTarget(**mapping) if mapping is not None else None
                 result = refresh_once(database, root, source,
                                       cost=VerifiedQuotaCost(args.quota_units, args.quota_evidence),
-                                      api_token=_operator_token())
+                                      api_token=_operator_token(), target=target)
             else:
                 result = run_signal(database, root, source,
                                     local_path(os.environ['EGX_SHADOW_DIRECTORY']),

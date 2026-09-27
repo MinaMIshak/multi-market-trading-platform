@@ -2,6 +2,16 @@
 from app.egx_scope import require_equity_identity
 
 
+def configured_refresh_mapping(resolver, *, provider_symbol, provider_name, symbol, instrument_id):
+    """Decode an optional explicit alias without guessing or normalizing identity."""
+    if provider_symbol is None:
+        return None
+    require_refresh_mapping(resolver, canonical_symbol=symbol,
+                            provider_symbol=provider_symbol, provider_name=provider_name,
+                            symbol=symbol, instrument_id=instrument_id)
+    return {'canonical_symbol': symbol, 'provider_symbol': provider_symbol}
+
+
 def require_refresh_mapping(resolver, *, canonical_symbol, provider_symbol, provider_name, symbol, instrument_id):
     """Bind an explicit refresh target to the requested equity before any fetch."""
     if (canonical_symbol != symbol

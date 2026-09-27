@@ -546,3 +546,24 @@ def test_explicit_refresh_mapping_accepts_registered_alias(launch):
                           target=DailyRefreshTarget('COMI', 'COMI.EGX'))
     assert result['operation'] == 'REFRESH_COMPLETED_SIGNAL_NOT_RUN'
     assert provider.calls[-1]['symbol'] == 'COMI.EGX'
+
+
+def test_cli_refresh_alias_rejected_before_token_read(launch, monkeypatch, capsys):
+    _, _, _, _, path, _, _ = launch
+    token = path.parent / 'engineering-token'
+    token.write_text('ENGINEERING_FIXTURE_NOT_A_TOKEN')
+    token.chmod(0o600)
+    monkeypatch.setenv('EODHD_API_TOKEN_FILE', str(token))
+    monkeypatch.setattr('tools.paper_shadow_launch._operator_token',
+                        lambda: pytest.fail('invalid alias must not read token'))
+    monkeypatch.setattr('tools.paper_shadow_launch.refresh_once',
+                        lambda *args, **kwargs: pytest.fail('invalid alias must not refresh'))
+    assert main(['refresh', '--input', str(path), '--authorize-provider-call',
+                 '--quota-units', '1', '--quota-evidence', LABEL,
+                 '--provider-symbol', 'UNREGISTERED.EGX']) == 2
+    assert json.loads(capsys.readouterr().out)['status'] == 'EVIDENCE_BLOCKED'
+
+
+def test_cli_provider_symbol_not_silently_ignored(capsys):
+    assert main(['status', '--provider-symbol', 'EXPLICIT.EGX']) == 2
+    assert json.loads(capsys.readouterr().out)['status'] == 'CONFIG_MISSING'
