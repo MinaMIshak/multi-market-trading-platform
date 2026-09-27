@@ -228,3 +228,16 @@ volume remains valid. Nineteen isolated checks of the actual AST-loaded validato
 and 25 dependency-free mapping/scanner/heartbeat regressions pass. Nineteen added
 provider regression cases await pytest/pydantic; this does not establish integration
 validation, free-source readiness, fresh data, scans or deployment.
+
+## Incremental checkpoint: refresh result accounting
+
+Daily refresh job reporting no longer coerces counts with `int()`. Returned raw,
+valid and quarantined counts must be nonnegative integers and reconcile before
+the result contributes to completed items. A failure retains only earlier valid
+items. This is a reporting guard; it does not roll back artifacts already produced
+by the canonical pipeline or establish new provider admission.
+
+24 focused offline regressions pass, including four tests loading the actual
+dependency-free job module, malformed-count subcases, partial completion and
+mapping/scanner coverage. Dependency-backed integration remains pending missing
+pytest/runtime dependencies. No fresh market evidence, scans or deployment.

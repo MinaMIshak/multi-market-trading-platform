@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "PROVIDER_FINITE_VALUE_ADMISSION",
-  "current_capability": "Existing EODHD acquisition rejects non-finite OHLC, adjusted close and volume before returning provider responses. Reviewed free-provider composition remains pending.",
+  "phase": "REFRESH_RESULT_COUNT_INTEGRITY",
+  "current_capability": "Daily refresh job rejects malformed or inconsistent result counts instead of coercing them into reported success; partial failures preserve only preceding valid results. Reviewed free-provider composition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "aa6999db20c254f1373006e908afaa88b944b1d4",
+  "head": "2547638e1b614c8834a242312d9893913cfa53da",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "19 isolated actual-validator cases PASS (AST-loaded without dependency imports); 25 dependency-free mapping/scanner/heartbeat regressions PASS; git diff --check PASS. Added 19 dependency-backed provider regression cases; pytest/pydantic unavailable, integration/full release validation pending.",
+  "tests": "24 focused offline regressions PASS: 4 actual-job result-contract tests (including malformed-count subcases), 10 mapping tests, 10 scanner tests. git diff --check PASS. Dependency-backed integration/full release validation pending unavailable pytest/runtime dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run provider/admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",
@@ -55,7 +55,7 @@
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "pytest/pydantic unavailable in mission venv; pip installation attempted but package-host DNS resolution failed. 37 dependency-free affected regressions pass.",
+    "test_execution": "System Python and acquisition venv lack pytest; runtime dependencies remain unavailable. Actual dependency-free job module and mapping/scanner regressions executed successfully.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

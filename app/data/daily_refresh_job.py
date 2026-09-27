@@ -221,6 +221,16 @@ class DailyRefreshJob:
                     .canonical_manifest
                 )
 
+                counts = (
+                    ingestion.record_count,
+                    manifest.valid_bar_count,
+                    manifest.quarantined_bar_count,
+                )
+                if any(type(count) is not int or count < 0 for count in counts):
+                    raise ValueError("refresh counts must be nonnegative integers")
+                if counts[0] != counts[1] + counts[2]:
+                    raise ValueError("refresh counts do not reconcile")
+
                 completed.append(
                     DailyRefreshItemResult(
                         canonical_symbol=(
@@ -239,17 +249,9 @@ class DailyRefreshJob:
                         artifact_id=str(
                             promotion.artifact_id
                         ),
-                        record_count=int(
-                            ingestion.record_count
-                        ),
-                        valid_bar_count=int(
-                            manifest
-                            .valid_bar_count
-                        ),
-                        quarantined_bar_count=int(
-                            manifest
-                            .quarantined_bar_count
-                        ),
+                        record_count=counts[0],
+                        valid_bar_count=counts[1],
+                        quarantined_bar_count=counts[2],
                     )
                 )
 
