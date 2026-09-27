@@ -251,3 +251,18 @@ proof that malformed counts never invoke promotion and that a later failure
 preserves only the preceding valid promotion; ten mapping and ten scanner
 regressions also pass. These are engineering fixtures, not acquisition or market
 coverage evidence. Free-provider composition and runtime validation remain pending.
+
+## Incremental checkpoint: bind refresh ingestion identity
+
+The daily refresh job checks returned canonical/provider symbols and requested
+start/end/snapshot dates against its target before canonical promotion. Mismatched
+or missing fields fail closed; later failures preserve only preceding completed
+targets. This prevents a returned ingestion for another symbol or window from
+being promoted and reported as the requested refresh. Raw ingestion may already
+have persisted evidence; the guard does not roll it back or establish source rights.
+
+28 dependency-free regressions pass, including ten identity/window rejection
+subcases and partial completion. Existing job fixtures now include the real
+ingestion identity fields. Dependency-backed integration remains pending: pytest
+installation returned no matching distribution. No fresh coverage, provider
+acquisition, scheduled operation or deployment is claimed.

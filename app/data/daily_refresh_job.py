@@ -201,6 +201,19 @@ class DailyRefreshJob:
                     )
                 )
 
+                expected_identity = {
+                    "canonical_symbol": target.canonical_symbol,
+                    "provider_symbol": target.provider_symbol,
+                    "requested_start_date": start_date,
+                    "requested_end_date": end_date,
+                    "snapshot_date": snapshot_date,
+                }
+                if any(
+                    getattr(ingestion, field, None) != expected
+                    for field, expected in expected_identity.items()
+                ):
+                    raise ValueError("refresh ingestion identity or window mismatch")
+
                 # Promotion persists canonical artifacts. Reject malformed
                 # ingestion counts before invoking that side effect.
                 if type(ingestion.record_count) is not int or ingestion.record_count < 0:

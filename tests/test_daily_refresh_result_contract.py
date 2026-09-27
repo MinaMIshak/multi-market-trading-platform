@@ -16,14 +16,19 @@ SPEC.loader.exec_module(job_module)
 
 
 class RefreshResultContractTests(unittest.TestCase):
-    def run_counts(self, counts, *, second_counts=None):
+    def run_counts(self, counts, *, second_counts=None, identity_changes=None):
         ingestor, pipeline = Mock(), Mock()
         self.ingestor = ingestor
         self.pipeline = pipeline
         values = [counts] if second_counts is None else [counts, second_counts]
         ingestor.ingest.side_effect = [
-            SimpleNamespace(record_count=value[0], manifest=SimpleNamespace(ingestion_id='fixture'))
-            for value in values]
+            SimpleNamespace(**(dict(
+                canonical_symbol=f'FIXTURE{i}', provider_symbol=f'CODE{i}',
+                requested_start_date=date(2026, 1, 1),
+                requested_end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2),
+                record_count=value[0], manifest=SimpleNamespace(ingestion_id='fixture'))
+                | ((identity_changes or {}) if i == len(values) - 1 else {})))
+            for i, value in enumerate(values)]
         pipeline.finalize_ingestion.side_effect = [
             SimpleNamespace(artifact_id='fixture', canonical_manifest=SimpleNamespace(
                 valid_bar_count=value[1], quarantined_bar_count=value[2])) for value in values]
@@ -39,6 +44,29 @@ class RefreshResultContractTests(unittest.TestCase):
         result = self.run_counts((3, 2, 1))
         item = result.items[0]
         self.assertEqual((item.record_count, item.valid_bar_count, item.quarantined_bar_count), (3, 2, 1))
+
+    def test_mismatched_or_missing_identity_never_promotes(self):
+        for field, wrong in (
+            ('canonical_symbol', 'OTHER'), ('provider_symbol', 'OTHER-CODE'),
+            ('requested_start_date', date(2025, 1, 1)),
+            ('requested_end_date', date(2026, 1, 1)),
+            ('snapshot_date', date(2026, 1, 3)),
+        ):
+            for value in (wrong, None):
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+                        self.run_counts((3, 3, 0), identity_changes={field: value})
+                    self.assertEqual(caught.exception.completed, ())
+                    self.assertEqual(caught.exception.cause_type, 'ValueError')
+                    self.pipeline.finalize_ingestion.assert_not_called()
+
+    def test_later_identity_mismatch_retains_only_prior_promotion(self):
+        with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+            self.run_counts((3, 3, 0), second_counts=(3, 3, 0),
+                            identity_changes={'canonical_symbol': 'FIXTURE0'})
+        self.assertEqual(caught.exception.canonical_symbol, 'FIXTURE1')
+        self.assertEqual([item.canonical_symbol for item in caught.exception.completed], ['FIXTURE0'])
+        self.assertEqual(self.pipeline.finalize_ingestion.call_count, 1)
 
     def test_malformed_counts_never_become_success(self):
         for position in range(3):

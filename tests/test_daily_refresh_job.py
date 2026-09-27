@@ -34,6 +34,10 @@ class FakeIngestor:
 
         return SimpleNamespace(
             canonical_symbol=symbol,
+            provider_symbol=kwargs["provider_symbol"],
+            requested_start_date=kwargs["start_date"],
+            requested_end_date=kwargs["end_date"],
+            snapshot_date=kwargs["snapshot_date"],
             manifest=SimpleNamespace(
                 ingestion_id=f"ing-{symbol}"
             ),
