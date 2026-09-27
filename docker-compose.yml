@@ -18,6 +18,7 @@ services:
       EGX_DB_PATH: /app/data/platform.db
       EGX_SCHEDULER_HEARTBEAT_PATH: /app/data/scheduler-heartbeat.json
       EGX_SCAN_HISTORY_PATH: /app/data/egx-scan-history.json
+      EGX_SCAN_LEDGER_PATH: ${EGX_SCAN_LEDGER_PATH:-}
 
     volumes:
       - ./data:/app/data

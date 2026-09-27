@@ -163,9 +163,11 @@ def load_scan_history():
         raw = json.loads(payload, object_pairs_hook=_unique_object)
         if not _valid_summary(raw):
             return unknown
+        reconciled = reconcile_scan_completion(raw)
         return {'status': 'HISTORICAL_RUN',
+                'observed_at': datetime.now(timezone.utc).isoformat(),
                 'reason': 'Last completed explicit-scope run; not current readiness, fills or universe coverage',
-                'reconciled_scheduler_completion': reconcile_scan_completion(raw),
+                'reconciled_scheduler_completion': reconciled,
                 'run': raw}
     except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return unknown

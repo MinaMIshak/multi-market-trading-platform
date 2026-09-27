@@ -1,4 +1,5 @@
 """Unified read-only product views over operational receipts, never legacy signals."""
+from datetime import datetime, timezone
 from html import escape
 from urllib.parse import urlencode
 
@@ -34,7 +35,8 @@ def observed_receipt_summary(market_state):
 
 
 def scan_run_state(history):
-    unknown = {'status': 'UNKNOWN', 'run': None, 'scheduler_completion': None}
+    unknown = {'status': 'UNKNOWN', 'run': None, 'scheduler_completion': None,
+               'completion_evidence': None}
     if (not isinstance(history, dict) or history.get('status') != 'HISTORICAL_RUN'
             or not _valid_summary(history.get('run'))):
         return unknown
@@ -49,10 +51,25 @@ def scan_run_state(history):
     attempt = dict(raw['scheduler_attempt']) if raw['schema_version'] == 3 else None
     run['scheduler_attempt'] = attempt
     completion = attempt if attempt and attempt['status'] == 'SUCCEEDED' else None
+    origin = 'RECORDED_HISTORY' if completion else None
     reconciled = history.get('reconciled_scheduler_completion')
     if completion is None and valid_reconciliation(raw, reconciled):
         completion = dict(reconciled)
-    return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': completion}
+        origin = 'READ_ONLY_LEDGER'
+    evidence = None
+    if completion:
+        try:
+            observed = datetime.fromisoformat(history['observed_at'])
+            if (observed.tzinfo is None or not
+                    max(datetime.fromisoformat(raw['completed_at']),
+                        datetime.fromisoformat(completion['finished_at']))
+                    <= observed <= datetime.now(timezone.utc)):
+                raise ValueError('invalid observation time')
+            evidence = {'origin': origin, 'observed_at': history['observed_at']}
+        except (KeyError, TypeError, ValueError):
+            completion = None
+    return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': completion,
+            'completion_evidence': evidence}
 
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None):
@@ -121,13 +138,20 @@ def render_product(state):
             if run is None:
                 continue
             completion = history['scheduler_completion']
-            label = ('Recorded SUCCEEDED · ' + completion['market_date'] + ' · '
+            evidence = history['completion_evidence']
+            prefix = ('Recorded SUCCEEDED' if evidence and evidence['origin'] == 'RECORDED_HISTORY'
+                      else 'Ledger-reconciled SUCCEEDED')
+            label = (prefix + ' · ' + completion['market_date'] + ' · '
                      + completion['checkpoint'] + ' · attempt ' + str(completion['attempt_count'])
                      if completion else 'UNKNOWN')
             content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
                         'Scheduler completion: ' + escape(label) + '.</p><p>Completed at: '
                         + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
                         + f' · Requested: {run["requested"]} · Verified scans: {run["scanned"]}</p>')
+            if evidence:
+                content += ('<p>Completion evidence: ' + escape(evidence['origin'])
+                            + ' · Observed at: ' + escape(evidence['observed_at'])
+                            + '. Historical observation only; current worker health UNKNOWN.</p>')
             content += '<table><caption>Historical per-target outcomes</caption><tr><th>Symbol</th><th>Status</th><th>Scanned</th></tr>'
             for row in run['symbols']:
                 content += (f'<tr><td>{escape(row["symbol"])}</td><td>{escape(row["status"])}</td>'

@@ -82,6 +82,9 @@ class AttemptContracts(unittest.TestCase):
         self.assertIsNone(state['coverage']['EGX']['scanned'])
         self.assertIsNone(state['scan_runs']['US']['scheduler_completion'])
         self.assertIn('Recorded SUCCEEDED', render_product(state))
+        self.assertEqual(state['scan_runs']['EGX']['completion_evidence']['origin'],
+                         'RECORDED_HISTORY')
+        self.assertIsNone(state['scan_runs']['US']['completion_evidence'])
         self.assertIsNone(self.dispatch())
         self.evaluation.due = [NS(name=Checkpoint.FALLBACK)]
         self.assertIsNone(self.dispatch())
@@ -191,7 +194,10 @@ class AttemptContracts(unittest.TestCase):
         self.assertEqual(state['scan_runs']['EGX']['run']['scheduler_attempt']['status'], 'RUNNING')
         self.assertIsNone(state['coverage']['EGX']['scanned'])
         self.assertIsNone(state['scan_runs']['US']['scheduler_completion'])
-        self.assertIn('Recorded SUCCEEDED', render_product(state))
+        self.assertIn('Ledger-reconciled SUCCEEDED', render_product(state))
+        evidence = state['scan_runs']['EGX']['completion_evidence']
+        self.assertEqual(evidence['origin'], 'READ_ONLY_LEDGER')
+        self.assertIn('Observed at: ' + evidence['observed_at'], render_product(state))
         self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
 
     def test_reconciliation_rejects_new_attempt_and_invalid_ledger_truth(self):
@@ -267,3 +273,40 @@ class AttemptContracts(unittest.TestCase):
                              [values, values])
         with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(ambiguous)}):
             self.assertIsNone(self.state()['scan_runs']['EGX']['scheduler_completion'])
+
+    def test_completion_observation_time_is_required_and_bounded(self):
+        for reconciled in (False, True):
+            with self.subTest(reconciled=reconciled):
+                if reconciled:
+                    # Reset fixture job to allow another dispatch.
+                    with self.db.connect() as conn:
+                        conn.execute("UPDATE scheduled_jobs SET status='PENDING'")
+                    self.running_history()
+                else:
+                    self.dispatch()
+                with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(self.root / 'ledger.sqlite')}):
+                    history = load_scan_history()
+                before = deepcopy(history)
+                for value in (None, '', 42, [], '2026-09-24T10:00:00',
+                              '2000-01-01T00:00:00+00:00', '2999-01-01T00:00:00+00:00'):
+                    injected = history | {'observed_at': value}
+                    state = product_state(dict(configured=False, available=False,
+                                               status='UNKNOWN', symbols=[]),
+                                          section='LIVE', scan_history=injected)
+                    result = state['scan_runs']['EGX']
+                    self.assertIsNotNone(result['run'])
+                    self.assertIsNone(result['scheduler_completion'])
+                    self.assertIsNone(result['completion_evidence'])
+                    self.assertNotIn('SUCCEEDED ·', render_product(state))
+                missing_time = dict(history)
+                del missing_time['observed_at']
+                self.assertIsNone(product_state(
+                    dict(configured=False, available=False, status='UNKNOWN', symbols=[]),
+                    scan_history=missing_time)['scan_runs']['EGX']['scheduler_completion'])
+                self.assertEqual(history, before)
+                state = product_state(dict(configured=False, available=False,
+                                           status='UNKNOWN', symbols=[]), scan_history=history)
+                evidence = state['scan_runs']['EGX']['completion_evidence']
+                self.assertEqual(evidence['observed_at'], history['observed_at'])
+                self.assertGreaterEqual(datetime.fromisoformat(evidence['observed_at']),
+                    datetime.fromisoformat(state['scan_runs']['EGX']['scheduler_completion']['finished_at']))
