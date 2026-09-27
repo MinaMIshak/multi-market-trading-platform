@@ -8,6 +8,7 @@ import pytest
 from app.data.quota import (QuotaGuard, QuotaPolicy, QuotaRejected,
                             VerifiedQuotaCost, QuotaLimitedDailyProvider)
 from app.core.daily_refresh_runtime import build_daily_refresh_runtime
+from app.data.daily_refresh_job import DailyRefreshTarget
 from app.storage import Database
 from app.storage.scheduler_repository import SchedulerRepository
 
@@ -157,7 +158,8 @@ def test_concurrent_admission_cannot_overspend(db):
 def test_runtime_default_unknown_contract_and_budget_rejection(db, tmp_path):
     fake = Fake()
     arguments = dict(database=db, scheduler_repository=SchedulerRepository(db),
-                     data_root=tmp_path / "data", provider=fake)
+                     data_root=tmp_path / "data", provider=fake,
+                     targets=(DailyRefreshTarget('TEST', 'TEST'),))
     runtime = build_daily_refresh_runtime(**arguments)
     with pytest.raises(QuotaRejected):
         fetch(runtime.provider)

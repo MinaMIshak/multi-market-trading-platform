@@ -31,6 +31,7 @@ from app.data.providers.eodhd import (
     EODHDProvider,
 )
 from app.data.raw_store import ImmutableRawStore
+from app.egx_refresh_mapping import select_refresh_targets
 from app.storage import Database
 from app.storage.daily_canonical_artifact_repository import (
     DailyCanonicalArtifactRepository,
@@ -91,7 +92,7 @@ def build_daily_refresh_runtime(
     targets: tuple[
         DailyRefreshTarget,
         ...,
-    ] = DEFAULT_EODHD_TARGETS,
+    ] | None = None,
     lookback_days: int = 400,
     minimum_valid_bars: int = 260,
     quota_policy: QuotaPolicy = QuotaPolicy(),
@@ -101,9 +102,9 @@ def build_daily_refresh_runtime(
     Compose the production daily-refresh
     components without executing a request.
 
-    Tests may inject a provider. Production
-    leaves provider=None and supplies the
-    runtime EODHD token.
+    Providers may be injected without a token, but non-EODHD providers
+    require explicit targets. The legacy EODHD path supplies a token;
+    its default codes must not become another provider's universe.
     """
 
     root = Path(data_root)
@@ -127,6 +128,11 @@ def build_daily_refresh_runtime(
 
     else:
         selected_provider = provider
+
+    targets = select_refresh_targets(
+        provider_name=selected_provider.name, targets=targets,
+        eodhd_defaults=DEFAULT_EODHD_TARGETS,
+    )
 
     selected_provider = QuotaLimitedDailyProvider(
         selected_provider, QuotaGuard(database, policy=quota_policy),

@@ -3,7 +3,32 @@ import unittest
 from unittest.mock import Mock
 from uuid import UUID
 
-from app.egx_refresh_mapping import configured_refresh_mapping, require_refresh_mapping
+from app.egx_refresh_mapping import (
+    configured_refresh_mapping, require_refresh_mapping, select_refresh_targets,
+)
+
+
+class RefreshTargetSelectionTests(unittest.TestCase):
+    def test_eodhd_preserves_legacy_defaults(self):
+        defaults = (object(),)
+        self.assertIs(select_refresh_targets(provider_name='eodhd', targets=None,
+                                            eodhd_defaults=defaults), defaults)
+
+    def test_other_provider_cannot_inherit_eodhd_codes(self):
+        for provider in ('tradingview_tvdatafeed_egx', 'fixture', None, '', 'EODHD'):
+            with self.subTest(provider=provider), self.assertRaisesRegex(ValueError, 'explicit refresh targets'):
+                select_refresh_targets(provider_name=provider, targets=None,
+                                       eodhd_defaults=(object(),))
+
+    def test_explicit_targets_are_preserved_without_translation(self):
+        targets = (object(), object())
+        for provider in ('eodhd', 'tradingview_tvdatafeed_egx'):
+            self.assertIs(select_refresh_targets(provider_name=provider, targets=targets,
+                                                eodhd_defaults=(object(),)), targets)
+
+    def test_explicit_empty_scope_never_expands_to_defaults(self):
+        self.assertEqual(select_refresh_targets(provider_name='fixture', targets=(),
+                                               eodhd_defaults=(object(),)), ())
 
 
 class RefreshMappingTests(unittest.TestCase):

@@ -266,3 +266,17 @@ subcases and partial completion. Existing job fixtures now include the real
 ingestion identity fields. Dependency-backed integration remains pending: pytest
 installation returned no matching distribution. No fresh coverage, provider
 acquisition, scheduled operation or deployment is claimed.
+
+## Incremental checkpoint: provider-specific refresh defaults
+
+Refresh runtime composition now requires explicit targets when an injected
+provider is not EODHD. Omitted targets fail before quota/storage construction;
+the five legacy EODHD codes remain defaults only in the EODHD namespace.
+Explicit mappings are preserved without translating provider codes. This is
+configuration isolation, not evidence of source rights, membership or acquisition.
+
+32 offline mapping/selection, actual-job contract and scanner regressions pass.
+Runtime/quota integration regressions were updated but remain unexecuted because
+pytest/pydantic are unavailable; the isolated install retry found no pytest
+distribution. No new market observation or deployment occurred. Reusable reviewed
+free-provider acquisition and broader runtime integration remain pending.

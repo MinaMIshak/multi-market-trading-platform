@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_INGESTION_IDENTITY_ADMISSION",
-  "current_capability": "Daily refresh binds returned ingestion symbols and requested date window to the target before canonical promotion; mismatches fail closed and preserve only earlier completed targets. Reviewed free-provider composition remains pending.",
+  "phase": "REFRESH_PROVIDER_TARGET_ISOLATION",
+  "current_capability": "Daily refresh composition requires explicit targets for non-EODHD providers before quota/storage construction; EODHD defaults are isolated to its provider namespace. Reviewed free-provider acquisition integration remains pending.",
   "starting_head": "e55fbbc",
-  "head": "9e74706bd0e2acd4e884e3808fd5cbbefa8b7552",
+  "head": "e2d417ceb3dde5a128324a6914aeaaba105173fd",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "28 focused offline regressions PASS: 8 actual-job result-contract tests, 10 mapping tests, 10 scanner tests. Changed Python files parse successfully; git diff --check PASS. Dependency-backed integration/full release validation pending unavailable pytest/runtime dependencies.",
+  "tests": "32 offline regressions PASS: 14 mapping/target-selection, 8 actual-job result-contract, 10 scanner tests. Changed Python files parse; git diff --check PASS. Runtime/quota integration regressions updated but not executed: pytest/pydantic unavailable; isolated installation retry found no matching pytest distribution.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run provider/admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",
+  "next_action": "Compose reviewed free-provider acquisition with explicit alias-bound targets; run runtime/quota/provider/admission/launch integration once dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

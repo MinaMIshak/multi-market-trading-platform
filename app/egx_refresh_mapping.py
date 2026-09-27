@@ -2,6 +2,19 @@
 from app.egx_scope import require_equity_identity
 
 
+def select_refresh_targets(*, provider_name, targets, eodhd_defaults):
+    """EODHD codes are defaults only for EODHD, never a generic universe.
+
+    Explicit targets still require alias and evidence admission at execution.
+    Selecting them does not certify source rights or dated membership.
+    """
+    if targets is not None:
+        return targets
+    if provider_name != 'eodhd':
+        raise ValueError('explicit refresh targets required for non-EODHD provider')
+    return eodhd_defaults
+
+
 def configured_refresh_mapping(resolver, *, provider_symbol, provider_name, symbol, instrument_id):
     """Decode an optional explicit alias without guessing or normalizing identity."""
     if provider_symbol is None:

@@ -97,6 +97,7 @@ def test_injected_provider_requires_no_token(
         data_root=tmp_path / "data",
         provider=provider,
         api_token=None,
+        targets=DEFAULT_EODHD_TARGETS,
     )
 
     assert isinstance(
@@ -118,6 +119,25 @@ def test_injected_provider_requires_no_token(
     )
 
     assert provider.calls == []
+
+
+def test_non_eodhd_provider_requires_targets_before_storage(tmp_path, monkeypatch):
+    provider = FakeProvider()
+    guard = []
+
+    def forbidden_guard(*args, **kwargs):
+        guard.append(True)
+        raise AssertionError('quota storage must not be constructed')
+
+    monkeypatch.setattr('app.core.daily_refresh_runtime.QuotaGuard', forbidden_guard)
+    with pytest.raises(ValueError, match='explicit refresh targets'):
+        build_daily_refresh_runtime(
+            database=None, scheduler_repository=None,
+            data_root=tmp_path / 'absent', provider=provider,
+        )
+    assert provider.calls == []
+    assert guard == []
+    assert not (tmp_path / 'absent').exists()
 
 
 def test_production_provider_requires_token(
@@ -236,6 +256,7 @@ def test_runtime_wires_admission_policy(
         scheduler_repository=repository,
         data_root=tmp_path / "data",
         provider=FakeProvider(),
+        targets=DEFAULT_EODHD_TARGETS,
         minimum_valid_bars=275,
     )
 
