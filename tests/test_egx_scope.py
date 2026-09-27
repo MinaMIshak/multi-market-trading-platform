@@ -28,6 +28,23 @@ class EquityIdentityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'equity classification required'):
             self.admit(row)
 
+    def test_matching_malformed_identifiers_are_not_identity_evidence(self):
+        for identifier in ('', 'not-a-uuid', '42', 42, True, [], {}):
+            with self.subTest(identifier=identifier), self.assertRaisesRegex(
+                    ValueError, 'identity mismatch'):
+                self.admit(self.master() | {'instrument_id': identifier},
+                           instrument_id=identifier)
+
+    def test_stringifiable_objects_cannot_impersonate_uuid(self):
+        class Identifier:
+            def __str__(self):
+                return str(UUID(int=1))
+
+        with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+            self.admit(self.master(), instrument_id=Identifier())
+        with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+            self.admit(self.master() | {'instrument_id': Identifier()})
+
     def test_wrong_or_missing_identity_rejected(self):
         cases = [None, [], {}, self.master() | {'instrument_id': str(UUID(int=2))},
                  self.master() | {'canonical_ticker': 'EAST'},

@@ -1,5 +1,6 @@
 """Lexical EGX scope checks; valid spelling is never membership evidence."""
 import re
+from uuid import UUID
 
 
 _SYMBOL = re.compile(r"[A-Z0-9][A-Z0-9._-]{0,63}")
@@ -15,8 +16,15 @@ SCAN_STATUSES = ("WATCH", "READY_NO_SIGNAL", "EVIDENCE_BLOCKED", "DATA_STALE", "
 
 def require_equity_identity(resolved, *, symbol, instrument_id):
     """Admit an exact master identity; this does not prove dated membership."""
+    if not isinstance(instrument_id, (str, UUID)):
+        raise ValueError('security-master identity mismatch')
+    try:
+        UUID(str(instrument_id))
+    except ValueError as exc:
+        raise ValueError('security-master identity mismatch') from exc
     if (not isinstance(resolved, dict)
             or not valid_scope_symbol(symbol) or instrument_id is None
+            or not isinstance(resolved.get('instrument_id'), (str, UUID))
             or str(resolved.get('instrument_id')) != str(instrument_id)
             or resolved.get('canonical_ticker') != symbol):
         raise ValueError('security-master identity mismatch')

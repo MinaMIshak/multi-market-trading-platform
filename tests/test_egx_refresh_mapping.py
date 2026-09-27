@@ -51,6 +51,11 @@ class RefreshMappingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.admit()
 
+    def test_matching_malformed_identity_cannot_authorize_refresh_alias(self):
+        self.resolver.resolve.return_value = self.row | {'instrument_id': 'invalid'}
+        with self.assertRaisesRegex(ValueError, 'identity mismatch'):
+            self.admit(instrument_id='invalid')
+
     def configure(self, provider_symbol):
         return configured_refresh_mapping(
             self.resolver, provider_symbol=provider_symbol, provider_name='fixture',

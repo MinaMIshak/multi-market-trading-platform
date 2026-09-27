@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "SCHEDULER_HEARTBEAT_CONTRACT",
-  "current_capability": "SYSTEM heartbeat admission rejects boolean/fractional schema versions. Writer rejects unsupported modes, invalid polling intervals and naive timestamps before replacing previous liveness evidence. Reviewed free-provider composition and runtime integration remain pending.",
+  "phase": "REFRESH_IDENTITY_CONTRACT",
+  "current_capability": "Shared EGX equity admission now rejects matching malformed IDs and stringifiable non-UUID objects before refresh alias authorization. Reviewed free-provider composition and runtime integration remain pending.",
   "starting_head": "e55fbbc",
-  "head": "ccd4b717e26fe1962a1573ade36ae28a484f15a5",
+  "head": "657ecd96822ca7d0f49ac965e6bc0f097dd0daac",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "54 dependency-free heartbeat/SYSTEM/scope/mapping/scanner/configuration/dispatcher/history regressions PASS; git diff --check PASS. Refresh admission/launch integration and full release suites remain pending unavailable pytest/pydantic.",
+  "tests": "37 dependency-free identity/mapping/scanner/configuration/heartbeat regressions PASS; git diff --check PASS. Dependency-backed integration and full release suites pending: pytest/pydantic unavailable and package-host DNS resolution failed.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",
@@ -55,7 +55,7 @@
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "Existing /tmp/egx-mission-venv still lacks pytest; dependency-backed integration/release validation remains pending. 54 dependency-free affected regressions pass.",
+    "test_execution": "pytest/pydantic unavailable in mission venv; pip installation attempted but package-host DNS resolution failed. 37 dependency-free affected regressions pass.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

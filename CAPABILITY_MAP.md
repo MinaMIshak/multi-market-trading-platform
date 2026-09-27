@@ -207,3 +207,15 @@ Malformed input preserves the last valid heartbeat, which still expires normally
 54 dependency-free heartbeat/SYSTEM/scope/mapping/scanner/configuration/dispatcher/
 history tests pass, including separate-process reader/writer coverage. No runtime
 scheduler operation, deployment or current market coverage is inferred.
+
+## Incremental checkpoint: refresh identity UUID admission
+
+Shared EGX equity identity admission now rejects matching malformed identifiers
+and arbitrary stringifiable objects before explicit refresh aliases can be
+authorized. Valid UUID objects and matching stored UUID text remain supported;
+exact identity comparison is preserved. This is a local admission capability,
+not dated membership, provider rights, acquisition or market scan evidence.
+37 dependency-free identity/mapping/scanner/configuration/heartbeat regressions
+pass. Dependency-backed integration remains pending: installing pytest/pydantic
+failed because package-host DNS was unavailable. No deployment or fresh runtime
+market observation occurred. Reviewed free-provider composition remains pending.
