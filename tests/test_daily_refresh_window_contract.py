@@ -69,6 +69,7 @@ class RefreshWindowTests(unittest.TestCase):
                 'matched_provider': 'fixture', 'matched_alias_value': 'CODE'})))
         provider = Mock()
         provider.name = 'fixture'
+        provider.fetch_daily_bars.return_value.record_count = 2
         with self.assertRaises(self.error):
             ingestor.ingest(provider=provider, canonical_symbol='FIXTURE',
                             provider_symbol='CODE', start_date=self.start,

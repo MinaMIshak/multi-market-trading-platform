@@ -485,3 +485,16 @@ empty batches remain valid raw-ingestion results, not data-readiness evidence.
 without partial persistence and valid count preservation. Dependency-backed index
 ingestion/provider suites were attempted but pytest remains unavailable. No new
 acquisition, coverage, deployment or scheduled operation is claimed.
+
+## Incremental checkpoint: daily record-count integrity
+
+Daily ingestion now requires a nonnegative integer response count before semantic
+admission or persistence, matching the index ingestion boundary. Booleans,
+fractions, strings and negative counts fail closed. Zero remains a valid raw count,
+not evidence of readiness; valid counts do not bypass semantic admission.
+
+20 focused offline stdlib ingestion/window tests pass. The existing window fixture
+now declares a valid integer count so its semantic-rejection assertion remains
+exercised. Dependency-backed daily ingestion/admission suites were attempted but
+pytest is unavailable. No acquisition, coverage, deployment or scheduled operation
+is claimed. Reviewed free-provider composition remains pending.

@@ -142,6 +142,9 @@ class DailyBarIngestor:
                 "daily provider record_count is required"
             )
 
+        if type(response.record_count) is not int or response.record_count < 0:
+            raise ValueError("daily provider record_count must be a nonnegative integer")
+
         if self.admission_policy is not None:
             self.admission_policy.validate_provider_response(
                 response,
