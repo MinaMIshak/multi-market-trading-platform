@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "INDEX_INGESTION_WINDOW_ADMISSION",
-  "current_capability": "Direct index ingestion now rejects non-calendar-date windows, reversed bounds and snapshots before the requested end date before provider acquisition or persistence, matching daily equity chronology admission.",
+  "phase": "INDEX_INGESTION_COUNT_ADMISSION",
+  "current_capability": "Index ingestion validates batch and every page record count as nonnegative integers before any persistence; malformed counts and total mismatches fail closed.",
   "starting_head": "e55fbbc",
-  "head": "a367c2f43b7d7e27845ce2adf74a90c92dea54f5",
+  "head": "59ef898ebd4fdc102212b86fb705e4a407a683ec",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "38 focused offline stdlib index/daily ingestion, admission, execution and result tests PASS; git diff --check PASS. Dependency-backed index ingestion and official refresh suites attempted but pytest unavailable; integration pending.",
+  "tests": "17 focused offline stdlib index ingestion, daily alias and history-window tests PASS; git diff --check PASS. Dependency-backed index ingestion/provider suites attempted but pytest unavailable; integration pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

@@ -473,3 +473,15 @@ calendars, provider payloads or canonical promotion.
 and valid fetch-boundary checks. Dependency-backed index ingestion and official
 refresh suites were attempted but pytest is unavailable. No market acquisition,
 coverage increase, deployment or scheduled operation is claimed.
+
+## Incremental checkpoint: index record-count integrity
+
+Index ingestion now requires nonnegative integer counts for the batch and every
+page before persisting any artifact. Booleans, fractions, negative counts and
+missing page counts can no longer satisfy total equality. Exact zero counts and
+empty batches remain valid raw-ingestion results, not data-readiness evidence.
+
+17 focused offline stdlib tests pass, including malformed later-page rejection
+without partial persistence and valid count preservation. Dependency-backed index
+ingestion/provider suites were attempted but pytest remains unavailable. No new
+acquisition, coverage, deployment or scheduled operation is claimed.

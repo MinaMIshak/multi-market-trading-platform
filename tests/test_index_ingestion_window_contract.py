@@ -43,3 +43,62 @@ class IndexIngestionWindowTests(unittest.TestCase):
                     end_date=self.window['end_date'], page_size=1000)
                 self.store.store_bytes.assert_not_called()
                 self.repository.save_manifest.assert_not_called()
+
+
+class IndexIngestionCountTests(unittest.TestCase):
+    def setUp(self):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+        self.ns = SimpleNamespace
+        namespace = load_classes('app/data/index_ingestion.py',
+                                 {'IndexHistoryIngestor', 'IndexIngestionResult'},
+                                 {'date': date, 'dataclass': dataclass,
+                                  'DataAssetType': SimpleNamespace(INDEX_BARS='index'),
+                                  'BarGranularity': SimpleNamespace(D1='daily'),
+                                  'IngestionStatus': SimpleNamespace(RECEIVED='received')})
+        self.store, self.repository, self.provider = Mock(), Mock(), Mock()
+        self.ingestor = namespace['IndexHistoryIngestor'](
+            raw_store=self.store, repository=self.repository)
+
+    def ingest(self, total, counts):
+        self.provider.fetch_index_bars.return_value = self.ns(
+            record_count=total, metadata={}, responses=tuple(self.ns(
+                record_count=count, payload=b'fixture', filename='fixture.json',
+                source_uri=None, metadata={}) for count in counts))
+        return self.ingestor.ingest(
+            provider=self.provider, index_name='CASE30',
+            start_date=date(2026, 9, 1), end_date=date(2026, 9, 24),
+            snapshot_date=date(2026, 9, 24))
+
+    def test_invalid_batch_counts_never_persist(self):
+        for total in (None, True, False, -1, 1.0, '1'):
+            with self.subTest(total=total), self.assertRaises(ValueError):
+                self.ingest(total, [total])
+            self.store.store_bytes.assert_not_called()
+            self.repository.save_manifest.assert_not_called()
+
+    def test_invalid_later_page_never_persists_earlier_page(self):
+        for total, counts in ((1, [1, None]), (2, [1, True]), (1, [1, False]),
+                              (2, [1, 1.0]), (0, [1, -1]), (2, [1, '1'])):
+            with self.subTest(counts=counts), self.assertRaises(ValueError):
+                self.ingest(total, counts)
+            self.store.store_bytes.assert_not_called()
+            self.repository.save_manifest.assert_not_called()
+
+    def test_mismatch_never_persists(self):
+        with self.assertRaisesRegex(ValueError, 'count mismatch'):
+            self.ingest(3, [1, 1])
+        self.store.store_bytes.assert_not_called()
+        self.repository.save_manifest.assert_not_called()
+
+    def test_exact_nonnegative_counts_preserved(self):
+        for counts in ([], [0], [2, 0, 1]):
+            with self.subTest(counts=counts):
+                self.store.reset_mock()
+                self.repository.reset_mock()
+                result = self.ingest(sum(counts), counts)
+                self.assertEqual(result.record_count, sum(counts))
+                self.assertEqual(len(result.manifests), len(counts))
+                self.assertEqual(self.repository.save_manifest.call_count, len(counts))
+                self.assertEqual([c.kwargs['record_count'] for c in
+                                  self.store.store_bytes.call_args_list], counts)

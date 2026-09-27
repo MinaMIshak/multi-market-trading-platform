@@ -133,8 +133,17 @@ class IndexHistoryIngestor:
                 "record_count is required"
             )
 
+        if type(expected_count) is not int or expected_count < 0:
+            raise ValueError("index provider batch record_count must be a nonnegative integer")
+
+        # Validate every page before writing any artifacts. Arithmetic equality
+        # alone admits booleans, fractions and cancelling negative counts.
+        for response in batch.responses:
+            if type(response.record_count) is not int or response.record_count < 0:
+                raise ValueError("index provider response record_count must be a nonnegative integer")
+
         response_count = sum(
-            response.record_count or 0
+            response.record_count
             for response in batch.responses
         )
 
