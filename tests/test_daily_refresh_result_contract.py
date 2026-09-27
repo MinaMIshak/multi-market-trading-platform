@@ -16,7 +16,7 @@ SPEC.loader.exec_module(job_module)
 
 
 class RefreshResultContractTests(unittest.TestCase):
-    def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture"):
+    def run_counts(self, counts, *, second_counts=None, identity_changes=None, provider_name="fixture", target_admission=None):
         ingestor, pipeline = Mock(), Mock()
         self.ingestor = ingestor
         self.pipeline = pipeline
@@ -34,11 +34,47 @@ class RefreshResultContractTests(unittest.TestCase):
                 valid_bar_count=value[1], quarantined_bar_count=value[2])) for value in values]
         job = job_module.DailyRefreshJob(
             ingestor=ingestor, pipeline=pipeline, canonical_store=object(),
+            target_admission=target_admission,
             artifact_repository=object(), targets=tuple(
                 job_module.DailyRefreshTarget(f'FIXTURE{i}', f'CODE{i}')
                 for i in range(len(values))))
         return job.run(provider=SimpleNamespace(name=provider_name), start_date=date(2026, 1, 1),
                        end_date=date(2026, 1, 2), snapshot_date=date(2026, 1, 2))
+
+    def test_scope_rejection_precedes_all_ingestion_and_promotion(self):
+        admission = Mock(side_effect=ValueError('unbound later target'))
+        with self.assertRaisesRegex(ValueError, 'unbound later target'):
+            self.run_counts((3, 3, 0), second_counts=(3, 3, 0), target_admission=admission)
+        self.ingestor.ingest.assert_not_called()
+        self.pipeline.finalize_ingestion.assert_not_called()
+        self.assertEqual(admission.call_args.kwargs['provider_name'], 'fixture')
+        self.assertEqual(len(admission.call_args.kwargs['targets']), 2)
+
+    def test_real_scope_gate_rejects_later_unbound_alias_before_first_fetch(self):
+        from functools import partial
+        from uuid import UUID
+        from app.egx_refresh_mapping import require_refresh_targets
+
+        def resolve(symbol, *, provider):
+            index = 0 if symbol in ('FIXTURE0', 'CODE0') else 1
+            if provider == 'fixture' and index == 1:
+                raise KeyError('unregistered second alias')
+            return dict(instrument_id=str(UUID(int=index + 1)),
+                        canonical_ticker=f'FIXTURE{index}', instrument_type='EQUITY',
+                        matched_provider=provider, matched_alias_value=symbol)
+
+        with self.assertRaisesRegex(ValueError, 'alias unavailable'):
+            self.run_counts((3, 3, 0), second_counts=(3, 3, 0),
+                            target_admission=partial(require_refresh_targets,
+                                                     SimpleNamespace(resolve=resolve)))
+        self.ingestor.ingest.assert_not_called()
+        self.pipeline.finalize_ingestion.assert_not_called()
+
+    def test_admitted_scope_runs_normally(self):
+        admission = Mock()
+        result = self.run_counts((3, 3, 0), target_admission=admission)
+        admission.assert_called_once()
+        self.assertEqual(len(result.items), 1)
 
     def test_valid_and_quarantined_counts_are_preserved(self):
         result = self.run_counts((3, 2, 1))

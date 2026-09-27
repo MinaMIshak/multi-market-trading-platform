@@ -113,6 +113,7 @@ class DailyRefreshJob:
             DailyRefreshTarget,
             ...,
         ],
+        target_admission: Any | None = None,
     ) -> None:
         if not targets:
             raise ValueError(
@@ -155,6 +156,7 @@ class DailyRefreshJob:
             artifact_repository
         )
         self.targets = targets
+        self.target_admission = target_admission
 
     def run(
         self,
@@ -180,6 +182,9 @@ class DailyRefreshJob:
         if (not isinstance(provider_name, str) or not provider_name.strip()
                 or provider_name != provider_name.strip().lower()):
             raise ValueError("refresh provider name must be canonical")
+
+        if self.target_admission is not None:
+            self.target_admission(provider_name=provider_name, targets=self.targets)
 
         completed: list[
             DailyRefreshItemResult

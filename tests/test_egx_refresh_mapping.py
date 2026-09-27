@@ -1,10 +1,12 @@
 """Engineering aliases only; no market or source-rights evidence."""
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID
 
 from app.egx_refresh_mapping import (
     configured_refresh_mapping, require_refresh_mapping, select_refresh_targets,
+    require_refresh_targets,
 )
 
 
@@ -105,3 +107,28 @@ class RefreshMappingTests(unittest.TestCase):
         self.resolver.resolve.return_value = self.row | {'instrument_id': str(UUID(int=2))}
         with self.assertRaises(ValueError):
             self.configure('EXPLICIT-CODE')
+
+
+class ScopeAdmissionTests(unittest.TestCase):
+    def test_each_alias_must_bind_to_its_canonical_identity(self):
+        identity = dict(instrument_id=str(UUID(int=1)), canonical_ticker='FIXTURE',
+                        instrument_type='EQUITY')
+        target = SimpleNamespace(canonical_symbol='FIXTURE', provider_symbol='CODE')
+        for changes in ({}, {'instrument_id': str(UUID(int=2))}, {'instrument_type': 'INDEX'}):
+            resolver = Mock()
+            resolver.resolve.side_effect = [identity, identity | dict(
+                matched_provider='fixture', matched_alias_value='CODE') | changes]
+            with self.subTest(changes=changes):
+                if changes:
+                    with self.assertRaises(ValueError):
+                        require_refresh_targets(resolver, provider_name='fixture', targets=(target,))
+                else:
+                    require_refresh_targets(resolver, provider_name='fixture', targets=(target,))
+                self.assertEqual(resolver.resolve.call_args_list[0].kwargs, {'provider': 'canonical'})
+
+    def test_missing_canonical_identity_fails_closed(self):
+        target = SimpleNamespace(canonical_symbol='FIXTURE', provider_symbol='CODE')
+        for identity in (None, {}, []):
+            with self.subTest(identity=identity), self.assertRaises(ValueError):
+                require_refresh_targets(Mock(resolve=Mock(return_value=identity)),
+                                        provider_name='fixture', targets=(target,))

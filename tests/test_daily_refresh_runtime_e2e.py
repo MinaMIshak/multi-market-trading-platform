@@ -170,6 +170,15 @@ def seed_comi(database):
             ),
         )
 
+    with database.connect() as con:
+        con.execute(
+            "INSERT INTO instrument_aliases "
+            "(instrument_id, provider, alias_type, alias_value, normalized_value, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (instrument_id, "eodhd", "PROVIDER_SYMBOL", "COMI.EGX", "COMI.EGX",
+             "2026-09-10T00:00:00+00:00"),
+        )
+
     return instrument_id
 
 

@@ -43,3 +43,20 @@ def require_refresh_mapping(resolver, *, canonical_symbol, provider_symbol, prov
             or str(resolved.get('matched_alias_value', '')).strip().upper()
             != provider_symbol):
         raise ValueError('provider refresh alias mismatch')
+
+
+def require_refresh_targets(resolver, *, provider_name, targets):
+    """Preflight the whole scope before any fetch; aliases do not prove rights."""
+    for target in targets:
+        try:
+            identity = resolver.resolve(target.canonical_symbol, provider='canonical')
+        except (KeyError, ValueError) as exc:
+            raise ValueError('canonical refresh identity unavailable or ambiguous') from exc
+        instrument_id = identity.get('instrument_id') if isinstance(identity, dict) else None
+        require_equity_identity(identity, symbol=target.canonical_symbol,
+                               instrument_id=instrument_id)
+        require_refresh_mapping(
+            resolver, canonical_symbol=target.canonical_symbol,
+            provider_symbol=target.provider_symbol, provider_name=provider_name,
+            symbol=target.canonical_symbol, instrument_id=instrument_id,
+        )

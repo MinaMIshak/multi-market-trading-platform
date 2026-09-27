@@ -291,3 +291,20 @@ mismatch fails the current target while retaining only earlier completed results
 but that suite remains unexecuted because system Python lacks pytest. This is
 source-contract validation using engineering fixtures, not free-source acquisition,
 market coverage, scheduled operation or deployment evidence.
+
+
+## Incremental checkpoint: runtime whole-scope alias admission
+
+Direct daily-refresh runtime execution now checks every canonical equity identity
+and provider-specific alias before any ingestion. Previously this gate existed
+in the Paper/Shadow launch path but direct runtime jobs could reach acquisition
+using only canonical resolution. A missing/mismatched later alias prevents all
+requests in that job. This is identity admission, not source-rights approval or
+proof of dated membership. Standalone job callers retain their existing contract;
+the composed runtime installs the mandatory preflight.
+
+29 offline regressions pass, including the actual job composed with the real
+scope validator and a rejected second target. Runtime end-to-end fixtures now
+register their explicit EODHD alias. Runtime/quota/launch integration was attempted
+but system Python lacks pytest; those suites remain pending. No acquisition,
+market scan, scheduled execution or deployment is claimed.

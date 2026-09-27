@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from app.core.daily_refresh_execution import (
@@ -31,7 +32,7 @@ from app.data.providers.eodhd import (
     EODHDProvider,
 )
 from app.data.raw_store import ImmutableRawStore
-from app.egx_refresh_mapping import select_refresh_targets
+from app.egx_refresh_mapping import select_refresh_targets, require_refresh_targets
 from app.storage import Database
 from app.storage.daily_canonical_artifact_repository import (
     DailyCanonicalArtifactRepository,
@@ -184,6 +185,7 @@ def build_daily_refresh_runtime(
             )
         ),
         targets=targets,
+        target_admission=partial(require_refresh_targets, resolver),
     )
 
     execution_adapter = (
