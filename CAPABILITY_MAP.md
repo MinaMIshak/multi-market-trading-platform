@@ -331,3 +331,17 @@ window subcases. Runtime/quota/launch integration remains pending: isolated pyte
 installation returned no matching distribution. No new acquisition, coverage,
 scheduled execution or deployment is claimed. Free-provider composition remains
 the next integration objective.
+
+## Incremental checkpoint: scheduler refresh window admission
+
+The refresh execution adapter now validates positive integer lookback and actual
+calendar-date inputs and computes the window before any scheduler ledger access.
+Previously date overflow occurred after claim but outside failure handling, leaving
+a claim unfinished. Invalid windows now leave no claim; primary/fallback windows
+and provider-failure recording remain covered.
+
+38 focused offline execution/job/mapping tests pass, including five new tests
+loading actual adapter source without optional runtime imports. This is not SQLite
+or deployed scheduler evidence. Isolated pytest installation failed due to package-
+host DNS; dependency-backed integration remains pending. No acquisition, fresh
+market counts or deployment occurred.

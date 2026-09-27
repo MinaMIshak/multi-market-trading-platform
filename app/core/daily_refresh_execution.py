@@ -65,9 +65,9 @@ class DailyRefreshExecutionAdapter:
         refresh_job: Any,
         lookback_days: int = 400,
     ) -> None:
-        if lookback_days < 1:
+        if type(lookback_days) is not int or lookback_days < 1:
             raise ValueError(
-                "lookback_days must be positive"
+                "lookback_days must be a positive integer"
             )
 
         self.scheduler_repository = (
@@ -83,6 +83,15 @@ class DailyRefreshExecutionAdapter:
         checkpoint_name: CheckpointName,
         provider: Any,
     ) -> DailyRefreshExecutionResult:
+        # Validate the entire date window before touching the durable ledger.
+        # Date arithmetic can overflow even with a valid positive lookback.
+        if type(market_date) is not date:
+            raise ValueError("market_date must be a calendar date")
+        try:
+            start_date = market_date - timedelta(days=self.lookback_days)
+        except OverflowError as exc:
+            raise ValueError("refresh lookback exceeds the calendar date range") from exc
+
         if checkpoint_name not in (
             _ALLOWED_CHECKPOINTS
         ):
@@ -138,13 +147,6 @@ class DailyRefreshExecutionAdapter:
                 claimed=False,
                 succeeded=False,
             )
-
-        start_date = (
-            market_date
-            - timedelta(
-                days=self.lookback_days
-            )
-        )
 
         try:
             result = self.refresh_job.run(
