@@ -498,3 +498,17 @@ now declares a valid integer count so its semantic-rejection assertion remains
 exercised. Dependency-backed daily ingestion/admission suites were attempted but
 pytest is unavailable. No acquisition, coverage, deployment or scheduled operation
 is claimed. Reviewed free-provider composition remains pending.
+
+## Incremental checkpoint: daily ingestion source identity binding
+
+Daily ingestion now rejects a provider name change during fetch before semantic
+admission or persistence. Admission, raw artifact storage and the ingestion result
+use the same source identity that passed explicit alias validation, including when
+an injected admission callback mutates the provider object. This prevents source
+relabeling after the identity gate; it does not establish provider rights.
+
+Validation: 22 focused offline ingestion/window regressions pass, including fetch
+identity mutation and post-fetch source binding. Dependency-backed daily ingestion
+and admission suites remain pending because pytest is unavailable. No acquisition,
+fresh coverage, scheduled operation or deployment is claimed. Reviewed free-provider
+composition remains pending.

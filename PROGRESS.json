@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "DAILY_INGESTION_COUNT_ADMISSION",
-  "current_capability": "Daily and index ingestion reject malformed record counts before persistence; daily semantic admission remains mandatory when configured.",
+  "phase": "DAILY_INGESTION_SOURCE_IDENTITY_BINDING",
+  "current_capability": "Daily ingestion rejects provider identity changes during fetch and binds admission, raw persistence and results to the alias-validated source identity.",
   "starting_head": "e55fbbc",
-  "head": "88aa97bea718995e26c8329f04ef71dcf837df18",
+  "head": "2368171da2f29c7519c63636d9d26439c9aa0d63",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "20 focused offline stdlib daily/index ingestion and history-window tests PASS; git diff --check PASS. Dependency-backed daily ingestion/admission suites attempted but pytest unavailable; integration pending.",
+  "tests": "22 focused offline stdlib daily/index ingestion and history-window tests PASS; git diff --check PASS. Dependency-backed daily ingestion/admission suites attempted but pytest unavailable; integration pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

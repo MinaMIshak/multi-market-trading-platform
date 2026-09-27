@@ -137,6 +137,9 @@ class DailyBarIngestor:
             end_date=end_date,
         )
 
+        if provider.name != provider_name:
+            raise ValueError("daily provider identity changed during fetch")
+
         if response.record_count is None:
             raise ValueError(
                 "daily provider record_count is required"
@@ -151,14 +154,14 @@ class DailyBarIngestor:
                 instrument_id=instrument_id,
                 canonical_symbol=canonical_symbol,
                 provider_symbol=provider_symbol,
-                provider=provider.name,
+                provider=provider_name,
                 snapshot_date=snapshot_date,
                 expected_market_date=end_date,
                 requested_start_date=start_date,
             )
 
         manifest = self.raw_store.store_bytes(
-            provider=provider.name,
+            provider=provider_name,
             asset_type=DataAssetType.DAILY_BARS,
             payload=response.payload,
             filename=response.filename,
@@ -188,7 +191,7 @@ class DailyBarIngestor:
         )
 
         return DailyBarIngestionResult(
-            provider=provider.name,
+            provider=provider_name,
             canonical_symbol=canonical_symbol,
             provider_symbol=provider_symbol,
             instrument_id=instrument_id,

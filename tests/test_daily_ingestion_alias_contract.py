@@ -123,3 +123,34 @@ class DailyIngestionAliasTests(unittest.TestCase):
             self.run_ingestion()
         self.store.store_bytes.assert_not_called()
         self.repository.save_manifest.assert_not_called()
+
+    def test_provider_identity_change_during_fetch_rejected_before_admission(self):
+        self.ingestor.admission_policy = Mock()
+
+        def fetch(**kwargs):
+            self.provider.name = 'different_source'
+            return SimpleNamespace(record_count=2)
+
+        self.provider.fetch_daily_bars.side_effect = fetch
+        with self.assertRaisesRegex(ValueError, 'provider identity changed'):
+            self.run_ingestion()
+        self.ingestor.admission_policy.validate_provider_response.assert_not_called()
+        self.store.store_bytes.assert_not_called()
+        self.repository.save_manifest.assert_not_called()
+
+    def test_admitted_source_identity_preserved_through_persistence(self):
+        self.provider.fetch_daily_bars.return_value = SimpleNamespace(
+            record_count=2, payload=b'fixture', filename='fixture.json',
+            metadata={}, source_uri=None)
+        self.ingestor.admission_policy = Mock()
+
+        def admit(*args, **kwargs):
+            self.provider.name = 'different_source'
+
+        self.ingestor.admission_policy.validate_provider_response.side_effect = admit
+        result = self.run_ingestion()
+        self.assertEqual(
+            self.ingestor.admission_policy.validate_provider_response.call_args.kwargs['provider'],
+            'free_fixture')
+        self.assertEqual(self.store.store_bytes.call_args.kwargs['provider'], 'free_fixture')
+        self.assertEqual(result.provider, 'free_fixture')
