@@ -3,7 +3,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from app.ui.operational import render_operational
-from app.egx_scan_history import _valid_summary
+from app.egx_scan_history import _valid_summary, valid_reconciliation
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -49,6 +49,9 @@ def scan_run_state(history):
     attempt = dict(raw['scheduler_attempt']) if raw['schema_version'] == 3 else None
     run['scheduler_attempt'] = attempt
     completion = attempt if attempt and attempt['status'] == 'SUCCEEDED' else None
+    reconciled = history.get('reconciled_scheduler_completion')
+    if completion is None and valid_reconciliation(raw, reconciled):
+        completion = dict(reconciled)
     return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': completion}
 
 

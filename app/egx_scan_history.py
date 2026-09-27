@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import sqlite3
 
 from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 
@@ -102,6 +103,49 @@ def _unique_object(pairs):
     return result
 
 
+def valid_reconciliation(raw, completion):
+    """Completion must certify the exact historical attempt, after classification."""
+    if not _valid_summary(raw) or raw['schema_version'] != 3:
+        return False
+    attempt = raw['scheduler_attempt']
+    return (attempt['status'] == 'RUNNING' and valid_scheduler_attempt(completion)
+            and completion['status'] == 'SUCCEEDED'
+            and all(completion[key] == attempt[key] for key in
+                    ('market_date', 'checkpoint', 'attempt_count', 'started_at'))
+            and datetime.fromisoformat(completion['finished_at']) >=
+                datetime.fromisoformat(raw['completed_at']))
+
+
+def reconcile_scan_completion(raw):
+    """Read one ledger snapshot without initializing storage or rewriting history."""
+    configured = os.getenv('EGX_SCAN_LEDGER_PATH')
+    if not configured or raw['schema_version'] != 3 or raw['scheduler_attempt']['status'] != 'RUNNING':
+        return None
+    attempt = raw['scheduler_attempt']
+    try:
+        path = Path(configured)
+        if (not path.is_absolute() or not path.is_file()
+                or any(part.is_symlink() for part in (path, *path.parents))):
+            return None
+        conn = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=0.1)
+        try:
+            conn.execute('PRAGMA query_only=ON')
+            # Bound work even if configured storage has an unexpected schema.
+            conn.set_progress_handler(lambda: 1, 100_000)
+            rows = conn.execute('''SELECT attempt_count, started_at, status, finished_at,
+                calendar_truth FROM scheduled_jobs WHERE market_date=? AND checkpoint_name=?
+                LIMIT 2''', (attempt['market_date'], attempt['checkpoint'])).fetchall()
+        finally:
+            conn.close()
+        if len(rows) != 1 or rows[0][4] != 'VERIFIED_TRADING_DAY':
+            return None
+        completion = attempt | dict(zip(
+            ('attempt_count', 'started_at', 'status', 'finished_at'), rows[0][:4]))
+        return completion if valid_reconciliation(raw, completion) else None
+    except (OSError, sqlite3.Error, ValueError, TypeError):
+        return None
+
+
 def load_scan_history():
     unknown = {'status': 'UNKNOWN', 'reason': 'No valid EGX scan history connected'}
     configured = os.getenv('EGX_SCAN_HISTORY_PATH')
@@ -121,6 +165,7 @@ def load_scan_history():
             return unknown
         return {'status': 'HISTORICAL_RUN',
                 'reason': 'Last completed explicit-scope run; not current readiness, fills or universe coverage',
+                'reconciled_scheduler_completion': reconcile_scan_completion(raw),
                 'run': raw}
     except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return unknown

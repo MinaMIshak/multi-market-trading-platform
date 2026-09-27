@@ -163,3 +163,107 @@ class AttemptContracts(unittest.TestCase):
         self.assertTrue(self.repo.mark_failed(**self.key, error='fixture'))
         self.repo.claim_job(**self.key)
         self.assertTrue(self.repo.mark_succeeded(**self.key))
+
+    def running_history(self):
+        """Preserve the real pre-completion snapshot to model a process crash."""
+        import json
+        from app.egx_scan_history import write_scan_history
+        snapshots = []
+        def capture(*args, **kwargs):
+            write_scan_history(*args, **kwargs)
+            snapshots.append(self.path.read_bytes())
+        with patch('app.egx_scan_dispatch.write_scan_history', side_effect=capture):
+            self.dispatch()
+        self.path.write_bytes(snapshots[0])
+        return json.loads(snapshots[0])
+
+    def test_reconciles_crash_gap_without_mutating_storage_or_coverage(self):
+        raw = self.running_history()
+        ledger = self.root / 'ledger.sqlite'
+        before = {p.name: p.read_bytes() for p in self.root.iterdir()}
+        with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(ledger)}):
+            history = load_scan_history()
+            state = self.state()
+        self.assertEqual(history['run'], raw)
+        result = state['scan_runs']['EGX']['scheduler_completion']
+        self.assertEqual(result['status'], 'SUCCEEDED')
+        self.assertEqual(result['started_at'], raw['scheduler_attempt']['started_at'])
+        self.assertEqual(state['scan_runs']['EGX']['run']['scheduler_attempt']['status'], 'RUNNING')
+        self.assertIsNone(state['coverage']['EGX']['scanned'])
+        self.assertIsNone(state['scan_runs']['US']['scheduler_completion'])
+        self.assertIn('Recorded SUCCEEDED', render_product(state))
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
+
+    def test_reconciliation_rejects_new_attempt_and_invalid_ledger_truth(self):
+        self.running_history()
+        ledger = self.root / 'ledger.sqlite'
+        original = self.repo.get_job(**self.key)
+        for change in ({'attempt_count': original['attempt_count'] + 1},
+                       {'started_at': '2026-09-24T10:00:00+00:00'},
+                       {'status': 'RUNNING'}, {'status': 'FAILED'},
+                       {'finished_at': None}, {'finished_at': '2999-01-01T00:00:00+00:00'},
+                       {'finished_at': original['started_at']},
+                       {'calendar_truth': 'UNKNOWN'}, {'market_date': '2026-09-23'},
+                       {'checkpoint_name': 'OTHER'}):
+            with self.subTest(change=change):
+                with self.db.connect() as conn:
+                    for key, value in change.items():
+                        conn.execute(f'UPDATE scheduled_jobs SET {key}=? WHERE job_id=?',
+                                     (value, original['job_id']))
+                with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(ledger)}):
+                    self.assertIsNone(self.state()['scan_runs']['EGX']['scheduler_completion'])
+                with self.db.connect() as conn:
+                    for key in change:
+                        conn.execute(f'UPDATE scheduled_jobs SET {key}=? WHERE job_id=?',
+                                     (original[key], original['job_id']))
+
+    def test_unavailable_ledger_preserves_history_and_does_not_create_database(self):
+        self.running_history()
+        broken = self.root / 'broken.sqlite'
+        broken.write_text('not sqlite')
+        empty = self.root / 'empty.sqlite'
+        sqlite3.connect(empty).close()
+        link = self.root / 'link.sqlite'
+        link.symlink_to(self.root / 'ledger.sqlite')
+        missing = self.root / 'missing.sqlite'
+        for path in ('', 'relative.sqlite', missing, broken, empty, link, self.root):
+            with self.subTest(path=path), patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(path)}):
+                state = self.state()['scan_runs']['EGX']
+                self.assertEqual(state['status'], 'HISTORICAL_RUN')
+                self.assertIsNone(state['scheduler_completion'])
+        self.assertFalse(missing.exists())
+
+    def test_product_rejects_unbound_injected_reconciliation(self):
+        self.running_history()
+        with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(self.root / 'ledger.sqlite')}):
+            history = load_scan_history()
+        for change in ({'attempt_count': 99}, {'checkpoint': 'EGX_SCAN_FALLBACK'},
+                       {'market_date': '2026-09-23'}, {'status': 'RUNNING'}):
+            value = deepcopy(history)
+            value['reconciled_scheduler_completion'].update(change)
+            state = product_state(dict(configured=False, available=False, status='UNKNOWN', symbols=[]),
+                                  scan_history=value)
+            self.assertIsNone(state['scan_runs']['EGX']['scheduler_completion'])
+
+    def test_locked_and_ambiguous_ledgers_fail_closed(self):
+        self.running_history()
+        ledger = self.root / 'ledger.sqlite'
+        conn = sqlite3.connect(ledger)
+        try:
+            conn.execute('BEGIN EXCLUSIVE')
+            with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(ledger)}):
+                self.assertIsNone(self.state()['scan_runs']['EGX']['scheduler_completion'])
+        finally:
+            conn.rollback()
+            conn.close()
+        ambiguous = self.root / 'ambiguous.sqlite'
+        row = self.repo.get_job(**self.key)
+        with sqlite3.connect(ambiguous) as conn:
+            conn.execute('''CREATE TABLE scheduled_jobs (market_date, checkpoint_name,
+                attempt_count, started_at, status, finished_at, calendar_truth)''')
+            values = tuple(row[key] for key in ('market_date', 'checkpoint_name',
+                'attempt_count', 'started_at', 'status', 'finished_at', 'calendar_truth'))
+            conn.executemany('INSERT INTO scheduled_jobs VALUES (?, ?, ?, ?, ?, ?, ?)',
+                             [values, values])
+        with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(ambiguous)}):
+            self.assertIsNone(self.state()['scan_runs']['EGX']['scheduler_completion'])
