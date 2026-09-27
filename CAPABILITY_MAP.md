@@ -447,3 +447,16 @@ FastAPI UI validation was attempted but pytest remains unavailable; package
 installation returned no matching distribution. No fresh acquisition, coverage,
 scheduled operation or deployment is claimed. Free-provider composition remains
 pending.
+
+## Incremental checkpoint: direct ingestion date admission
+
+Direct daily ingestion now enforces actual calendar dates, ordered request bounds
+and a snapshot on or after the requested end date. Direct callers previously
+bypassed the refresh job's date checks. Invalid inputs fail before resolution,
+provider requests or storage; single-day windows and later snapshots remain valid.
+
+36 offline ingestion/admission/execution/result regressions pass, including 14
+invalid-window subcases. Dependency-backed ingestion tests were attempted but
+pytest is unavailable. These are engineering fixtures, not market evidence.
+No acquisition, new coverage, deployment or scheduled operation is claimed.
+Reviewed free-provider composition and runtime integration remain pending.

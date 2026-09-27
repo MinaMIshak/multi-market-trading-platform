@@ -59,7 +59,7 @@ class RefreshWindowTests(unittest.TestCase):
         self.assertEqual(self.validate([self.start, self.end]).valid_bar_count, 2)
 
     def test_ingestion_passes_window_and_does_not_persist_rejected_response(self):
-        namespace = load_classes('app/data/daily_ingestion.py', {'DailyBarIngestor'}, {})
+        namespace = load_classes('app/data/daily_ingestion.py', {'DailyBarIngestor'}, {'date': date})
         policy, store, repository = Mock(), Mock(), Mock()
         policy.validate_provider_response.side_effect = self.error('outside requested window')
         ingestor = namespace['DailyBarIngestor'](

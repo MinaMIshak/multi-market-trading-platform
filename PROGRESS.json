@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "milestone": "M2",
-  "phase": "OPERATIONAL_AGGREGATE_TRUTH",
-  "current_capability": "Operational and SYSTEM aggregate status now reflects current admitted receipts: empty/unverified scopes are NOT_READY, stale-only scopes DATA_STALE, mixed states PARTIAL, and only entirely current verified scopes OPERATIONAL. Database readability alone no longer implies readiness.",
+  "milestone": "M3",
+  "phase": "DIRECT_INGESTION_WINDOW_ADMISSION",
+  "current_capability": "Direct daily ingestion now requires calendar-date request windows and a snapshot on or after the requested end date before identity resolution, acquisition or persistence. Existing alias and history admission remain enforced.",
   "starting_head": "e55fbbc",
-  "head": "43c0429435ad15409c47896907914bc5063a5938",
+  "head": "7aaef8c3cb87f7c882acb70c07e5c10b7b4b0bde",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "42 affected stdlib SYSTEM, heartbeat, scanner, history, configuration and dispatch tests PASS; git diff --check PASS. FastAPI operational UI pytest attempted but pytest unavailable; dependency installation returned no matching distribution. Full integration remains pending.",
+  "tests": "36 offline stdlib ingestion, admission, refresh execution and result contract tests PASS; git diff --check PASS. Dependency-backed ingestion suite attempted but pytest unavailable; full integration pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

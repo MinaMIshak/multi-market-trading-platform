@@ -81,10 +81,19 @@ class DailyBarIngestor:
             raise ValueError("canonical_symbol cannot be empty")
         if not provider_symbol:
             raise ValueError("provider_symbol cannot be empty")
+        for name, value in (
+            ("start_date", start_date),
+            ("end_date", end_date),
+            ("snapshot_date", snapshot_date),
+        ):
+            if type(value) is not date:
+                raise ValueError(f"{name} must be a calendar date")
         if end_date < start_date:
             raise ValueError(
                 "end_date cannot be before start_date"
             )
+        if snapshot_date < end_date:
+            raise ValueError("snapshot_date cannot be before end_date")
 
         instrument = self.resolver.resolve(
             canonical_symbol,
