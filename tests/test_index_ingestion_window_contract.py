@@ -11,6 +11,7 @@ class IndexIngestionWindowTests(unittest.TestCase):
         namespace = load_classes('app/data/index_ingestion.py',
                                  {'IndexHistoryIngestor'}, {'date': date})
         self.store, self.repository, self.provider = Mock(), Mock(), Mock()
+        self.provider.name = "fixture_index_source"
         self.ingestor = namespace['IndexHistoryIngestor'](
             raw_store=self.store, repository=self.repository)
         self.window = dict(start_date=date(2026, 9, 1), end_date=date(2026, 9, 24),
@@ -57,6 +58,7 @@ class IndexIngestionCountTests(unittest.TestCase):
                                   'BarGranularity': SimpleNamespace(D1='daily'),
                                   'IngestionStatus': SimpleNamespace(RECEIVED='received')})
         self.store, self.repository, self.provider = Mock(), Mock(), Mock()
+        self.provider.name = "fixture_index_source"
         self.ingestor = namespace['IndexHistoryIngestor'](
             raw_store=self.store, repository=self.repository)
 
@@ -102,3 +104,36 @@ class IndexIngestionCountTests(unittest.TestCase):
                 self.assertEqual(self.repository.save_manifest.call_count, len(counts))
                 self.assertEqual([c.kwargs['record_count'] for c in
                                   self.store.store_bytes.call_args_list], counts)
+
+
+class IndexIngestionIdentityTests(IndexIngestionCountTests):
+    def test_invalid_source_identity_rejected_before_fetch(self):
+        for name in (None, True, 1, '', ' source', 'source ', 'SOURCE', 'canonical'):
+            with self.subTest(name=name):
+                self.provider.name = name
+                with self.assertRaisesRegex(ValueError, 'provider name'):
+                    self.ingest(1, [1])
+                self.provider.fetch_index_bars.assert_not_called()
+                self.store.store_bytes.assert_not_called()
+                self.repository.save_manifest.assert_not_called()
+
+    def test_identity_change_during_fetch_rejected_before_persistence(self):
+        def fetch(**kwargs):
+            self.provider.name = 'other_source'
+            return self.provider.fetch_index_bars.return_value
+        self.provider.fetch_index_bars.side_effect = fetch
+        with self.assertRaisesRegex(ValueError, 'identity changed'):
+            self.ingest(2, [1, 1])
+        self.store.store_bytes.assert_not_called()
+        self.repository.save_manifest.assert_not_called()
+
+    def test_storage_callback_cannot_relabel_later_pages_or_result(self):
+        original = self.provider.name
+        def save(manifest, **kwargs):
+            self.provider.name = 'other_source'
+            return manifest
+        self.repository.save_manifest.side_effect = save
+        result = self.ingest(2, [1, 1])
+        self.assertEqual(result.provider, original)
+        self.assertEqual([call.kwargs['provider'] for call in
+                          self.store.store_bytes.call_args_list], [original, original])

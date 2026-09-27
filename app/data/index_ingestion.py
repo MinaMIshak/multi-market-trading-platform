@@ -114,6 +114,12 @@ class IndexHistoryIngestor:
         if snapshot_date < end_date:
             raise ValueError("snapshot_date cannot be before end_date")
 
+        provider_name = provider.name
+        if (not isinstance(provider_name, str) or not provider_name
+                or provider_name != provider_name.strip().lower()
+                or provider_name == "canonical"):
+            raise ValueError("index provider name must be canonical")
+
         batch: ProviderBatchResponse = (
             provider.fetch_index_bars(
                 index_name=index_name,
@@ -122,6 +128,9 @@ class IndexHistoryIngestor:
                 page_size=page_size,
             )
         )
+
+        if provider.name != provider_name:
+            raise ValueError("index provider identity changed during fetch")
 
         expected_count = (
             batch.record_count
@@ -162,7 +171,7 @@ class IndexHistoryIngestor:
         for response in batch.responses:
             manifest = (
                 self.raw_store.store_bytes(
-                    provider=provider.name,
+                    provider=provider_name,
                     asset_type=(
                         DataAssetType
                         .INDEX_BARS
@@ -222,7 +231,7 @@ class IndexHistoryIngestor:
             )
 
         return IndexIngestionResult(
-            provider=provider.name,
+            provider=provider_name,
             index_name=index_name,
             snapshot_date=(
                 snapshot_date

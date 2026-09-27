@@ -512,3 +512,16 @@ identity mutation and post-fetch source binding. Dependency-backed daily ingesti
 and admission suites remain pending because pytest is unavailable. No acquisition,
 fresh coverage, scheduled operation or deployment is claimed. Reviewed free-provider
 composition remains pending.
+
+
+## Incremental checkpoint: index ingestion source identity binding
+
+Index ingestion now validates the provider namespace before fetching, rejects
+identity changes during fetch before persistence, and binds all raw pages and
+the returned result to the original source. Repository callbacks cannot relabel
+later pages. This closes the index equivalent of the daily ingestion provenance
+gap; it does not establish source rights or benchmark eligibility.
+
+Validation: 29 focused offline stdlib ingestion/refresh tests pass. The
+dependency-backed index ingestion suite remains pending because pytest is
+unavailable. No acquisition, runtime coverage, scheduling or deployment is claimed.
