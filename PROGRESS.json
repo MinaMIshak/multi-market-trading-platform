@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "UNIFIED_PRODUCT_SHELL",
-  "current_capability": "Unified read-only product shell at / and /api/product with TODAY, LIVE, PRE-SURGE, SWING, PERFORMANCE, RESEARCH and SYSTEM views across EGX, US and ALL. EGX uses existing operational receipts; disconnected US and unsupported coverage/performance remain UNKNOWN/null. Root no longer falls back to legacy signals. Existing evidence pages and compatibility endpoints preserved.",
+  "phase": "SOURCE_BOUND_ACQUISITION_COST",
+  "current_capability": "Unified read-only product shell at / and /api/product with TODAY, LIVE, PRE-SURGE, SWING, PERFORMANCE, RESEARCH and SYSTEM views across EGX, US and ALL. EGX uses existing operational receipts; disconnected US and unsupported coverage/performance remain UNKNOWN/null. Root no longer falls back to legacy signals. Existing evidence pages and compatibility endpoints preserved. Explicit refresh acquisition now binds caller-supplied quota cost evidence to the exact provider, alias and date window through an immutable DailyQuotaCostContract. Scope mismatch fails before quota reservation/transport; repeated and failed attempts retain durable charges. Legacy deterministic runtime cost callbacks remain supported. This is software contract validation, not provider rights or health evidence.",
   "starting_head": "e55fbbc",
-  "head": "5d083f0f4dded5d65df5066f864887d97261be81",
+  "head": "c7abf6079c0076315c56fe646410e58c3c9bc896",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "88 focused offline stdlib contracts PASS, including 10 product shell contracts covering all 21 market/section combinations and actual route bodies isolated from unavailable dependencies. git diff --check PASS. FastAPI HTTP integration/full dependency-backed suite pending; known package blockers not retried. No runtime/provider observations.",
+  "tests": "90 focused offline stdlib tests PASS across quota contracts/real SQLite ledger, launch composition, alias admission, ingestion windows/results, execution and mapping. git diff --check PASS. Dependency-backed integration/full suite remains pending under unchanged known package blockers; no retries or network/provider observations.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence, using completed durable quota controls. Unified Product Shell initial integration complete; connect further views only to validated operational evidence. Run dependency-backed HTTP integration when packages become available. Retain 224 EGX baseline pending authoritative dated membership; safe deployment pending.",
+  "next_action": "Continue free-provider acquisition composition by integrating exact source/request cost contracts into scheduler-driven explicit multi-target acquisition, preserving alias preflight and per-attempt durable charging. Bind only genuine provider-specific cost evidence; no production cost contract supplied by this cycle. Preserve existing source-review/data/calendar/action gates and 224 EGX baseline. Dependency-backed integration and safe deployment remain pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

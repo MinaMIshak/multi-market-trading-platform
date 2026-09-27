@@ -20,7 +20,7 @@ from app.data.daily_canonical import (
 )
 from app.data.daily_refresh_admission import DailyRefreshAdmissionPolicy
 from app.data.point_in_time import PointInTimeDailyRepository
-from app.data.quota import VerifiedQuotaCost
+from app.data.quota import VerifiedQuotaCost, DailyQuotaCostContract
 from app.data.raw_store import ImmutableRawStore
 from app.domain import TradePlan
 from app.egx_scope import valid_scope_symbol, require_equity_identity
@@ -178,7 +178,8 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
     at = _now()
     source = admit_calendar(source, at)
     _identity(database, source)
-    if type(cost) is not VerifiedQuotaCost or type(cost.units) is not int or cost.units <= 0 or not cost.evidence.strip():
+    if (type(cost) is not VerifiedQuotaCost or type(cost.units) is not int
+            or cost.units <= 0 or type(cost.evidence) is not str or not cost.evidence.strip()):
         _blocked('verified quota cost required')
     provider_name = getattr(provider, 'name', None) if provider is not None else 'eodhd'
     try:
@@ -207,7 +208,11 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
     runtime = build_daily_refresh_runtime(
         database=database, scheduler_repository=SchedulerRepository(database), data_root=data_root,
         api_token=api_token, provider=provider, targets=(target,),
-        quota_cost_contract=lambda **inputs: cost,
+        quota_cost_contract=DailyQuotaCostContract(
+            provider_name=provider_name, symbol=target.provider_symbol,
+            start_date=source.history_start, end_date=source.signal_session.market_date,
+            cost=cost,
+        ),
     )
     # The job explicitly excludes scheduler ledger/dispatch. No scheduler mode is changed.
     result = runtime.refresh_job.run(provider=runtime.provider, start_date=source.history_start,

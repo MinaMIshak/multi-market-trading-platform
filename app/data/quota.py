@@ -55,6 +55,44 @@ class VerifiedQuotaCost:
     evidence: str
 
 
+@dataclass(frozen=True)
+class DailyQuotaCostContract:
+    """Reviewed cost for one exact source request, not a reusable flat rate.
+
+    The caller supplies genuine cost evidence; constructing this contract does
+    not review source rights or establish market-data readiness. Each repeated
+    attempt still reserves the full cost through the durable guard.
+    """
+    provider_name: str
+    symbol: str
+    start_date: date
+    end_date: date
+    cost: VerifiedQuotaCost
+
+    def __post_init__(self):
+        if (type(self.provider_name) is not str or not self.provider_name
+                or self.provider_name != self.provider_name.strip().lower()
+                or self.provider_name == 'canonical'):
+            raise QuotaRejected('explicit quota provider required')
+        if (type(self.symbol) is not str or not self.symbol
+                or self.symbol != self.symbol.strip()):
+            raise QuotaRejected('explicit quota symbol required')
+        if (type(self.start_date) is not date or type(self.end_date) is not date
+                or self.start_date > self.end_date):
+            raise QuotaRejected('invalid quota request window')
+        if (type(self.cost) is not VerifiedQuotaCost
+                or type(self.cost.units) is not int or self.cost.units <= 0
+                or type(self.cost.evidence) is not str or not self.cost.evidence.strip()):
+            raise QuotaRejected('verified quota cost required')
+
+    def resolve(self, *, provider_name, symbol, start_date, end_date):
+        if (provider_name != self.provider_name or symbol != self.symbol
+                or type(start_date) is not date or type(end_date) is not date
+                or start_date != self.start_date or end_date != self.end_date):
+            raise QuotaRejected('quota request does not match reviewed cost scope')
+        return self.cost
+
+
 class QuotaGuard:
     def __init__(self, database: Database, *, policy: QuotaPolicy = QuotaPolicy(),
                  clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
@@ -110,8 +148,9 @@ class QuotaGuard:
 class QuotaLimitedDailyProvider:
     """Only the currently supported automatic operation is exposed.
 
-    cost_contract is local, deterministic, and must perform no network I/O.
-    It receives the exact request inputs and returns a verified upper bound.
+    cost_contract is an exact DailyQuotaCostContract or a local, deterministic
+    callback that performs no network I/O and receives exact request inputs.
+    Legacy callbacks remain supported; they must verify their own cost scope.
     """
     def __init__(self, provider, guard: QuotaGuard, cost_contract=None):
         self._provider = provider
@@ -126,8 +165,11 @@ class QuotaLimitedDailyProvider:
         provider_name = self.name
         inputs = dict(symbol=symbol, start_date=start_date, end_date=end_date)
         try:
-            cost = (self._cost_contract(**inputs)
-                    if self._cost_contract is not None else None)
+            if type(self._cost_contract) is DailyQuotaCostContract:
+                cost = self._cost_contract.resolve(provider_name=provider_name, **inputs)
+            else:
+                cost = (self._cost_contract(**inputs)
+                        if self._cost_contract is not None else None)
         except Exception:
             raise QuotaRejected("quota cost contract unavailable") from None
         if self.name != provider_name:
