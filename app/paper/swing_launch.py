@@ -180,22 +180,21 @@ def refresh_once(database, data_root, source, *, cost: VerifiedQuotaCost, api_to
     _identity(database, source)
     if type(cost) is not VerifiedQuotaCost or type(cost.units) is not int or cost.units <= 0 or not cost.evidence.strip():
         _blocked('verified quota cost required')
-    if target is not None:
-        try:
-            if type(target) is not DailyRefreshTarget:
-                raise ValueError("explicit provider refresh mapping required")
-            require_refresh_mapping(
-                SecurityMasterRepository(database), canonical_symbol=target.canonical_symbol,
-                provider_symbol=target.provider_symbol,
-                provider_name=getattr(provider, 'name', None) if provider is not None else 'eodhd',
-                symbol=source.symbol, instrument_id=source.instrument_id,
-            )
-        except ValueError as exc:
-            _blocked(str(exc))
-    else:
+    if target is None:
         target = next((t for t in DEFAULT_EODHD_TARGETS if t.canonical_symbol == source.symbol), None)
     if target is None:
         _blocked('reviewed provider refresh mapping unavailable')
+    try:
+        if type(target) is not DailyRefreshTarget:
+            raise ValueError("explicit provider refresh mapping required")
+        require_refresh_mapping(
+            SecurityMasterRepository(database), canonical_symbol=target.canonical_symbol,
+            provider_symbol=target.provider_symbol,
+            provider_name=getattr(provider, 'name', None) if provider is not None else 'eodhd',
+            symbol=source.symbol, instrument_id=source.instrument_id,
+        )
+    except ValueError as exc:
+        _blocked(str(exc))
     runtime = build_daily_refresh_runtime(
         database=database, scheduler_repository=SchedulerRepository(database), data_root=data_root,
         api_token=api_token, provider=provider, targets=(target,),

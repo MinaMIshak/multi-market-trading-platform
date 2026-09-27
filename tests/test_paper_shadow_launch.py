@@ -226,6 +226,10 @@ def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
     # symbol/signal date. It must not replace or demote the original ledger row.
     alternate = EngineeringProvider(provider.records)
     alternate.name = 'fixture-alternate'
+    SecurityMasterRepository(db).replace_provider_snapshot(provider=alternate.name, instruments=[
+        CanonicalInstrument(instrument_id=ID, instrument_type=InstrumentType.EQUITY,
+                            canonical_ticker='COMI', source_provider=alternate.name,
+                            source_symbol_code='COMI.EGX', source_sha256='b'*64)])
 
     refreshed = refresh_once(
         db,
@@ -524,6 +528,18 @@ def test_new_equity_refresh_blocks_without_provider_mapping(launch):
     with pytest.raises(LaunchBlocked, match='admitted daily history missing') as caught:
         run_signal(db, root, expanded, directory, publish=False)
     assert caught.value.status == 'DATA_INSUFFICIENT'
+
+
+@pytest.mark.parametrize('provider_name', ['unregistered-provider', None, 'canonical'])
+def test_default_refresh_mapping_rejects_unbound_provider_before_runtime(launch, monkeypatch, provider_name):
+    db, root, source, _, _, provider, _ = launch
+    provider.name = provider_name
+    monkeypatch.setattr(swing_launch, 'build_daily_refresh_runtime',
+                        lambda **kwargs: pytest.fail('unbound default must not construct runtime'))
+    calls_before = len(provider.calls)
+    with pytest.raises(LaunchBlocked):
+        refresh_once(db, root, source, provider=provider, cost=VerifiedQuotaCost(1, LABEL))
+    assert len(provider.calls) == calls_before
 
 
 def test_explicit_refresh_mapping_rejects_wrong_alias_before_runtime(launch, monkeypatch):

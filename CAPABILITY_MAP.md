@@ -172,3 +172,17 @@ composition remains pending and zero-paid-subscription operation is not claimed.
 53 dependency-free regressions pass, including four new configuration checks.
 Two CLI regressions were added but execution remains pending missing pytest and
 pydantic; syntax validation passes. No fresh market observations, scans or deployment.
+
+## Incremental checkpoint: default refresh alias admission
+
+Default EODHD target selection now passes the same provider-specific alias and
+equity identity gate as explicit targets before refresh runtime construction.
+An injected provider cannot use a default code unless that alias is registered
+for that provider and requested equity. Registration still does not prove source
+rights, dated membership, or operational readiness.
+
+53 dependency-free regressions and launch syntax checks pass. New launch
+regressions reject missing/unregistered/canonical provider namespaces before
+runtime construction; execution awaits pytest/pydantic. The alternate-provider
+engineering fixture now explicitly registers its alias. No deployment, provider
+fetch, fresh market observation, or expanded coverage is claimed.

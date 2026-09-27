@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "EXPLICIT_REFRESH_CLI_MAPPING",
-  "current_capability": "Local refresh CLI accepts an explicit registered EODHD provider symbol, validates its equity binding before token access, and forwards the target to refresh composition. Defaults and existing admission controls preserved. Reviewed free-provider integration remains pending.",
+  "phase": "DEFAULT_REFRESH_ALIAS_ADMISSION",
+  "current_capability": "Default and explicit refresh targets now share registered provider-alias equity validation before runtime construction. Cross-provider default fallback fails closed. Reviewed free-provider composition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "455ad595efa816daeb0de65536b7a0c0e866a0a5",
+  "head": "7bba7339a4d0372b9086813517a598456fc91ddf",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "53 dependency-free mapping/scope/scanner/configuration/dispatcher/history/heartbeat/SYSTEM regressions PASS; launch/test syntax checks PASS; git diff --check PASS. Initial helper test exposed unavailable pydantic via package import; dependency-free mapping decoder now passes. Real CLI/launch integration and full release suite pending unavailable pytest/pydantic.",
+  "tests": "53 dependency-free mapping/scope/scanner/configuration/dispatcher/history/heartbeat/SYSTEM regressions PASS; launch/test syntax checks PASS; git diff --check PASS. New launch default-provider admission regressions and full release suite pending unavailable pytest/pydantic.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Compose reviewed free-provider refresh using explicit alias-bound targets; validate CLI/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving the 224 baseline; safe deployment remains pending.",
+  "next_action": "Validate launch default/explicit alias integration when dependencies are available; compose reviewed free-provider refresh using alias-bound targets. Establish authoritative dated EGX membership preserving the 224 baseline; safe deployment remains pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
