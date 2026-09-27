@@ -186,3 +186,14 @@ regressions reject missing/unregistered/canonical provider namespaces before
 runtime construction; execution awaits pytest/pydantic. The alternate-provider
 engineering fixture now explicitly registers its alias. No deployment, provider
 fetch, fresh market observation, or expanded coverage is claimed.
+
+## Incremental checkpoint: refresh count contracts
+
+Refresh admission now requires a strictly positive integer history minimum and
+a nonnegative integer provider record count. Boolean minima previously reduced
+the required history to one bar; NaN minima bypassed the length comparison.
+Boolean and floating provider counts could compare equal to payload lengths.
+These malformed inputs now fail closed before payload canonicalization.
+Added 15 parametrized regression cases; execution awaits pytest/pydantic.
+48 existing dependency-free scope/scan/heartbeat regressions and changed-file
+syntax checks pass. No new market observation or deployment is claimed.

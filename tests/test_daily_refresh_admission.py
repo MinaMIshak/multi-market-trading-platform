@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 from datetime import date, timedelta
 from uuid import uuid4
@@ -13,6 +14,19 @@ from app.data.provider import ProviderResponse
 
 
 EXPECTED = date(2026, 9, 10)
+
+
+@pytest.mark.parametrize('minimum', [True, False, 1.0, 260.5, float('nan'), '260', None, -1])
+def test_history_minimum_requires_positive_integer(minimum):
+    with pytest.raises(ValueError, match='positive integer'):
+        DailyRefreshAdmissionPolicy(minimum_valid_bars=minimum)
+
+
+@pytest.mark.parametrize('count', [True, False, 1.0, 260.0, float('nan'), '1', -1])
+def test_provider_count_requires_nonnegative_integer(count):
+    response = replace(make_response(make_rows(count=1, end_date=EXPECTED)), record_count=count)
+    with pytest.raises(DailyRefreshAdmissionError, match='nonnegative integer'):
+        validate(DailyRefreshAdmissionPolicy(minimum_valid_bars=1), response)
 
 
 def make_rows(

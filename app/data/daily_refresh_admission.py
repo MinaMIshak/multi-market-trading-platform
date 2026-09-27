@@ -35,10 +35,11 @@ class DailyRefreshAdmissionPolicy:
     minimum_valid_bars: int = 260
 
     def __post_init__(self) -> None:
-        if self.minimum_valid_bars <= 0:
+        if (type(self.minimum_valid_bars) is not int
+                or self.minimum_valid_bars <= 0):
             raise ValueError(
                 "minimum_valid_bars must "
-                "be positive"
+                "be positive integer"
             )
 
     def validate_rows(
@@ -143,6 +144,11 @@ class DailyRefreshAdmissionPolicy:
             raise DailyRefreshAdmissionError(
                 "provider record_count "
                 "is required"
+            )
+
+        if type(response.record_count) is not int or response.record_count < 0:
+            raise DailyRefreshAdmissionError(
+                "provider record_count must be a nonnegative integer"
             )
 
         try:
