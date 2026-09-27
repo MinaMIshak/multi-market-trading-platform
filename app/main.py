@@ -13,6 +13,7 @@ from app.ui.today import load_today_state
 from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state
 from app.ui.product import product_state, render_product
+from app.egx_scan_history import load_scan_history
 
 
 app = FastAPI(
@@ -31,7 +32,8 @@ def root(market: str = 'ALL', section: str = 'TODAY') -> HTMLResponse:
 @app.get('/api/product')
 def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
     try:
-        return product_state(load_operational_state(), market, section)
+        return product_state(load_operational_state(), market, section,
+                             scan_history=load_scan_history() if market != "US" else None)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail='Unknown product view') from exc
 

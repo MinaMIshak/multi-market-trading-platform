@@ -3,6 +3,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from app.ui.operational import render_operational
+from app.egx_scan_history import _valid_summary
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -32,7 +33,22 @@ def observed_receipt_summary(market_state):
     return summary | {'observed_symbols': len(statuses), 'status_counts': counts}
 
 
-def product_state(operational, market='ALL', section='TODAY'):
+def scan_run_state(history):
+    unknown = {'status': 'UNKNOWN', 'run': None, 'scheduler_completion': None}
+    if (not isinstance(history, dict) or history.get('status') != 'HISTORICAL_RUN'
+            or not _valid_summary(history.get('run'))):
+        return unknown
+    raw = history['run']
+    # A history file proves classification, not a scheduler ledger transition.
+    run = {key: raw[key] for key in ('completed_at', 'scope_reference', 'scope_kind',
+                                    'requested', 'scanned')}
+    run['status_counts'] = dict(raw['status_counts'])
+    run['symbols'] = [{key: row[key] for key in ('symbol', 'status', 'scanned')}
+                      for row in raw['symbols']]
+    return {'status': 'HISTORICAL_RUN', 'run': run, 'scheduler_completion': None}
+
+
+def product_state(operational, market='ALL', section='TODAY', *, scan_history=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -49,6 +65,8 @@ def product_state(operational, market='ALL', section='TODAY'):
                            'candidates': None,
                            **observed_receipt_summary(markets[key])}
                      for key in selected},
+        'scan_runs': {key: scan_run_state(scan_history if key == 'EGX' else None)
+                      for key in selected},
         'performance': None,
     }
 
@@ -82,13 +100,28 @@ def render_product(state):
             content += render_operational(value, fragment=True)
     else:
         messages = {
-            'LIVE': 'Live scanner activity UNKNOWN. No scheduler execution evidence is connected to this view.',
+            'LIVE': 'Current scanner activity UNKNOWN. Historical classification does not prove scheduler completion.',
             'PRE-SURGE': 'Pre-surge opportunities UNKNOWN. No validated operational feed is connected.',
             'PERFORMANCE': 'Performance UNKNOWN. Authentic Paper/Shadow lifecycle evidence is required.',
             'RESEARCH': 'Research results do not authorize operational use.',
             'SYSTEM': 'Open SYSTEM for the detailed operator checkpoint and capability blockers.',
         }
         content += '<p>' + messages[section] + '</p>'
+    if section == 'LIVE':
+        for key, history in state['scan_runs'].items():
+            content += f'<h2>{key} scan history: {history["status"]}</h2>'
+            run = history['run']
+            if run is None:
+                continue
+            content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
+                        'Scheduler completion: UNKNOWN.</p><p>Completed at: '
+                        + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
+                        + f' · Requested: {run["requested"]} · Verified scans: {run["scanned"]}</p>')
+            content += '<table><caption>Historical per-target outcomes</caption><tr><th>Symbol</th><th>Status</th><th>Scanned</th></tr>'
+            for row in run['symbols']:
+                content += (f'<tr><td>{escape(row["symbol"])}</td><td>{escape(row["status"])}</td>'
+                            f'<td>{row["scanned"]}</td></tr>')
+            content += '</table>'
     content += ('<footer><a href="/system">SYSTEM details</a> · '
                 '<a href="/shadow">Audited collection</a> · '
                 '<a href="/performance">Performance evidence</a></footer>')

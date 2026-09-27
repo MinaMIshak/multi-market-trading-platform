@@ -146,6 +146,7 @@ class ProductShellContracts(unittest.TestCase):
                 self.status_code = kwargs['status_code']
         namespace = {'HTMLResponse': str, 'HTTPException': HttpError,
                      'load_operational_state': lambda: self.source,
+                     'load_scan_history': lambda: None,
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())
