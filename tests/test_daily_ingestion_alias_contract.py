@@ -53,6 +53,36 @@ class DailyIngestionAliasTests(unittest.TestCase):
             symbol='CODE', start_date=date(2026, 9, 1), end_date=date(2026, 9, 24))
         self.store.store_bytes.assert_not_called()
 
+    def test_invalid_canonical_ids_fail_before_alias_lookup_or_fetch(self):
+        for value in (None, '', ' ', ' fixture-id ', True, 42):
+            with self.subTest(value=value):
+                self.resolver.reset_mock()
+                self.identity['instrument_id'] = value
+                self.alias['instrument_id'] = value
+                with self.assertRaisesRegex(ValueError, 'canonical instrument_id'):
+                    self.run_ingestion()
+                self.resolver.resolve.assert_called_once_with('FIXTURE', provider='canonical')
+                self.provider.fetch_daily_bars.assert_not_called()
+                self.store.store_bytes.assert_not_called()
+                self.repository.save_manifest.assert_not_called()
+
+    def test_missing_canonical_id_fails_closed(self):
+        del self.identity['instrument_id']
+        with self.assertRaisesRegex(ValueError, 'canonical instrument_id'):
+            self.run_ingestion()
+        self.provider.fetch_daily_bars.assert_not_called()
+        self.store.store_bytes.assert_not_called()
+        self.repository.save_manifest.assert_not_called()
+
+    def test_alias_id_is_not_coerced_to_match(self):
+        self.identity['instrument_id'] = '42'
+        self.alias['instrument_id'] = 42
+        with self.assertRaisesRegex(ValueError, 'alias identity mismatch'):
+            self.run_ingestion()
+        self.provider.fetch_daily_bars.assert_not_called()
+        self.store.store_bytes.assert_not_called()
+        self.repository.save_manifest.assert_not_called()
+
     def test_invalid_provider_namespace_fails_before_alias_lookup(self):
         for name in ('canonical', '', ' FREE ', None):
             with self.subTest(name=name):

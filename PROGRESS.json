@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M3",
-  "phase": "INDEX_INGESTION_SOURCE_IDENTITY_BINDING",
-  "current_capability": "Index ingestion validates source identity before fetch, rejects identity changes during fetch, and binds every raw page and result to the original source.",
+  "phase": "DAILY_INGESTION_INSTRUMENT_ID_ADMISSION",
+  "current_capability": "Direct daily ingestion rejects missing or malformed canonical instrument IDs before alias lookup and requires exact alias ID equality without string coercion.",
   "starting_head": "e55fbbc",
-  "head": "001b22b5e3ef656d326434fb58afc373c2ece706",
+  "head": "9cc29ec797b187cddd79389fa65f6b7dd76ed5bd",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "29 focused offline stdlib index/daily ingestion and refresh contract tests PASS; git diff --check PASS. Dependency-backed index ingestion suite attempted but pytest unavailable; integration pending.",
+  "tests": "49 focused offline stdlib daily/index ingestion and refresh contract tests PASS; git diff --check PASS. Dependency-backed validation pending: python3 has no pytest.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Continue reviewed free-provider acquisition composition with explicit alias-bound targets and source-specific evidence. Validate dependency-backed runtime and FastAPI integration when packages become available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",

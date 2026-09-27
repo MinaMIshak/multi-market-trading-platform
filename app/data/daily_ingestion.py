@@ -109,9 +109,10 @@ class DailyBarIngestor:
                 "resolved canonical ticker mismatch"
             )
 
-        instrument_id = str(
-            instrument["instrument_id"]
-        )
+        instrument_id = instrument.get("instrument_id")
+        if (not isinstance(instrument_id, str) or not instrument_id
+                or instrument_id != instrument_id.strip()):
+            raise ValueError("daily canonical instrument_id must be a nonempty string")
 
         # Direct callers must bind the provider alias too: canonical resolution
         # alone could otherwise store another instrument's bytes under this ID.
@@ -125,7 +126,7 @@ class DailyBarIngestor:
         except (KeyError, ValueError) as exc:
             raise ValueError("daily provider alias unavailable or ambiguous") from exc
         if (not isinstance(alias, dict)
-                or str(alias.get("instrument_id", "")) != instrument_id
+                or alias.get("instrument_id") != instrument_id
                 or alias.get("canonical_ticker") != canonical_symbol
                 or alias.get("matched_provider") != provider_name
                 or alias.get("matched_alias_value") != provider_symbol):

@@ -525,3 +525,17 @@ gap; it does not establish source rights or benchmark eligibility.
 Validation: 29 focused offline stdlib ingestion/refresh tests pass. The
 dependency-backed index ingestion suite remains pending because pytest is
 unavailable. No acquisition, runtime coverage, scheduling or deployment is claimed.
+
+## Incremental checkpoint: canonical instrument ID admission
+
+Direct daily ingestion requires a nonempty, unpadded string canonical instrument
+ID and exact provider-alias ID equality. Missing IDs can no longer match through
+string conversion, and numeric aliases cannot match string IDs. Invalid canonical
+IDs fail before alias lookup, fetch, admission or persistence. The existing SQLite
+resolver returns string IDs; valid explicit aliases retain their behavior.
+
+Validation: 49 focused offline stdlib ingestion/refresh tests pass, including
+missing, blank, padded, boolean and numeric identity cases. Dependency-backed
+validation remains pending because python3 lacks pytest. No fresh acquisition,
+market coverage, scheduled operation or deployment is claimed. Reviewed free-
+provider composition remains pending.
