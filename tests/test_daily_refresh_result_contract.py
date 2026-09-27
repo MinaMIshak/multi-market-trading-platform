@@ -18,6 +18,8 @@ SPEC.loader.exec_module(job_module)
 class RefreshResultContractTests(unittest.TestCase):
     def run_counts(self, counts, *, second_counts=None):
         ingestor, pipeline = Mock(), Mock()
+        self.ingestor = ingestor
+        self.pipeline = pipeline
         values = [counts] if second_counts is None else [counts, second_counts]
         ingestor.ingest.side_effect = [
             SimpleNamespace(record_count=value[0], manifest=SimpleNamespace(ingestion_id='fixture'))
@@ -53,6 +55,20 @@ class RefreshResultContractTests(unittest.TestCase):
         for counts in ((3, 1, 1), (1, 1, 1), (0, 1, 0)):
             with self.subTest(counts=counts), self.assertRaises(job_module.DailyRefreshJobError):
                 self.run_counts(counts)
+
+    def test_invalid_ingestion_count_cannot_promote_artifact(self):
+        for count in (True, False, 1.0, 1.9, '1', None, -1, float('nan'), float('inf')):
+            with self.subTest(count=count):
+                with self.assertRaises(job_module.DailyRefreshJobError):
+                    self.run_counts((count, 1, 0))
+                self.pipeline.finalize_ingestion.assert_not_called()
+
+    def test_invalid_later_ingestion_preserves_only_prior_promotion(self):
+        with self.assertRaises(job_module.DailyRefreshJobError) as caught:
+            self.run_counts((3, 2, 1), second_counts=(True, 1, 0))
+        self.assertEqual(self.ingestor.ingest.call_count, 2)
+        self.assertEqual(self.pipeline.finalize_ingestion.call_count, 1)
+        self.assertEqual([item.canonical_symbol for item in caught.exception.completed], ['FIXTURE0'])
 
     def test_failure_retains_only_preceding_valid_results(self):
         with self.assertRaises(job_module.DailyRefreshJobError) as caught:

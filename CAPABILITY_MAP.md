@@ -241,3 +241,13 @@ by the canonical pipeline or establish new provider admission.
 dependency-free job module, malformed-count subcases, partial completion and
 mapping/scanner coverage. Dependency-backed integration remains pending missing
 pytest/runtime dependencies. No fresh market evidence, scans or deployment.
+
+## Incremental checkpoint: reject counts before promotion
+
+Daily refresh now rejects malformed ingestion record counts before invoking
+canonical promotion, which can persist artifacts. Post-promotion manifest count
+reconciliation remains in place. Six offline actual-job regressions include
+proof that malformed counts never invoke promotion and that a later failure
+preserves only the preceding valid promotion; ten mapping and ten scanner
+regressions also pass. These are engineering fixtures, not acquisition or market
+coverage evidence. Free-provider composition and runtime validation remain pending.

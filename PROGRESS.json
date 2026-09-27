@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_RESULT_COUNT_INTEGRITY",
-  "current_capability": "Daily refresh job rejects malformed or inconsistent result counts instead of coercing them into reported success; partial failures preserve only preceding valid results. Reviewed free-provider composition remains pending.",
+  "phase": "REFRESH_PRE_PROMOTION_COUNT_ADMISSION",
+  "current_capability": "Daily refresh rejects malformed ingestion record counts before canonical promotion can persist artifacts; later target failures retain only preceding valid promotions. Reviewed free-provider composition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "2547638e1b614c8834a242312d9893913cfa53da",
+  "head": "095281f6c111575ba3642aacf91ffa870e217be0",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "24 focused offline regressions PASS: 4 actual-job result-contract tests (including malformed-count subcases), 10 mapping tests, 10 scanner tests. git diff --check PASS. Dependency-backed integration/full release validation pending unavailable pytest/runtime dependencies.",
+  "tests": "26 focused offline regressions PASS: 6 actual-job result-contract tests (including no-promotion and partial-failure checks), 10 mapping tests, 10 scanner tests. git diff --check PASS. Dependency-backed integration/full release validation pending unavailable pytest/runtime dependencies.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run provider/admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",

@@ -201,6 +201,11 @@ class DailyRefreshJob:
                     )
                 )
 
+                # Promotion persists canonical artifacts. Reject malformed
+                # ingestion counts before invoking that side effect.
+                if type(ingestion.record_count) is not int or ingestion.record_count < 0:
+                    raise ValueError("refresh record_count must be a nonnegative integer")
+
                 promotion = (
                     self.pipeline
                     .finalize_ingestion(
