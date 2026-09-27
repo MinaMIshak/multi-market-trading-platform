@@ -37,12 +37,13 @@ class Resolver:
         *,
         provider=None,
     ):
-        assert value == "COMI"
-        assert provider == "canonical"
+        assert (value, provider) in (("COMI", "canonical"), ("COMI.EGX", "eodhd"))
 
         return {
             "instrument_id": INSTRUMENT_ID,
             "canonical_ticker": "COMI",
+            "matched_provider": provider,
+            "matched_alias_value": value,
         }
 
 

@@ -417,3 +417,18 @@ invalid-window subcases using SQLite fixtures. The pytest operational UI suite
 was attempted but pytest is unavailable. No new market observations, acquisition,
 scheduled execution or deployment are claimed. Reviewed free-provider composition
 and dependency-backed runtime validation remain pending.
+
+## Incremental checkpoint: direct daily ingestion alias binding
+
+DailyBarIngestor now resolves the exact provider-specific alias and requires its
+instrument ID, ticker, provider namespace and alias value to match the requested
+canonical identity before fetch or persistence. Direct calls can no longer bypass
+the identity gate previously enforced by refresh orchestration. This generic
+data boundary adds no EGX assumptions to U.S. ingestion and proves no source rights.
+
+Validation: 26 offline stdlib contract tests pass, including rejected missing,
+ambiguous, wrong-instrument, wrong-ticker, wrong-provider and wrong-alias cases
+and an admitted alias reaching the exact fetch request. Existing integration
+fixtures now declare explicit aliases. Four dependency-backed suites were
+attempted but pytest is unavailable. No acquisition, coverage increase, deployment
+or scheduled operation is claimed; reviewed free-provider composition remains pending.

@@ -65,8 +65,10 @@ class RefreshWindowTests(unittest.TestCase):
         ingestor = namespace['DailyBarIngestor'](
             raw_store=store, repository=repository, admission_policy=policy,
             resolver=Mock(resolve=Mock(return_value={
-                'canonical_ticker': 'FIXTURE', 'instrument_id': 'fixture'})))
-        provider = Mock(name='fixture')
+                'canonical_ticker': 'FIXTURE', 'instrument_id': 'fixture',
+                'matched_provider': 'fixture', 'matched_alias_value': 'CODE'})))
+        provider = Mock()
+        provider.name = 'fixture'
         with self.assertRaises(self.error):
             ingestor.ingest(provider=provider, canonical_symbol='FIXTURE',
                             provider_symbol='CODE', start_date=self.start,

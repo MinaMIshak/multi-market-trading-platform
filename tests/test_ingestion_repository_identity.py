@@ -256,12 +256,13 @@ def test_daily_ingestor_replay_returns_persisted_identity(
             *,
             provider=None,
         ):
-            assert value == "COMI"
-            assert provider == "canonical"
+            assert (value, provider) in (("COMI", "canonical"), ("COMI.EGX", "eodhd"))
 
             return {
                 "instrument_id": "instrument-1",
                 "canonical_ticker": "COMI",
+                "matched_provider": provider,
+                "matched_alias_value": value,
             }
 
     class Provider:

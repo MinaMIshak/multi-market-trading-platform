@@ -104,6 +104,24 @@ class DailyBarIngestor:
             instrument["instrument_id"]
         )
 
+        # Direct callers must bind the provider alias too: canonical resolution
+        # alone could otherwise store another instrument's bytes under this ID.
+        provider_name = provider.name
+        if (not isinstance(provider_name, str) or not provider_name
+                or provider_name != provider_name.strip().lower()
+                or provider_name == "canonical"):
+            raise ValueError("daily provider name must be canonical")
+        try:
+            alias = self.resolver.resolve(provider_symbol, provider=provider_name)
+        except (KeyError, ValueError) as exc:
+            raise ValueError("daily provider alias unavailable or ambiguous") from exc
+        if (not isinstance(alias, dict)
+                or str(alias.get("instrument_id", "")) != instrument_id
+                or alias.get("canonical_ticker") != canonical_symbol
+                or alias.get("matched_provider") != provider_name
+                or alias.get("matched_alias_value") != provider_symbol):
+            raise ValueError("daily provider alias identity mismatch")
+
         response = provider.fetch_daily_bars(
             symbol=provider_symbol,
             start_date=start_date,

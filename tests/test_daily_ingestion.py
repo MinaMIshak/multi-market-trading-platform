@@ -14,11 +14,12 @@ class Resolver:
         self.ticker = ticker
 
     def resolve(self, value, *, provider=None):
-        assert value == "COMI"
-        assert provider == "canonical"
+        assert (value, provider) in (("COMI", "canonical"), ("COMI.EGX", "eodhd"))
         return {
             "instrument_id": "instrument-1",
             "canonical_ticker": self.ticker,
+            "matched_provider": provider,
+            "matched_alias_value": value,
         }
 
 
