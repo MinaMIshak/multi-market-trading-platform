@@ -155,6 +155,9 @@ class DailyRefreshExecutionAdapter:
                 end_date=market_date,
                 snapshot_date=market_date,
             )
+            # Finalize reporting before committing success: an unreadable result
+            # must leave the fallback eligible, not a false successful checkpoint.
+            item_count = len(result.items)
 
         except Exception as exc:
             marked = (
@@ -203,7 +206,5 @@ class DailyRefreshExecutionAdapter:
             checkpoint_name=checkpoint_name,
             claimed=True,
             succeeded=True,
-            item_count=len(
-                result.items
-            ),
+            item_count=item_count,
         )

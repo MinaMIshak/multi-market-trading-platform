@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_SCHEDULER_WINDOW_ADMISSION",
-  "current_capability": "Scheduled daily refresh validates integer lookback and calendar-date window before ledger access, preventing date overflow from stranding a claimed job. Valid primary/fallback windows and provider failure recording remain covered. Free-provider integration remains pending.",
+  "phase": "REFRESH_SCHEDULER_RESULT_FINALIZATION",
+  "current_capability": "Daily refresh computes its result count before recording scheduler success; unreadable results enter failure handling so false success cannot suppress fallback. Reviewed free-provider integration remains pending.",
   "starting_head": "e55fbbc",
-  "head": "6e91be80c956baae1017d5a2ab84a06732430792",
+  "head": "f3a08013caa9b8a84af5a440e47ce82face43cb6",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "38 focused offline execution-window/job/mapping regressions PASS. Five new execution tests cover malformed lookbacks, non-date inputs, date overflow before any ledger access, valid primary/fallback windows and provider failure handling. Actual adapter source loaded without optional runtime imports; not database integration evidence. git diff --check PASS. Isolated pytest dependency install failed due to package-host DNS; runtime/quota/launch integration pending.",
+  "tests": "41 focused offline execution/result/mapping tests PASS (8 execution, 17 result contract, 16 mapping). Three new regressions cover unreadable primary/fallback results, failure persistence errors and count evaluation before success. git diff --check PASS. Dependency-backed daily refresh job suite failed to import: pytest unavailable. No runtime/database integration or full-suite validation claimed.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
   "next_action": "Compose reviewed free-provider acquisition with explicit alias-bound targets; run runtime/quota/launch and scheduler integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment pending. MISSION.txt absent: mission supplied in supervisor prompt.",
@@ -55,7 +55,7 @@
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
   "capability_blockers": {
-    "test_execution": "System/runtime environments lack pytest and pydantic; isolated installation failed because package-host DNS was unavailable. Offline source-level tests pass; dependency-backed integration pending.",
+    "test_execution": "pytest unavailable in system Python and both existing isolated validation environments; dependency-backed job/runtime integration pending.",
     "deployment": "No safe deployment mechanism established in this cycle",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",

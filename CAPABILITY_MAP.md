@@ -345,3 +345,17 @@ loading actual adapter source without optional runtime imports. This is not SQLi
 or deployed scheduler evidence. Isolated pytest installation failed due to package-
 host DNS; dependency-backed integration remains pending. No acquisition, fresh
 market counts or deployment occurred.
+
+## Incremental checkpoint: refresh result finalization
+
+Daily refresh execution now reads the returned item count inside the failure
+boundary before marking the scheduler checkpoint successful. Previously an
+unreadable result could raise after durable success, falsely suppressing fallback.
+Unreadable primary/fallback results now invoke failure persistence; persistence
+errors remain explicit. The count is evaluated once before success.
+
+41 focused offline execution/result/mapping regressions pass, including three new
+execution tests. These use engineering fixtures, not runtime scheduler evidence.
+The dependency-backed job suite cannot import because pytest is unavailable;
+full integration remains pending. No acquisition, fresh coverage or deployment
+is claimed. Reviewed free-provider composition remains the next integration task.

@@ -107,6 +107,49 @@ class ExecutionWindowContractTests(unittest.TestCase):
         self.repo.mark_failed.assert_called_once()
         self.repo.mark_succeeded.assert_not_called()
 
+    def test_unreadable_results_fail_before_success_for_both_checkpoints(self):
+        for checkpoint in execution._ALLOWED_CHECKPOINTS:
+            for result in (None, SimpleNamespace(), SimpleNamespace(items=None),
+                           SimpleNamespace(items=iter(()))):
+                with self.subTest(checkpoint=checkpoint, result=result):
+                    adapter = self.adapter()
+                    self.job.run.return_value = result
+                    with self.assertRaises((AttributeError, TypeError)):
+                        self.execute(adapter, date(2026, 9, 27), checkpoint)
+                    self.repo.mark_succeeded.assert_not_called()
+                    self.repo.mark_failed.assert_called_once()
+                    self.assertIn(self.repo.mark_failed.call_args.kwargs['error'], (
+                        'DAILY_REFRESH_FAILED:AttributeError',
+                        'DAILY_REFRESH_FAILED:TypeError'))
+
+    def test_result_failure_persistence_error_is_exposed(self):
+        adapter = self.adapter()
+        self.job.run.return_value = None
+        self.repo.mark_failed.return_value = False
+        with self.assertRaisesRegex(execution.DailyRefreshExecutionError,
+                                    'failed to persist daily refresh failure'):
+            self.execute(adapter, date(2026, 9, 27),
+                         execution.CheckpointName.AFTER_SESSION_PRIMARY)
+        self.repo.mark_succeeded.assert_not_called()
+
+    def test_result_count_is_read_once_before_success(self):
+        adapter = self.adapter()
+        reads = []
+
+        class Result:
+            @property
+            def items(inner):
+                self.repo.mark_succeeded.assert_not_called()
+                reads.append(True)
+                return (object(), object())
+
+        self.job.run.return_value = Result()
+        result = self.execute(adapter, date(2026, 9, 27),
+                              execution.CheckpointName.AFTER_SESSION_PRIMARY)
+        self.assertEqual(result.item_count, 2)
+        self.assertEqual(reads, [True])
+        self.repo.mark_succeeded.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()
