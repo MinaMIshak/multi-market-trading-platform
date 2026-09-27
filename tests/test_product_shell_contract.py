@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from app.ui.operational import load_operational_state
-from app.ui.product import MARKETS, SECTIONS, product_state, render_product
+from app.ui.product import MARKETS, SECTIONS, product_state, render_product, RECEIPT_STATUSES
 
 
 class ProductShellContracts(unittest.TestCase):
@@ -83,6 +83,56 @@ class ProductShellContracts(unittest.TestCase):
         for market, section in [('EU', 'TODAY'), ('ALL', '<script>'), ('egx', 'TODAY')]:
             with self.assertRaises(ValueError):
                 product_state(self.source, market, section)
+
+    def test_mixed_receipt_counts_are_scoped_and_do_not_infer_candidates(self):
+        self.source['symbols'] = [dict(market='EGX', symbol=str(i), status=status)
+                                  for i, status in enumerate(RECEIPT_STATUSES)]
+        before = deepcopy(self.source)
+        state = product_state(self.source)
+        counts = state['coverage']['EGX']
+        self.assertEqual(counts['observed_symbols'], 6)
+        self.assertEqual(counts['status_counts'], dict.fromkeys(RECEIPT_STATUSES, 1))
+        self.assertIsNone(counts['candidates'])
+        self.assertIsNone(counts['scanned'])
+        self.assertIsNone(counts['data_ready'])
+        self.assertIsNone(state['coverage']['US']['status_counts'])
+        for section in SECTIONS:
+            body = render_product(product_state(self.source, section=section))
+            self.assertIn('EGX observed receipt statuses', body)
+            self.assertNotIn('US observed receipt statuses', body)
+            self.assertIn('not scan coverage', body)
+        self.assertEqual(self.source, before)
+
+    def test_empty_available_and_unavailable_are_distinct(self):
+        self.source['symbols'] = []
+        counts = product_state(self.source)['coverage']['EGX']
+        self.assertEqual(counts['observed_symbols'], 0)
+        self.assertEqual(counts['status_counts'], dict.fromkeys(RECEIPT_STATUSES, 0))
+        self.source['available'] = False
+        counts = product_state(self.source)['coverage']['EGX']
+        self.assertIsNone(counts['status_counts'])
+        self.assertIsNone(counts['observed_symbols'])
+
+    def test_duplicate_symbol_is_counted_once_as_blocked_in_any_order(self):
+        rows = [dict(market='EGX', symbol='FIXTURE', status=status)
+                for status in ('WATCH', 'READY_NO_SIGNAL', 'WATCH')]
+        for order in (rows, list(reversed(rows))):
+            self.source['symbols'] = order
+            counts = product_state(self.source)['coverage']['EGX']
+            self.assertEqual(counts['observed_symbols'], 1)
+            self.assertEqual(counts['status_counts']['EVIDENCE_BLOCKED'], 1)
+            self.assertEqual(counts['status_counts']['WATCH'], 0)
+
+    def test_unknown_status_and_missing_identity_do_not_create_readiness(self):
+        self.source['symbols'][0]['status'] = 'CANDIDATE'
+        counts = product_state(self.source)['coverage']['EGX']
+        self.assertEqual(counts['status_counts']['UNKNOWN'], 1)
+        self.assertIsNone(counts['candidates'])
+        for symbol in (None, '', ' '):
+            self.source['symbols'][0]['symbol'] = symbol
+            counts = product_state(self.source)['coverage']['EGX']
+            self.assertIsNone(counts['observed_symbols'])
+            self.assertIsNone(counts['status_counts'])
 
     def test_actual_route_functions_use_only_operational_truth(self):
         # Execute complete route bodies without importing unavailable FastAPI dependencies.

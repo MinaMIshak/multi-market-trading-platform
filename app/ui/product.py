@@ -6,6 +6,30 @@ from app.ui.operational import render_operational
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
+RECEIPT_STATUSES = ('WATCH', 'READY_NO_SIGNAL', 'NOT_READY', 'DATA_STALE',
+                    'EVIDENCE_BLOCKED', 'UNKNOWN')
+
+
+def observed_receipt_summary(market_state):
+    """Count reader observations only; never infer universe or scan completion."""
+    summary = {'scope': 'Observed operational symbols only; not scan coverage',
+               'observed_symbols': None, 'status_counts': None}
+    if not market_state['available']:
+        return summary
+    # The reader emits one row per symbol. Ambiguous duplicates must not inflate
+    # counts or select a favorable status; preserve them as blocked evidence.
+    statuses = {}
+    for item in market_state['symbols']:
+        symbol = item.get('symbol')
+        if not isinstance(symbol, str) or not symbol.strip():
+            return summary
+        status = item.get('status')
+        status = status if status in RECEIPT_STATUSES else 'UNKNOWN'
+        statuses[symbol] = 'EVIDENCE_BLOCKED' if symbol in statuses else status
+    counts = dict.fromkeys(RECEIPT_STATUSES, 0)
+    for status in statuses.values():
+        counts[status] += 1
+    return summary | {'observed_symbols': len(statuses), 'status_counts': counts}
 
 
 def product_state(operational, market='ALL', section='TODAY'):
@@ -23,8 +47,7 @@ def product_state(operational, market='ALL', section='TODAY'):
         'live': 'DISABLED', 'markets': {key: markets[key] for key in selected},
         'coverage': {key: {'universe': None, 'data_ready': None, 'scanned': None,
                            'candidates': None,
-                           'observed_symbols': len(markets[key]['symbols'])
-                           if markets[key]['available'] else None}
+                           **observed_receipt_summary(markets[key])}
                      for key in selected},
         'performance': None,
     }
@@ -44,6 +67,15 @@ def render_product(state):
         content += (f'<article><h2>{key}</h2><p>Status: {escape(str(value["status"]))}</p>'
                     f'<p>Observed symbols: {observed if observed is not None else "UNKNOWN"}. '
                     'Universe / data-ready / scanned / candidates: UNKNOWN.</p></article>')
+        counts = state['coverage'][key]['status_counts']
+        if counts is not None:
+            content += (f'<table aria-label="{key} observed receipt statuses">'
+                        '<caption>Observed operational symbols only; not scan coverage</caption>'
+                        '<thead><tr><th scope="col">Receipt status</th>'
+                        '<th scope="col">Symbols</th></tr></thead><tbody>')
+            for status, count in counts.items():
+                content += f'<tr><th scope="row">{status}</th><td>{count}</td></tr>'
+            content += '</tbody></table>'
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
         for value in state['markets'].values():
