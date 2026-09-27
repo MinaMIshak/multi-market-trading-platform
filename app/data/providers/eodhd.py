@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import date
 from urllib import error, parse, request
 
@@ -127,9 +128,9 @@ class EODHDProvider:
                     raise EODHDResponseError(
                         f"invalid EODHD numeric field: {field}"
                     )
-                if value <= 0:
+                if (isinstance(value, float) and not math.isfinite(value)) or value <= 0:
                     raise EODHDResponseError(
-                        f"non-positive EODHD field: {field}"
+                        f"non-finite or non-positive EODHD field: {field}"
                     )
 
             volume = row["volume"]
@@ -137,9 +138,9 @@ class EODHDProvider:
                 raise EODHDResponseError(
                     "invalid EODHD volume"
                 )
-            if volume < 0:
+            if (isinstance(volume, float) and not math.isfinite(volume)) or volume < 0:
                 raise EODHDResponseError(
-                    "negative EODHD volume"
+                    "non-finite or negative EODHD volume"
                 )
 
             seen.add(market_date)

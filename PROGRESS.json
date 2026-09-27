@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M2",
-  "phase": "REFRESH_IDENTITY_CONTRACT",
-  "current_capability": "Shared EGX equity admission now rejects matching malformed IDs and stringifiable non-UUID objects before refresh alias authorization. Reviewed free-provider composition and runtime integration remain pending.",
+  "phase": "PROVIDER_FINITE_VALUE_ADMISSION",
+  "current_capability": "Existing EODHD acquisition rejects non-finite OHLC, adjusted close and volume before returning provider responses. Reviewed free-provider composition remains pending.",
   "starting_head": "e55fbbc",
-  "head": "657ecd96822ca7d0f49ac965e6bc0f097dd0daac",
+  "head": "aa6999db20c254f1373006e908afaa88b944b1d4",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "37 dependency-free identity/mapping/scanner/configuration/heartbeat regressions PASS; git diff --check PASS. Dependency-backed integration and full release suites pending: pytest/pydantic unavailable and package-host DNS resolution failed.",
+  "tests": "19 isolated actual-validator cases PASS (AST-loaded without dependency imports); 25 dependency-free mapping/scanner/heartbeat regressions PASS; git diff --check PASS. Added 19 dependency-backed provider regression cases; pytest/pydantic unavailable, integration/full release validation pending.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Opt-in local worker dispatch implemented; actual scheduled operation unverified.",
-  "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",
+  "next_action": "Compose reviewed free-provider refresh using alias-bound targets; run provider/admission/launch integration when dependencies are available. Establish authoritative dated EGX membership preserving 224 baseline; safe deployment remains pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",

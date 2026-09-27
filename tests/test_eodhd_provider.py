@@ -108,3 +108,28 @@ def test_unsorted_dates_are_rejected():
             start_date=date(2026, 9, 1),
             end_date=date(2026, 9, 9),
         )
+
+
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "adjusted_close", "volume"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_market_values_are_rejected(field, value):
+    observation = row()
+    observation[field] = value
+    provider = FakeEODHD(json.dumps([observation]).encode())
+    with pytest.raises(EODHDResponseError):
+        provider.fetch_daily_bars(
+            symbol="COMI.EGX",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 9),
+        )
+
+
+def test_finite_zero_volume_is_preserved():
+    observation = row()
+    observation["volume"] = 0
+    result = FakeEODHD(json.dumps([observation]).encode()).fetch_daily_bars(
+        symbol="COMI.EGX",
+        start_date=date(2026, 9, 1),
+        end_date=date(2026, 9, 9),
+    )
+    assert result.record_count == 1

@@ -219,3 +219,12 @@ not dated membership, provider rights, acquisition or market scan evidence.
 pass. Dependency-backed integration remains pending: installing pytest/pydantic
 failed because package-host DNS was unavailable. No deployment or fresh runtime
 market observation occurred. Reviewed free-provider composition remains pending.
+
+## Incremental checkpoint: provider finite-value admission
+
+Existing EODHD acquisition now rejects NaN and positive/negative infinity in
+OHLC, adjusted close and volume before returning a provider response. Finite zero
+volume remains valid. Nineteen isolated checks of the actual AST-loaded validator
+and 25 dependency-free mapping/scanner/heartbeat regressions pass. Nineteen added
+provider regression cases await pytest/pydantic; this does not establish integration
+validation, free-source readiness, fresh data, scans or deployment.
