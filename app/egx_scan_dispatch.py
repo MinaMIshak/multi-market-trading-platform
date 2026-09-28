@@ -43,17 +43,19 @@ def dispatch_scan(*, evaluation, repository, database, data_root,
         row = repository.get_job(**key)
         if row is None or row['status'] != 'PENDING':
             continue
-        previous_count = row['attempt_count']
         if not repository.claim_job(**key):
             continue
+        # Re-read after claim_job's own atomic CAS: a concurrent worker may
+        # have claimed and released this job between the checks above and
+        # here, so the pre-claim row is not a trustworthy attempt_count
+        # baseline. claim_job's row-level atomicity is the only guarantee
+        # that matters; the freshly claimed row is authoritative on its own.
         row = repository.get_job(**key)
         attempt = dict(market_date=evaluation.market_date.isoformat(),
                        checkpoint=checkpoint.value, attempt_count=row['attempt_count'],
                        started_at=row['started_at'], status=row['status'],
                        finished_at=row['finished_at'])
-        if (not valid_scheduler_attempt(attempt) or attempt['status'] != 'RUNNING'
-                or type(previous_count) is not int
-                or attempt['attempt_count'] != previous_count + 1):
+        if not valid_scheduler_attempt(attempt) or attempt['status'] != 'RUNNING':
             raise RuntimeError('invalid claimed scan attempt')
         guarded_key = key | {'expected_attempt': (attempt['attempt_count'], attempt['started_at'])}
         try:

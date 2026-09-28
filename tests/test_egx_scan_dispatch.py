@@ -107,6 +107,23 @@ class ScanDispatchTests(unittest.TestCase):
                 self.repo.mark_failed.assert_called_once()
                 self.repo.mark_succeeded.assert_not_called()
 
+    def test_concurrent_reclaim_does_not_crash_on_attempt_count_gap(self):
+        # A different worker claimed and released this job between our
+        # pre-claim read (attempt_count=0) and our own claim_job() call, so
+        # claim_job's atomic CAS legitimately lands on attempt_count=3
+        # instead of the naively expected 1. That gap must not be treated
+        # as invalid: claim_job's own row-level atomicity is authoritative.
+        self.repo.get_job.return_value = {'status': 'PENDING', 'attempt_count': 0}
+
+        def claim(**kwargs):
+            self.repo.get_job.return_value = dict(status='RUNNING', attempt_count=3,
+                started_at='2026-09-24T10:00:00+00:00', finished_at=None)
+            return True
+
+        self.repo.claim_job.side_effect = claim
+        result = self.run_dispatch()
+        self.assertTrue(result['succeeded'])
+
     def test_ledger_write_failure_is_not_reported_as_success(self):
         self.repo.mark_succeeded.side_effect = None
         self.repo.mark_succeeded.return_value = False
