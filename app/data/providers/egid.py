@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from urllib import error, parse, request
+from urllib import error, request
 
 from app.data.models import (
     BarGranularity,
@@ -16,6 +16,28 @@ class EGIDAuthenticationError(
     RuntimeError
 ):
     pass
+
+
+class EGIDResponseError(
+    RuntimeError
+):
+    pass
+
+
+def _parsed_json_list(payload: bytes, description: str) -> list:
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise EGIDResponseError(
+            f"EGID {description} response was not valid JSON"
+        ) from exc
+
+    if not isinstance(parsed, list):
+        raise EGIDResponseError(
+            f"unexpected EGID {description} response type"
+        )
+
+    return parsed
 
 
 class EGIDProvider:
@@ -125,18 +147,9 @@ class EGIDProvider:
 
         payload = self._open(req)
 
-        parsed = json.loads(
-            payload.decode("utf-8")
+        parsed = _parsed_json_list(
+            payload, "security master"
         )
-
-        if not isinstance(
-            parsed,
-            list,
-        ):
-            raise ValueError(
-                "unexpected EGID security "
-                "master response type"
-            )
 
         return ProviderResponse(
             payload=payload,
@@ -164,6 +177,13 @@ class EGIDProvider:
             raise ValueError(
                 "end_date cannot be "
                 "before start_date"
+            )
+
+        symbol = symbol.strip().upper()
+
+        if not symbol:
+            raise ValueError(
+                "symbol is required"
             )
 
         url = (
@@ -204,12 +224,17 @@ class EGIDProvider:
 
         payload = self._open(req)
 
+        parsed = _parsed_json_list(
+            payload, "daily history"
+        )
+
         return ProviderResponse(
             payload=payload,
             filename=(
-                f"{symbol.upper()}-history.json"
+                f"{symbol}-history.json"
             ),
             source_uri=url,
+            record_count=len(parsed),
             metadata={
                 "endpoint": (
                     "getSymbolHistory"
