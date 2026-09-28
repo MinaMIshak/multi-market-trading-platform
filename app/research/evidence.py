@@ -35,15 +35,8 @@ class ResearchEvidenceCriteria(Contract):
     minimum_completed_holdout_trades: int = Field(ge=2)
     minimum_net_expectancy: Decimal
     maximum_drawdown_fraction: Decimal = Field(ge=0)
-    minimum_profit_factor: Decimal | None
+    minimum_profit_factor: Decimal | None = Field(ge=0)
     minimum_net_expectancy_lower_bound: Decimal | None
-
-    @field_validator('minimum_profit_factor')
-    @classmethod
-    def nonnegative_pf(cls, value):
-        if value is not None and value < 0:
-            raise ValueError('profit factor threshold must be nonnegative')
-        return value
 
 
 class FrozenResearchProtocol(Contract):
@@ -90,7 +83,7 @@ class CriterionCheck(Contract):
     threshold: Decimal
     comparison: Literal['GE', 'LE']
     passed: bool | None
-    unavailable_reason: str | None
+    unavailable_reason: Literal['BELOW_DECLARED_SAMPLE_MINIMUM', 'UNDEFINED_METRIC'] | None
 
 
 class FoldOOSReport(Contract):

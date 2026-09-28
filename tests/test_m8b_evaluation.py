@@ -147,6 +147,17 @@ def test_criteria_invalid(field, value):
         criteria(**{field: value})
 
 
+def test_criterion_check_unavailable_reason_is_closed_set():
+    from app.research import CriterionCheck
+    args = dict(criterion='completed_trades', actual=None, threshold=D(0),
+               comparison='GE', passed=None)
+    CriterionCheck(**args, unavailable_reason='BELOW_DECLARED_SAMPLE_MINIMUM')
+    CriterionCheck(**args, unavailable_reason='UNDEFINED_METRIC')
+    CriterionCheck(**args, unavailable_reason=None)
+    with pytest.raises(ValueError):
+        CriterionCheck(**args, unavailable_reason='BELOW_DECLARED_SAMPLE_MINUMUM')
+
+
 @pytest.mark.parametrize('block', [1, 2, 3])
 def test_bootstrap_deterministic_off_ambient_random_and_decimal_context(block):
     d, p = mixed(), protocol(bootstrap=bootstrap(block_size=block))
