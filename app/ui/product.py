@@ -4,7 +4,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from app.ui.operational import render_operational
-from app.egx_scan_history import _valid_summary, valid_reconciliation
+from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
@@ -77,7 +77,7 @@ def scan_run_state(history):
     unknown = {'status': 'UNKNOWN', 'run': None, 'scheduler_completion': None,
                'completion_evidence': None}
     if (not isinstance(history, dict) or history.get('status') != 'HISTORICAL_RUN'
-            or not _valid_summary(history.get('run'))):
+            or not valid_summary(history.get('run'))):
         return unknown
     raw = history['run']
     # Legacy classification has no scheduler result. Version 3 includes a

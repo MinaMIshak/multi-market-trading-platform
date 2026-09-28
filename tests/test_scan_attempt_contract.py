@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from app.egx_scan_dispatch import dispatch_scan
-from app.egx_scan_history import load_scan_history, _valid_summary
+from app.egx_scan_history import load_scan_history, valid_summary
 from app.ui.product import product_state, render_product
 from test_egx_scan_dispatch import Checkpoint
 
@@ -146,8 +146,8 @@ class AttemptContracts(unittest.TestCase):
             with self.subTest(changes=changes):
                 value = deepcopy(raw)
                 value['scheduler_attempt'].update(changes)
-                self.assertFalse(_valid_summary(value))
-        self.assertFalse(_valid_summary(raw | {'schema_version': 2}))
+                self.assertFalse(valid_summary(value))
+        self.assertFalse(valid_summary(raw | {'schema_version': 2}))
 
     def test_completion_reread_must_match_same_attempt(self):
         original = self.repo.get_job

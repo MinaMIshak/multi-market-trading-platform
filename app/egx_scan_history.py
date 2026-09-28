@@ -9,6 +9,10 @@ import sqlite3
 from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 
 
+def _symlinked(path):
+    return any(part.is_symlink() for part in (path, *path.parents))
+
+
 def write_scan_history(report, path, *, scheduler_attempt=None):
     path = Path(path)
     if not path.is_absolute():
@@ -21,7 +25,7 @@ def write_scan_history(report, path, *, scheduler_attempt=None):
                             for row in report['symbols']])
     if scheduler_attempt is not None:
         summary.update(schema_version=3, scheduler_attempt=dict(scheduler_attempt))
-    if not _valid_summary(summary):
+    if not valid_summary(summary):
         raise ValueError('invalid EGX scan history summary')
     temporary = None
     try:
@@ -55,7 +59,7 @@ def valid_scheduler_attempt(attempt):
         return False
 
 
-def _valid_summary(raw):
+def valid_summary(raw):
     """Share admission between persistence and operator-visible history."""
     try:
         completed = datetime.fromisoformat(raw['completed_at'])
@@ -105,7 +109,7 @@ def _unique_object(pairs):
 
 def valid_reconciliation(raw, completion):
     """Completion must certify the exact historical attempt, after classification."""
-    if not _valid_summary(raw) or raw['schema_version'] != 3:
+    if not valid_summary(raw) or raw['schema_version'] != 3:
         return False
     attempt = raw['scheduler_attempt']
     return (attempt['status'] == 'RUNNING' and valid_scheduler_attempt(completion)
@@ -124,8 +128,7 @@ def reconcile_scan_completion(raw):
     attempt = raw['scheduler_attempt']
     try:
         path = Path(configured)
-        if (not path.is_absolute() or not path.is_file()
-                or any(part.is_symlink() for part in (path, *path.parents))):
+        if not path.is_absolute() or not path.is_file() or _symlinked(path):
             return None
         conn = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=0.1)
         try:
@@ -153,7 +156,7 @@ def load_scan_history():
         return unknown
     try:
         path = Path(configured)
-        if any(part.is_symlink() for part in (path, *path.parents)):
+        if _symlinked(path):
             return unknown
         # Bound the operator-facing read even when configuration points at a bad file.
         with path.open('rb') as stream:
@@ -161,7 +164,7 @@ def load_scan_history():
         if len(payload) > 1_048_576:
             return unknown
         raw = json.loads(payload, object_pairs_hook=_unique_object)
-        if not _valid_summary(raw):
+        if not valid_summary(raw):
             return unknown
         reconciled = reconcile_scan_completion(raw)
         return {'status': 'HISTORICAL_RUN',
