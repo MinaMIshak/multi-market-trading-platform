@@ -173,17 +173,21 @@ def test_decoder_roundtrip():
 
 
 def test_today_displays_frozen_candidates_separately_from_data(tmp_path, monkeypatch):
+    """The unified product shell at / never renders frozen shadow candidates;
+    they remain visible only through the dedicated /shadow surface. Root's
+    legacy fallback to render_today_dashboard was intentionally removed in
+    commit c7abf60 (unified operational product shell)."""
     directory = tmp_path / 'collection'
     produce_strategy_watchlist(directory, request())
     monkeypatch.setenv('EGX_SHADOW_DIRECTORY', str(directory))
     monkeypatch.setenv('EGX_DB_PATH', str(tmp_path / 'missing.db'))
-    page = main.root().body.decode()
-    assert 'No validated daily data available' in page
-    assert 'Frozen US record for 2026-09-14' in page
-    assert 'IBM · WATCH' in page
-    assert 'Freshness NOT ESTABLISHED' in page
-    assert 'UNVALIDATED and execution-disabled' in page
-    assert 'not current signals, fills or positions' in page
+    shadow_body = main.shadow_page().body.decode()
+    assert 'US · 2026-09-14 · Record US-20260914-fixture' in shadow_body
+    assert 'IBM · WATCH' in shadow_body
+    assert 'Freshness NOT ESTABLISHED' in shadow_body
+    assert 'Frozen declarations; fills and current positions NOT EVALUATED.' in shadow_body
+    today_page = main.root().body.decode()
+    assert 'IBM' not in today_page
     assert 'Authenticated trade observations are required' in main.performance().body.decode()
     assert not (tmp_path / 'missing.db').exists()
 

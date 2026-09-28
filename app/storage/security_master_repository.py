@@ -174,7 +174,7 @@ class SecurityMasterRepository:
                     ]
                 ] = [
                     (
-                        "egid",
+                        provider,
                         "EGID_SYMBOL_CODE",
                         (
                             instrument
@@ -194,7 +194,7 @@ class SecurityMasterRepository:
                 if instrument.reuters_raw:
                     aliases.append(
                         (
-                            "egid",
+                            provider,
                             "REUTERS_RAW",
                             (
                                 instrument
@@ -209,7 +209,7 @@ class SecurityMasterRepository:
                 ):
                     aliases.append(
                         (
-                            "egid",
+                            provider,
                             "REUTERS_NORMALIZED",
                             (
                                 instrument

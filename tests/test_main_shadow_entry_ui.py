@@ -292,9 +292,9 @@ def test_missed_collection_surface_is_distinct_and_fails_closed(
     assert "MISSED / NOT SCORED" in shadow_body
     assert "No candidates reconstructed; not a zero-candidate decision." in shadow_body
 
-    today_body = main.root().body.decode()
-    assert "MISSED / NOT SCORED" in today_body
-    assert "No candidates reconstructed." in today_body
+    # The unified product shell at / is receipt-scoped only (see app/ui/product.py)
+    # and never reads shadow state; missed-session evidence stays on /shadow.
+    assert "MISSED / NOT SCORED" not in main.root().body.decode()
 
     assert not (shadow_dir / "candidate-ledger").exists()
     assert not (shadow_dir / "watchlists").exists()

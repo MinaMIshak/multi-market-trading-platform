@@ -1,0 +1,5 @@
+# Test/development dependencies. Recreate the local suite environment with:
+#   python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
+# Run: PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest -q -p no:cacheprovider
+-r requirements.txt
+pytest==9.1.1

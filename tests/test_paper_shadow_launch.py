@@ -228,10 +228,18 @@ def test_reviewed_daily_evidence_selects_exact_current_artifact(launch, capsys):
     # symbol/signal date. It must not replace or demote the original ledger row.
     alternate = EngineeringProvider(provider.records)
     alternate.name = 'fixture-alternate'
-    SecurityMasterRepository(db).replace_provider_snapshot(provider=alternate.name, instruments=[
-        CanonicalInstrument(instrument_id=ID, instrument_type=InstrumentType.EQUITY,
-                            canonical_ticker='COMI', source_provider=alternate.name,
-                            source_symbol_code='COMI.EGX', source_sha256='b'*64)])
+    # canonical_instruments is keyed by instrument_id, so the same instrument
+    # cannot belong to a second provider snapshot; register only the
+    # provider-scoped alias the refresh preflight requires.
+    with db.connect() as con:
+        con.execute(
+            """
+            INSERT INTO instrument_aliases (instrument_id, provider, alias_type,
+                                            alias_value, normalized_value, created_at)
+            VALUES (?, ?, 'EGID_SYMBOL_CODE', 'COMI.EGX', 'COMI.EGX', ?)
+            """,
+            (str(ID), alternate.name, datetime.now(timezone.utc).isoformat()),
+        )
 
     refreshed = refresh_once(
         db,
@@ -519,11 +527,15 @@ def test_launch_symbol_spelling_is_strict(launch, symbol):
 
 def test_new_equity_refresh_blocks_without_provider_mapping(launch):
     db, root, source, directory, _, provider, _ = launch
-    SecurityMasterRepository(db).replace_provider_snapshot(provider='fixture', instruments=[
-        CanonicalInstrument(instrument_id=ID, instrument_type=InstrumentType.EQUITY,
-                            canonical_ticker='FIXTURE', source_provider='fixture',
+    # A distinct new equity in its own snapshot: re-snapshotting 'fixture' would
+    # try to delete COMI, which already has dependent persisted evidence.
+    new_id = UUID(int=2)
+    SecurityMasterRepository(db).replace_provider_snapshot(provider='fixture-new-equity', instruments=[
+        CanonicalInstrument(instrument_id=new_id, instrument_type=InstrumentType.EQUITY,
+                            canonical_ticker='FIXTURE', source_provider='fixture-new-equity',
                             source_symbol_code='fixture-explicit-code', source_sha256='a'*64)])
-    expanded = _decode(SwingLaunchInput, source.model_dump(mode='json') | {'symbol': 'FIXTURE'})
+    expanded = _decode(SwingLaunchInput, source.model_dump(mode='json')
+                       | {'symbol': 'FIXTURE', 'instrument_id': str(new_id)})
     calls_before = len(provider.calls)
     with pytest.raises(LaunchBlocked, match='explicit refresh targets required'):
         refresh_once(db, root, expanded, provider=provider, cost=VerifiedQuotaCost(1, LABEL))

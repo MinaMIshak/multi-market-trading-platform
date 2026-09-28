@@ -189,6 +189,53 @@ def render_market_receipts(market, summary):
     return html + '</tbody></table></div></section>'
 
 
+CHECKPOINT_LABELS = (
+    ('milestone', 'Reported milestone'),
+    ('phase', 'Reported phase'),
+    ('current_capability', 'Reported capability'),
+    ('head', 'Checkpoint source HEAD at cycle start (not the deployed revision)'),
+    ('tests', 'Reported tests'),
+    ('deployment', 'Reported deployment note'),
+    ('scheduler', 'Reported scheduler note'),
+    ('next_action', 'Reported next action'),
+    ('hard_blocker', 'Reported hard blocker'),
+)
+
+
+def render_project_checkpoint(state):
+    """Render approved checkpoint fields; this is reported history, not verification."""
+    def cell(key, value):
+        if isinstance(value, str):
+            return escape(value)
+        if key == 'hard_blocker' and value is None:
+            return 'None reported'
+        return 'UNKNOWN'
+
+    disclaimer = ('<p>Reported history only; not runtime verification, not deployment '
+                  'verification, not scheduler heartbeat evidence and not the deployed revision.</p>')
+    checkpoint = state.get('checkpoint')
+    if not isinstance(checkpoint, dict):
+        return '<section><h2>Project checkpoint: UNAVAILABLE</h2>' + disclaimer + '</section>'
+    html = '<section><h2>Project checkpoint</h2>' + disclaimer
+    html += ('<div class="table-scroll"><table><caption>Reported checkpoint fields</caption><tbody>'
+             + ''.join('<tr><th scope="row">' + escape(label) + '</th><td>'
+                       + cell(key, checkpoint.get(key)) + '</td></tr>'
+                       for key, label in CHECKPOINT_LABELS)
+             + '</tbody></table></div>')
+    blockers = checkpoint.get('capability_blockers')
+    if not isinstance(blockers, dict):
+        html += '<p>Reported capability blockers: UNKNOWN.</p>'
+    elif not blockers:
+        html += '<p>Reported capability blockers: none reported.</p>'
+    else:
+        html += ('<div class="table-scroll"><table><caption>Reported capability blockers</caption><tbody>'
+                 + ''.join('<tr><th scope="row">' + escape(str(key)) + '</th><td>'
+                           + (escape(value) if isinstance(value, str) else 'UNKNOWN') + '</td></tr>'
+                           for key, value in blockers.items())
+                 + '</tbody></table></div>')
+    return html + '</section>'
+
+
 def render_runtime_observation(state):
     """Render approved runtime fields; a heartbeat is poll-loop evidence, not job success."""
     def cell(value):
@@ -225,8 +272,6 @@ def render_runtime_observation(state):
 
 
 def render_system(state):
-    def block(title, value):
-        return '<section><h2>' + escape(title) + '</h2><pre>' + escape(json.dumps(value, indent=2)) + '</pre></section>'
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>System progress</title><style>body{font:16px sans-serif;max-width:1100px;margin:32px auto;padding:20px;'
             'background:#071019;color:#e9f0f5}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#8bd5b0}'
@@ -241,5 +286,5 @@ def render_system(state):
             + render_market_receipts('EGX', state['markets']['EGX'])
             + render_market_receipts('US', state['markets']['US'])
             + render_scan_runs(state['scan_runs'])
-            + block('Project checkpoint — reported history, not runtime verification', state['checkpoint'])
+            + render_project_checkpoint(state)
             + '</body></html>')
