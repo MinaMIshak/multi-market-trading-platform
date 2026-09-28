@@ -124,6 +124,33 @@ def test_nonfinite_market_values_are_rejected(field, value):
         )
 
 
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "adjusted_close"])
+def test_non_positive_field_error_does_not_claim_non_finite(field):
+    # A plain int like close=0 is neither NaN nor Inf; the raised message must
+    # say so precisely, not blame finiteness for an ordinary threshold miss.
+    observation = row()
+    observation[field] = 0
+    provider = FakeEODHD(json.dumps([observation]).encode())
+    with pytest.raises(EODHDResponseError, match=f"non-positive EODHD field: {field}"):
+        provider.fetch_daily_bars(
+            symbol="COMI.EGX",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 9),
+        )
+
+
+def test_negative_volume_error_does_not_claim_non_finite():
+    observation = row()
+    observation["volume"] = -100
+    provider = FakeEODHD(json.dumps([observation]).encode())
+    with pytest.raises(EODHDResponseError, match="negative EODHD volume"):
+        provider.fetch_daily_bars(
+            symbol="COMI.EGX",
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 9, 9),
+        )
+
+
 def test_finite_zero_volume_is_preserved():
     observation = row()
     observation["volume"] = 0

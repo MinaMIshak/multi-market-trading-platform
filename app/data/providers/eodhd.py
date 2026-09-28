@@ -20,6 +20,10 @@ class EODHDResponseError(EODHDProviderError):
     pass
 
 
+def _non_finite(value):
+    return isinstance(value, float) and not math.isfinite(value)
+
+
 _REQUIRED = {
     "date",
     "open",
@@ -128,9 +132,13 @@ class EODHDProvider:
                     raise EODHDResponseError(
                         f"invalid EODHD numeric field: {field}"
                     )
-                if (isinstance(value, float) and not math.isfinite(value)) or value <= 0:
+                if _non_finite(value):
                     raise EODHDResponseError(
-                        f"non-finite or non-positive EODHD field: {field}"
+                        f"non-finite EODHD field: {field}"
+                    )
+                if value <= 0:
+                    raise EODHDResponseError(
+                        f"non-positive EODHD field: {field}"
                     )
 
             volume = row["volume"]
@@ -138,9 +146,13 @@ class EODHDProvider:
                 raise EODHDResponseError(
                     "invalid EODHD volume"
                 )
-            if (isinstance(volume, float) and not math.isfinite(volume)) or volume < 0:
+            if _non_finite(volume):
                 raise EODHDResponseError(
-                    "non-finite or negative EODHD volume"
+                    "non-finite EODHD volume"
+                )
+            if volume < 0:
+                raise EODHDResponseError(
+                    "negative EODHD volume"
                 )
 
             seen.add(market_date)
