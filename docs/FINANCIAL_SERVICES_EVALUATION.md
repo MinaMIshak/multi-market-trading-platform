@@ -41,8 +41,12 @@ Status: **METHODOLOGY_REFERENCE_ONLY** (research layer; execution authority NONE
   note generation are rejected as lookahead. The contract has no order, side,
   quantity, fill or execution fields, and its projection always reports
   `execution_authority: NONE`.
-- No sourced note store is connected yet; RESEARCH reports notes as UNKNOWN
-  rather than generating them.
+- RESEARCH notes are built deterministically by `app/research/receipt_notes.py`
+  from hash-verified EGX operational receipts only (no language model, no
+  trade levels): SOURCE_FACTs locate the PIT audit event and raw daily-data
+  hash, expiry is a DERIVED_METRIC, and fundamentals/disclosures are UNKNOWN.
+  Unverifiable receipts yield UNKNOWN-only notes; with no receipt reader (and
+  for US) notes are UNKNOWN rather than generated.
 
 ## To enable a connector later (manual)
 

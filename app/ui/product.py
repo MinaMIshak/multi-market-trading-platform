@@ -134,8 +134,12 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         'performance': None,
     }
     if section == 'RESEARCH':
-        # No sourced note store is connected; notes stay UNKNOWN rather than generated.
-        state['research'] = {'notes': None, 'financial_services': financial_services_status()}
+        # Notes restate verified EGX receipts only; nothing is generated. US has no reader.
+        notes = None
+        if 'EGX' in selected and egx['available']:
+            from app.research.receipt_notes import receipt_research_notes
+            notes = receipt_research_notes(egx)
+        state['research'] = {'notes': notes, 'financial_services': financial_services_status()}
     return state
 
 
@@ -190,8 +194,29 @@ def render_research(research):
     content += ('</table><p>EGX coverage: ' + escape(status['egx_coverage']) + '. '
                 + escape(status['data_policy']) + '</p>')
     notes = research['notes']
-    content += ('<p>Sourced research notes: UNKNOWN. No sourced note store is connected.</p>'
-                if notes is None else '')
+    if notes is None:
+        return content + '<p>Sourced research notes: UNKNOWN. No verified receipt reader is available.</p>'
+    content += ('<h2>Sourced research notes</h2><p>Restated from verified operational receipts; '
+                'no generated claims, no trade levels, execution authority NONE.</p>')
+    if not notes:
+        content += '<p>No EGX symbols observed by the receipt reader.</p>'
+    for note in notes:
+        content += ('<table><caption>' + escape(note['market']) + ' ' + escape(note['subject'])
+                    + ' (generated ' + escape(note['generated_at']) + ')</caption>'
+                    '<tr><th>Kind</th><th>Statement</th><th>Basis</th></tr>')
+        for row in note['statements']:
+            if row['kind'] == 'SOURCE_FACT':
+                source = row['provenance']
+                basis = (source['source_id'] + ' · ' + source['locator'] + ' · as of '
+                         + source['as_of'] + ' · observed ' + source['observed_at'])
+            elif row['kind'] == 'UNKNOWN':
+                basis = row['reason']
+            else:
+                basis = row.get('method') or row.get('model')
+                basis += ' · from ' + ', '.join(row['inputs'])
+            content += ('<tr><td>' + escape(row['kind']) + '</td><td>' + escape(row['text'])
+                        + '</td><td>' + escape(basis) + '</td></tr>')
+        content += '</table>'
     return content
 
 

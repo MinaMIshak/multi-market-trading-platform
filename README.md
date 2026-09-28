@@ -17,8 +17,10 @@ Open http://127.0.0.1:8000/ . With no environment configured, the UI starts and
 reports unavailable evidence as UNKNOWN; it never fabricates data.
 
 Optional read-only evidence inputs (all absent by default):
-`EGX_DB_PATH`, `EGX_SCHEDULER_HEARTBEAT_PATH`, `EGX_SCAN_HISTORY_PATH`,
-`EGX_SCAN_LEDGER_PATH`, `EGX_SHADOW_DIRECTORY`, `EGX_BUILD_REVISION`.
+`EGX_PAPER_RUNTIME` (absolute directory containing `platform.db`; feeds TODAY,
+LIVE and RESEARCH receipts), `EGX_DB_PATH`, `EGX_SCHEDULER_HEARTBEAT_PATH`,
+`EGX_SCAN_HISTORY_PATH`, `EGX_SCAN_LEDGER_PATH`, `EGX_SHADOW_DIRECTORY`,
+`EGX_BUILD_REVISION`.
 
 Container build (API + OBSERVE-mode scheduler, bound to 127.0.0.1:8000):
 `docker compose up --build`. See `EGX_SCAN_SCHEDULER.md` and
@@ -49,6 +51,8 @@ with `python3 -B -m unittest tests.<module>`.
 
 The research layer is intelligence only. `app/research/intelligence.py` defines
 sourced research notes (fact / derived / interpretation / UNKNOWN with
-provenance and timestamps). The anthropics/financial-services evaluation is in
-`docs/FINANCIAL_SERVICES_EVALUATION.md`: methodology reference only, with
-every connector fail-closed.
+provenance and timestamps); `app/research/receipt_notes.py` builds them
+deterministically from verified EGX receipts (`EGX_PAPER_RUNTIME`). The
+anthropics/financial-services evaluation is in
+`docs/FINANCIAL_SERVICES_EVALUATION.md`: methodology reference only, with every
+connector fail-closed.
