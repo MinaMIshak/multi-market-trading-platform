@@ -14,6 +14,7 @@ from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state
 from app.ui.product import product_state, render_product
 from app.egx_scan_history import load_scan_history
+from app.path_safety import symlinked
 
 
 app = FastAPI(
@@ -68,7 +69,7 @@ def shadow() -> dict:
              "status": "UNAVAILABLE / NO AUDITED COLLECTION"}
     if configured:
         directory = Path(configured)
-        if directory.is_absolute() and not any(p.is_symlink() for p in directory.parents):
+        if directory.is_absolute() and not symlinked(directory):
             state = load_shadow_watchlist(directory, None)
     return {"mode": "EXPERIMENTAL / PAPER ONLY",
             "empirical_validation": "NOT YET VALIDATED",

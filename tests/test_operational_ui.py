@@ -82,6 +82,7 @@ def _rehash_receipt(runtime, mutate):
     (lambda r: r.pop('provider'), True),
     (lambda r: r['trade_plan'].pop('stop_price'), False),
     (lambda r: r.update(trade_plan='not-a-plan'), False),
+    (lambda r: r.update(trade_plan={}), False),
 ])
 def test_incomplete_receipt_renders_unknown_not_partial(launch, monkeypatch, mutation, plan_intact):
     db, root, source, directory, _, _, at = launch

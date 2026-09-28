@@ -7,10 +7,7 @@ import tempfile
 import sqlite3
 
 from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
-
-
-def _symlinked(path):
-    return any(part.is_symlink() for part in (path, *path.parents))
+from app.path_safety import symlinked as _symlinked
 
 
 def write_scan_history(report, path, *, scheduler_attempt=None):

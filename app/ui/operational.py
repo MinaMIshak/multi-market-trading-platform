@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import sqlite3
 
+from app.path_safety import symlinked
+
 
 def load_operational_state():
     configured = os.getenv('EGX_PAPER_RUNTIME')
@@ -18,7 +20,7 @@ def load_operational_state():
     try:
         root = Path(configured)
         path = root / 'platform.db'
-        if not root.is_absolute() or any(p.is_symlink() for p in (path, *path.parents)):
+        if not root.is_absolute() or symlinked(path):
             raise ValueError('isolated absolute runtime required')
         with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as con:
             con.row_factory = sqlite3.Row
@@ -92,7 +94,7 @@ def render_operational(state, *, fragment=False):
             content += '<p>Admitted source: ' + field(item, 'provider') + ' · Fresh at verification: ' + field(item, 'decision_at') + '</p>'
             content += '<p>Operational window: ' + field(item, 'history_start') + ' through ' + field(item, 'last_verified_session') + ' · ' + field(item, 'bar_count') + ' bars. Full immutable source history retained.</p>'
         plan = item.get('trade_plan')
-        if item['status'] == 'WATCH' and plan:
+        if item['status'] == 'WATCH' and plan is not None:
             levels = ('entry_low', 'entry_high', 'stop_price', 'target_1')
             if isinstance(plan, dict) and all(plan.get(key) not in (None, '') for key in levels):
                 content += '<p>Unsized WATCH · Entry band: ' + text(plan['entry_low']) + '–' + text(plan['entry_high']) + ' · Stop: ' + text(plan['stop_price']) + ' · Target: ' + text(plan['target_1']) + '</p>'
