@@ -61,16 +61,22 @@ def load_scan_configuration(path):
     return ScanConfiguration(tuple(raw['symbols']), raw['scope_reference'], sources, source_errors)
 
 
-def universe_scan_configuration(repository, *, scope_reference):
+def universe_scan_configuration(repository, *, scope_reference, launch=None):
     """Derive full-scope symbols from the stored EQUITY security master.
 
     The security master is scope attribution, not authoritative dated
-    membership. No launch evidence is attached here; every symbol scans as
-    EVIDENCE_BLOCKED until real per-symbol evidence is supplied separately.
+    membership. Only an explicit launch configuration may attach per-symbol
+    evidence; every other symbol scans as EVIDENCE_BLOCKED. Launch symbols
+    outside the stored universe fail closed rather than silently widening scope.
     """
     if not isinstance(scope_reference, str) or not scope_reference.strip():
         raise ValueError('nonempty scope reference required')
     tickers = tuple(repository.list_equity_tickers())
     if not tickers or any(not valid_scope_symbol(t) for t in tickers) or len(set(tickers)) != len(tickers):
         raise ValueError('security master returned no usable equity universe')
-    return ScanConfiguration(tickers, scope_reference, {}, {})
+    if launch is None:
+        return ScanConfiguration(tickers, scope_reference, {}, {})
+    if not set(launch.symbols) <= set(tickers):
+        raise ValueError('explicit launch symbols outside security master universe')
+    return ScanConfiguration(tickers, scope_reference, dict(launch.sources),
+                             dict(launch.source_errors))

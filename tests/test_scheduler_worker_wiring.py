@@ -260,11 +260,13 @@ def test_scan_mode_local_calls_dispatch_scan_and_logs_outcome(
     }
 
     def fake_dispatch_scan(
-        *, evaluation, repository, database, data_root, config_path, history_path
+        *, evaluation, repository, database, data_root, config_path, history_path,
+        scope
     ):
         calls.append(dict(
             evaluation=evaluation, repository=repository, database=database,
             data_root=data_root, config_path=config_path, history_path=history_path,
+            scope=scope,
         ))
         return outcome
 
@@ -290,6 +292,8 @@ def test_scan_mode_local_calls_dispatch_scan_and_logs_outcome(
     assert calls[0]["config_path"] == str(scan_config)
     assert calls[0]["history_path"] == str(scan_history)
     assert calls[0]["data_root"] == Path(str(db)).parent
+    assert calls[0]["scope"] == "explicit"
+    assert "scan_scope=explicit" in out
     assert "EGX_SCAN_DISPATCH " + json.dumps(outcome, sort_keys=True) in out
 
 
@@ -343,3 +347,58 @@ def test_scan_mode_unsupported_value_fails_closed(
 
     with pytest.raises(ValueError):
         scheduler_worker.main()
+
+
+def test_scan_scope_security_master_allows_missing_config_path(
+    tmp_path, monkeypatch, capsys
+):
+    prepare(monkeypatch)
+
+    calls = []
+    monkeypatch.setattr(
+        "app.egx_scan_dispatch.dispatch_scan",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_CALENDAR_TRUTH", "UNVERIFIED")
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "platform.db"))
+    monkeypatch.setenv("EGX_SCAN_MODE", "local")
+    monkeypatch.setenv("EGX_SCAN_SCOPE", "security_master")
+    monkeypatch.delenv("EGX_SCAN_CONFIG_PATH", raising=False)
+    monkeypatch.setenv("EGX_SCAN_HISTORY_PATH", str(tmp_path / "history.json"))
+
+    scheduler_worker.main()
+
+    out = capsys.readouterr().out
+
+    assert "scan_scope=security_master" in out
+    assert len(calls) == 1
+    assert calls[0]["scope"] == "security_master"
+    assert calls[0]["config_path"] is None
+
+
+@pytest.mark.parametrize(
+    "scope, config_path, history_path",
+    [
+        ("everything", "/abs/config.json", "/abs/history.json"),
+        ("security_master", "relative/config.json", "/abs/history.json"),
+        ("security_master", "", "relative/history.json"),
+        ("explicit", "", "/abs/history.json"),
+    ],
+)
+def test_scan_scope_invalid_configuration_fails_closed(
+    tmp_path, monkeypatch, scope, config_path, history_path
+):
+    prepare(monkeypatch)
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "platform.db"))
+    monkeypatch.setenv("EGX_SCAN_MODE", "local")
+    monkeypatch.setenv("EGX_SCAN_SCOPE", scope)
+    monkeypatch.setenv("EGX_SCAN_CONFIG_PATH", config_path)
+    monkeypatch.setenv("EGX_SCAN_HISTORY_PATH", history_path)
+
+    with pytest.raises(ValueError):
+        scheduler_worker.main()
+    assert not (tmp_path / "platform.db").exists()

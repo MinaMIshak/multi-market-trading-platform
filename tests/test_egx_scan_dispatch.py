@@ -117,3 +117,62 @@ class ScanDispatchTests(unittest.TestCase):
         self.repo.mark_failed.return_value = False
         with self.assertRaises(RuntimeError):
             self.run_dispatch()
+
+
+class SecurityMasterScopeDispatchTests(ScanDispatchTests):
+    """Opt-in full security-master scope; explicit scope stays the default."""
+
+    def setUp(self):
+        super().setUp()
+        self.master = patch('app.egx_scan_dispatch.SecurityMasterRepository').start()
+        self.universe = patch('app.egx_scan_dispatch.universe_scan_configuration',
+                              return_value=NS(symbols=('A', 'B'), sources={}, source_errors={},
+                                              scope_reference='security-master-equity-universe')).start()
+
+    def run_scope(self, scope, config_path='/tmp/config'):
+        if scope == 'security_master':
+            self.scan.return_value = {'requested': 2, 'scanned': 0}
+        return dispatch_scan(evaluation=self.evaluation, repository=self.repo,
+                             database='db', data_root='/tmp', config_path=config_path,
+                             history_path='/tmp/history', scope=scope)
+
+    def test_default_scope_is_explicit_configuration(self):
+        self.assertTrue(self.run_dispatch()['succeeded'])
+        self.universe.assert_not_called()
+        self.master.assert_not_called()
+
+    def test_security_master_scope_without_config_scans_universe_blocked(self):
+        result = self.run_scope('security_master', config_path=None)
+        self.assertTrue(result['succeeded'])
+        self.assertEqual((result['requested'], result['scanned']), (2, 0))
+        self.config.assert_not_called()
+        self.master.assert_called_once_with('db')
+        self.assertIsNone(self.universe.call_args.kwargs['launch'])
+        self.assertEqual(self.universe.call_args.kwargs['scope_reference'],
+                         'security-master-equity-universe')
+        self.assertEqual(self.scan.call_args.kwargs['symbols'], ('A', 'B'))
+
+    def test_security_master_scope_overlays_explicit_launch_evidence(self):
+        self.run_scope('security_master')
+        self.config.assert_called_once_with('/tmp/config')
+        self.assertIs(self.universe.call_args.kwargs['launch'], self.config.return_value)
+
+    def test_universe_failure_marks_job_failed_with_type_only(self):
+        self.universe.side_effect = ValueError('security master returned no usable equity universe')
+        result = self.run_scope('security_master', config_path=None)
+        self.assertEqual(result, dict(checkpoint='EGX_SCAN_PRIMARY', succeeded=False,
+                                      error='EGX_SCAN_FAILED:ValueError'))
+        self.repo.mark_succeeded.assert_not_called()
+
+    def test_unsupported_scope_fails_before_claim(self):
+        for scope in ('all', '', None, 'SECURITY_MASTER'):
+            with self.subTest(scope=scope):
+                with self.assertRaises(ValueError):
+                    self.run_scope(scope)
+        self.repo.claim_job.assert_not_called()
+        self.scan.assert_not_called()
+
+    def test_explicit_scope_requires_config_path(self):
+        with self.assertRaises(ValueError):
+            self.run_scope('explicit', config_path=None)
+        self.repo.claim_job.assert_not_called()

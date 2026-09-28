@@ -8,6 +8,18 @@ runtime. Data is read from the existing database's parent directory. Compose
 already shares the history path with the API; activation requires explicit
 worker environment configuration. Do not activate until integration validation.
 
+`EGX_SCAN_SCOPE` selects the scan scope (default `explicit`, unchanged: the
+configuration file lists the symbols). `EGX_SCAN_SCOPE=security_master` instead
+requests every distinct EQUITY ticker stored in the database's security master,
+recorded with scope reference `security-master-equity-universe`. The security
+master is scope attribution, not authoritative dated membership. In this scope
+`EGX_SCAN_CONFIG_PATH` is optional and, when set, only contributes per-symbol
+launch inputs; its symbols must all exist in the security master or the attempt
+fails. Symbols without launch evidence are classified EVIDENCE_BLOCKED, never
+scanned. An empty or malformed stored universe fails the attempt with only the
+exception type. Unsupported scope values or relative paths stop the worker
+before database initialization.
+
 The opt-in policy adds 18:30 and 19:00 Africa/Cairo checkpoints, each with a
 15-minute start window and mandatory verified-trading-day truth. The existing
 orchestrator and durable ledger govern claims and stale-job recovery. Only
@@ -31,4 +43,8 @@ when disabled (the default), and calls it with the correct paths/data root
 and logs its outcome when `local`. This is offline plumbing validation only;
 `dispatch_scan` itself is mocked in the worker tests, so no live decoder,
 verifier, provider or deployed-runtime run has been demonstrated. Existing
-five-symbol launch restrictions still apply.
+five-symbol launch restrictions still apply. Security master scope is covered by
+dispatcher unit tests and a real-SQLite integration test (security master,
+scheduler ledger, coordinator and history writer; verifier patched and asserted
+uncalled) showing a stored two-equity universe plus one index classified as two
+EVIDENCE_BLOCKED symbols with zero scanned.

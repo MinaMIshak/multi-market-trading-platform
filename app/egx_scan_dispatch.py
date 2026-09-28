@@ -3,13 +3,32 @@
 Completion means scope classified, never that all symbols are ready. Failed jobs
 are not retried every poll; the separate fallback window permits one retry.
 """
-from app.egx_scan_config import load_scan_configuration
+from app.egx_scan_config import load_scan_configuration, universe_scan_configuration
 from app.egx_scan import scan_egx_scope
 from app.egx_scan_history import write_scan_history, valid_scheduler_attempt
+from app.storage.security_master_repository import SecurityMasterRepository
+
+SCAN_SCOPES = ('explicit', 'security_master')
+UNIVERSE_SCOPE_REFERENCE = 'security-master-equity-universe'
+
+
+def _load_configuration(scope, database, config_path):
+    if scope == 'explicit':
+        return load_scan_configuration(config_path)
+    # Security master scope is attribution, not dated membership evidence; an
+    # optional explicit configuration only contributes per-symbol launch inputs.
+    launch = load_scan_configuration(config_path) if config_path else None
+    return universe_scan_configuration(SecurityMasterRepository(database),
+                                       scope_reference=UNIVERSE_SCOPE_REFERENCE,
+                                       launch=launch)
 
 
 def dispatch_scan(*, evaluation, repository, database, data_root,
-                  config_path, history_path):
+                  config_path, history_path, scope='explicit'):
+    if scope not in SCAN_SCOPES:
+        raise ValueError('unsupported EGX scan scope')
+    if scope == 'explicit' and not config_path:
+        raise ValueError('explicit scan scope requires a configuration path')
     if evaluation.calendar_truth != 'VERIFIED_TRADING_DAY':
         return None
     for window in evaluation.due:
@@ -39,7 +58,7 @@ def dispatch_scan(*, evaluation, repository, database, data_root,
         guarded_key = key | {'expected_attempt': (attempt['attempt_count'], attempt['started_at'])}
         try:
             # Reload each attempt: corrected evidence must not require restart.
-            config = load_scan_configuration(config_path)
+            config = _load_configuration(scope, database, config_path)
             report = scan_egx_scope(
                 symbols=config.symbols, sources=config.sources,
                 source_errors=config.source_errors,

@@ -44,3 +44,42 @@ def test_scan_claim_is_durable_and_calendar_gated(tmp_path):
                              config_path=tmp_path / 'config.json',
                              history_path=tmp_path / 'history.json') is None
         scan.assert_called_once()
+
+
+def test_security_master_scope_classifies_full_universe_without_evidence(tmp_path):
+    """Opt-in universe scope over a real security master and ledger: every
+    stored equity is requested, none is verified without launch evidence."""
+    import json
+    from uuid import uuid4
+    from app.data.security_master import CanonicalInstrument, InstrumentType
+    from app.storage.security_master_repository import SecurityMasterRepository
+
+    database = Database(tmp_path / 'platform.db')
+    database.initialize()
+    SecurityMasterRepository(database).replace_provider_snapshot(provider='fixture', instruments=[
+        CanonicalInstrument(instrument_id=uuid4(), instrument_type=kind, canonical_ticker=ticker,
+                            source_provider='fixture', source_symbol_code=ticker + '.EGX',
+                            source_sha256='a' * 64)
+        for ticker, kind in (('FWRY', InstrumentType.EQUITY), ('COMI', InstrumentType.EQUITY),
+                             ('EGX30', InstrumentType.INDEX))])
+    repository = SchedulerRepository(database)
+    orchestrator = MarketSessionOrchestrator()
+    orchestrator.policy.checkpoints.append(ScheduledCheckpoint(
+        name=CheckpointName.EGX_SCAN_PRIMARY, at=time(18, 30),
+        max_lateness_minutes=15, requires_verified_trading_day=True))
+    now = datetime(2026, 9, 24, 18, 30, tzinfo=ZoneInfo('Africa/Cairo'))
+    evaluation = orchestrator.evaluate(now=now, market_date=now.date(),
+                                       calendar_truth=CalendarTruth.VERIFIED_TRADING_DAY,
+                                       completed_jobs=set())
+    repository.sync_evaluation(evaluation)
+    history = tmp_path / 'history.json'
+    with patch('app.egx_scan._verify') as verify:
+        result = dispatch_scan(evaluation=evaluation, repository=repository,
+                               database=database, data_root=tmp_path, config_path=None,
+                               history_path=history, scope='security_master')
+    verify.assert_not_called()
+    assert result == dict(checkpoint='EGX_SCAN_PRIMARY', succeeded=True, requested=2, scanned=0)
+    written = json.loads(history.read_text())
+    assert written['scope_reference'] == 'security-master-equity-universe'
+    assert [t['symbol'] for t in written['symbols']] == ['COMI', 'FWRY']
+    assert {t['status'] for t in written['symbols']} == {'EVIDENCE_BLOCKED'}

@@ -110,10 +110,18 @@ def main() -> None:
     scan_mode = os.getenv("EGX_SCAN_MODE", "disabled").strip().lower()
     if scan_mode not in {"disabled", "local"}:
         raise ValueError("unsupported EGX scan mode")
+    scan_scope = os.getenv("EGX_SCAN_SCOPE", "explicit").strip().lower()
+    if scan_scope not in {"explicit", "security_master"}:
+        raise ValueError("unsupported EGX scan scope")
     scan_config_path = os.getenv("EGX_SCAN_CONFIG_PATH", "")
     scan_history_path = os.getenv("EGX_SCAN_HISTORY_PATH", "")
     if scan_mode == "local":
-        if not all(Path(p).is_absolute() for p in (scan_config_path, scan_history_path)):
+        # Security master scope may run without explicit launch evidence; every
+        # symbol then remains EVIDENCE_BLOCKED. A supplied path must be absolute.
+        required = [scan_history_path]
+        if scan_scope == "explicit" or scan_config_path:
+            required.append(scan_config_path)
+        if not all(Path(p).is_absolute() for p in required):
             raise ValueError("local scan requires absolute config and history paths")
 
     acquisition_options = worker_acquisition_options(mode.value, os.environ)
@@ -208,6 +216,7 @@ def main() -> None:
         f"calendar_maintenance={calendar_maintenance_mode} "
         f"calendar_live={calendar_live_mode} "
         f"local_scan={scan_mode} "
+        f"scan_scope={scan_scope} "
         "execution_enabled="
         f"{'yes' if execution_context.execution_enabled else 'no'}",
         flush=True,
@@ -375,7 +384,8 @@ def main() -> None:
             scan_outcome = dispatch_scan(
                 evaluation=evaluation, repository=repository, database=database,
                 data_root=Path(db_path).parent,
-                config_path=scan_config_path, history_path=scan_history_path)
+                config_path=scan_config_path or None, history_path=scan_history_path,
+                scope=scan_scope)
             if scan_outcome is not None:
                 print("EGX_SCAN_DISPATCH " + json.dumps(scan_outcome, sort_keys=True),
                       flush=True)

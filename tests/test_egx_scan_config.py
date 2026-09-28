@@ -126,3 +126,26 @@ class UniverseScanConfigurationTests(unittest.TestCase):
             with self.subTest(tickers=tickers):
                 with self.assertRaises(ValueError):
                     universe_scan_configuration(self.repository(tickers), scope_reference='fixture')
+
+    def test_explicit_launch_evidence_overlays_universe_scope(self):
+        source = SimpleNamespace(symbol='COMI')
+        launch = SimpleNamespace(symbols=('COMI', 'FWRY'), sources={'COMI': source},
+                                 source_errors={'FWRY': 'INVALID_LAUNCH_EVIDENCE'})
+        config = universe_scan_configuration(self.repository(('COMI', 'ETEL', 'FWRY')),
+                                             scope_reference='fixture', launch=launch)
+        self.assertEqual(config.symbols, ('COMI', 'ETEL', 'FWRY'))
+        self.assertEqual(config.sources, {'COMI': source})
+        self.assertEqual(config.source_errors, {'FWRY': 'INVALID_LAUNCH_EVIDENCE'})
+
+    def test_launch_evidence_outside_security_master_fails_closed(self):
+        launch = SimpleNamespace(symbols=('COMI', 'ZZZZ'), sources={}, source_errors={})
+        with self.assertRaises(ValueError):
+            universe_scan_configuration(self.repository(('COMI',)),
+                                        scope_reference='fixture', launch=launch)
+
+    def test_overlay_does_not_share_mutable_launch_mappings(self):
+        launch = SimpleNamespace(symbols=('COMI',), sources={}, source_errors={'COMI': 'INVALID_LAUNCH_EVIDENCE'})
+        config = universe_scan_configuration(self.repository(('COMI',)),
+                                             scope_reference='fixture', launch=launch)
+        config.source_errors.clear()
+        self.assertEqual(launch.source_errors, {'COMI': 'INVALID_LAUNCH_EVIDENCE'})
