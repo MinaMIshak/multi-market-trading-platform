@@ -22,7 +22,7 @@ class SystemVisibilityTests(unittest.TestCase):
                  (['READY_NO_SIGNAL', 'NOT_READY'], 'PARTIAL', 1),
                  (['WATCH', 'READY_NO_SIGNAL'], 'OPERATIONAL', 2)]
         now = datetime.now(timezone.utc)
-        for statuses, expected, scanned in cases:
+        for statuses, expected, verified in cases:
             with self.subTest(statuses=statuses), tempfile.TemporaryDirectory() as directory:
                 path = Path(directory) / 'platform.db'
                 with sqlite3.connect(path) as db:
@@ -47,7 +47,10 @@ class SystemVisibilityTests(unittest.TestCase):
                 with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
                     state = load_system_state()
                 self.assertEqual(state['markets']['EGX']['status'], expected)
-                self.assertEqual(state['markets']['EGX']['scanned'], scanned)
+                self.assertIsNone(state['markets']['EGX']['scanned'])
+                self.assertEqual(state['markets']['EGX']['observed_symbols'], len(statuses))
+                counts = state['markets']['EGX']['status_counts']
+                self.assertEqual(counts['WATCH'] + counts['READY_NO_SIGNAL'], verified)
                 self.assertEqual(before, path.read_bytes())
 
     def test_invalid_receipt_isolated_without_hiding_verified_symbols(self):
@@ -90,12 +93,12 @@ class SystemVisibilityTests(unittest.TestCase):
                 egx = state['markets']['EGX']
                 self.assertEqual(egx['status'], 'PARTIAL')
                 self.assertEqual((egx['scanned'], egx['ready_no_signal'], egx['evidence_blocked']),
-                                 (1, 1, 1))
+                                 (None, 1, 1))
                 self.assertEqual(len(egx['receipts']), 2)
                 self.assertEqual(egx['receipts'][0]['reason'], 'invalid verification receipt')
                 self.assertEqual(before, path.read_bytes())
                 # With no valid neighbor, preserve the blocked symbol and report
-                # zero verified scans, not unknown database availability.
+                # blocked receipt counts while scan coverage remains unknown.
                 with sqlite3.connect(path) as db:
                     db.execute("DELETE FROM daily_canonical_artifacts WHERE canonical_symbol='GOOD'")
                 with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
@@ -103,7 +106,7 @@ class SystemVisibilityTests(unittest.TestCase):
                     from app.ui.operational import load_operational_state, render_operational
                     operational = load_operational_state()
                 self.assertEqual(state['markets']['EGX']['status'], 'EVIDENCE_BLOCKED')
-                self.assertEqual(state['markets']['EGX']['scanned'], 0)
+                self.assertIsNone(state['markets']['EGX']['scanned'])
                 self.assertEqual(state['markets']['EGX']['evidence_blocked'], 1)
                 self.assertIsNone(operational['symbols'][0]['trade_plan'])
                 self.assertIn('invalid verification receipt', render_operational(operational))
@@ -168,7 +171,7 @@ class SystemVisibilityTests(unittest.TestCase):
             with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory}, clear=True):
                 state = load_system_state()
             egx = state['markets']['EGX']
-            self.assertEqual((egx['scanned'], egx['watch'], egx['data_stale'], egx['not_ready']), (1, 1, 1, 1))
+            self.assertEqual((egx['scanned'], egx['watch'], egx['data_stale'], egx['not_ready']), (None, 1, 1, 1))
             self.assertEqual(egx['baseline_universe'], 224)
             self.assertIsNone(egx['authoritative_universe'])
             self.assertEqual(before, path.read_bytes())
@@ -195,6 +198,8 @@ class SystemVisibilityTests(unittest.TestCase):
                    dict(provider='second', status='EVIDENCE_BLOCKED')]
         symbols.extend(dict(provider=value, status='NOT_READY')
                        for value in (None, '', ' ', {}, []))
+        for index, item in enumerate(symbols):
+            item['symbol'] = 'FIXTURE' + str(index)
         result = provider_receipt_summary({'available': True, 'symbols': symbols})
         self.assertEqual(result['unattributed_symbols'], 5)
         first, second = result['sources']
@@ -218,3 +223,40 @@ class SystemVisibilityTests(unittest.TestCase):
                 self.assertEqual(state['markets']['EGX']['status'], 'EVIDENCE_BLOCKED')
                 self.assertIsNone(state['markets']['EGX']['scanned'])
                 self.assertFalse((Path(directory) / 'platform.db').exists())
+
+    def test_system_receipt_projection_matches_product_without_coverage_inference(self):
+        from copy import deepcopy
+        from app.ui.product import product_state
+        base = dict(market='EGX', provider='fixture', status='WATCH')
+        cases = [[],
+                 [base | {'symbol': str(i), 'status': status} for i, status in enumerate(
+                     ('WATCH', 'READY_NO_SIGNAL', 'NOT_READY', 'DATA_STALE', 'EVIDENCE_BLOCKED', 'unexpected'))],
+                 [base | {'symbol': 'DUP'}, base | {'symbol': 'DUP', 'status': 'NOT_READY'}],
+                 [base | {'symbol': 'DUP'}, base | {'symbol': 'DUP', 'provider': 'other'}],
+                 [base | {'symbol': None}],
+                 [base | {'symbol': 'US_ONLY', 'market': 'US'}]]
+        for available in (True, False):
+            for rows in cases:
+                with self.subTest(available=available, rows=rows):
+                    operational = dict(configured=True, available=available, status='PARTIAL', symbols=rows)
+                    before = deepcopy(operational)
+                    with patch('app.ui.system.load_operational_state', return_value=operational), \
+                            patch('app.ui.system.load_scan_history', return_value=None), \
+                            patch.dict('os.environ', {}, clear=True):
+                        state = load_system_state()
+                    expected = product_state(operational)['coverage']['EGX']
+                    egx = state['markets']['EGX']
+                    for key in ('observed_symbols', 'status_counts', 'scope'):
+                        self.assertEqual(egx[key], expected[key])
+                    for key in ('data_ready', 'eligible', 'scanned'):
+                        self.assertIsNone(egx[key])
+                    for status, count in (expected['status_counts'] or {}).items():
+                        self.assertEqual(egx[status.lower()], count)
+                    self.assertIsNone(state['markets']['US']['observed_symbols'])
+                    if available and rows and rows[0].get('symbol') == 'DUP':
+                        self.assertEqual(egx['evidence_blocked'], 1)
+                        self.assertEqual(egx['watch'], 0)
+                        self.assertEqual(state['providers']['sources'], [])
+                        self.assertEqual(state['providers']['receipt_observation'], 'UNAVAILABLE')
+                    self.assertEqual(before, operational)
+                    self.assertIn('receipt classifications only', render_system(state))

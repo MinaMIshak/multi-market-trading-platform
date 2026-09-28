@@ -310,3 +310,80 @@ class AttemptContracts(unittest.TestCase):
                 self.assertEqual(evidence['observed_at'], history['observed_at'])
                 self.assertGreaterEqual(datetime.fromisoformat(evidence['observed_at']),
                     datetime.fromisoformat(state['scan_runs']['EGX']['scheduler_completion']['finished_at']))
+
+    def system_state(self, history):
+        from app.ui.system import load_system_state
+        with patch('app.ui.system.CHECKPOINT', self.root / 'absent-checkpoint.json'), \
+                patch('app.ui.system.load_scan_history', return_value=history), \
+                patch.dict('os.environ', {}, clear=True):
+            return load_system_state()
+
+    def test_system_shares_completion_projection_and_preserves_storage(self):
+        from app.ui.system import render_system
+        from app.ui.product import scan_run_state
+        for reconciled in (False, True):
+            with self.subTest(reconciled=reconciled):
+                with self.db.connect() as conn:
+                    conn.execute("UPDATE scheduled_jobs SET status='PENDING'")
+                if reconciled:
+                    self.running_history()
+                else:
+                    self.dispatch()
+                before = {p.name: p.read_bytes() for p in self.root.iterdir()}
+                with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(self.root / 'ledger.sqlite')}):
+                    history = load_scan_history()
+                original = deepcopy(history)
+                state = self.system_state(history)
+                result = state['scan_runs']['EGX']
+                self.assertEqual(result, scan_run_state(history))
+                evidence = result['completion_evidence']
+                self.assertEqual(evidence['origin'], 'READ_ONLY_LEDGER' if reconciled else 'RECORDED_HISTORY')
+                body = render_system(state)
+                self.assertIn('Observed at: ' + evidence['observed_at'], body)
+                self.assertIn('Ledger-reconciled SUCCEEDED' if reconciled else 'Recorded SUCCEEDED', body)
+                self.assertIn('Historical observation only; current worker health UNKNOWN', body)
+                self.assertEqual(state['scheduler']['status'], 'UNKNOWN')
+                self.assertIsNone(state['markets']['EGX']['scanned'])
+                self.assertIsNone(state['markets']['US']['scanned'])
+                self.assertIsNone(state['scan_runs']['US']['scheduler_completion'])
+                result['run']['symbols'][0]['status'] = 'WATCH'
+                self.assertEqual(history, original)
+                self.assertEqual(before, {p.name: p.read_bytes() for p in self.root.iterdir()})
+
+    def test_system_suppresses_invalid_completion_and_escapes_scope(self):
+        from app.ui.system import render_system
+        self.running_history()
+        with patch.dict('os.environ', {'EGX_SCAN_LEDGER_PATH': str(self.root / 'ledger.sqlite')}):
+            history = load_scan_history()
+        for change in ({'observed_at': None}, {'observed_at': '2999-01-01T00:00:00+00:00'},
+                       {'observed_at': '2000-01-01T00:00:00+00:00'},
+                       {'observed_at': '2026-09-24T10:00:00'},
+                       {'reconciled_scheduler_completion': history['reconciled_scheduler_completion'] | {'attempt_count': 99}}):
+            with self.subTest(change=change):
+                state = self.system_state(history | change)
+                self.assertIsNotNone(state['scan_runs']['EGX']['run'])
+                self.assertIsNone(state['scan_runs']['EGX']['scheduler_completion'])
+                self.assertIsNone(state['scan_runs']['EGX']['completion_evidence'])
+                self.assertIn('Scheduler completion: UNKNOWN', render_system(state))
+                self.assertNotIn('SUCCEEDED', render_system(state))
+        history['run']['scope_reference'] = '<script>fixture</script>'
+        body = render_system(self.system_state(history))
+        self.assertNotIn('<script>', body)
+        self.assertIn('&lt;script&gt;fixture&lt;/script&gt;', body)
+
+    def test_system_legacy_and_unavailable_history_never_imply_completion(self):
+        from app.ui.system import render_system
+        self.dispatch()
+        history = load_scan_history()
+        legacy = deepcopy(history)
+        legacy['run']['schema_version'] = 2
+        del legacy['run']['scheduler_attempt']
+        state = self.system_state(legacy)
+        self.assertIsNotNone(state['scan_runs']['EGX']['run'])
+        self.assertIsNone(state['scan_runs']['EGX']['scheduler_completion'])
+        self.assertIn('Scheduler completion: UNKNOWN', render_system(state))
+        for invalid in (None, {}, {'status': 'UNKNOWN'}, history | {'run': {}}):
+            state = self.system_state(invalid)
+            self.assertIsNone(state['scan_runs']['EGX']['run'])
+            self.assertIn('EGX scan history: UNKNOWN', render_system(state))
+            self.assertNotIn('SUCCEEDED', render_system(state))

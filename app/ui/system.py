@@ -8,6 +8,7 @@ from pathlib import Path
 from app.ui.operational import load_operational_state
 from app.scheduler_heartbeat import load_heartbeat
 from app.egx_scan_history import load_scan_history
+from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -17,7 +18,10 @@ def provider_receipt_summary(operational):
     """Group admitted receipt states; receipt freshness is not provider uptime."""
     groups = {}
     unattributed = 0
-    if operational['available']:
+    summary = observed_receipt_summary(operational)
+    admitted = (summary['observed_symbols'] is not None
+                and len(operational['symbols']) == summary['observed_symbols'])
+    if admitted:
         for item in operational['symbols']:
             provider = item.get('provider')
             if not isinstance(provider, str) or not provider.strip():
@@ -28,7 +32,7 @@ def provider_receipt_summary(operational):
                 'current_verified_symbols': 0, 'stale_receipt_symbols': 0,
                 'other_symbols': 0,
             })
-            status = item['status']
+            status = item.get('status')
             key = ('current_verified_symbols' if status in ('WATCH', 'READY_NO_SIGNAL')
                    else 'stale_receipt_symbols' if status == 'DATA_STALE'
                    else 'other_symbols')
@@ -37,8 +41,8 @@ def provider_receipt_summary(operational):
         'status': 'UNKNOWN',
         'reason': 'No live provider health probe connected; receipt counts do not establish availability or source rights',
         'receipt_scope': 'Distinct symbols in configured EGX isolated runtime only; no US provider observation',
-        'receipt_observation': 'AVAILABLE' if operational['available'] else 'UNAVAILABLE',
-        'unattributed_symbols': unattributed if operational['available'] else None,
+        'receipt_observation': 'AVAILABLE' if admitted else 'UNAVAILABLE',
+        'unattributed_symbols': unattributed if admitted else None,
         'sources': [groups[key] for key in sorted(groups)],
     }
 
@@ -55,19 +59,15 @@ def load_system_state():
     except (OSError, ValueError):
         pass
     operational = load_operational_state()
+    history = load_scan_history()
     observed = datetime.now(timezone.utc).isoformat()
-    counts = dict.fromkeys(('data_ready', 'eligible', 'scanned', 'watch',
-                            'ready_no_signal', 'not_ready', 'data_stale', 'evidence_blocked'))
-    if operational['available']:
-        symbols = operational['symbols']
-        counts = {key: 0 for key in counts}
-        for item in symbols:
-            status = item['status']
-            if status.lower() in counts:
-                counts[status.lower()] += 1
-            if status in ('WATCH', 'READY_NO_SIGNAL'):
-                for key in ('data_ready', 'eligible', 'scanned'):
-                    counts[key] += 1
+    product = product_state(operational, scan_history=history)
+    egx = product['markets']['EGX']
+    summary = product['coverage']['EGX']
+    # Preserve legacy field names, but coverage requires independent evidence.
+    counts = dict.fromkeys(('data_ready', 'eligible', 'scanned'))
+    counts.update({status.lower(): value for status, value in
+                   (summary['status_counts'] or dict.fromkeys(RECEIPT_STATUSES)).items()})
     return {
         'observed_at': observed, 'live_money': False,
         'api': {'status': 'RESPONDING'},
@@ -76,20 +76,24 @@ def load_system_state():
         'checkpoint': checkpoint,
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': load_heartbeat(),
-        'egx_scan_history': load_scan_history(),
+        'egx_scan_history': history,
+        'scan_runs': product['scan_runs'],
         'markets': {
             'EGX': {'baseline_universe': 224, 'authoritative_universe': None,
-                    'status': operational['status'], **counts,
+                    'status': egx['status'], **counts,
+                    'observed_symbols': summary['observed_symbols'],
+                    'status_counts': summary['status_counts'],
                     'observed_at': observed,
-                    'scope': 'Distinct symbols in configured isolated runtime only; not full-universe coverage',
-                    'source': 'load_operational_state: current verified receipts; expired receipts excluded from ready/eligible/scanned',
+                    'scope': summary['scope'],
+                    'source': 'load_operational_state: receipt classifications only; data_ready/eligible/scanned require independent evidence',
                     'receipts': [{key: item.get(key) for key in (
                         'symbol', 'status', 'provider', 'decision_at', 'valid_until',
-                        'last_verified_session', 'reason')} for item in operational['symbols']]},
+                        'last_verified_session', 'reason')} for item in egx['symbols']]},
             'US': {'configured_universe': None, 'data_ready': None, 'eligible': None,
                    'scanned': None, 'candidates': None, 'status': 'UNKNOWN',
+                   'observed_symbols': None, 'status_counts': None,
                    'reason': 'No configured operational universe connected'}},
-        'providers': provider_receipt_summary(operational),
+        'providers': provider_receipt_summary(egx),
     }
 
 
@@ -105,6 +109,6 @@ def render_system(state):
             + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler', 'providers')})
             + block('EGX — isolated receipt scope', state['markets']['EGX'])
             + block('US', state['markets']['US'])
-            + block('EGX last completed scan — historical scope only', state['egx_scan_history'])
+            + render_scan_runs(state['scan_runs'])
             + block('Project checkpoint — reported history, not runtime verification', state['checkpoint'])
             + '</body></html>')

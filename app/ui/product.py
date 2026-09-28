@@ -95,6 +95,37 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     }
 
 
+def render_scan_runs(scan_runs):
+    """Display validated historical completion separately from worker health."""
+    content = ''
+    for key, history in scan_runs.items():
+        content += f'<h2>{key} scan history: {history["status"]}</h2>'
+        run = history['run']
+        if run is None:
+            continue
+        completion = history['scheduler_completion']
+        evidence = history['completion_evidence']
+        prefix = ('Recorded SUCCEEDED' if evidence and evidence['origin'] == 'RECORDED_HISTORY'
+                  else 'Ledger-reconciled SUCCEEDED')
+        label = (prefix + ' · ' + completion['market_date'] + ' · '
+                 + completion['checkpoint'] + ' · attempt ' + str(completion['attempt_count'])
+                 if completion else 'UNKNOWN')
+        content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
+                    'Scheduler completion: ' + escape(label) + '.</p><p>Completed at: '
+                    + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
+                    + f' · Requested: {run["requested"]} · Verified scans: {run["scanned"]}</p>')
+        if evidence:
+            content += ('<p>Completion evidence: ' + escape(evidence['origin'])
+                        + ' · Observed at: ' + escape(evidence['observed_at'])
+                        + '. Historical observation only; current worker health UNKNOWN.</p>')
+        content += '<table><caption>Historical per-target outcomes</caption><tr><th>Symbol</th><th>Status</th><th>Scanned</th></tr>'
+        for row in run['symbols']:
+            content += (f'<tr><td>{escape(row["symbol"])}</td><td>{escape(row["status"])}</td>'
+                        f'<td>{row["scanned"]}</td></tr>')
+        content += '</table>'
+    return content
+
+
 def render_product(state):
     market, section = state['market'], state['section']
     def link(label, selected_market, selected_section):
@@ -132,31 +163,7 @@ def render_product(state):
         }
         content += '<p>' + messages[section] + '</p>'
     if section == 'LIVE':
-        for key, history in state['scan_runs'].items():
-            content += f'<h2>{key} scan history: {history["status"]}</h2>'
-            run = history['run']
-            if run is None:
-                continue
-            completion = history['scheduler_completion']
-            evidence = history['completion_evidence']
-            prefix = ('Recorded SUCCEEDED' if evidence and evidence['origin'] == 'RECORDED_HISTORY'
-                      else 'Ledger-reconciled SUCCEEDED')
-            label = (prefix + ' · ' + completion['market_date'] + ' · '
-                     + completion['checkpoint'] + ' · attempt ' + str(completion['attempt_count'])
-                     if completion else 'UNKNOWN')
-            content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
-                        'Scheduler completion: ' + escape(label) + '.</p><p>Completed at: '
-                        + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
-                        + f' · Requested: {run["requested"]} · Verified scans: {run["scanned"]}</p>')
-            if evidence:
-                content += ('<p>Completion evidence: ' + escape(evidence['origin'])
-                            + ' · Observed at: ' + escape(evidence['observed_at'])
-                            + '. Historical observation only; current worker health UNKNOWN.</p>')
-            content += '<table><caption>Historical per-target outcomes</caption><tr><th>Symbol</th><th>Status</th><th>Scanned</th></tr>'
-            for row in run['symbols']:
-                content += (f'<tr><td>{escape(row["symbol"])}</td><td>{escape(row["status"])}</td>'
-                            f'<td>{row["scanned"]}</td></tr>')
-            content += '</table>'
+        content += render_scan_runs(state['scan_runs'])
     content += ('<footer><a href="/system">SYSTEM details</a> · '
                 '<a href="/shadow">Audited collection</a> · '
                 '<a href="/performance">Performance evidence</a></footer>')
