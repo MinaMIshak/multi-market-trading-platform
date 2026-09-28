@@ -108,3 +108,42 @@ class ReceiptObservationContracts(unittest.TestCase):
             self.assertEqual(before, path.read_bytes())
             with patch.dict('os.environ', {'EGX_PAPER_RUNTIME': directory + '/missing'}, clear=True):
                 self.assertIsNone(load_operational_state()['observed_at'])
+
+    def test_provider_attribution_requires_unambiguous_reader_evidence(self):
+        from app.ui.system import provider_receipt_summary
+        source = self.source()
+        source['symbols'][0]['provider'] = 'fixture'
+        for change in ({'observed_at': None}, {'observed_at': '2026-01-02'},
+                       {'observed_at': '2999-01-01T00:00:00+00:00'},
+                       {'available': False}, {'symbols': source['symbols'] * 2},
+                       {'symbols': [source['symbols'][0] | {'symbol': None}]}):
+            with self.subTest(change=change):
+                invalid = source | change
+                before = deepcopy(invalid)
+                result = provider_receipt_summary(invalid)
+                self.assertEqual(result['receipt_observation'], 'UNAVAILABLE')
+                self.assertIsNone(result['observation_evidence'])
+                self.assertIsNone(result['unattributed_symbols'])
+                self.assertEqual(result['sources'], [])
+                self.assertEqual(invalid, before)
+
+    def test_provider_counts_are_bound_to_classification_window(self):
+        from app.ui.system import provider_receipt_summary
+        for status, expiry, expected in (
+                ('WATCH', '2026-01-03T00:00:00+00:00', (1, 0, 0)),
+                ('WATCH', NOW.isoformat(), (0, 0, 1)),
+                ('DATA_STALE', NOW.isoformat(), (0, 1, 0)),
+                ('DATA_STALE', '2026-01-03T00:00:00+00:00', (0, 0, 1)),
+                ('unexpected', NOW.isoformat(), (0, 0, 1))):
+            source = self.source()
+            source['symbols'][0].update(provider='fixture', status=status, valid_until=expiry)
+            before = deepcopy(source)
+            result = provider_receipt_summary(source)
+            group = result['sources'][0]
+            self.assertEqual(tuple(group[k] for k in ('verified_symbols_at_observation',
+                             'stale_receipt_symbols', 'other_symbols')), expected)
+            self.assertEqual(group['current_verified_symbols'], expected[0])
+            self.assertEqual(group['observed_at'], NOW.isoformat())
+            self.assertEqual(result['observation_evidence'], self.evidence(source))
+            self.assertEqual(group['health'], 'UNKNOWN')
+            self.assertEqual(source, before)

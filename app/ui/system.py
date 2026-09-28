@@ -19,9 +19,12 @@ def provider_receipt_summary(operational):
     groups = {}
     unattributed = 0
     summary = observed_receipt_summary(operational)
-    admitted = (summary['observed_symbols'] is not None
+    evidence = summary['observation_evidence']
+    admitted = (evidence is not None and summary['observed_symbols'] is not None
                 and len(operational['symbols']) == summary['observed_symbols'])
     if admitted:
+        windows = {row['symbol']: row['verification_window']
+                   for row in evidence['receipt_windows']}
         for item in operational['symbols']:
             provider = item.get('provider')
             if not isinstance(provider, str) or not provider.strip():
@@ -29,18 +32,26 @@ def provider_receipt_summary(operational):
                 continue
             group = groups.setdefault(provider, {
                 'market': 'EGX', 'provider': provider, 'health': 'UNKNOWN',
-                'current_verified_symbols': 0, 'stale_receipt_symbols': 0,
+                'observed_at': evidence['observed_at'],
+                'verified_symbols_at_observation': 0, 'stale_receipt_symbols': 0,
                 'other_symbols': 0,
             })
             status = item.get('status')
-            key = ('current_verified_symbols' if status in ('WATCH', 'READY_NO_SIGNAL')
-                   else 'stale_receipt_symbols' if status == 'DATA_STALE'
+            window = windows[item['symbol']]
+            key = ('verified_symbols_at_observation'
+                   if window and status in ('WATCH', 'READY_NO_SIGNAL')
+                   else 'stale_receipt_symbols' if window and status == 'DATA_STALE'
                    else 'other_symbols')
             group[key] += 1
+        for group in groups.values():
+            # Compatibility alias: this is historical classification, not health.
+            group['current_verified_symbols'] = group['verified_symbols_at_observation']
     return {
         'status': 'UNKNOWN',
         'reason': 'No live provider health probe connected; receipt counts do not establish availability or source rights',
         'receipt_scope': 'Distinct symbols in configured EGX isolated runtime only; no US provider observation',
+        'count_semantics': 'Receipt classifications at reader observation time; not current provider health or coverage',
+        'observation_evidence': evidence if admitted else None,
         'receipt_observation': 'AVAILABLE' if admitted else 'UNAVAILABLE',
         'unattributed_symbols': unattributed if admitted else None,
         'sources': [groups[key] for key in sorted(groups)],

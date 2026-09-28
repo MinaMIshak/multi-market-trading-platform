@@ -182,6 +182,8 @@ class SystemVisibilityTests(unittest.TestCase):
             self.assertEqual(providers['sources'], [{
                 'market': 'EGX', 'provider': '<script>fixture</script>',
                 'health': 'UNKNOWN', 'current_verified_symbols': 1,
+                'verified_symbols_at_observation': 1,
+                'observed_at': egx['observed_at'],
                 'stale_receipt_symbols': 1, 'other_symbols': 0,
             }])
             html = render_system(state)
@@ -200,14 +202,17 @@ class SystemVisibilityTests(unittest.TestCase):
                        for value in (None, '', ' ', {}, []))
         for index, item in enumerate(symbols):
             item['symbol'] = 'FIXTURE' + str(index)
-        result = provider_receipt_summary({'available': True, 'symbols': symbols})
+            item['decision_at'] = '2025-01-01T00:00:00+00:00'
+            item['valid_until'] = ('2025-01-02T00:00:00+00:00' if item['status'] == 'DATA_STALE'
+                                   else '2027-01-01T00:00:00+00:00')
+        result = provider_receipt_summary({'available': True, 'observed_at': '2026-01-01T00:00:00+00:00', 'symbols': symbols})
         self.assertEqual(result['unattributed_symbols'], 5)
         first, second = result['sources']
         self.assertEqual((first['provider'], second['provider']), ('first', 'second'))
         self.assertEqual((first['current_verified_symbols'], first['stale_receipt_symbols']), (1, 1))
         self.assertEqual((second['current_verified_symbols'], second['other_symbols']), (1, 1))
         self.assertTrue(all(source['health'] == 'UNKNOWN' for source in result['sources']))
-        empty = provider_receipt_summary({'available': True, 'symbols': []})
+        empty = provider_receipt_summary({'available': True, 'observed_at': '2026-01-01T00:00:00+00:00', 'symbols': []})
         self.assertEqual(empty['unattributed_symbols'], 0)
         self.assertEqual(empty['receipt_observation'], 'AVAILABLE')
         self.assertEqual(empty['status'], 'UNKNOWN')
