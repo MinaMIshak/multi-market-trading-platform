@@ -139,6 +139,56 @@ def render_provider_receipts(providers):
     return html + '</tbody></table></div></section>'
 
 
+def render_market_receipts(market, summary):
+    """Present scoped receipt classifications without inferring market coverage."""
+    def cell(value):
+        return escape(str(value)) if value is not None else 'UNKNOWN'
+
+    html = ('<section id="market-' + cell(market) + '"><h2>' + cell(market)
+            + ' receipt observations</h2><p>Receipt status: ' + cell(summary['status'])
+            + '</p><p>Scope: ' + cell(summary.get('scope'))
+            + '</p><p>Historical receipt classifications only; not source freshness or current coverage.</p>')
+    if market == 'EGX':
+        html += ('<p>Baseline universe target: ' + cell(summary['baseline_universe'])
+                 + '. Authoritative universe: ' + cell(summary['authoritative_universe']) + '.</p>')
+    else:
+        html += '<p>Configured universe: ' + cell(summary.get('configured_universe')) + '.</p>'
+    html += '<p>Data-ready / eligible / scanned / candidates: UNKNOWN.</p>'
+    evidence = summary.get('observation_evidence')
+    html += ('<p>Reader observed at: ' + cell(evidence['observed_at'] if evidence else None)
+             + '</p><p>Distinct observed symbols: ' + cell(summary['observed_symbols']) + '</p>')
+    counts = summary['status_counts']
+    if counts is None:
+        return html + '<p>Receipt counts and details: UNKNOWN.</p></section>'
+    html += ('<div class="table-scroll"><table><caption>Observed receipt status counts</caption>'
+             '<thead><tr><th scope="col">Receipt status</th><th scope="col">Symbols</th></tr></thead><tbody>')
+    for status in RECEIPT_STATUSES:
+        html += '<tr><th scope="row">' + cell(status) + '</th><td>' + cell(counts[status]) + '</td></tr>'
+    html += '</tbody></table></div>'
+    if summary['observed_symbols'] == 0:
+        return html + '<p>Receipt details: 0 observed symbols.</p></section>'
+    windows = {row['symbol']: row['verification_window'] for row in evidence['receipt_windows']} if evidence else {}
+    grouped = {}
+    for row in summary.get('receipts', []):
+        grouped.setdefault(row['symbol'], []).append(row)
+    html += ('<div class="table-scroll"><table><caption>Historical receipt details; '
+             'verification windows have expiry exclusive. Expired bounds do not imply current validity.</caption>'
+             '<thead><tr>' + ''.join('<th scope="col">' + title + '</th>' for title in (
+                 'Symbol', 'Receipt status', 'Provider', 'Decision at', 'Valid until',
+                 'Last verified session', 'Reason')) + '</tr></thead><tbody>')
+    for symbol, rows in grouped.items():
+        row = rows[0]
+        if len(rows) > 1:
+            values = (symbol, 'EVIDENCE_BLOCKED', None, None, None, None, 'Ambiguous duplicate receipt identity')
+        else:
+            bounds = windows.get(symbol) or {}
+            status = row['status'] if row['status'] in RECEIPT_STATUSES else 'UNKNOWN'
+            values = (symbol, status, row.get('provider'), bounds.get('decision_at'),
+                      bounds.get('valid_until'), row.get('last_verified_session'), row.get('reason'))
+        html += '<tr>' + ''.join('<td>' + cell(value) + '</td>' for value in values) + '</tr>'
+    return html + '</tbody></table></div></section>'
+
+
 def render_system(state):
     def block(title, value):
         return '<section><h2>' + escape(title) + '</h2><pre>' + escape(json.dumps(value, indent=2)) + '</pre></section>'
@@ -150,11 +200,11 @@ def render_system(state):
             'caption{text-align:left;margin-bottom:12px}</style>'
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
-            '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as null.</p>'
+            '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler')})
             + render_provider_receipts(state['providers'])
-            + block('EGX — isolated receipt scope', state['markets']['EGX'])
-            + block('US', state['markets']['US'])
+            + render_market_receipts('EGX', state['markets']['EGX'])
+            + render_market_receipts('US', state['markets']['US'])
             + render_scan_runs(state['scan_runs'])
             + block('Project checkpoint — reported history, not runtime verification', state['checkpoint'])
             + '</body></html>')

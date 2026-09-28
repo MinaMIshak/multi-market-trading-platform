@@ -322,3 +322,62 @@ class SystemVisibilityTests(unittest.TestCase):
                         self.assertEqual(state['providers']['receipt_observation'], 'UNAVAILABLE')
                     self.assertEqual(before, operational)
                     self.assertIn('receipt classifications only', render_system(state))
+
+    def test_market_tables_preserve_unknown_empty_and_market_separation(self):
+        from copy import deepcopy
+        from app.ui.system import render_market_receipts
+        base = dict(configured=True, available=True, status='NOT_READY',
+                    observed_at='2026-01-02T00:00:00+00:00', symbols=[])
+        for source, expected in ((base, '0'), (base | {'available': False}, 'UNKNOWN'),
+                                 (base | {'symbols': [dict(symbol=None, market='EGX')]}, 'UNKNOWN')):
+            with self.subTest(source=source), patch('app.ui.system.load_operational_state', return_value=source), patch.dict('os.environ', {}, clear=True):
+                state = load_system_state()
+                before = deepcopy(state)
+                egx = render_market_receipts('EGX', state['markets']['EGX'])
+                us = render_market_receipts('US', state['markets']['US'])
+                self.assertIn('Distinct observed symbols: ' + expected, egx)
+                self.assertIn('Baseline universe target: 224', egx)
+                self.assertIn('Authoritative universe: UNKNOWN', egx)
+                self.assertIn('Distinct observed symbols: UNKNOWN', us)
+                self.assertNotIn('<table>', us)
+                self.assertNotIn('224', us)
+                for html in (egx, us):
+                    self.assertNotIn('<pre>', html)
+                    self.assertIn('Data-ready / eligible / scanned / candidates: UNKNOWN', html)
+                self.assertIn('Receipt details: 0 observed symbols' if expected == '0'
+                              else 'Receipt counts and details: UNKNOWN', egx)
+                self.assertEqual(state, before)
+
+    def test_market_details_use_validated_windows_and_block_duplicate_identity(self):
+        from copy import deepcopy
+        from app.ui.system import render_market_receipts
+        row = dict(symbol='<fixture>', market='EGX', provider='<provider>',
+                   status='DATA_STALE', decision_at='2025-01-01T00:00:00+00:00',
+                   valid_until='2026-01-01T00:00:00+00:00', reason='<reason>',
+                   last_verified_session='<session>')
+        base = dict(configured=True, available=True, status='DATA_STALE',
+                    observed_at='2026-01-02T00:00:00+00:00', symbols=[row])
+        cases = [(base, True, False), (base | {'observed_at': None}, False, False),
+                 (base | {'observed_at': '2026-01-02'}, False, False),
+                 (base | {'observed_at': '9999-01-02T00:00:00+00:00'}, False, False),
+                 (base | {'symbols': [row, row | {'provider': 'ambiguous'}]}, False, True),
+                 (base | {'symbols': [row | {'status': 'WATCH'}]}, False, False)]
+        for source, window, duplicate in cases:
+            with self.subTest(source=source), patch('app.ui.system.load_operational_state', return_value=source), patch.dict('os.environ', {}, clear=True):
+                state = load_system_state()
+                before = deepcopy(state)
+                html = render_market_receipts('EGX', state['markets']['EGX'])
+                self.assertEqual(row['decision_at'] in html, window)
+                self.assertEqual(row['valid_until'] in html, window)
+                self.assertIn('expiry exclusive', html)
+                self.assertIn('Expired bounds do not imply current validity', html)
+                self.assertNotIn('<fixture>', html)
+                self.assertEqual(html.count('&lt;fixture&gt;'), 1)
+                if duplicate:
+                    self.assertIn('Ambiguous duplicate receipt identity', html)
+                    self.assertNotIn('&lt;provider&gt;', html)
+                    self.assertNotIn('ambiguous', html)
+                else:
+                    for value in ('provider', 'reason', 'session'):
+                        self.assertIn('&lt;' + value + '&gt;', html)
+                self.assertEqual(state, before)
