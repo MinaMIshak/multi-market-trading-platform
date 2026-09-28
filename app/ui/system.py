@@ -189,6 +189,41 @@ def render_market_receipts(market, summary):
     return html + '</tbody></table></div></section>'
 
 
+def render_runtime_observation(state):
+    """Render approved runtime fields; a heartbeat is poll-loop evidence, not job success."""
+    def cell(value):
+        return escape(str(value)) if value is not None else 'UNKNOWN'
+
+    scheduler = state['scheduler']
+    status = scheduler.get('status')
+    status = status if status in ('RECENT_POLL', 'STALE') else 'UNKNOWN'
+    polled = status != 'UNKNOWN'
+    rows = (('API status', state['api'].get('status')),
+            ('API response timestamp', state['observed_at']),
+            ('Deployment-injected revision', state['build'].get('revision')),
+            ('EGX scheduler heartbeat status', status),
+            ('EGX scheduler mode', scheduler.get('mode') if polled else None),
+            ('Worker poll observed at', scheduler.get('observed_at') if polled else None),
+            ('Poll evidence valid until', scheduler.get('valid_until') if polled else None))
+    html = ('<section id="runtime-observation"><h2>Runtime observation</h2>'
+            '<div class="table-scroll"><table><caption>API response and local scheduler heartbeat</caption><tbody>'
+            + ''.join('<tr><th scope="row">' + title + '</th><td>' + cell(value) + '</td></tr>'
+                      for title, value in rows)
+            + '</tbody></table></div>')
+    if status == 'RECENT_POLL':
+        html += ('<p>EGX worker poll evidence: recent completed EGX poll-loop iteration only; '
+                 'valid-until expiry is exclusive. Job outcomes, scan completion, source health '
+                 'and provider health: UNKNOWN (job outcomes are recorded in the job ledger).</p>')
+    elif status == 'STALE':
+        html += ('<p>Worker health: UNKNOWN. Heartbeat expired (valid-until expiry exclusive); '
+                 'historical poll only. A stopped, crashed or delayed worker cannot be distinguished.</p>')
+    else:
+        html += '<p>Worker health: UNKNOWN. No valid scheduler heartbeat evidence available.</p>'
+    return html + ('<p>Heartbeats do not establish scan completion, job success, source health '
+                   'or provider health. US worker health: UNKNOWN (no US scheduler observation). '
+                   'Revision is unverified and UNKNOWN when not injected at deployment.</p></section>')
+
+
 def render_system(state):
     def block(title, value):
         return '<section><h2>' + escape(title) + '</h2><pre>' + escape(json.dumps(value, indent=2)) + '</pre></section>'
@@ -201,7 +236,7 @@ def render_system(state):
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
-            + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler')})
+            + render_runtime_observation(state)
             + render_provider_receipts(state['providers'])
             + render_market_receipts('EGX', state['markets']['EGX'])
             + render_market_receipts('US', state['markets']['US'])
