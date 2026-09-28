@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 from app.ui.operational import render_operational
 from app.egx_scan_history import _valid_summary, valid_reconciliation
+from app.financial_services_status import financial_services_status
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -121,7 +122,7 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     us = {'configured': False, 'available': False, 'status': 'UNKNOWN', 'symbols': []}
     markets = {'EGX': egx, 'US': us}
     selected = MARKETS[:2] if market == 'ALL' else (market,)
-    return {
+    state = {
         'market': market, 'section': section, 'mode': 'PAPER/SHADOW ONLY',
         'live': 'DISABLED', 'markets': {key: markets[key] for key in selected},
         'coverage': {key: {'universe': None, 'data_ready': None, 'scanned': None,
@@ -132,6 +133,10 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
                       for key in selected},
         'performance': None,
     }
+    if section == 'RESEARCH':
+        # No sourced note store is connected; notes stay UNKNOWN rather than generated.
+        state['research'] = {'notes': None, 'financial_services': financial_services_status()}
+    return state
 
 
 def render_scan_runs(scan_runs):
@@ -162,6 +167,31 @@ def render_scan_runs(scan_runs):
             content += (f'<tr><td>{escape(row["symbol"])}</td><td>{escape(row["status"])}</td>'
                         f'<td>{row["scanned"]}</td></tr>')
         content += '</table>'
+    return content
+
+
+def render_research(research):
+    """Research intelligence status; never an execution or order path."""
+    status = research['financial_services']
+    upstream = status['upstream']
+    content = ('<h2>Financial Services integration: ' + escape(status['status']) + '</h2>'
+               '<p>Research layer only; no trade execution authority. Upstream '
+               + escape(upstream['repository']) + ' pinned at ' + escape(upstream['commit'][:7])
+               + ' (' + escape(upstream['license']) + ', evaluated ' + escape(upstream['evaluated_on'])
+               + '). Recorded evaluation, not a live connector check.</p>'
+               '<table><caption>Evaluated plugins (not installed)</caption>'
+               '<tr><th>Plugin</th><th>Version</th><th>MCP config</th></tr>')
+    for row in status['plugins']:
+        content += ('<tr><td>' + escape(row['name']) + '</td><td>' + escape(row['version'])
+                    + '</td><td>' + escape(row['mcp_config']) + '</td></tr>')
+    content += '</table><table><caption>Connectors</caption><tr><th>Connector</th><th>Status</th></tr>'
+    for row in status['connectors']:
+        content += '<tr><td>' + escape(row['name']) + '</td><td>' + escape(row['status']) + '</td></tr>'
+    content += ('</table><p>EGX coverage: ' + escape(status['egx_coverage']) + '. '
+                + escape(status['data_policy']) + '</p>')
+    notes = research['notes']
+    content += ('<p>Sourced research notes: UNKNOWN. No sourced note store is connected.</p>'
+                if notes is None else '')
     return content
 
 
@@ -213,6 +243,8 @@ def render_product(state):
         content += '<p>' + messages[section] + '</p>'
     if section == 'LIVE':
         content += render_scan_runs(state['scan_runs'])
+    if section == 'RESEARCH':
+        content += render_research(state['research'])
     content += ('<footer><a href="/system">SYSTEM details</a> · '
                 '<a href="/shadow">Audited collection</a> · '
                 '<a href="/performance">Performance evidence</a></footer>')
