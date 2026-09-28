@@ -22,6 +22,13 @@ The verifier retains all existing admission and freshness gates and does not
 publish candidates or infer fills. Scope is not authoritative universe evidence.
 
 Validation: mocked dispatcher and existing coordinator/configuration/history
-regressions pass. Actual worker/SQLite/decoder/verifier integration remains
-pending unavailable runtime dependencies. No scheduled runtime run or deployment
-has been demonstrated. Existing five-symbol launch restrictions still apply.
+regressions pass. `tests/test_egx_scan_scheduler_integration.py` exercises
+`dispatch_scan` against a real SQLite-backed `SchedulerRepository`. Focused
+worker tests (`tests/test_scheduler_worker_wiring.py`) confirm `main()` parses
+`EGX_SCAN_MODE`/`EGX_SCAN_CONFIG_PATH`/`EGX_SCAN_HISTORY_PATH`, fails closed on
+a relative path or an unsupported mode value, leaves `dispatch_scan` untouched
+when disabled (the default), and calls it with the correct paths/data root
+and logs its outcome when `local`. This is offline plumbing validation only;
+`dispatch_scan` itself is mocked in the worker tests, so no live decoder,
+verifier, provider or deployed-runtime run has been demonstrated. Existing
+five-symbol launch restrictions still apply.

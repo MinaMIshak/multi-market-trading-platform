@@ -1,6 +1,8 @@
 from datetime import datetime as RealDateTime
+from pathlib import Path
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
+import json
 
 import pytest
 
@@ -235,6 +237,109 @@ def test_unknown_mode_fails_closed(
         "EGX_DB_PATH",
         str(tmp_path / "platform.db"),
     )
+
+    with pytest.raises(ValueError):
+        scheduler_worker.main()
+
+
+def test_scan_mode_local_calls_dispatch_scan_and_logs_outcome(
+    tmp_path, monkeypatch, capsys
+):
+    prepare(monkeypatch)
+
+    db = tmp_path / "platform.db"
+    scan_config = tmp_path / "scan-config.json"
+    scan_history = tmp_path / "scan-history.json"
+
+    calls = []
+    outcome = {
+        "checkpoint": "EGX_SCAN_PRIMARY",
+        "succeeded": True,
+        "requested": 1,
+        "scanned": 1,
+    }
+
+    def fake_dispatch_scan(
+        *, evaluation, repository, database, data_root, config_path, history_path
+    ):
+        calls.append(dict(
+            evaluation=evaluation, repository=repository, database=database,
+            data_root=data_root, config_path=config_path, history_path=history_path,
+        ))
+        return outcome
+
+    monkeypatch.setattr(
+        "app.egx_scan_dispatch.dispatch_scan",
+        fake_dispatch_scan,
+    )
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_CALENDAR_TRUTH", "UNVERIFIED")
+    monkeypatch.setenv("EGX_DB_PATH", str(db))
+    monkeypatch.setenv("EODHD_API_TOKEN_FILE", str(tmp_path / "missing"))
+    monkeypatch.setenv("EGX_SCAN_MODE", "local")
+    monkeypatch.setenv("EGX_SCAN_CONFIG_PATH", str(scan_config))
+    monkeypatch.setenv("EGX_SCAN_HISTORY_PATH", str(scan_history))
+
+    scheduler_worker.main()
+
+    out = capsys.readouterr().out
+
+    assert "local_scan=local" in out
+    assert len(calls) == 1
+    assert calls[0]["config_path"] == str(scan_config)
+    assert calls[0]["history_path"] == str(scan_history)
+    assert calls[0]["data_root"] == Path(str(db)).parent
+    assert "EGX_SCAN_DISPATCH " + json.dumps(outcome, sort_keys=True) in out
+
+
+def test_scan_mode_disabled_never_calls_dispatch_scan(
+    tmp_path, monkeypatch, capsys
+):
+    prepare(monkeypatch)
+
+    calls = []
+    monkeypatch.setattr(
+        "app.egx_scan_dispatch.dispatch_scan",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_CALENDAR_TRUTH", "UNVERIFIED")
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "platform.db"))
+
+    scheduler_worker.main()
+
+    out = capsys.readouterr().out
+
+    assert "local_scan=disabled" in out
+    assert "EGX_SCAN_DISPATCH" not in out
+    assert calls == []
+
+
+def test_scan_mode_local_requires_absolute_paths(
+    tmp_path, monkeypatch
+):
+    prepare(monkeypatch)
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "platform.db"))
+    monkeypatch.setenv("EGX_SCAN_MODE", "local")
+    monkeypatch.setenv("EGX_SCAN_CONFIG_PATH", "relative/config.json")
+    monkeypatch.setenv("EGX_SCAN_HISTORY_PATH", str(tmp_path / "history.json"))
+
+    with pytest.raises(ValueError):
+        scheduler_worker.main()
+
+
+def test_scan_mode_unsupported_value_fails_closed(
+    tmp_path, monkeypatch
+):
+    prepare(monkeypatch)
+
+    monkeypatch.setenv("EGX_SCHEDULER_MODE", "observe")
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "platform.db"))
+    monkeypatch.setenv("EGX_SCAN_MODE", "aggressive")
 
     with pytest.raises(ValueError):
         scheduler_worker.main()
