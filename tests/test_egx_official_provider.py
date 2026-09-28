@@ -141,6 +141,55 @@ def warm_response() -> FakeResponse:
     )
 
 
+def test_warm_up_url_and_post_referer_cannot_drift_apart():
+    # Both are built from the same _since_inception_page_url helper; this
+    # locks in that the warm-up GET and the POST's Referer header can never
+    # silently diverge from each other after a future URL-path edit.
+    opener = FakeOpener(
+        [
+            warm_response(),
+            json_response(
+                page=1,
+                page_size=2,
+                total_count=1,
+                rows=[
+                    index_row(
+                        "2026-09-08T00:00:00"
+                    ),
+                ],
+            ),
+        ]
+    )
+
+    provider = (
+        EGXOfficialPublicProvider(
+            base_url=(
+                "https://example.test"
+            ),
+            opener=opener,
+        )
+    )
+
+    provider.fetch_index_bars(
+        index_name="CASE30",
+        start_date=date(1998, 1, 1),
+        end_date=date(2026, 9, 9),
+        page_size=2,
+    )
+
+    warm_request, post_request = (
+        opener.requests[0],
+        opener.requests[1],
+    )
+
+    assert (
+        warm_request.full_url
+        == post_request.get_header(
+            "Referer"
+        )
+    )
+
+
 def test_pagination_uses_total_count_not_broken_metadata():
     opener = FakeOpener(
         [

@@ -210,22 +210,31 @@ class EGXOfficialPublicProvider:
 
         return payload, parsed
 
-    def _warm_index_session(
+    def _since_inception_page_url(
         self,
         *,
         index_name: str,
-    ) -> None:
+    ) -> str:
         query = parse.urlencode(
             {
                 "index": index_name,
             }
         )
 
-        url = (
+        return (
             self.base_url
             + "/en/market/indices/"
             + "since-inception?"
             + query
+        )
+
+    def _warm_index_session(
+        self,
+        *,
+        index_name: str,
+    ) -> None:
+        url = self._since_inception_page_url(
+            index_name=index_name,
         )
 
         req = request.Request(
@@ -449,15 +458,8 @@ class EGXOfficialPublicProvider:
                 ),
                 "Origin": self.base_url,
                 "Referer": (
-                    self.base_url
-                    + "/en/market/indices/"
-                    + "since-inception?"
-                    + parse.urlencode(
-                        {
-                            "index": (
-                                index_name
-                            ),
-                        }
+                    self._since_inception_page_url(
+                        index_name=index_name,
                     )
                 ),
                 "User-Agent": (
