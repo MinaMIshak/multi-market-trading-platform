@@ -190,6 +190,63 @@ class SystemVisibilityTests(unittest.TestCase):
             self.assertNotIn('<script>', html)
             self.assertIn('&lt;script&gt;', html)
             self.assertIn('LIVE MONEY DISABLED', html)
+            table = html.split('<section id="provider-receipts">')[1].split('</section>')[0]
+            self.assertIn('<td>EGX</td><td>&lt;script&gt;fixture&lt;/script&gt;</td><td>1</td><td>1</td><td>0</td>', table)
+            self.assertIn(egx['observed_at'], table)
+            self.assertIn('Symbols without provider attribution: 1', table)
+            # Checkpoint prose may name the compatibility alias; runtime UI must not.
+            runtime_html = html.split('<section><h2>Project checkpoint')[0]
+            self.assertNotIn('current_verified_symbols', runtime_html)
+            self.assertNotIn('&quot;providers&quot;', runtime_html)
+            self.assertEqual(before, path.read_bytes())
+
+    def test_provider_html_distinguishes_unknown_empty_and_unattributed(self):
+        from copy import deepcopy
+        from app.ui.system import provider_receipt_summary, render_provider_receipts
+        base = dict(available=True, observed_at='2026-01-01T00:00:00+00:00', symbols=[])
+        cases = [
+            (base, True, 0),
+            (base | {'symbols': [dict(symbol='A', status='NOT_READY')]}, True, 1),
+            (base | {'available': False}, False, None),
+            (base | {'observed_at': None}, False, None),
+            (base | {'observed_at': '2026-01-01T00:00:00'}, False, None),
+            (base | {'observed_at': '9999-01-01T00:00:00+00:00'}, False, None),
+            (base | {'symbols': [dict(symbol='A', provider='hidden', status='NOT_READY')] * 2}, False, None),
+        ]
+        for operational, available, unattributed in cases:
+            with self.subTest(operational=operational):
+                summary = provider_receipt_summary(operational)
+                before = deepcopy(summary)
+                html = render_provider_receipts(summary)
+                self.assertIn('Provider health: UNKNOWN', html)
+                self.assertIn('US provider observation: UNKNOWN', html)
+                self.assertNotIn('<table>', html)
+                if available:
+                    self.assertIn('Attributed providers: 0 at reader observation time', html)
+                    self.assertIn('Symbols without provider attribution: ' + str(unattributed), html)
+                    self.assertIn(base['observed_at'], html)
+                else:
+                    self.assertIn('Receipt attribution: UNAVAILABLE', html)
+                    self.assertNotIn('Attributed providers: 0', html)
+                    self.assertNotIn('hidden', html)
+                self.assertEqual(summary, before)
+
+    def test_provider_html_uses_historical_counts_without_mutating_api_alias(self):
+        from copy import deepcopy
+        from app.ui.system import provider_receipt_summary, render_provider_receipts
+        summary = provider_receipt_summary(dict(
+            available=True, observed_at='2026-01-02T00:00:00+00:00', symbols=[dict(
+                symbol='EXPIRED', provider='fixture', status='DATA_STALE',
+                decision_at='2025-01-01T00:00:00+00:00', valid_until='2026-01-01T00:00:00+00:00')]))
+        # Renderer must never select the legacy count alias.
+        summary['sources'][0]['current_verified_symbols'] = 999
+        before = deepcopy(summary)
+        html = render_provider_receipts(summary)
+        self.assertIn('<td>EGX</td><td>fixture</td><td>0</td><td>1</td><td>0</td>', html)
+        self.assertIn('Verified at observation', html)
+        self.assertIn('Stale at observation', html)
+        self.assertNotIn('999', html)
+        self.assertEqual(summary, before)
 
     def test_provider_sources_remain_separate_and_missing_identity_is_explicit(self):
         from app.ui.system import provider_receipt_summary

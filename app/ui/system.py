@@ -111,16 +111,48 @@ def load_system_state():
     }
 
 
+def render_provider_receipts(providers):
+    """Render the validated summary, retaining historical observation semantics."""
+    def cell(value):
+        return escape(str(value)) if value is not None else 'UNKNOWN'
+
+    html = ('<section id="provider-receipts"><h2>Provider receipts</h2>'
+            '<p>Historical receipt classifications at reader observation time. '
+            'Provider health: UNKNOWN. Counts do not establish current coverage, '
+            'source freshness or source rights.</p>'
+            '<p>Scope: configured EGX isolated runtime. US provider observation: UNKNOWN.</p>')
+    if providers['receipt_observation'] != 'AVAILABLE':
+        return html + '<p>Receipt attribution: UNAVAILABLE. Counts and reader observation time: UNKNOWN.</p></section>'
+    html += ('<p>Reader observed at: ' + cell(providers['observation_evidence']['observed_at'])
+             + '</p><p>Symbols without provider attribution: '
+             + cell(providers['unattributed_symbols']) + '</p>')
+    if not providers['sources']:
+        return html + '<p>Attributed providers: 0 at reader observation time.</p></section>'
+    html += ('<div class="table-scroll"><table><caption>Symbols by provider at reader observation time</caption>'
+             '<thead><tr><th scope="col">Market</th><th scope="col">Provider</th>'
+             '<th scope="col">Verified at observation</th><th scope="col">Stale at observation</th>'
+             '<th scope="col">Other at observation</th></tr></thead><tbody>')
+    for source in providers['sources']:
+        html += '<tr>' + ''.join('<td>' + cell(source[key]) + '</td>' for key in (
+            'market', 'provider', 'verified_symbols_at_observation',
+            'stale_receipt_symbols', 'other_symbols')) + '</tr>'
+    return html + '</tbody></table></div></section>'
+
+
 def render_system(state):
     def block(title, value):
         return '<section><h2>' + escape(title) + '</h2><pre>' + escape(json.dumps(value, indent=2)) + '</pre></section>'
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>System progress</title><style>body{font:16px sans-serif;max-width:1100px;margin:32px auto;padding:20px;'
-            'background:#071019;color:#e9f0f5}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#8bd5b0}</style>'
+            'background:#071019;color:#e9f0f5}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#8bd5b0}'
+            '.table-scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}'
+            'th,td{text-align:left;padding:10px;border-bottom:1px solid #344653;overflow-wrap:anywhere}'
+            'caption{text-align:left;margin-bottom:12px}</style>'
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as null.</p>'
-            + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler', 'providers')})
+            + block('Runtime observation', {key: state[key] for key in ('observed_at', 'api', 'build', 'scheduler')})
+            + render_provider_receipts(state['providers'])
             + block('EGX — isolated receipt scope', state['markets']['EGX'])
             + block('US', state['markets']['US'])
             + render_scan_runs(state['scan_runs'])
