@@ -76,6 +76,11 @@ def load_operational_state():
 def render_operational(state, *, fragment=False):
     def text(value):
         return escape(str(value))
+    # Reader admission only requires status fields; a hash-consistent receipt may
+    # still lack display fields. Show those as UNKNOWN rather than failing the page.
+    def field(source, key):
+        value = source.get(key)
+        return 'UNKNOWN' if value is None or value == '' else text(value)
     content = '<h2>Operational Paper/Shadow</h2><p>LIVE MONEY DISABLED · Candidate != fill · No execution or performance inference</p>'
     content += '<p>' + text(state['status']) + '</p>'
     for item in state['symbols']:
@@ -83,12 +88,17 @@ def render_operational(state, *, fragment=False):
         if item.get('reason'):
             content += '<p>' + text(item['reason']) + '</p>'
         if 'decision_at' in item:
-            content += '<p>Signal session: ' + text(item['last_verified_session']) + ' · Expected entry session: ' + text(item['entry_session']) + '</p>'
-            content += '<p>Admitted source: ' + text(item['provider']) + ' · Fresh at verification: ' + text(item['decision_at']) + '</p>'
-            content += '<p>Operational window: ' + text(item['history_start']) + ' through ' + text(item['last_verified_session']) + ' · ' + text(item['bar_count']) + ' bars. Full immutable source history retained.</p>'
-        if item['status'] == 'WATCH' and item.get('trade_plan'):
-            plan = item['trade_plan']
-            content += '<p>Unsized WATCH · Entry band: ' + text(plan['entry_low']) + '–' + text(plan['entry_high']) + ' · Stop: ' + text(plan['stop_price']) + ' · Target: ' + text(plan['target_1']) + '</p>'
+            content += '<p>Signal session: ' + field(item, 'last_verified_session') + ' · Expected entry session: ' + field(item, 'entry_session') + '</p>'
+            content += '<p>Admitted source: ' + field(item, 'provider') + ' · Fresh at verification: ' + field(item, 'decision_at') + '</p>'
+            content += '<p>Operational window: ' + field(item, 'history_start') + ' through ' + field(item, 'last_verified_session') + ' · ' + field(item, 'bar_count') + ' bars. Full immutable source history retained.</p>'
+        plan = item.get('trade_plan')
+        if item['status'] == 'WATCH' and plan:
+            levels = ('entry_low', 'entry_high', 'stop_price', 'target_1')
+            if isinstance(plan, dict) and all(plan.get(key) not in (None, '') for key in levels):
+                content += '<p>Unsized WATCH · Entry band: ' + text(plan['entry_low']) + '–' + text(plan['entry_high']) + ' · Stop: ' + text(plan['stop_price']) + ' · Target: ' + text(plan['target_1']) + '</p>'
+            else:
+                # Never present a partial plan; missing levels are not inferable.
+                content += '<p>Unsized WATCH · Trade plan: UNKNOWN (incomplete receipt)</p>'
         content += '</article>'
     if fragment:
         return content
