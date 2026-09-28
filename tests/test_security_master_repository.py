@@ -76,3 +76,36 @@ def test_canonical_ticker_alias_remains_provider_agnostic(tmp_path):
     ])
     resolved = repository.resolve('COMI', provider='canonical')
     assert resolved['matched_provider'] == 'canonical'
+
+
+def test_list_equity_tickers_returns_distinct_sorted_canonical_tickers(tmp_path):
+    """Two provider snapshots observing the same equity must not duplicate its
+    ticker, and results must be deterministically ordered for scan scope use."""
+    database = db(tmp_path)
+    repository = SecurityMasterRepository(database)
+    repository.replace_provider_snapshot(provider='fixture', instruments=[
+        instrument(uuid4(), provider='fixture', ticker='FWRY', code='FWRY.EGX'),
+        instrument(uuid4(), provider='fixture', ticker='COMI', code='COMI.EGX'),
+    ])
+    repository.replace_provider_snapshot(provider='eodhd', instruments=[
+        instrument(uuid4(), provider='eodhd', ticker='COMI', code='COMI.CA'),
+    ])
+    assert repository.list_equity_tickers() == ('COMI', 'FWRY')
+
+
+def test_list_equity_tickers_excludes_non_equity_instruments(tmp_path):
+    database = db(tmp_path)
+    repository = SecurityMasterRepository(database)
+    index_instrument = instrument(uuid4(), provider='fixture', ticker='EGX30', code='EGX30.EGX')
+    index_instrument = index_instrument.model_copy(update={'instrument_type': InstrumentType.INDEX})
+    repository.replace_provider_snapshot(provider='fixture', instruments=[
+        instrument(uuid4(), provider='fixture', ticker='COMI', code='COMI.EGX'),
+        index_instrument,
+    ])
+    assert repository.list_equity_tickers() == ('COMI',)
+
+
+def test_list_equity_tickers_empty_when_no_instruments_stored(tmp_path):
+    database = db(tmp_path)
+    repository = SecurityMasterRepository(database)
+    assert repository.list_equity_tickers() == ()

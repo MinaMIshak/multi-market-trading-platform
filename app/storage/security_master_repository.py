@@ -366,6 +366,30 @@ class SecurityMasterRepository:
             row["count"]
         )
 
+    def list_equity_tickers(
+        self,
+    ) -> tuple[str, ...]:
+        """Distinct EQUITY canonical tickers across all provider snapshots.
+
+        Multiple providers may each hold a row for the same real instrument;
+        this is scope attribution only, never dated membership evidence.
+        """
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT canonical_ticker
+                FROM canonical_instruments
+                WHERE instrument_type = ?
+                ORDER BY canonical_ticker
+                """,
+                ("EQUITY",),
+            ).fetchall()
+
+        return tuple(
+            row["canonical_ticker"]
+            for row in rows
+        )
+
     def type_counts(
         self,
     ) -> dict[str, int]:

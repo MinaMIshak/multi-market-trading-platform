@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from app.egx_scan_config import load_scan_configuration
+from app.egx_scan_config import load_scan_configuration, universe_scan_configuration
 from app.egx_scan import scan_egx_scope
 
 
@@ -86,3 +86,43 @@ class ScanConfigurationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_scan_configuration('fixture.json')
             read.assert_not_called()
+
+
+class UniverseScanConfigurationTests(unittest.TestCase):
+    def repository(self, tickers):
+        return SimpleNamespace(list_equity_tickers=lambda: tickers)
+
+    def test_builds_full_scope_from_distinct_security_master_tickers(self):
+        config = universe_scan_configuration(self.repository(('COMI', 'FWRY')),
+                                             scope_reference='security-master-equity-universe')
+        self.assertEqual(config.symbols, ('COMI', 'FWRY'))
+        self.assertEqual(config.scope_reference, 'security-master-equity-universe')
+        self.assertEqual(config.sources, {})
+        self.assertEqual(config.source_errors, {})
+
+    def test_every_symbol_remains_unscanned_without_launch_evidence(self):
+        config = universe_scan_configuration(self.repository(('COMI', 'FWRY')),
+                                             scope_reference='fixture')
+        with patch('app.egx_scan._verify') as verify:
+            report = scan_egx_scope(symbols=config.symbols, sources=config.sources,
+                                    source_errors=config.source_errors,
+                                    scope_reference=config.scope_reference,
+                                    database=None, data_root='/tmp')
+        verify.assert_not_called()
+        self.assertEqual(report['requested'], 2)
+        self.assertEqual(report['scanned'], 0)
+        self.assertEqual(report['status_counts']['EVIDENCE_BLOCKED'], 2)
+
+    def test_empty_security_master_universe_is_rejected(self):
+        with self.assertRaises(ValueError):
+            universe_scan_configuration(self.repository(()), scope_reference='fixture')
+
+    def test_blank_scope_reference_is_rejected(self):
+        with self.assertRaises(ValueError):
+            universe_scan_configuration(self.repository(('COMI',)), scope_reference='   ')
+
+    def test_malformed_security_master_ticker_fails_closed(self):
+        for tickers in (('comi',), ('A/B',), ('A' * 65,), (' COMI',), ('COMI', 'COMI')):
+            with self.subTest(tickers=tickers):
+                with self.assertRaises(ValueError):
+                    universe_scan_configuration(self.repository(tickers), scope_reference='fixture')
