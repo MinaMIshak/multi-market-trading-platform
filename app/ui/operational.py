@@ -12,7 +12,7 @@ import sqlite3
 def load_operational_state():
     configured = os.getenv('EGX_PAPER_RUNTIME')
     state = {'configured': bool(configured), 'available': False, 'symbols': [],
-             'status': 'NOT_READY', 'mode': 'PAPER/SHADOW ONLY', 'live': 'DISABLED'}
+             'observed_at': None, 'status': 'NOT_READY', 'mode': 'PAPER/SHADOW ONLY', 'live': 'DISABLED'}
     if not configured:
         return state
     try:
@@ -24,6 +24,8 @@ def load_operational_state():
             con.row_factory = sqlite3.Row
             con.execute('BEGIN')
             symbols = con.execute('SELECT DISTINCT canonical_symbol FROM daily_canonical_artifacts ORDER BY canonical_symbol').fetchall()
+            # Classify all rows at one reader snapshot time.
+            now = datetime.now(timezone.utc)
             for symbol_row in symbols:
                 symbol = symbol_row[0]
                 item = {'symbol': symbol, 'market': 'EGX', 'status': 'NOT_READY', 'trade_plan': None}
@@ -42,7 +44,6 @@ def load_operational_state():
                                 or receipt['status'] not in ('WATCH', 'READY_NO_SIGNAL')
                                 or receipt['live'] != 'DISABLED' or receipt['mode'] != 'SHADOW'):
                             raise ValueError('invalid verification receipt')
-                        now = datetime.now(timezone.utc)
                         decision_at = datetime.fromisoformat(receipt['decision_at'])
                         valid_until = datetime.fromisoformat(receipt['valid_until'])
                         if (decision_at.utcoffset() is None or valid_until.utcoffset() is None
@@ -67,7 +68,7 @@ def load_operational_state():
             status = next(iter(statuses))
         else:
             status = 'PARTIAL'
-        return state | {'available': True, 'status': status}
+        return state | {'available': True, 'status': status, 'observed_at': now.isoformat()}
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error):
         return state | {'symbols': [], 'status': 'EVIDENCE_BLOCKED'}
 

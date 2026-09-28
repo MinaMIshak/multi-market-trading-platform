@@ -12,10 +12,48 @@ RECEIPT_STATUSES = ('WATCH', 'READY_NO_SIGNAL', 'NOT_READY', 'DATA_STALE',
                     'EVIDENCE_BLOCKED', 'UNKNOWN')
 
 
+def receipt_observation(market_state):
+    """Project reader time and per-receipt bounds, never source freshness."""
+    if not market_state['available']:
+        return None
+    try:
+        observed = datetime.fromisoformat(market_state['observed_at'])
+        if observed.utcoffset() is None or observed > datetime.now(timezone.utc):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    grouped = {}
+    for item in market_state['symbols']:
+        symbol = item.get('symbol')
+        if not isinstance(symbol, str) or not symbol.strip():
+            return None
+        grouped.setdefault(symbol, []).append(item)
+    windows = []
+    for symbol, rows in grouped.items():
+        bounds = None
+        if len(rows) == 1:
+            item = rows[0]
+            try:
+                decision = datetime.fromisoformat(item['decision_at'])
+                expiry = datetime.fromisoformat(item['valid_until'])
+                status = item.get('status')
+                if (decision.utcoffset() is not None and expiry.utcoffset() is not None
+                        and decision <= observed and decision < expiry
+                        and ((status in ('WATCH', 'READY_NO_SIGNAL') and observed < expiry)
+                             or (status == 'DATA_STALE' and observed >= expiry))):
+                    bounds = {'decision_at': item['decision_at'], 'valid_until': item['valid_until']}
+            except (KeyError, TypeError, ValueError):
+                pass
+        windows.append({'symbol': symbol, 'verification_window': bounds})
+    return {'origin': 'OPERATIONAL_RECEIPT_READER',
+            'observed_at': market_state['observed_at'], 'receipt_windows': windows}
+
+
 def observed_receipt_summary(market_state):
     """Count reader observations only; never infer universe or scan completion."""
     summary = {'scope': 'Observed operational symbols only; not scan coverage',
-               'observed_symbols': None, 'status_counts': None}
+               'observed_symbols': None, 'status_counts': None,
+               'observation_evidence': receipt_observation(market_state)}
     if not market_state['available']:
         return summary
     # The reader emits one row per symbol. Ambiguous duplicates must not inflate
@@ -77,6 +115,7 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
     egx = {key: operational[key] for key in ('configured', 'available', 'status')}
+    egx['observed_at'] = operational.get('observed_at')
     egx['symbols'] = [dict(item) for item in operational['symbols']
                       if item.get('market') == 'EGX'] if egx['available'] else []
     us = {'configured': False, 'available': False, 'status': 'UNKNOWN', 'symbols': []}
@@ -140,6 +179,16 @@ def render_product(state):
         content += (f'<article><h2>{key}</h2><p>Status: {escape(str(value["status"]))}</p>'
                     f'<p>Observed symbols: {observed if observed is not None else "UNKNOWN"}. '
                     'Universe / data-ready / scanned / candidates: UNKNOWN.</p></article>')
+        evidence = state['coverage'][key]['observation_evidence']
+        content += '<p>Receipt reader observation: ' + escape(
+            evidence['observed_at'] if evidence else 'UNKNOWN') + (
+            '. Classification time only; not source freshness or current coverage.</p>')
+        if evidence:
+            for row in evidence['receipt_windows']:
+                bounds = row['verification_window']
+                window = (bounds['decision_at'] + ' through ' + bounds['valid_until']
+                          + ' (expiry exclusive)' if bounds else 'UNKNOWN')
+                content += '<p>' + escape(row['symbol']) + ' verification window: ' + escape(window) + '</p>'
         counts = state['coverage'][key]['status_counts']
         if counts is not None:
             content += (f'<table aria-label="{key} observed receipt statuses">'

@@ -83,7 +83,9 @@ def load_system_state():
                     'status': egx['status'], **counts,
                     'observed_symbols': summary['observed_symbols'],
                     'status_counts': summary['status_counts'],
-                    'observed_at': observed,
+                    'observed_at': (summary['observation_evidence']['observed_at']
+                                    if summary['observation_evidence'] else None),
+                    'observation_evidence': summary['observation_evidence'],
                     'scope': summary['scope'],
                     'source': 'load_operational_state: receipt classifications only; data_ready/eligible/scanned require independent evidence',
                     'receipts': [{key: item.get(key) for key in (
@@ -92,6 +94,7 @@ def load_system_state():
             'US': {'configured_universe': None, 'data_ready': None, 'eligible': None,
                    'scanned': None, 'candidates': None, 'status': 'UNKNOWN',
                    'observed_symbols': None, 'status_counts': None,
+                   'observed_at': None, 'observation_evidence': None,
                    'reason': 'No configured operational universe connected'}},
         'providers': provider_receipt_summary(egx),
     }
