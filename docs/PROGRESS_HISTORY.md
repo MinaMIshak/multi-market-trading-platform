@@ -111,3 +111,23 @@ record; each field below is its exact JSON string value, unchanged.
 ```json
 "Design a vendor-neutral MarketDataProvider contract for dated daily/delayed EGX OHLCV observations (provenance, source identity, observed_at/as_of, raw evidence stored separately from normalized bars, freshness/quality validation, fail-closed), reusing existing app/data providers (egid, egx_official, eodhd) and daily_canonical structures instead of duplicating them \u2014 inspect those first. No source is admitted without documented provenance, timestamps, coverage and licensing assumptions. Run the full suite at the next code-changing milestone. Keep PROGRESS.json fields current-state only (prior narrative goes to docs/PROGRESS_HISTORY.md). Open policy decisions stay documented, not implemented from guesswork (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
 ```
+
+## Cycle 192 checkpoint-3 fields (superseded in cycle 192 checkpoint 4)
+
+### current_capability
+
+```json
+"Cycle 192 checkpoint 3: authentic dated EGX daily observations are visible in the product shell TODAY/SWING. app/ui/today.py load_validated_daily_observations() reads VALIDATED daily_canonical_artifacts rows read-only (symbol, provider, oldest/newest market date, valid/quarantined bar counts, source snapshot date) and fails closed to None; app/main.py passes it to product_state(daily_observations=...) for EGX/ALL only. render_product shows an 'EGX validated daily observations' table labelled Freshness NOT ESTABLISHED (no verified exchange calendar links the newest session to today), Source usage rights NOT ESTABLISHED, Not a signal, candidate or fill; None renders UNKNOWN, [] renders 'none recorded'; US renders UNKNOWN. Coverage/universe/data_ready/scanned/candidates remain None. Earlier this cycle: security-master identity summary in TODAY dashboard (2ec299c) and product shell (1f7e959). Architecture finding: a vendor-neutral MarketDataProvider Protocol already exists (app/data/provider.py) with raw bytes persisted separately (ImmutableRawStore) and canonicalization/quality layers (daily_canonical*, quality.py) \u2014 not duplicated. Local observation (read-only operational DB): COMI x2 artifacts (tradingview_tvdatafeed, tradingview_tvdatafeed_egx), 2025-01-27 to 2026-09-24, 400 bars each; TradingView rights unreviewed per PROJECT_AUDIT.md. PAPER/SHADOW ONLY."
+```
+
+### tests
+
+```json
+"Cycle 192 checkpoint 3 FULL SUITE: 3253 passed, 676 subtests passed, 0 failed (767s; er1-autopilot/state/cycle192-full-suite-cp3.log). New tests failed pre-implementation (ImportError) and pass: product shell daily observations EGX-only/never coverage, TODAY/SWING rendering with freshness/rights disclaimers, UNKNOWN vs none-recorded, escaping, route wiring; loader filters non-VALIDATED rows, does not mutate the DB, fails closed on missing DB. Earlier this cycle: full suite 3241 passed/672 subtests (checkpoint 1). Local runtime: uvicorn 127.0.0.1:8768 \u2014 /, /?market=US&section=TODAY, /?market=EGX&section=SWING, /?market=ALL&section=PRE-SURGE, /api/product all 200 with the rows above. Offline/unit and local runtime only; no deployed or live-market validation."
+```
+
+### next_action
+
+```json
+"Calendar-aware freshness for daily observations: derive a per-artifact freshness status (FRESH/STALE/UNKNOWN) only from VERIFIED market_sessions (app/core/schedule CalendarTruth), never from weekday arithmetic; with one verified session on record it must stay UNKNOWN \u2014 test-first. Then assess whether a reviewed free daily transport can be admitted through the existing MarketDataProvider Protocol + DailyBarIngestor + scheduler_acquisition_config gates (documented provenance, timestamps, coverage, licensing assumptions required; do not repeat completed provider investigations absent new evidence). Keep PROGRESS.json fields current-state only (prior narrative goes to docs/PROGRESS_HISTORY.md). Open policy decisions stay documented, not implemented from guesswork (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
+```

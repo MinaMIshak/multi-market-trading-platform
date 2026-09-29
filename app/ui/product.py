@@ -267,18 +267,22 @@ def render_daily_observations(observations):
             f'<td>{escape(str(r["oldest_market_date"]))} to {escape(str(r["newest_market_date"]))}</td>'
             f'<td>{escape(str(r["valid_bar_count"]))}</td>'
             f'<td>{escape(str(r["quarantined_bar_count"]))}</td>'
-            f'<td>{escape(str(r["source_snapshot_date"]))}</td></tr>'
+            f'<td>{escape(str(r["source_snapshot_date"]))}</td>'
+            f'<td>{escape(str(r.get("freshness") or "UNKNOWN"))}</td></tr>'
             for r in rows)
         html += (f'<section aria-label="{key} validated daily observations">'
                  f'<h2>{key} validated daily observations</h2>'
                  '<p>Dated historical daily bars that passed canonical validation. '
-                 'Freshness NOT ESTABLISHED: no verified exchange calendar links the newest '
-                 'session to today. Source usage rights NOT ESTABLISHED. '
-                 'Not a signal, candidate or fill.</p>'
+                 'Freshness is derived only from VERIFIED exchange sessions, through the '
+                 'prior Cairo calendar day (today\'s session is not evaluated): STALE means '
+                 'a verified trading session is missing; CURRENT means every intervening day '
+                 'is a verified non-trading day; UNKNOWN means freshness NOT ESTABLISHED. '
+                 'Source usage rights NOT ESTABLISHED. Not a signal, candidate or fill.</p>'
                  f'<table aria-label="{key} validated daily observations">'
                  '<thead><tr><th scope="col">Symbol</th><th scope="col">Source</th>'
                  '<th scope="col">Market dates</th><th scope="col">Valid bars</th>'
                  '<th scope="col">Quarantined bars</th><th scope="col">Source snapshot</th>'
+                 '<th scope="col">Freshness</th>'
                  f'</tr></thead><tbody>{body}</tbody></table></section>')
     return html
 

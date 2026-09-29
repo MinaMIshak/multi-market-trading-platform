@@ -4,12 +4,79 @@ import html
 import os
 import sqlite3
 from contextlib import closing
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.core.schedule import CalendarTruth
 from app.domain import MarketSession, MarketSessionStatus
+
+
+def _session_truth(
+    row: sqlite3.Row,
+    market_date: date,
+) -> tuple[MarketSession, CalendarTruth]:
+    """Validate a market_sessions row against its payload; map to calendar truth."""
+    session = MarketSession.model_validate_json(
+        row["payload_json"]
+    )
+
+    if session.market_date != market_date:
+        raise ValueError(
+            "market-session payload date "
+            "does not match ledger date"
+        )
+
+    if row["status"] != session.status.value:
+        raise ValueError(
+            "market-session status column "
+            "does not match canonical payload"
+        )
+
+    if session.status == MarketSessionStatus.VERIFIED:
+        return session, CalendarTruth.VERIFIED_TRADING_DAY
+
+    if session.status in {
+        MarketSessionStatus.HOLIDAY,
+        MarketSessionStatus.WEEKEND,
+    }:
+        return session, CalendarTruth.VERIFIED_NON_TRADING_DAY
+
+    return session, CalendarTruth.UNVERIFIED
+
+
+def _daily_freshness(
+    newest_market_date: date,
+    as_of: date,
+    truths: dict[date, CalendarTruth],
+) -> str:
+    """CURRENT/STALE only from verified sessions; never weekday arithmetic.
+
+    STALE: a verified trading session lies strictly between the newest bar
+    and as_of. CURRENT: every date in that gap is a verified non-trading day.
+    Otherwise UNKNOWN (incomplete calendar, or bars dated after as_of).
+    """
+    if newest_market_date > as_of:
+        return "UNKNOWN"
+
+    gap = [
+        newest_market_date + timedelta(days=offset)
+        for offset in range(1, (as_of - newest_market_date).days)
+    ]
+
+    if any(
+        truths.get(day) == CalendarTruth.VERIFIED_TRADING_DAY
+        for day in gap
+    ):
+        return "STALE"
+
+    if all(
+        truths.get(day) == CalendarTruth.VERIFIED_NON_TRADING_DAY
+        for day in gap
+    ):
+        return "CURRENT"
+
+    return "UNKNOWN"
 
 
 def _read_security_master(con: sqlite3.Connection) -> dict:
@@ -81,16 +148,26 @@ def load_security_master_summary(
 
 def load_validated_daily_observations(
     database_path: Path | None = None,
+    market_date: date | None = None,
 ) -> list[dict] | None:
     """Read-only VALIDATED daily-canonical artifact rows; None when unreadable.
 
-    Dated historical observations only: no freshness, rights or signal claim.
+    Dated historical observations with calendar-derived freshness as of the
+    Cairo market date; no rights, readiness or signal claim.
     """
     path = database_path if database_path is not None else Path(
         os.getenv(
             "EGX_DB_PATH",
             "/app/data/platform.db",
         )
+    )
+
+    as_of = (
+        market_date
+        if market_date is not None
+        else datetime.now(
+            ZoneInfo("Africa/Cairo")
+        ).date()
     )
 
     try:
@@ -115,7 +192,35 @@ def load_validated_daily_observations(
                 ORDER BY canonical_symbol, provider
                 """
             ).fetchall()
-            return [dict(row) for row in rows]
+
+            truths = {}
+            for session_row in con.execute(
+                """
+                SELECT market_date, status, payload_json
+                FROM market_sessions
+                WHERE market_date <= ?
+                """,
+                (as_of.isoformat(),),
+            ).fetchall():
+                session_date = date.fromisoformat(
+                    session_row["market_date"]
+                )
+                _, truths[session_date] = _session_truth(
+                    session_row,
+                    session_date,
+                )
+
+            return [
+                {
+                    **dict(row),
+                    "freshness": _daily_freshness(
+                        date.fromisoformat(row["newest_market_date"]),
+                        as_of,
+                        truths,
+                    ),
+                }
+                for row in rows
+            ]
     except Exception:
         return None
 
@@ -200,52 +305,10 @@ def load_today_state(
             }
 
             if market_session_row is not None:
-                session = (
-                    MarketSession.model_validate_json(
-                        market_session_row[
-                            "payload_json"
-                        ]
-                    )
+                session, calendar_truth = _session_truth(
+                    market_session_row,
+                    target_market_date,
                 )
-
-                if (
-                    session.market_date
-                    != target_market_date
-                ):
-                    raise ValueError(
-                        "market-session payload date "
-                        "does not match ledger date"
-                    )
-
-                if (
-                    market_session_row["status"]
-                    != session.status.value
-                ):
-                    raise ValueError(
-                        "market-session status column "
-                        "does not match canonical payload"
-                    )
-
-                if (
-                    session.status
-                    == MarketSessionStatus.VERIFIED
-                ):
-                    calendar_truth = (
-                        CalendarTruth
-                        .VERIFIED_TRADING_DAY
-                    )
-                elif session.status in {
-                    MarketSessionStatus.HOLIDAY,
-                    MarketSessionStatus.WEEKEND,
-                }:
-                    calendar_truth = (
-                        CalendarTruth
-                        .VERIFIED_NON_TRADING_DAY
-                    )
-                else:
-                    calendar_truth = (
-                        CalendarTruth.UNVERIFIED
-                    )
 
                 market_session = {
                     "market_date":

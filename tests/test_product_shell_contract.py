@@ -25,7 +25,7 @@ class ProductShellContracts(unittest.TestCase):
     DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed_egx',
               'source_snapshot_date': '2026-09-24', 'oldest_market_date': '2025-01-27',
               'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
-              'quarantined_bar_count': 0}]
+              'quarantined_bar_count': 0, 'freshness': 'UNKNOWN'}]
 
     def test_daily_observations_are_egx_only_and_never_coverage(self):
         state = product_state(self.source, daily_observations=self.DAILY)
@@ -47,7 +47,9 @@ class ProductShellContracts(unittest.TestCase):
                 self.assertIn('tradingview_tvdatafeed_egx', page)
                 self.assertIn('2025-01-27 to 2026-09-24', page)
                 self.assertIn('<td>400</td>', page)
-                self.assertIn('Freshness NOT ESTABLISHED', page)
+                self.assertIn('<td>UNKNOWN</td>', page)
+                self.assertIn('only from VERIFIED exchange sessions', page)
+                self.assertIn('UNKNOWN means freshness NOT ESTABLISHED', page)
                 self.assertIn('usage rights NOT ESTABLISHED', page)
                 self.assertIn('Not a signal, candidate or fill', page)
                 self.assertIn('US validated daily observations: UNKNOWN', page)

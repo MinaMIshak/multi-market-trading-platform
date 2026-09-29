@@ -387,9 +387,71 @@ def test_validated_daily_observations_read_only(tmp_path, monkeypatch):
     assert set(rows[0]) == {
         "canonical_symbol", "provider", "source_snapshot_date",
         "oldest_market_date", "newest_market_date",
-        "valid_bar_count", "quarantined_bar_count",
+        "valid_bar_count", "quarantined_bar_count", "freshness",
     }
     assert path.read_bytes() == before
+
+
+def _add_session(path, market_date, status, payload_date=None):
+    session = MarketSession(
+        market_date=payload_date or market_date, status=status,
+    )
+    con = sqlite3.connect(path)
+    con.execute(
+        "INSERT INTO market_sessions (market_date, status, payload_json,"
+        " updated_at) VALUES (?, ?, ?, ?)",
+        (market_date.isoformat(), status.value, session.model_dump_json(),
+         "2026-09-10T07:00:00+00:00"),
+    )
+    con.commit()
+    con.close()
+
+
+def _freshness(path, as_of):
+    rows = load_validated_daily_observations(path, market_date=as_of)
+    return None if rows is None else rows[0]["freshness"]
+
+
+# Fixture: COMI newest bar 2026-09-09; 2026-09-10 session VERIFIED.
+def test_daily_freshness_stale_when_verified_session_is_missing(tmp_path):
+    path = make_ui_db(tmp_path)
+    assert _freshness(path, date(2026, 9, 12)) == "STALE"
+
+
+def test_daily_freshness_current_when_gap_is_empty(tmp_path):
+    path = make_ui_db(tmp_path)
+    assert _freshness(path, date(2026, 9, 10)) == "CURRENT"
+    assert _freshness(path, date(2026, 9, 9)) == "CURRENT"
+
+
+def test_daily_freshness_current_only_across_verified_non_trading_days(tmp_path):
+    path = make_ui_db(tmp_path, session_status=MarketSessionStatus.HOLIDAY)
+    _add_session(path, date(2026, 9, 11), MarketSessionStatus.WEEKEND)
+    assert _freshness(path, date(2026, 9, 12)) == "CURRENT"
+
+
+def test_daily_freshness_unknown_without_complete_calendar(tmp_path):
+    path = make_ui_db(tmp_path, session_status=MarketSessionStatus.HOLIDAY)
+    # 2026-09-11 has no session record: never infer it from the weekday.
+    assert _freshness(path, date(2026, 9, 12)) == "UNKNOWN"
+    # Unverified lifecycle states are not calendar truth either.
+    other = tmp_path / "other"
+    other.mkdir()
+    path = make_ui_db(other, session_status=MarketSessionStatus.CLOSED)
+    assert _freshness(path, date(2026, 9, 11)) == "UNKNOWN"
+
+
+def test_daily_freshness_unknown_for_future_dated_bars(tmp_path):
+    path = make_ui_db(tmp_path)
+    assert _freshness(path, date(2026, 9, 8)) == "UNKNOWN"
+
+
+def test_daily_freshness_fails_closed_on_session_payload_mismatch(tmp_path):
+    path = make_ui_db(tmp_path, session_status=MarketSessionStatus.HOLIDAY)
+    _add_session(path, date(2026, 9, 11), MarketSessionStatus.WEEKEND,
+                 payload_date=date(2026, 9, 5))
+    assert load_validated_daily_observations(
+        path, market_date=date(2026, 9, 12)) is None
 
 
 def test_validated_daily_observations_fail_closed(tmp_path, monkeypatch):
