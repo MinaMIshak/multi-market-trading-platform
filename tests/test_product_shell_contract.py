@@ -26,10 +26,12 @@ class ProductShellContracts(unittest.TestCase):
               'source_snapshot_date': '2026-09-24', 'oldest_market_date': '2025-01-27',
               'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
               'quarantined_bar_count': 0, 'freshness': 'UNKNOWN'}]
+    BLOCKED = [dict(DAILY[0], source_status='EVIDENCE_BLOCKED',
+                    source_reason='source entitlement not established')]
 
     def test_daily_observations_are_egx_only_and_never_coverage(self):
         state = product_state(self.source, daily_observations=self.DAILY)
-        self.assertEqual(state['daily_observations'], {'EGX': self.DAILY, 'US': None})
+        self.assertEqual(state['daily_observations'], {'EGX': self.BLOCKED, 'US': None})
         for counts in state['coverage'].values():
             for key in ('universe', 'data_ready', 'scanned', 'candidates'):
                 self.assertIsNone(counts[key])
@@ -51,6 +53,9 @@ class ProductShellContracts(unittest.TestCase):
                 self.assertIn('only from VERIFIED exchange sessions', page)
                 self.assertIn('UNKNOWN means freshness NOT ESTABLISHED', page)
                 self.assertIn('usage rights NOT ESTABLISHED', page)
+                self.assertIn('<td>EVIDENCE_BLOCKED</td>', page)
+                self.assertIn('<td>source entitlement not established</td>', page)
+                self.assertNotIn('<td>ADMITTED</td>', page)
                 self.assertIn('Not a signal, candidate or fill', page)
                 self.assertIn('US validated daily observations: UNKNOWN', page)
         live = render_product(product_state(
@@ -63,6 +68,28 @@ class ProductShellContracts(unittest.TestCase):
         empty = render_product(product_state(self.source, market='EGX', daily_observations=[]))
         self.assertIn('EGX validated daily observations: none recorded', empty)
         self.assertNotIn('EGX validated daily observations: UNKNOWN', empty)
+
+    def test_daily_observation_source_status_comes_only_from_registry(self):
+        claims = [dict(self.DAILY[0], source_status='ADMITTED', source_reason='trust me'),
+                  dict(self.DAILY[0], canonical_symbol='SWDY', provider='unknown_feed'),
+                  dict(self.DAILY[0], canonical_symbol='EAST', provider='eodhd')]
+        rows = product_state(self.source, daily_observations=claims)['daily_observations']['EGX']
+        self.assertEqual([r['source_status'] for r in rows], ['EVIDENCE_BLOCKED'] * 3)
+        self.assertEqual([r['source_reason'] for r in rows],
+                         ['source entitlement not established',
+                          'undeclared daily source for market',
+                          'paid subscription source not admissible'])
+        page = render_product(product_state(self.source, daily_observations=claims))
+        self.assertNotIn('ADMITTED</td>', page.replace('EVIDENCE_BLOCKED', ''))
+        self.assertNotIn('trust me', page)
+        # Caller-supplied rows are not mutated.
+        self.assertEqual(claims[0]['source_status'], 'ADMITTED')
+
+    def test_daily_observation_render_fails_closed_without_source_status(self):
+        from app.ui.product import render_daily_observations
+        page = render_daily_observations({'EGX': self.DAILY})
+        self.assertIn('<td>EVIDENCE_BLOCKED</td>', page)
+        self.assertIn('<td>source admission unavailable</td>', page)
 
     def test_daily_observation_text_is_escaped(self):
         hostile = [dict(self.DAILY[0], canonical_symbol='<b>X</b>', provider='<i>p</i>')]
@@ -270,7 +297,7 @@ class ProductShellContracts(unittest.TestCase):
         self.assertEqual(namespace['product']('ALL')['identities']['EGX'], self.identities)
         self.assertIn('tradingview_tvdatafeed_egx', namespace['root']())
         self.assertNotIn('tradingview_tvdatafeed_egx', namespace['root']('US'))
-        self.assertEqual(namespace['product']('ALL')['daily_observations']['EGX'], self.DAILY)
+        self.assertEqual(namespace['product']('ALL')['daily_observations']['EGX'], self.BLOCKED)
         with self.assertRaises(HttpError) as error:
             namespace['product']('invalid')
         self.assertEqual(error.exception.status_code, 422)

@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from app.ui.operational import render_operational
 from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
+from app.data.source_admission import daily_source_admission
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -111,6 +112,18 @@ def scan_run_state(history):
             'completion_evidence': evidence}
 
 
+def admitted_daily_observations(rows, market):
+    """Annotate each row with registry source admission; row claims are ignored."""
+    if rows is None:
+        return None
+    result = []
+    for row in rows:
+        admission = daily_source_admission(row.get('provider'), market)
+        result.append({**row, 'source_status': admission.status,
+                       'source_reason': admission.reason})
+    return result
+
+
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
                   security_master=None, daily_observations=None):
     if market not in MARKETS or section not in SECTIONS:
@@ -138,7 +151,9 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         'identities': {key: security_master if key == 'EGX' else None
                        for key in selected},
         # Dated VALIDATED daily-canonical artifacts; not freshness or readiness.
-        'daily_observations': {key: daily_observations if key == 'EGX' else None
+        # Source status comes only from the daily source admission registry.
+        'daily_observations': {key: admitted_daily_observations(daily_observations, key)
+                                    if key == 'EGX' else None
                                for key in selected},
     }
     if section == 'RESEARCH':
@@ -268,7 +283,9 @@ def render_daily_observations(observations):
             f'<td>{escape(str(r["valid_bar_count"]))}</td>'
             f'<td>{escape(str(r["quarantined_bar_count"]))}</td>'
             f'<td>{escape(str(r["source_snapshot_date"]))}</td>'
-            f'<td>{escape(str(r.get("freshness") or "UNKNOWN"))}</td></tr>'
+            f'<td>{escape(str(r.get("freshness") or "UNKNOWN"))}</td>'
+            f'<td>{escape(str(r.get("source_status") or "EVIDENCE_BLOCKED"))}</td>'
+            f'<td>{escape(str(r.get("source_reason") or "source admission unavailable"))}</td></tr>'
             for r in rows)
         html += (f'<section aria-label="{key} validated daily observations">'
                  f'<h2>{key} validated daily observations</h2>'
@@ -277,12 +294,15 @@ def render_daily_observations(observations):
                  'prior Cairo calendar day (today\'s session is not evaluated): STALE means '
                  'a verified trading session is missing; CURRENT means every intervening day '
                  'is a verified non-trading day; UNKNOWN means freshness NOT ESTABLISHED. '
-                 'Source usage rights NOT ESTABLISHED. Not a signal, candidate or fill.</p>'
+                 'Source usage rights NOT ESTABLISHED unless Source status is ADMITTED '
+                 '(reviewed paper/shadow entitlement); EVIDENCE_BLOCKED rows are not '
+                 'admitted trading inputs. Not a signal, candidate or fill.</p>'
                  f'<table aria-label="{key} validated daily observations">'
                  '<thead><tr><th scope="col">Symbol</th><th scope="col">Source</th>'
                  '<th scope="col">Market dates</th><th scope="col">Valid bars</th>'
                  '<th scope="col">Quarantined bars</th><th scope="col">Source snapshot</th>'
-                 '<th scope="col">Freshness</th>'
+                 '<th scope="col">Freshness</th><th scope="col">Source status</th>'
+                 '<th scope="col">Source admission</th>'
                  f'</tr></thead><tbody>{body}</tbody></table></section>')
     return html
 
