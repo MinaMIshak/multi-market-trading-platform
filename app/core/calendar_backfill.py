@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import os
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -153,3 +155,66 @@ def build_calendar_backfill_runtime(
         holiday_promotion_service=holiday_promotion_service,
         verification_service=verification_service,
     )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """
+    Reproducible CLI for the offline calendar-session recovery pass.
+
+    Explicit --start-date/--end-date only: this is a manual recovery
+    tool, not a scheduled job, so it never infers a range. Performs no
+    network acquisition; WEEKEND/HOLIDAY/VERIFIED are only ever derived
+    from evidence already admitted to the target database.
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Recover market-session calendar truth for a date range "
+            "from evidence already admitted to the database "
+            "(deterministic WEEKEND; HOLIDAY/VERIFIED fail closed to "
+            "UNKNOWN absent admitted evidence)."
+        )
+    )
+    parser.add_argument(
+        "--start-date",
+        required=True,
+        type=date.fromisoformat,
+    )
+    parser.add_argument(
+        "--end-date",
+        required=True,
+        type=date.fromisoformat,
+    )
+    parser.add_argument(
+        "--db-path",
+        default=None,
+        help=(
+            "Defaults to the EGX_DB_PATH environment variable, "
+            "then /app/data/platform.db."
+        ),
+    )
+    args = parser.parse_args(argv)
+
+    db_path = args.db_path or os.getenv(
+        "EGX_DB_PATH",
+        "/app/data/platform.db",
+    )
+
+    database = Database(db_path)
+    database.initialize()
+
+    runtime = build_calendar_backfill_runtime(database=database)
+    results = runtime.run_range(args.start_date, args.end_date)
+
+    for result in results:
+        print(
+            f"{result.market_date} "
+            f"base={result.base_status.value} "
+            f"holiday={result.holiday_status.value} "
+            f"verification={result.verification_status.value}"
+        )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
