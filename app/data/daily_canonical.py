@@ -278,9 +278,12 @@ def canonicalize_daily_row(
     low = _required_decimal(row, "low")
     close = _required_decimal(row, "close")
     volume = _required_decimal(row, "volume")
-    adjusted = _required_decimal(
-        row,
-        "adjusted_close",
+    # Provider-neutral: adjusted close is an optional audit-only reference.
+    # Absent (or explicit null) stays None and is never derived from close.
+    adjusted = (
+        _required_decimal(row, "adjusted_close")
+        if row.get("adjusted_close") is not None
+        else None
     )
 
     for name, value in (
@@ -290,7 +293,7 @@ def canonicalize_daily_row(
         ("close", close),
         ("adjusted_close", adjusted),
     ):
-        if value <= 0:
+        if value is not None and value <= 0:
             raise DailyCanonicalizationError(
                 f"non-positive daily field: {name}"
             )

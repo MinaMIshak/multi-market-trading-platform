@@ -149,19 +149,39 @@ def test_bad_ohlc_is_quarantined():
     )
 
 
-def test_missing_required_field_is_rejected():
+@pytest.mark.parametrize("field", ["open", "high", "low", "close", "volume"])
+def test_missing_required_field_is_rejected(field):
+    row = {"date":"2026-09-08", "open":140, "high":141, "low":138,
+           "close":139, "volume":100}
+    del row[field]
     with pytest.raises(
         DailyCanonicalizationError,
         match="missing daily field",
     ):
-        canonicalize({
-            "date":"2026-09-08",
-            "open":140,
-            "high":141,
-            "low":138,
-            "close":139,
-            "volume":100,
-        })
+        canonicalize(row)
+
+
+@pytest.mark.parametrize("extra", [{}, {"adjusted_close": None}])
+def test_adjusted_close_is_optional_and_never_derived(extra):
+    # Provider-neutral: sources without an adjusted series remain executable;
+    # the audit-only reference stays None rather than copying close.
+    bar=canonicalize({"date":"2026-09-08", "open":140, "high":141,
+                      "low":138, "close":139, "volume":100, **extra})
+    assert bar.semantic_class == DailyBarSemanticClass.VALID_EXECUTABLE
+    assert bar.provider_adjusted_close_reference is None
+    assert bar.close == Decimal("139")
+
+
+@pytest.mark.parametrize("value,match", [
+    ("x", "invalid daily field: adjusted_close"),
+    (True, "invalid daily field: adjusted_close"),
+    (0, "non-positive daily field: adjusted_close"),
+    ("NaN", "non-finite daily field: adjusted_close"),
+])
+def test_supplied_adjusted_close_is_still_validated(value, match):
+    with pytest.raises(DailyCanonicalizationError, match=match):
+        canonicalize({"date":"2026-09-08", "open":140, "high":141, "low":138,
+                      "close":139, "volume":100, "adjusted_close": value})
 
 
 def test_serialization_is_deterministic_and_preserves_provenance():
