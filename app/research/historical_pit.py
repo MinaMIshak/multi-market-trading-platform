@@ -712,11 +712,14 @@ def derive_research_pit_daily(
         if session.market_state == "TRADING_SESSION"
     }
 
+    # A document published after the decision is future information even if
+    # its availability evidence claims otherwise (operational parity).
     admitted_universes = [
         item
         for item in source.universes
         if item.universe.effective_date in trading_dates
         and _available_by(item.evidence, decision_at)
+        and item.universe.published_at <= decision_at
     ]
 
     universe_by_date: dict[date, HistoricalUniverseSnapshot] = {}
@@ -930,7 +933,10 @@ def derive_research_pit_daily(
     raw_rows.sort(key=lambda row: row.market_date)
 
     coverage = source.action_coverage
-    if not _available_by(coverage.evidence, decision_at):
+    if (
+        not _available_by(coverage.evidence, decision_at)
+        or coverage.actions.published_at > decision_at
+    ):
         raise ValueError(
             "exact action coverage unavailable by decision"
         )

@@ -227,6 +227,7 @@ def _universe(
     eligible: bool = True,
     instrument_id: UUID = INSTRUMENT,
     available_at: datetime = EARLY,
+    published_at: datetime = EARLY,
     label: str | None = None,
     members: tuple[UniverseMember, ...] | None = None,
 ) -> HistoricalUniverseSnapshot:
@@ -246,7 +247,7 @@ def _universe(
             contract="egx-universe-v1",
             market="EGX",
             effective_date=market_date,
-            published_at=EARLY,
+            published_at=published_at,
             complete=True,
             members=members,
         ),
@@ -314,6 +315,7 @@ def _coverage(
     end: date = D3,
     rows: tuple[ActionEvidenceRow, ...] = (),
     available_at: datetime = EARLY,
+    published_at: datetime = EARLY,
     label: str = "actions",
     package: HistoricalEvidencePackage | None = None,
 ) -> HistoricalActionCoverage:
@@ -329,7 +331,7 @@ def _coverage(
             instrument_id=INSTRUMENT,
             coverage_start=start,
             coverage_end=end,
-            published_at=EARLY,
+            published_at=published_at,
             complete=True,
             actions=rows,
         ),
@@ -768,6 +770,41 @@ def test_exact_dated_universe_is_required():
         _derive(_clone(source, universes=universes))
 
 
+def test_universe_published_after_decision_is_not_admitted():
+    # Mirrors the operational reference repository, which never admits a
+    # document whose own publication time is after as_of.
+    source = _source()
+    late = _universe(
+        D1,
+        published_at=FUTURE,
+        label="late-published-universe",
+    )
+    universes = tuple(
+        late if row.universe.effective_date == D1 else row
+        for row in source.universes
+    )
+
+    with pytest.raises(ValueError, match="dated universe required"):
+        _derive(_clone(source, universes=universes))
+
+
+def test_universe_published_exactly_at_decision_is_admitted():
+    source = _source()
+    boundary = _universe(
+        D1,
+        published_at=DECISION,
+        label="boundary-published-universe",
+    )
+    universes = tuple(
+        boundary if row.universe.effective_date == D1 else row
+        for row in source.universes
+    )
+
+    result = _derive(_clone(source, universes=universes))
+
+    assert boundary.evidence.identity in result.used_evidence_ids
+
+
 def test_absent_universe_member_fails():
     source = _source()
 
@@ -971,6 +1008,21 @@ def test_exact_action_coverage_is_required():
                 action_coverage=bad_coverage,
             )
         )
+
+
+def test_action_coverage_published_after_decision_is_unavailable():
+    source = _source()
+
+    late = _coverage(
+        published_at=FUTURE,
+        label="late-published-actions",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="action coverage unavailable by decision",
+    ):
+        _derive(_clone(source, action_coverage=late))
 
 
 def test_split_math_matches_operational_m3_semantics():
