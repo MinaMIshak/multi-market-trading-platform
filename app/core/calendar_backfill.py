@@ -4,6 +4,7 @@ import argparse
 import os
 from dataclasses import dataclass
 from datetime import date, timedelta
+from pathlib import Path
 
 from app.core.base_calendar_service import (
     BaseCalendarSessionService,
@@ -20,6 +21,10 @@ from app.core.calendar_verification import (
 from app.core.calendar_verification_service import (
     CalendarVerificationService,
 )
+from app.core.historical_calendar_verification import (
+    HistoricalCalendarVerificationPolicy,
+    HistoricalOfficialIndexEvidenceRepository,
+)
 from app.core.holiday_promotion import HolidayPromotionPolicy
 from app.core.holiday_promotion_service import (
     HolidayPromotionService,
@@ -29,6 +34,9 @@ from app.core.holiday_verification import (
 )
 from app.core.holiday_verification_service import (
     HolidayVerificationService,
+)
+from app.data.validated_index_repository import (
+    ValidatedCanonicalIndexRepository,
 )
 from app.domain.enums import MarketSessionStatus
 from app.storage.database import Database
@@ -47,6 +55,7 @@ class CalendarBackfillDateResult:
     base_status: MarketSessionStatus
     holiday_status: MarketSessionStatus
     verification_status: MarketSessionStatus
+    verification_basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,11 +72,22 @@ class CalendarBackfillRuntime:
     acquisition: WEEKEND is deterministic weekday classification;
     HOLIDAY and VERIFIED require evidence already present in the
     database and fail closed to UNKNOWN otherwise.
+
+    When a historical verification service is configured, a date the
+    same-day (live) policy leaves unverified may still be VERIFIED from
+    admitted official index bars snapshotted after that date
+    (verification_basis=HISTORICAL_OFFICIAL). The same compare-and-
+    promote rules apply: HOLIDAY conflicts fail closed, while the
+    deterministic WEEKEND default is superseded by official evidence
+    exactly as on the live path (TradingDayPromotionPolicy).
     """
 
     base_service: BaseCalendarSessionService
     holiday_promotion_service: HolidayPromotionService
     verification_service: CalendarVerificationService
+    historical_verification_service: (
+        CalendarVerificationService | None
+    ) = None
 
     def run_date(
         self,
@@ -82,12 +102,34 @@ class CalendarBackfillRuntime:
         verification_decision = self.verification_service.verify(
             market_date
         )
+        verification_basis = (
+            "SAME_DAY_OFFICIAL"
+            if verification_decision.status
+            == MarketSessionStatus.VERIFIED
+            else None
+        )
+
+        if (
+            verification_basis is None
+            and self.historical_verification_service is not None
+        ):
+            verification_decision = (
+                self.historical_verification_service.verify(
+                    market_date
+                )
+            )
+            if (
+                verification_decision.status
+                == MarketSessionStatus.VERIFIED
+            ):
+                verification_basis = "HISTORICAL_OFFICIAL"
 
         return CalendarBackfillDateResult(
             market_date=market_date,
             base_status=base_status,
             holiday_status=holiday_outcome.verification.status,
             verification_status=verification_decision.status,
+            verification_basis=verification_basis,
         )
 
     def run_range(
@@ -113,6 +155,7 @@ class CalendarBackfillRuntime:
 def build_calendar_backfill_runtime(
     *,
     database: Database,
+    data_root: str | Path | None = None,
 ) -> CalendarBackfillRuntime:
     trading_repository = TradingRepository(database)
     transition_repository = MarketSessionTransitionRepository(
@@ -150,10 +193,33 @@ def build_calendar_backfill_runtime(
         transition_repository=transition_repository,
     )
 
+    historical_verification_service = None
+
+    if data_root is not None:
+        historical_verification_service = CalendarVerificationService(
+            evidence_repository=(
+                HistoricalOfficialIndexEvidenceRepository(
+                    validated_reader=(
+                        ValidatedCanonicalIndexRepository
+                        .from_data_root(
+                            database=database,
+                            data_root=data_root,
+                        )
+                    ),
+                )
+            ),
+            trading_repository=trading_repository,
+            policy=HistoricalCalendarVerificationPolicy(),
+            transition_repository=transition_repository,
+        )
+
     return CalendarBackfillRuntime(
         base_service=base_service,
         holiday_promotion_service=holiday_promotion_service,
         verification_service=verification_service,
+        historical_verification_service=(
+            historical_verification_service
+        ),
     )
 
 
@@ -192,6 +258,16 @@ def main(argv: list[str] | None = None) -> int:
             "then /app/data/platform.db."
         ),
     )
+    parser.add_argument(
+        "--data-root",
+        default=None,
+        help=(
+            "Platform data root holding the admitted official index "
+            "store used for historical session verification. Defaults "
+            "to the --db-path parent directory, matching "
+            "scheduler_worker."
+        ),
+    )
     args = parser.parse_args(argv)
 
     db_path = args.db_path or os.getenv(
@@ -202,7 +278,16 @@ def main(argv: list[str] | None = None) -> int:
     database = Database(db_path)
     database.initialize()
 
-    runtime = build_calendar_backfill_runtime(database=database)
+    data_root = (
+        Path(args.data_root)
+        if args.data_root
+        else Path(db_path).parent
+    )
+
+    runtime = build_calendar_backfill_runtime(
+        database=database,
+        data_root=data_root,
+    )
     results = runtime.run_range(args.start_date, args.end_date)
 
     for result in results:
@@ -211,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
             f"base={result.base_status.value} "
             f"holiday={result.holiday_status.value} "
             f"verification={result.verification_status.value}"
+            f" basis={result.verification_basis or 'NONE'}"
         )
 
     return 0

@@ -140,6 +140,83 @@ class ValidatedCanonicalIndexRepository:
 
         return candidate
 
+    @classmethod
+    def from_data_root(
+        cls,
+        *,
+        database: Database,
+        data_root: str | Path,
+    ) -> "ValidatedCanonicalIndexRepository":
+        """
+        Construct the validated reader from the
+        platform data root.
+
+        Canonical path conventions stay inside
+        this approved read boundary.
+        """
+        return cls(
+            database=database,
+            canonical_root=(
+                Path(data_root) / "canonical"
+            ),
+        )
+
+    def covering_snapshot_dates(
+        self,
+        *,
+        index_name: str,
+        market_date: date,
+        provider: str = (
+            "egx_official_public"
+        ),
+    ) -> tuple[date, ...]:
+        """
+        Snapshot dates, ascending, of VALIDATED
+        catalog artifacts taken strictly after
+        market_date whose dated range covers it.
+
+        Catalog candidates only: callers must
+        still load() each one, which performs
+        the full integrity checks.
+        """
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT source_snapshot_date
+                FROM canonical_data_artifacts
+                WHERE provider = ?
+                  AND asset_type = ?
+                  AND granularity = 'D1'
+                  AND symbol = ?
+                  AND status = 'VALIDATED'
+                  AND semantic_contract_version = ?
+                  AND serialization_format = ?
+                  AND source_snapshot_date > ?
+                  AND oldest_market_date <= ?
+                  AND newest_market_date >= ?
+                ORDER BY source_snapshot_date
+                """,
+                (
+                    provider.strip().lower(),
+                    DataAssetType
+                    .INDEX_BARS
+                    .value,
+                    index_name.strip().upper(),
+                    SEMANTIC_CONTRACT_VERSION,
+                    SERIALIZATION_FORMAT,
+                    market_date.isoformat(),
+                    market_date.isoformat(),
+                    market_date.isoformat(),
+                ),
+            ).fetchall()
+
+        return tuple(
+            date.fromisoformat(
+                row["source_snapshot_date"]
+            )
+            for row in rows
+        )
+
     def load(
         self,
         *,
