@@ -9,6 +9,7 @@ from pathlib import Path
 import sqlite3
 
 from app.path_safety import symlinked
+from app.data.source_admission import daily_source_admission
 
 
 def load_operational_state():
@@ -54,8 +55,13 @@ def load_operational_state():
                         if decision_at > now:
                             raise ValueError('future verification receipt')
                         item = receipt
+                        # Label, never rewrite: preserved receipts keep their recorded
+                        # status; admission reflects the current source registry.
+                        admission = daily_source_admission(receipt.get('provider'), 'EGX')
+                        item = item | {'source_status': admission.status,
+                                       'source_reason': admission.reason}
                         if now >= valid_until:
-                            item = receipt | {'status': 'DATA_STALE', 'market_data': 'DATA_STALE', 'trade_plan': None}
+                            item = item | {'status': 'DATA_STALE', 'market_data': 'DATA_STALE', 'trade_plan': None}
                     except (ValueError, TypeError, KeyError):
                         item = {'symbol': symbol, 'market': 'EGX',
                                 'status': 'EVIDENCE_BLOCKED', 'trade_plan': None,
@@ -91,7 +97,13 @@ def render_operational(state, *, fragment=False, heading='Operational Paper/Shad
             content += '<p>' + text(item['reason']) + '</p>'
         if 'decision_at' in item:
             content += '<p>Signal session: ' + field(item, 'last_verified_session') + ' · Expected entry session: ' + field(item, 'entry_session') + '</p>'
-            content += '<p>Admitted source: ' + field(item, 'provider') + ' · Fresh at verification: ' + field(item, 'decision_at') + '</p>'
+            content += ('<p>Receipt source: ' + field(item, 'provider') + ' · Source admission: '
+                        + text(item.get('source_status') or 'EVIDENCE_BLOCKED') + ' ('
+                        + text(item.get('source_reason') or 'source admission unavailable')
+                        + ') · Fresh at verification: ' + field(item, 'decision_at') + '</p>')
+            if item.get('source_status') != 'ADMITTED':
+                content += ('<p>Preserved historical receipt. Its source is not admitted, so '
+                            'it cannot seed new signals or candidates.</p>')
             content += '<p>Operational window: ' + field(item, 'history_start') + ' through ' + field(item, 'last_verified_session') + ' · ' + field(item, 'bar_count') + ' bars. Full immutable source history retained.</p>'
         plan = item.get('trade_plan')
         if item['status'] == 'WATCH' and plan is not None:

@@ -22,6 +22,7 @@ from app.data.daily_refresh_admission import DailyRefreshAdmissionPolicy
 from app.data.point_in_time import PointInTimeDailyRepository
 from app.data.quota import VerifiedQuotaCost, DailyQuotaCostContract
 from app.data.raw_store import ImmutableRawStore
+from app.data.source_admission import ADMITTED, DEFAULT_DAILY_SOURCE_REGISTRY
 from app.domain import TradePlan
 from app.egx_scope import valid_scope_symbol, require_equity_identity
 from app.egx_refresh_mapping import require_refresh_mapping, select_refresh_targets
@@ -84,6 +85,17 @@ class Q03Rule(Contract):
 def swing_config():
     return SwingConfig(config_version='SWING-V1-Q02-50-20-50-20', minimum_history=50,
                        fast_ema_window=20, slow_ema_window=50, breakout_lookback=20)
+
+
+# Eligibility for SWING candidate logic; acquisition and canonical validation
+# remain independent, so unadmitted observations persist as evidence only.
+DAILY_SOURCE_REGISTRY = DEFAULT_DAILY_SOURCE_REGISTRY
+
+
+def _require_admitted_source(provider):
+    admission = DAILY_SOURCE_REGISTRY.admission(provider, 'EGX')
+    if admission.status != ADMITTED:
+        _blocked('daily source not admitted for signals: ' + admission.reason)
 
 
 def _now():
@@ -290,6 +302,8 @@ def prepare_signal(database, data_root: Path, source: SwingLaunchInput):
         _blocked('daily evidence must uniquely bind current canonical source')
 
     artifact, manifest = bound[0]
+    # Validated observations from unadmitted sources never become candidates.
+    _require_admitted_source(manifest.provider)
     if (artifact['instrument_id'] != str(source.instrument_id)
             or datetime.fromisoformat(artifact['validated_at']) > at):
         _blocked('canonical artifact identity/availability mismatch')

@@ -116,3 +116,36 @@ def test_missing_runtime_never_falls_back_to_legacy(tmp_path, monkeypatch):
     assert main.today()['status'] == 'EVIDENCE_BLOCKED'
     assert 'EVIDENCE_BLOCKED' in main.root().body.decode()
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize('admitted', [False, True])
+def test_preserved_receipt_is_labeled_by_current_source_admission(launch, monkeypatch, admitted):
+    from tests.test_paper_shadow_launch import FIXTURE_DAILY_SOURCES
+    db, root, source, directory, _, _, at = launch
+    assert run_signal(db, root, source, directory, publish=False)['signal_status'] == 'WATCH'
+    runtime = db.path.parent
+    with db.connect() as original, sqlite3.connect(runtime / 'platform.db') as copy:
+        original.backup(copy)
+    monkeypatch.setenv('EGX_PAPER_RUNTIME', str(runtime))
+    monkeypatch.setattr(operational, 'datetime', type('Clock', (datetime,), {
+        'now': classmethod(lambda cls, tz=None: at)}))
+    if admitted:
+        monkeypatch.setattr(operational, 'daily_source_admission',
+                            FIXTURE_DAILY_SOURCES.admission)
+    before = (runtime / 'platform.db').read_bytes()
+    state = main.paper_operational()
+    body = main.root().body.decode()
+    item = state['symbols'][0]
+    # The recorded receipt status and plan are preserved, never rewritten.
+    assert item['status'] == 'WATCH' and item['trade_plan'] is not None
+    assert before == (runtime / 'platform.db').read_bytes()
+    assert 'Admitted source:' not in body
+    if admitted:
+        assert item['source_status'] == 'ADMITTED'
+        assert 'Source admission: ADMITTED' in body
+        assert 'Preserved historical receipt' not in body
+    else:
+        assert (item['source_status'], item['source_reason']) == (
+            'EVIDENCE_BLOCKED', 'undeclared daily source for market')
+        assert 'Source admission: EVIDENCE_BLOCKED (undeclared daily source for market)' in body
+        assert 'cannot seed new signals or candidates' in body

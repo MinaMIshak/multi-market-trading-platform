@@ -11,6 +11,10 @@ from uuid import UUID
 import pytest
 
 from app.data.provider import ProviderResponse
+from app.data.source_admission import (
+    DAILY_SOURCE_DECLARATIONS, DailySourceDeclaration, DailySourceRegistry, DataDelay,
+    EntitlementStatus, SourceAccess,
+)
 from app.data.daily_refresh_job import DailyRefreshTarget
 from app.data.quota import VerifiedQuotaCost
 from app.data.raw_store import ImmutableRawStore
@@ -63,10 +67,19 @@ def package(at, fields, digest='a'*64, byte_size=10, manifest=None):
     return preliminary.model_copy(update={'raw_receipt': raw, 'evidence': evidence, 'review': review_})
 
 
+# Artificial test-only admission of the engineering 'fixture' source; never a
+# real entitlement review. Gate tests below restore the repository registry.
+FIXTURE_DAILY_SOURCES = DailySourceRegistry(DAILY_SOURCE_DECLARATIONS + (DailySourceDeclaration(
+    provider='fixture', market='EGX', access=SourceAccess.ANONYMOUS_PUBLIC,
+    entitlement=EntitlementStatus.REVIEWED_PAPER_SHADOW, delay=DataDelay.END_OF_DAY,
+    source_timezone='Africa/Cairo', evidence='artificial offline test fixture'),))
+
+
 @pytest.fixture
 def launch(tmp_path, monkeypatch, request):
     at = datetime.now(timezone.utc) + timedelta(minutes=2)
     monkeypatch.setattr(fixture_packages, 'AT', at)
+    monkeypatch.setattr(swing_launch, 'DAILY_SOURCE_REGISTRY', FIXTURE_DAILY_SOURCES)
     for module in (swing_launch, shadow_producer, shadow_collection, shadow_freeze, shadow_ledger):
         monkeypatch.setattr(module, '_now', lambda: at)
     day = at.date() - timedelta(days=1)
@@ -599,3 +612,40 @@ def test_cli_refresh_alias_rejected_before_token_read(launch, monkeypatch, capsy
 def test_cli_provider_symbol_not_silently_ignored(capsys):
     assert main(['status', '--provider-symbol', 'EXPLICIT.EGX']) == 2
     assert json.loads(capsys.readouterr().out)['status'] == 'CONFIG_MISSING'
+
+
+def test_unadmitted_source_observations_persist_but_never_become_candidates(launch, monkeypatch):
+    db, root, source, directory, _, _, _ = launch
+    # Repository registry: 'fixture' is undeclared, so it is EVIDENCE_BLOCKED.
+    monkeypatch.setattr(swing_launch, 'DAILY_SOURCE_REGISTRY',
+                        swing_launch.DEFAULT_DAILY_SOURCE_REGISTRY)
+    with db.connect() as con:
+        artifacts = con.execute("SELECT COUNT(*) FROM daily_canonical_artifacts "
+                                "WHERE status='VALIDATED'").fetchone()[0]
+    assert artifacts > 0
+    for publish in (False, True):
+        with pytest.raises(LaunchBlocked) as blocked:
+            run_signal(db, root, source, directory, publish=publish)
+        assert blocked.value.status == 'EVIDENCE_BLOCKED'
+        assert blocked.value.reason == ('daily source not admitted for signals: '
+                                        'undeclared daily source for market')
+    assert not directory.exists()
+    with db.connect() as con:
+        assert con.execute("SELECT COUNT(*) FROM audit_events "
+                           "WHERE event_type='PAPER_SIGNAL_VERIFIED'").fetchone()[0] == 0
+        # Observation existence and canonical validation are untouched.
+        assert con.execute("SELECT COUNT(*) FROM daily_canonical_artifacts "
+                           "WHERE status='VALIDATED'").fetchone()[0] == artifacts
+    from app.egx_scan import scan_egx_scope
+    report = scan_egx_scope(symbols=[source.symbol], sources={source.symbol: source},
+                            database=db, data_root=root, scope_reference='gate-fixture')
+    assert report['scanned'] == 0
+    assert report['status_counts']['EVIDENCE_BLOCKED'] == 1
+    assert report['symbols'][0]['reason'].startswith('daily source not admitted for signals')
+
+
+@pytest.mark.parametrize('provider', ['tradingview_tvdatafeed_egx', 'eodhd', 'egid'])
+def test_declared_but_unreviewed_sources_are_not_candidate_inputs(provider):
+    with pytest.raises(LaunchBlocked) as blocked:
+        swing_launch._require_admitted_source(provider)
+    assert blocked.value.status == 'EVIDENCE_BLOCKED'

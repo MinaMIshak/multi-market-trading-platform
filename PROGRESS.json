@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 236: vendor-neutral daily source admission registry (app/data/source_admission.py). DailySourceDeclaration records provider, market, access class, entitlement review, delay semantics, source timezone and evidence; a reviewed paper/shadow entitlement is only constructible for free access classes with declared delay. Registry declares egid (AUTHENTICATED, getSymbolHistory 401), eodhd (PAID_SUBSCRIPTION), tradingview_tvdatafeed[_egx] (UNOFFICIAL_CLIENT); none admitted. Exact identities only; undeclared/unreviewed/paid/denied/other-market sources resolve EVIDENCE_BLOCKED. product_state annotates each EGX validated daily observation with registry source_status/source_reason (row claims ignored), exposed via /api/product and rendered in TODAY/SWING; missing status renders EVIDENCE_BLOCKED. EGX daily OHLCV still UNQUALIFIED: no free source with reviewed entitlement.",
-  "starting_head": "5fc14b65123dbb41eb0b2b5fa4a2b1f6a52a9b25",
-  "head": "5fc14b65123dbb41eb0b2b5fa4a2b1f6a52a9b25",
+  "current_capability": "Cycle 236b: source-admission eligibility gate for SWING candidate logic. Layers are now separate: observation existence (acquisition/raw store, ungated), canonical validation (ungated), source admission (app/data/source_admission.py registry), and candidate eligibility (app/paper/swing_launch.prepare_signal requires ADMITTED source for the bound raw manifest provider, else LaunchBlocked EVIDENCE_BLOCKED 'daily source not admitted for signals: <reason>'). Blocked verification writes no PAPER_SIGNAL_VERIFIED receipt and no publication; validated artifacts are untouched; egx_scan classifies it EVIDENCE_BLOCKED, scanned=0. Preserved receipts keep recorded status/plan but are labelled with current source admission (operational reader + render; misleading 'Admitted source' label replaced). Consequence: with no admitted EGX source, the TradingView-based COMI path can no longer produce new WATCH/READY_NO_SIGNAL receipts; its existing receipt remains, labelled EVIDENCE_BLOCKED. Test-only admission of the artificial 'fixture' provider lives in tests/test_paper_shadow_launch.py (monkeypatched registry), never in the production registry. Previous checkpoint 3605559: registry + TODAY/SWING observation source status.",
+  "starting_head": "3605559",
+  "head": "3605559",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 236: new tests/test_daily_source_admission.py (registry contracts) and 2 new product-shell contracts; focused daily_source_admission/product_shell/today_ui 84 passed. Full suite: 3336 passed, 676 subtests passed in 256.96s (python 3.11 venv from requirements-dev.txt); one UI wording-only edit after the run re-verified by the focused suites. Offline/unit only; no live-source or deployed validation.",
+  "tests": "Cycle 236b: +2 gate tests (tests/test_paper_shadow_launch.py incl. 3 parametrized unreviewed sources) and +2 receipt labelling tests (tests/test_operational_ui.py); affected launch/operational/research-notes suites 92 passed. Full suite: 3342 passed, 676 subtests passed in 264.66s (python 3.11 venv from requirements-dev.txt). Cycle 236 full suite: 3336 passed. Offline/unit only; no live-source or deployed validation.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "Admit an EGX daily source only with reviewed entitlement evidence (none exists); live probing of EGX/EGID hosts was denied by this cycle's egress policy, so live-source qualification remains pending. Next independent code work: gate daily refresh/canonical promotion and SWING verification inputs on DailySourceRegistry so unadmitted sources cannot become trading inputs, keeping EVIDENCE_BLOCKED.",
+  "next_action": "Qualify a free per-equity EGX daily/delayed source with reviewed entitlement (egress to EGX/EGID hosts denied this cycle; live qualification pending). Independent code work next: SYSTEM view of source admission (per-source access/entitlement/delay/evidence) so operators see why EGX signals are EVIDENCE_BLOCKED.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
@@ -63,7 +63,7 @@
     "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
     "shared_database_ownership": "A scheduler_worker (PID 146267) and two uvicorn app.main:app processes (PID 1717126, 1861599, port 8000) are running under uid 999, not this agent's uid 1001; /proc/<pid>/environ is not readable by this agent, so their EGX_DB_PATH (and hence whether they write research-data/paper-shadow-operational/platform.db) is unconfirmed. This agent's own runtime checks against that file have historically been read-only; a direct backfill write was deferred this cycle for that reason rather than risk an unreviewed collision. Not a production-boundary violation (research-data is an authorized auxiliary path) but ownership of the live file is unconfirmed.",
     "network_egx_sources": "Cycle 236 execution environment: egress proxy rejected CONNECT to ticker.egidegypt.com and beta.egx.com.eg (organization policy). Live acquisition/qualification pending; not a mission-wide blocker.",
-    "egx_daily_source_entitlement": "No EGX daily OHLCV source has a reviewed paper/shadow entitlement in app/data/source_admission.py; all existing validated observations display EVIDENCE_BLOCKED source status."
+    "egx_daily_source_entitlement": "No EGX daily OHLCV source has a reviewed paper/shadow entitlement; SWING candidate generation is therefore EVIDENCE_BLOCKED for every EGX symbol until one is admitted with evidence."
   },
-  "commit_status": "COMMITTED_DIRECTLY_CYCLE236"
+  "commit_status": "COMMITTED_DIRECTLY_CYCLE236B"
 }
