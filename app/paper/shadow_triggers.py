@@ -42,7 +42,7 @@ class TriggerEvaluation(BaseModel):
     status: Literal[
         "NOT_TRIGGERED", "INVALIDATED_OPEN_GAP", "TARGET_PASSED_OPEN_GAP",
         "INVALIDATED_BEFORE_ENTRY", "TARGET_PASSED_BEFORE_ENTRY",
-        "TRIGGERED", "TRIGGERED_AMBIGUOUS_BAR",
+        "TRIGGERED", "TRIGGERED_AMBIGUOUS_BAR", "UNSUPPORTED_CORPORATE_ACTION",
     ]
     evaluated_through_sequence: int = Field(ge=1)
     evaluated_through_available_at: datetime
@@ -52,7 +52,7 @@ class TriggerEvaluation(BaseModel):
         "ENTRY_ZONE_NOT_TOUCHED", "OPEN_AT_OR_BELOW_STOP_BEFORE_ENTRY",
         "OPEN_AT_OR_ABOVE_TARGET_BEFORE_ENTRY", "ENTRY_ZONE_TOUCHED",
         "STOP_TOUCHED_WITHOUT_ENTRY", "TARGET_TOUCHED_WITHOUT_ENTRY",
-        "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN",
+        "ENTRY_TOUCHED_WITH_PATH_ORDER_UNKNOWN", "UNSUPPORTED_CORPORATE_ACTION",
     ]
 
     @field_validator("evaluated_through_available_at", mode="before")
@@ -96,7 +96,14 @@ def evaluate_trigger(watchlist: ShadowWatchlist, facts: ForwardFactBundle) -> Tr
     reason = "ENTRY_ZONE_NOT_TOUCHED"
     trigger_sequence = None
     trigger_price = None
-    for bar in facts.bars:
+    # CASH_DIVIDEND is price-only, as in the exit gate; any other action effective
+    # on this session invalidates the pre-open zone/stop/target raw-price basis.
+    transformed = any(action.effective_date == facts.session.market_date
+                      and action.action_type != "CASH_DIVIDEND"
+                      for action in facts.action_coverage.actions)
+    if transformed:
+        status = reason = "UNSUPPORTED_CORPORATE_ACTION"
+    for bar in () if transformed else facts.bars:
         if bar.open <= candidate.stop:
             status, reason = "INVALIDATED_OPEN_GAP", "OPEN_AT_OR_BELOW_STOP_BEFORE_ENTRY"
             break

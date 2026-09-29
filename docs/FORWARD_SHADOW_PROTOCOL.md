@@ -203,6 +203,17 @@ followed entry. A high exactly equal to target 1 counts as a touch. An open
 inside the entry zone does not create this particular ambiguity; it still does
 not prove an executable fill.
 
+Any admitted corporate action other than `CASH_DIVIDEND` effective on the session
+date yields `UNSUPPORTED_CORPORATE_ACTION` before any bar is examined: the pre-open
+zone, stop and targets have no valid raw-price basis, so no trigger, fill or
+reservation can follow. `CASH_DIVIDEND` is price-only, matching the exit gate.
+Evaluations unaffected by actions serialize exactly as before, so existing
+content-addressed trigger events still reaudit. Open decision (not implemented):
+actions effective after the watchlist `information_cutoff` but before the session
+date (e.g. on intervening closed dates) are not gated, because forward action
+coverage is only required to include the session date; extending the gate needs
+coverage reaching back to the cutoff's local date.
+
 Append and audit recompute the deterministic evaluation, bind the exact upstream
 fact-event ID and bytes hash, enforce fact availability and local UTC ordering,
 and reject duplicate/unexpected fields or changed content. These mechanics do

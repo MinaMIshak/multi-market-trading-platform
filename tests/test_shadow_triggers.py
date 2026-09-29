@@ -179,3 +179,43 @@ def test_pre_entry_bar_retirement_survives_later_entry_touch(
         assert shadow_triggers.evaluate_trigger(item, prefix).status == status
     assert event["execution_status"] == "NO FILL OR POSITION CREATED"
     assert event["scoring"] == "NOT SCORED"
+
+
+def with_session_action(facts, action_type):
+    action = shadow_facts.ForwardActionFact(
+        event_id=f"fixture-{action_type.lower()}", action_type=action_type,
+        effective_date=facts.session.market_date, terms="artificial fixture terms",
+    )
+    return facts.model_copy(update={"action_coverage": facts.action_coverage.model_copy(
+        update={"actions": (action,)},
+    )})
+
+
+@pytest.mark.parametrize("action_type", ["SPLIT", "STOCK_DIVIDEND", "SPINOFF", "OTHER"])
+def test_session_date_transforming_action_is_never_a_trigger(tmp_path, monkeypatch, action_type):
+    """Pre-open entry zone/stop/targets have no valid raw-price basis on a session
+    where a transforming action takes effect; no trigger (and hence no fill)."""
+    item, _, facts, _, _ = admitted(tmp_path, monkeypatch)
+    assert shadow_triggers.evaluate_trigger(item, facts).status == "TRIGGERED"
+    result = shadow_triggers.evaluate_trigger(item, with_session_action(facts, action_type))
+    assert (result.status, result.reason) == (
+        "UNSUPPORTED_CORPORATE_ACTION", "UNSUPPORTED_CORPORATE_ACTION",
+    )
+    assert result.trigger_sequence is result.trigger_reference_price is None
+    assert result.evaluated_through_sequence == facts.bars[-1].sequence
+
+
+def test_session_date_cash_dividend_keeps_raw_trigger(tmp_path, monkeypatch):
+    item, _, facts, _, _ = admitted(tmp_path, monkeypatch)
+    result = shadow_triggers.evaluate_trigger(item, with_session_action(facts, "CASH_DIVIDEND"))
+    assert (result.status, result.trigger_reference_price) == ("TRIGGERED", Decimal("100"))
+
+
+def test_unchanged_trigger_evaluation_serialization(tmp_path, monkeypatch):
+    """Existing durable trigger events are content-addressed; the gate must not add
+    fields to evaluations that are unaffected by corporate actions."""
+    item, _, facts, _, _ = admitted(tmp_path, monkeypatch)
+    assert set(shadow_triggers.evaluate_trigger(item, facts).model_dump(mode="json")) == {
+        "schema_version", "label", "candidate_id", "status", "evaluated_through_sequence",
+        "evaluated_through_available_at", "trigger_sequence", "trigger_reference_price", "reason",
+    }
