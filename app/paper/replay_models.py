@@ -869,6 +869,15 @@ class PaperReplayPosition(Contract):
                 "CLOSED replay position requires exit"
             )
 
+        if (
+            self.exit.instrument_id != self.entry.instrument_id
+            or self.exit.venue_id != self.entry.venue_id
+            or self.exit.symbol != self.entry.symbol
+        ):
+            raise ValueError(
+                "position exit instrument/venue/symbol must match entry"
+            )
+
         if self.exit.side != "SELL":
             raise ValueError(
                 "paper replay exit must be SELL"
