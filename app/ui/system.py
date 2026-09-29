@@ -11,6 +11,7 @@ from app.egx_scan_history import load_scan_history
 from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
 from app.ui.readiness import render_readiness
+from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
 
 
@@ -95,6 +96,8 @@ def load_system_state():
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': heartbeat,
         'readiness': product['readiness']['EGX'],
+        # Where each reader input came from; snapshot hashes verified, not assumed.
+        'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
         'scan_runs': product['scan_runs'],
         'markets': {
@@ -121,6 +124,31 @@ def load_system_state():
         # sources may feed signals or candidates.
         'daily_sources': daily_source_summary(),
     }
+
+
+def render_runtime_state(report):
+    def cell(value):
+        return '<td>' + escape('UNSET' if value is None else str(value)) + '</td>'
+    content = ('<h2>Runtime state inputs: ' + escape(report['mode']) + '</h2>'
+               '<p>Where each reader input is resolved. A snapshot bundle is a point-in-time '
+               'copy, not live state.</p><div class="table-scroll">'
+               '<table aria-label="Runtime state inputs"><thead><tr><th scope="col">Input</th>'
+               '<th scope="col">Variable</th><th scope="col">Origin</th><th scope="col">Path</th>'
+               '</tr></thead><tbody>')
+    for name, item in report['inputs'].items():
+        content += ('<tr>' + cell(name) + cell(item['variable']) + cell(item['origin'])
+                    + cell(item['path']) + '</tr>')
+    content += '</tbody></table></div>'
+    snapshot = report['snapshot']
+    if snapshot is not None:
+        content += ('<p>Snapshot: ' + escape(snapshot['status']) + ' · taken at '
+                    + escape(str(snapshot['taken_at'] or 'UNKNOWN')) + ' · build '
+                    + escape(str(snapshot['build_revision'] or 'UNKNOWN')) + ' · integrity '
+                    + escape(str(snapshot['integrity_check'] or 'UNKNOWN')) + '</p><p>Missing: '
+                    + escape(', '.join(snapshot['missing']) or 'none') + ' · Hash mismatches: '
+                    + escape(', '.join(snapshot['mismatched']) or 'none') + '</p>')
+    content += ('<p>Warnings: ' + escape(', '.join(report['warnings']) or 'none') + '</p>')
+    return content
 
 
 def render_daily_sources(sources):
@@ -315,6 +343,7 @@ def render_system(state):
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
+            + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
             + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])
             + render_daily_sources(state.get('daily_sources') or [])

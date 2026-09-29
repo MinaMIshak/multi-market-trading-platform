@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import tempfile
 
+from app.runtime_state import resolved_path
+
 MAX_HEARTBEAT_BYTES = 64 * 1024
 
 
@@ -38,7 +40,7 @@ def write_heartbeat(*, mode, poll_seconds, now=None):
 
 def load_heartbeat(*, now=None):
     unknown = {'status': 'UNKNOWN', 'reason': 'No valid scheduler heartbeat connected'}
-    configured = os.getenv('EGX_SCHEDULER_HEARTBEAT_PATH')
+    configured = resolved_path('heartbeat')
     if not configured or not Path(configured).is_absolute():
         return unknown
     try:

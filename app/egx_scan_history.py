@@ -8,6 +8,7 @@ import sqlite3
 
 from app.egx_scope import SCAN_STATUSES, valid_scope_symbol
 from app.path_safety import symlinked as _symlinked
+from app.runtime_state import resolved_path
 
 
 def write_scan_history(report, path, *, scheduler_attempt=None):
@@ -119,7 +120,7 @@ def valid_reconciliation(raw, completion):
 
 def reconcile_scan_completion(raw):
     """Read one ledger snapshot without initializing storage or rewriting history."""
-    configured = os.getenv('EGX_SCAN_LEDGER_PATH')
+    configured = resolved_path('scan_ledger')
     if not configured or raw['schema_version'] != 3 or raw['scheduler_attempt']['status'] != 'RUNNING':
         return None
     attempt = raw['scheduler_attempt']
@@ -148,7 +149,7 @@ def reconcile_scan_completion(raw):
 
 def load_scan_history():
     unknown = {'status': 'UNKNOWN', 'reason': 'No valid EGX scan history connected'}
-    configured = os.getenv('EGX_SCAN_HISTORY_PATH')
+    configured = resolved_path('scan_history')
     if not configured or not Path(configured).is_absolute():
         return unknown
     try:

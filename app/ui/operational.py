@@ -4,16 +4,16 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape
 import json
-import os
 from pathlib import Path
 import sqlite3
 
 from app.path_safety import symlinked
+from app.runtime_state import resolved_path
 from app.data.source_admission import daily_source_admission
 
 
 def load_operational_state():
-    configured = os.getenv('EGX_PAPER_RUNTIME')
+    configured = resolved_path('receipts')
     state = {'configured': bool(configured), 'available': False, 'symbols': [],
              'observed_at': None, 'status': 'NOT_READY', 'mode': 'PAPER/SHADOW ONLY', 'live': 'DISABLED'}
     if not configured:

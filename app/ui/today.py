@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import os
 import sqlite3
 from contextlib import closing
 from datetime import date, datetime, timedelta
@@ -9,6 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.core.schedule import CalendarTruth
+from app.runtime_state import resolved_path
 from app.domain import MarketSession, MarketSessionStatus
 
 
@@ -127,12 +127,7 @@ def load_security_master_summary(
     database_path: Path | None = None,
 ) -> dict | None:
     """Read-only identity summary for the product shell; None when unreadable."""
-    path = database_path if database_path is not None else Path(
-        os.getenv(
-            "EGX_DB_PATH",
-            "/app/data/platform.db",
-        )
-    )
+    path = database_path if database_path is not None else Path(resolved_path("database"))
 
     try:
         with closing(sqlite3.connect(
@@ -155,12 +150,7 @@ def load_validated_daily_observations(
     Dated historical observations with calendar-derived freshness as of the
     Cairo market date; no rights, readiness or signal claim.
     """
-    path = database_path if database_path is not None else Path(
-        os.getenv(
-            "EGX_DB_PATH",
-            "/app/data/platform.db",
-        )
-    )
+    path = database_path if database_path is not None else Path(resolved_path("database"))
 
     as_of = (
         market_date
@@ -229,12 +219,7 @@ def load_today_state(
     database_path: Path | None = None,
     market_date: date | None = None,
 ) -> dict:
-    path = database_path if database_path is not None else Path(
-        os.getenv(
-            "EGX_DB_PATH",
-            "/app/data/platform.db",
-        )
-    )
+    path = database_path if database_path is not None else Path(resolved_path("database"))
 
     target_market_date = (
         market_date

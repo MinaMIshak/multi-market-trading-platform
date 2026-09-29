@@ -45,6 +45,35 @@ is also rendered in TODAY/SWING/SYSTEM, and `/api/system` exposes it as
 The receipt-reader fields (`markets.EGX.status`) and coverage counts are
 unchanged. Identities or bars never upgrade them.
 
+## Central runtime-state resolution
+
+`app/runtime_state.py` is the single resolver used by every reader. Each
+input resolves in this order:
+
+1. its explicit variable (`EGX_DB_PATH`, `EGX_PAPER_RUNTIME`,
+   `EGX_SCHEDULER_HEARTBEAT_PATH`, `EGX_SCAN_HISTORY_PATH`,
+   `EGX_SCAN_LEDGER_PATH`), kept for compatibility;
+2. `EGX_RUNTIME_STATE_DIR`, a snapshot bundle directory;
+3. the legacy default (only the product DB has one: `/app/data/platform.db`).
+
+Writers (the scheduler's heartbeat and scan history) still use only their
+explicit variables, so nothing ever writes into a bundle.
+
+`/api/system` → `runtime_state` reports each input's variable, origin and path.
+For a bundle it also reports a manifest check: every hash is re-verified, with
+the database integrity result, build revision, missing artifacts and
+mismatches. Status is `VERIFIED` only when the database hash matches and
+`integrity_check` is `ok`; otherwise it is `INVALID` or `UNAVAILABLE`.
+It raises these warnings:
+- `MIXED_STATE_SOURCES` when explicit overrides split state across sources,
+  whether combined with a bundle or with each other;
+- `SNAPSHOT_UNVERIFIED`;
+- `RUNTIME_STATE_DIR_NOT_ABSOLUTE`.
+
+The tests include an end-to-end check (`tests/test_runtime_state.py`):
+snapshot → bundle → `/api/product` + `/api/system` → identical, truthful
+readiness, including tamper detection.
+
 ## Reproducible read-only snapshot
 
 Do not point the UI at a live SQLite writer. Take a snapshot instead:
@@ -54,8 +83,17 @@ python tools/runtime_state_snapshot.py \
   --db /abs/path/platform.db \
   --heartbeat /abs/path/scheduler-heartbeat.json \
   --scan-history /abs/path/egx-scan-history.json \
-  --out /abs/path/snapshots/2026-09-29T1800Z
+  --out /abs/path/snapshots/2026-09-29T1800Z \
+  --build-revision "$(git rev-parse HEAD)"
+
+EGX_RUNTIME_STATE_DIR=/abs/path/snapshots/2026-09-29T1800Z \
+EGX_BUILD_REVISION="$(git rev-parse HEAD)" \
+  python -m uvicorn app.main:app --host 127.0.0.1 --port 8002
 ```
+
+To refresh, take a new snapshot into a new directory, then restart the UI with
+the new path. To roll back, restart with the previous directory; old bundles
+are never modified.
 
 `--heartbeat` and `--scan-history` are optional; omit them if the files do not
 exist. The tool:
@@ -73,9 +111,9 @@ exist. The tool:
   result, key table counts and the `PAPER_SIGNAL_VERIFIED` receipt count;
 - builds a private partial directory, sets the files read-only (0444) and
   renames it atomically. It never overwrites, and a failed attempt leaves nothing;
-- prints the environment for the UI process:
-  `EGX_DB_PATH`, `EGX_PAPER_RUNTIME`, `EGX_SCAN_LEDGER_PATH` and, when copied,
-  `EGX_SCHEDULER_HEARTBEAT_PATH` and `EGX_SCAN_HISTORY_PATH`.
+- records `--build-revision` (default `EGX_BUILD_REVISION`) and lists missing
+  artifacts in the manifest (`schema_version` 2);
+- prints the one variable the UI process needs: `EGX_RUNTIME_STATE_DIR=<out>`.
 
 A WAL source needs read access to its `-wal`/`-shm` files. If the snapshot
 user cannot read them, SQLite refuses and the tool exits non-zero. Run it as

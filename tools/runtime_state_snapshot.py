@@ -9,11 +9,13 @@ timestamps, so an old heartbeat is reported STALE, never refreshed.
 
 Layout (atomic rename of a private partial directory; never overwrites):
 
-  <out>/platform.db               EGX_DB_PATH, EGX_SCAN_LEDGER_PATH
-  <out>/                          EGX_PAPER_RUNTIME (reader expects platform.db)
-  <out>/scheduler-heartbeat.json  EGX_SCHEDULER_HEARTBEAT_PATH (if supplied)
-  <out>/egx-scan-history.json     EGX_SCAN_HISTORY_PATH (if supplied)
-  <out>/SNAPSHOT_MANIFEST.json    hashes, integrity check and table counts
+  <out>/platform.db               product DB, receipts, scan ledger
+  <out>/scheduler-heartbeat.json  scheduler heartbeat (if supplied)
+  <out>/egx-scan-history.json     scan history (if supplied)
+  <out>/SNAPSHOT_MANIFEST.json    hashes, integrity check, counts, missing list
+
+Readers select all of these with EGX_RUNTIME_STATE_DIR=<out>
+(app/runtime_state.py), which also verifies the manifest hashes.
 
 Nothing here fabricates evidence: absent inputs stay absent in the snapshot.
 """
@@ -79,7 +81,8 @@ def _copy_database(source, destination):
             'paper_signal_receipts': receipts}
 
 
-def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None):
+def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
+                    build_revision=None):
     db = _source(db, 'database')
     out = Path(out)
     if not out.is_absolute():
@@ -96,7 +99,8 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None):
         target = partial / 'platform.db'
         database = _copy_database(db, target)
         manifest = {
-            'schema_version': 1,
+            'schema_version': 2,
+            'build_revision': build_revision or None,
             'taken_at': (now or datetime.now(timezone.utc)).isoformat(),
             'semantics': ('Point-in-time read-only copy of committed state. Not live '
                           'state; heartbeat/history keep original timestamps.'),
@@ -114,6 +118,9 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None):
                                       'sha256': hashlib.sha256(payload).hexdigest()}
         for key in SNAPSHOT_FILES:
             manifest['files'].setdefault(key, None)
+        # Absent evidence stays absent; it is listed, never synthesized.
+        manifest['missing'] = sorted(key for key, item in manifest['files'].items()
+                                     if item is None)
         (partial / 'SNAPSHOT_MANIFEST.json').write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + '\n')
         for item in partial.iterdir():
@@ -129,15 +136,9 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None):
 
 
 def runtime_environment(out, manifest):
-    out = Path(out)
-    env = {'EGX_DB_PATH': str(out / 'platform.db'),
-           'EGX_PAPER_RUNTIME': str(out),
-           'EGX_SCAN_LEDGER_PATH': str(out / 'platform.db')}
-    if manifest['files']['heartbeat']:
-        env['EGX_SCHEDULER_HEARTBEAT_PATH'] = str(out / SNAPSHOT_FILES['heartbeat'])
-    if manifest['files']['scan_history']:
-        env['EGX_SCAN_HISTORY_PATH'] = str(out / SNAPSHOT_FILES['scan_history'])
-    return env
+    # One variable selects every reader input (app/runtime_state.py). Do not
+    # also set per-input variables, or SYSTEM reports MIXED_STATE_SOURCES.
+    return {'EGX_RUNTIME_STATE_DIR': str(Path(out))}
 
 
 def main(argv=None):
@@ -146,10 +147,13 @@ def main(argv=None):
     parser.add_argument('--out', required=True, help='absolute new snapshot directory')
     parser.add_argument('--heartbeat', help='absolute scheduler heartbeat JSON')
     parser.add_argument('--scan-history', help='absolute EGX scan history JSON')
+    parser.add_argument('--build-revision', default=os.getenv('EGX_BUILD_REVISION'),
+                        help='git revision of the reading application (recorded only)')
     args = parser.parse_args(argv)
     try:
         manifest = create_snapshot(db=args.db, out=args.out, heartbeat=args.heartbeat,
-                                   scan_history=args.scan_history)
+                                   scan_history=args.scan_history,
+                                   build_revision=args.build_revision)
     except (SnapshotError, OSError, sqlite3.Error) as exc:
         print(f'snapshot failed: {exc}', file=sys.stderr)
         return 1

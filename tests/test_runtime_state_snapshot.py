@@ -9,9 +9,12 @@ import pytest
 from app.scheduler_heartbeat import load_heartbeat
 from app.ui.operational import load_operational_state
 from app.ui.today import load_security_master_summary
+from app.runtime_state import INPUTS
 from tools.runtime_state_snapshot import (
     SnapshotError, create_snapshot, main, runtime_environment,
 )
+
+INPUT_VARIABLES = [variable for variable, _, _ in INPUTS.values()]
 
 
 def make_db(path):
@@ -91,11 +94,11 @@ def test_snapshot_runtime_readers_keep_original_evidence_times(tmp_path, monkeyp
     out = tmp_path / 'snap'
     manifest = create_snapshot(db=str(source), out=str(out), heartbeat=str(beat))
     env = runtime_environment(out, manifest)
-    assert env == {'EGX_DB_PATH': str(out / 'platform.db'), 'EGX_PAPER_RUNTIME': str(out),
-                   'EGX_SCAN_LEDGER_PATH': str(out / 'platform.db'),
-                   'EGX_SCHEDULER_HEARTBEAT_PATH': str(out / 'scheduler-heartbeat.json')}
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
+    assert env == {'EGX_RUNTIME_STATE_DIR': str(out)}
+    assert manifest['missing'] == ['scan_history']
+    for key in INPUT_VARIABLES:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('EGX_RUNTIME_STATE_DIR', str(out))
     # Copied heartbeat is historical: reported STALE, never refreshed.
     assert load_heartbeat()['status'] == 'STALE'
     # Receipt reader reads the snapshot; no receipts means none are fabricated.
@@ -110,5 +113,5 @@ def test_cli_reports_failure_without_traceback(tmp_path, capsys):
     source = tmp_path / 'live.db'
     make_db(source).close()
     assert main(['--db', str(source), '--out', str(tmp_path / 's')]) == 0
-    assert json.loads(capsys.readouterr().out)['environment']['EGX_PAPER_RUNTIME'] == str(
-        tmp_path / 's')
+    assert json.loads(capsys.readouterr().out)['environment'] == {
+        'EGX_RUNTIME_STATE_DIR': str(tmp_path / 's')}
