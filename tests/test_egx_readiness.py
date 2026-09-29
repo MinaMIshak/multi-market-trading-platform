@@ -58,14 +58,60 @@ def test_admitted_source_alone_is_not_ready():
     assert 'SCHEDULER_HEARTBEAT_STALE' in result['blockers']
 
 
+OPERATIONAL = {'configured': True, 'available': True, 'status': 'OPERATIONAL'}
+
+
+def _all_evidence(freshness):
+    return egx_readiness(operational=OPERATIONAL, security_master=IDENTITIES,
+                         daily_observations=[dict(r, freshness=freshness)
+                                             for r in admitted(DAILY)],
+                         heartbeat={'status': 'RECENT_POLL'},
+                         scan_history={'status': 'HISTORICAL_RUN'})
+
+
 def test_all_prerequisites_never_report_ready():
-    operational = {'configured': True, 'available': True, 'status': 'OPERATIONAL'}
-    result = egx_readiness(operational=operational, security_master=IDENTITIES,
-                           daily_observations=admitted(DAILY),
-                           heartbeat={'status': 'RECENT_POLL'},
-                           scan_history={'status': 'HISTORICAL_RUN'})
+    result = _all_evidence('CURRENT')
     assert result['blockers'] == []
     assert result['scan_readiness'] == 'PREREQUISITES_MET'
+    dims = result['dimensions']
+    assert dims['candidate_pipeline_ready'] is True and dims['paper_shadow_ready'] is True
+    # No dated authoritative universe exists, so overall readiness stays false.
+    assert dims['authoritative_universe_available'] is False
+    assert dims['overall_operational_ready'] is False
+
+
+@pytest.mark.parametrize('freshness', ['STALE', 'UNKNOWN'])
+def test_admitted_but_not_session_current_is_not_ready(freshness):
+    result = _all_evidence(freshness)
+    assert result['blockers'] == ['ADMITTED_DATA_NOT_CURRENT']
+    assert result['scan_readiness'] == 'NOT_READY'
+    assert result['dimensions']['source_admitted'] is True
+    assert result['dimensions']['source_fresh'] is False
+    assert result['dimensions']['candidate_pipeline_ready'] is False
+
+
+def test_dimensions_for_runtime_snapshot_scenario():
+    state = product_state(UNCONFIGURED, market='EGX', security_master=IDENTITIES,
+                          daily_observations=DAILY, heartbeat={'status': 'STALE'})
+    dims = state['readiness']['EGX']['dimensions']
+    assert dims == {
+        'security_master_available': True, 'authoritative_universe_available': False,
+        'daily_observations_available': True, 'source_admitted': False,
+        'source_fresh': False, 'scheduler_heartbeat_available': True,
+        'scheduler_healthy': False, 'scan_history_available': False, 'scan_ready': False,
+        'candidate_pipeline_ready': False, 'paper_shadow_ready': False,
+        'overall_operational_ready': False}
+    page = render_product(state)
+    assert '<th scope="row">scheduler_heartbeat_available</th><td>YES</td>' in page
+    assert '<th scope="row">overall_operational_ready</th><td>NO</td>' in page
+
+
+def test_unavailable_daily_data_leaves_source_dimensions_unknown():
+    result = egx_readiness(operational=UNCONFIGURED, security_master=None,
+                           daily_observations=None, heartbeat=None, scan_history=None)
+    assert result['dimensions']['source_admitted'] is None
+    assert result['dimensions']['source_fresh'] is None
+    assert 'source_fresh</th><td>UNKNOWN' in render_readiness({'EGX': result})
 
 
 @pytest.mark.parametrize('identities,daily,expected', [
