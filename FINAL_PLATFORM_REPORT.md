@@ -1,10 +1,10 @@
 # Platform Report — EGX + US Paper/Shadow Trading Platform
 
-Status as of 2026-09-29 (cycle 120). This is a current-state report, not a
+Status as of 2026-09-29 (cycle 152). This is a current-state report, not a
 claim of completion. PAPER/SHADOW ONLY. LIVE_MONEY=DISABLED.
 
 - Branch: `agent/er1c-free-acquisition`
-- Code HEAD at time of writing: `bb03063` (the commit that updates this report
+- Code HEAD at time of writing: `13465dd` (the commit that updates this report
   follows it; see `git log`)
 - Checkpoint details: `PROGRESS.json`
 
@@ -60,6 +60,13 @@ are documented in `README.md`. Container build: `docker compose up --build`.
 
 ## Test evidence
 
+- Full dependency-backed suite, cycle 152, on commit `261387f`:
+  **3235 passed, 667 subtests passed, 0 failed** (773 s). Log preserved at
+  `/home/egx-agent/er1-autopilot/state/cycle152-full-suite-261387f.log`.
+  `13465dd` (intraday stop/entry guard) then ran the 34 test files that
+  reference strategies/intraday: 668 passed. The full suite was not re-run
+  for that commit.
+
 - Full dependency-backed suite, cycle 120, on commit `bb03063`:
   **3207 passed, 665 subtests passed, 0 failed** (685 s). Log preserved at
   `/home/egx-agent/er1-autopilot/state/cycle120-full-suite.log`.
@@ -73,6 +80,13 @@ are documented in `README.md`. Container build: `docker compose up --build`.
   integration tests.
 
 ## Runtime validation (local only)
+
+Cycle 152 at `261387f`, uvicorn on 127.0.0.1:8766, unconfigured: all 21
+section x market pages and 21 `/api/product` calls returned 200, as did `/`,
+`/system`, `/api/system`, `/shadow`, `/api/shadow`, `/performance`,
+`/api/today`, `/api/paper-operational` and `/health`. Invalid or lowercase
+section/market returned 422. `/api/system` reported live_money false, scheduler
+UNKNOWN (no heartbeat configured), US UNKNOWN, EGX NOT_READY.
 
 Cycle 120 at `bb03063`, uvicorn on 127.0.0.1:8765, unconfigured: all 21
 section x market pages and 21 `/api/product` calls returned 200, as did `/`,
@@ -92,6 +106,18 @@ Cycle 40 at `d681291`, uvicorn on 127.0.0.1:
   session 2026-09-24).
 
 Not validated: deployed runtime, scheduled worker runs, live market sessions.
+
+## Cycle 152 review fixes
+
+- TODAY dashboard: "Validated Symbols" counted per-snapshot artifact rows
+  rather than distinct symbols. It now counts distinct symbols, and the
+  inventory bar counts are HTML-escaped.
+- Scheduler heartbeat reader: reads are capped at 64 KiB, and deeply nested
+  JSON now fails closed to UNKNOWN. Before, it could raise out of
+  `/api/system`.
+- Intraday strategies: a READY LONG setup whose stop is not strictly below
+  its entry (possible for VWAP pullback, and in degenerate momentum/ORB bars)
+  is now NO_CONFIRMATION with no entry or stop.
 
 ## Financial Services integration
 
