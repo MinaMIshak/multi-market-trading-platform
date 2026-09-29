@@ -37,3 +37,17 @@ record; each field below is its exact JSON string value, unchanged.
 ```json
 "Cycle 156 FULL SUITE at 4cb6ffa (pre-change baseline): 3236 passed, 667 subtests passed, 0 failed (777s; state/cycle156-full-suite-4cb6ffa.log). (The cycle-155 run at the same HEAD was interrupted at 52% and is not evidence.) New test_repository_checkpoint_presents_current_state_not_history failed pre-fix (tests/next_action/current_capability over bound) and passes post-fix. Offline/unit and local runtime only; no deployed or live-market validation. Earlier results: docs/PROGRESS_HISTORY.md."
 ```
+
+## Cycle 188 checkpoint fields (superseded in cycle 189)
+
+### current_capability
+
+```json
+"Cycle 188: architecture/product review. Local runtime (uvicorn 127.0.0.1:8765, unconfigured, defb599): /health, /api/system, /api/product (all sections incl. PRE-SURGE), /api/today, /, /system, /shadow, /performance 200; PRE_SURGE selector 422 (fail closed). Finding fixed: in TODAY/SWING the product shell rendered one status block per market under an identical unlabelled 'Operational Paper/Shadow' heading, so on ALL a NOT_READY and an UNKNOWN could not be attributed to EGX or US. render_operational now takes a heading; product shell labels each block by market ('EGX operational Paper/Shadow', 'US operational Paper/Shadow'). Standalone operational page heading unchanged. Earlier cycles: docs/PROGRESS_HISTORY.md. PAPER/SHADOW ONLY."
+```
+
+### tests
+
+```json
+"Cycle 188: new test_operational_status_blocks_are_labelled_by_market failed pre-fix (2 subtests) and passes post-fix. Affected suites (test_product_shell_contract, test_operational_ui, test_system_visibility, test_product_scan_history_contract, test_er1c_nyse_corporate_actions_product, test_system_checkpoint_presentation): 67 passed, 145 subtests, 0 failed. Runtime: labelled headings observed on / (ALL/TODAY, US/SWING). Last FULL SUITE: 4cb6ffa, 3236 passed, 667 subtests, 0 failed (state/cycle156-full-suite-4cb6ffa.log); not re-run for this UI-label change. Offline/unit and local runtime only; no deployed or live-market validation."
+```
