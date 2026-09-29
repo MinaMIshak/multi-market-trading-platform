@@ -8,6 +8,8 @@ from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
 from app.ui.readiness import egx_readiness, render_readiness
+from app.ui.sections import (live_state, pre_surge_state, render_live, render_pre_surge,
+                             source_delay)
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -121,7 +123,8 @@ def admitted_daily_observations(rows, market):
     for row in rows:
         admission = daily_source_admission(row.get('provider'), market)
         result.append({**row, 'source_status': admission.status,
-                       'source_reason': admission.reason})
+                       'source_reason': admission.reason,
+                       'source_delay': source_delay(row.get('provider'), market)})
     return result
 
 
@@ -164,6 +167,12 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         daily_observations=state['daily_observations']['EGX'],
         heartbeat=heartbeat, scan_history=scan_history) if key == 'EGX' else None
         for key in selected}
+    # US has no connected readers; its LIVE and PRE-SURGE state stays UNKNOWN.
+    # Not 'live': that key is the LIVE_MONEY=DISABLED safety label.
+    state['live_monitoring'] = {key: live_state(state['daily_observations']['EGX'])
+                     if key == 'EGX' else None for key in selected}
+    state['pre_surge'] = {key: pre_surge_state(state['readiness']['EGX'])
+                          if key == 'EGX' else None for key in selected}
     if section == 'RESEARCH':
         # Notes restate verified EGX receipts only; nothing is generated. US has no reader.
         notes = None
@@ -369,7 +378,10 @@ def render_product(state):
         }
         content += '<p>' + messages[section] + '</p>'
     if section == 'LIVE':
+        content += render_live(state['live_monitoring'])
         content += render_scan_runs(state['scan_runs'])
+    if section == 'PRE-SURGE':
+        content += render_pre_surge(state['pre_surge'])
     if section == 'RESEARCH':
         content += render_research(state['research'])
     content += ('<footer><a href="/system">SYSTEM details</a> · '

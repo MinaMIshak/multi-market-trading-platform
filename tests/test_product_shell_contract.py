@@ -27,7 +27,8 @@ class ProductShellContracts(unittest.TestCase):
               'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
               'quarantined_bar_count': 0, 'freshness': 'UNKNOWN'}]
     BLOCKED = [dict(DAILY[0], source_status='EVIDENCE_BLOCKED',
-                    source_reason='source entitlement not established')]
+                    source_reason='source entitlement not established',
+                    source_delay='UNKNOWN')]
 
     def test_daily_observations_are_egx_only_and_never_coverage(self):
         state = product_state(self.source, daily_observations=self.DAILY)
@@ -60,7 +61,12 @@ class ProductShellContracts(unittest.TestCase):
                 self.assertIn('US validated daily observations: UNKNOWN', page)
         live = render_product(product_state(
             self.source, section='LIVE', daily_observations=self.DAILY))
-        self.assertNotIn('tradingview_tvdatafeed_egx', live)
+        # LIVE never presents daily observations as real-time or as the TODAY table.
+        self.assertNotIn('EGX validated daily observations', live)
+        self.assertIn('EGX near-current feed: UNAVAILABLE', live)
+        self.assertIn('Nothing below is real-time', live)
+        self.assertLess(live.index('Nothing below is real-time'),
+                        live.index('tradingview_tvdatafeed_egx'))
 
     def test_daily_observations_unknown_and_empty_are_distinct(self):
         unknown = render_product(product_state(self.source, market='EGX'))
