@@ -112,7 +112,7 @@ def scan_run_state(history):
 
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
-                  security_master=None):
+                  security_master=None, daily_observations=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -137,6 +137,9 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         # readiness or dated membership. No US identity reader exists.
         'identities': {key: security_master if key == 'EGX' else None
                        for key in selected},
+        # Dated VALIDATED daily-canonical artifacts; not freshness or readiness.
+        'daily_observations': {key: daily_observations if key == 'EGX' else None
+                               for key in selected},
     }
     if section == 'RESEARCH':
         # Notes restate verified EGX receipts only; nothing is generated. US has no reader.
@@ -249,6 +252,37 @@ def render_identities(identities):
     return html
 
 
+def render_daily_observations(observations):
+    html = ''
+    for key, rows in observations.items():
+        if rows is None:
+            html += f'<p>{key} validated daily observations: UNKNOWN.</p>'
+            continue
+        if not rows:
+            html += f'<p>{key} validated daily observations: none recorded.</p>'
+            continue
+        body = ''.join(
+            f'<tr><td>{escape(str(r["canonical_symbol"]))}</td>'
+            f'<td>{escape(str(r["provider"]))}</td>'
+            f'<td>{escape(str(r["oldest_market_date"]))} to {escape(str(r["newest_market_date"]))}</td>'
+            f'<td>{escape(str(r["valid_bar_count"]))}</td>'
+            f'<td>{escape(str(r["quarantined_bar_count"]))}</td>'
+            f'<td>{escape(str(r["source_snapshot_date"]))}</td></tr>'
+            for r in rows)
+        html += (f'<section aria-label="{key} validated daily observations">'
+                 f'<h2>{key} validated daily observations</h2>'
+                 '<p>Dated historical daily bars that passed canonical validation. '
+                 'Freshness NOT ESTABLISHED: no verified exchange calendar links the newest '
+                 'session to today. Source usage rights NOT ESTABLISHED. '
+                 'Not a signal, candidate or fill.</p>'
+                 f'<table aria-label="{key} validated daily observations">'
+                 '<thead><tr><th scope="col">Symbol</th><th scope="col">Source</th>'
+                 '<th scope="col">Market dates</th><th scope="col">Valid bars</th>'
+                 '<th scope="col">Quarantined bars</th><th scope="col">Source snapshot</th>'
+                 f'</tr></thead><tbody>{body}</tbody></table></section>')
+    return html
+
+
 def render_product(state):
     market, section = state['market'], state['section']
     def link(label, selected_market, selected_section):
@@ -285,6 +319,7 @@ def render_product(state):
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
         content += render_identities(state['identities'])
+        content += render_daily_observations(state['daily_observations'])
         for key, value in state['markets'].items():
             content += render_operational(value, fragment=True,
                                           heading=f'{key} operational Paper/Shadow')

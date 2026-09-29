@@ -79,6 +79,47 @@ def load_security_master_summary(
         return None
 
 
+def load_validated_daily_observations(
+    database_path: Path | None = None,
+) -> list[dict] | None:
+    """Read-only VALIDATED daily-canonical artifact rows; None when unreadable.
+
+    Dated historical observations only: no freshness, rights or signal claim.
+    """
+    path = database_path if database_path is not None else Path(
+        os.getenv(
+            "EGX_DB_PATH",
+            "/app/data/platform.db",
+        )
+    )
+
+    try:
+        with closing(sqlite3.connect(
+            path.resolve().as_uri() + "?mode=ro",
+            uri=True,
+        )) as con:
+            con.row_factory = sqlite3.Row
+            con.execute("BEGIN")
+            rows = con.execute(
+                """
+                SELECT
+                    canonical_symbol,
+                    provider,
+                    source_snapshot_date,
+                    oldest_market_date,
+                    newest_market_date,
+                    valid_bar_count,
+                    quarantined_bar_count
+                FROM daily_canonical_artifacts
+                WHERE status='VALIDATED'
+                ORDER BY canonical_symbol, provider
+                """
+            ).fetchall()
+            return [dict(row) for row in rows]
+    except Exception:
+        return None
+
+
 def load_today_state(
     database_path: Path | None = None,
     market_date: date | None = None,

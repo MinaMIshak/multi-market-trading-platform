@@ -91,3 +91,23 @@ record; each field below is its exact JSON string value, unchanged.
 ```json
 "Surface the same security-master identity summary in the product shell TODAY/SWING view (app/ui/product.py via app/main.py), EGX only, labelled identity/reference data, fail-closed to UNKNOWN; keep US UNKNOWN. Then design a vendor-neutral MarketDataProvider contract (dated daily/delayed OHLCV observations with provenance, raw evidence kept separately, freshness/quality validation) reusing existing app/data provider and daily_canonical structures rather than duplicating them. Keep PROGRESS.json fields current-state only (prior narrative goes to docs/PROGRESS_HISTORY.md). Open policy decisions stay documented, not implemented from guesswork (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
 ```
+
+## Cycle 192 checkpoint-2 fields (superseded in cycle 192 checkpoint 3)
+
+### current_capability
+
+```json
+"Cycle 192 checkpoint 2: authentic EGX security-master identities are now visible in the main product shell. app/ui/today.py exposes load_security_master_summary() (read-only sqlite URI, fails closed to None) sharing _read_security_master() with load_today_state. app/main.py passes it to product_state(security_master=...) for EGX/ALL views only (US never reads it). product_state adds state['identities'] = {EGX: summary, US: None}; coverage/universe/data_ready/scanned/candidates stay None. render_product shows an 'EGX security-master identities' panel in TODAY and SWING, labelled identity/reference only (NOT price, NOT a trading signal, NOT dated membership/constituency, not scan coverage); missing summary or dates render UNKNOWN; US renders 'US security-master identities: UNKNOWN'. Checkpoint 1 (2ec299c) added the same summary to the TODAY dashboard/API. Local runtime against the read-only operational DB: / (ALL/TODAY) and EGX/SWING show 319 identity records from egid (EQUITY 312, INDEX 7), source market date UNKNOWN. PAPER/SHADOW ONLY."
+```
+
+### tests
+
+```json
+"Cycle 192 checkpoint 2: new tests (tests/test_product_shell_contract.py: EGX-only identities, TODAY/SWING rendering with disclaimer and UNKNOWN dates, missing summary UNKNOWN not zero, escaping, route wiring via the AST route harness; tests/test_today_ui.py: load_security_master_summary reads without mutating the DB and fails closed on missing/empty DB) failed pre-implementation (ImportError) and pass: 40 passed, 25 subtests. Affected suites (every test referencing product_state/render_product/app.main/app.ui.today plus system checkpoint/visibility): 218 passed, 199 subtests, 0 failed. Last FULL SUITE: checkpoint 1 code (parent of 2ec299c WIP): 3241 passed, 672 subtests, 0 failed (er1-autopilot/state/cycle192-full-suite-wip.log); not re-run for checkpoint 2. Local runtime: uvicorn 127.0.0.1:8767 \u2014 /, /?market=US&section=TODAY, /?market=EGX&section=SWING, /?market=ALL&section=LIVE all 200; /api/product?market=US identities {'US': None}. Offline/unit and local runtime only; no deployed or live-market validation."
+```
+
+### next_action
+
+```json
+"Design a vendor-neutral MarketDataProvider contract for dated daily/delayed EGX OHLCV observations (provenance, source identity, observed_at/as_of, raw evidence stored separately from normalized bars, freshness/quality validation, fail-closed), reusing existing app/data providers (egid, egx_official, eodhd) and daily_canonical structures instead of duplicating them \u2014 inspect those first. No source is admitted without documented provenance, timestamps, coverage and licensing assumptions. Run the full suite at the next code-changing milestone. Keep PROGRESS.json fields current-state only (prior narrative goes to docs/PROGRESS_HISTORY.md). Open policy decisions stay documented, not implemented from guesswork (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
+```

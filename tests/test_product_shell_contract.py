@@ -22,6 +22,53 @@ class ProductShellContracts(unittest.TestCase):
                            'latest_snapshot_updated_at': '2026-09-26T07:59:16+00:00',
                            'latest_source_market_date': None}
 
+    DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed_egx',
+              'source_snapshot_date': '2026-09-24', 'oldest_market_date': '2025-01-27',
+              'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
+              'quarantined_bar_count': 0}]
+
+    def test_daily_observations_are_egx_only_and_never_coverage(self):
+        state = product_state(self.source, daily_observations=self.DAILY)
+        self.assertEqual(state['daily_observations'], {'EGX': self.DAILY, 'US': None})
+        for counts in state['coverage'].values():
+            for key in ('universe', 'data_ready', 'scanned', 'candidates'):
+                self.assertIsNone(counts[key])
+        us = product_state(self.source, 'US', daily_observations=self.DAILY)
+        self.assertEqual(us['daily_observations'], {'US': None})
+        self.assertNotIn('tradingview', render_product(us))
+
+    def test_daily_observations_render_dated_with_freshness_not_established(self):
+        for section in ('TODAY', 'SWING'):
+            with self.subTest(section=section):
+                page = render_product(product_state(
+                    self.source, section=section, daily_observations=self.DAILY))
+                self.assertIn('EGX validated daily observations', page)
+                self.assertIn('<td>COMI</td>', page)
+                self.assertIn('tradingview_tvdatafeed_egx', page)
+                self.assertIn('2025-01-27 to 2026-09-24', page)
+                self.assertIn('<td>400</td>', page)
+                self.assertIn('Freshness NOT ESTABLISHED', page)
+                self.assertIn('usage rights NOT ESTABLISHED', page)
+                self.assertIn('Not a signal, candidate or fill', page)
+                self.assertIn('US validated daily observations: UNKNOWN', page)
+        live = render_product(product_state(
+            self.source, section='LIVE', daily_observations=self.DAILY))
+        self.assertNotIn('tradingview_tvdatafeed_egx', live)
+
+    def test_daily_observations_unknown_and_empty_are_distinct(self):
+        unknown = render_product(product_state(self.source, market='EGX'))
+        self.assertIn('EGX validated daily observations: UNKNOWN', unknown)
+        empty = render_product(product_state(self.source, market='EGX', daily_observations=[]))
+        self.assertIn('EGX validated daily observations: none recorded', empty)
+        self.assertNotIn('EGX validated daily observations: UNKNOWN', empty)
+
+    def test_daily_observation_text_is_escaped(self):
+        hostile = [dict(self.DAILY[0], canonical_symbol='<b>X</b>', provider='<i>p</i>')]
+        page = render_product(product_state(self.source, daily_observations=hostile))
+        self.assertNotIn('<b>X</b>', page)
+        self.assertNotIn('<i>p</i>', page)
+        self.assertIn('&lt;b&gt;X&lt;/b&gt;', page)
+
     def test_egx_identity_summary_is_egx_only_and_never_coverage(self):
         state = product_state(self.source, security_master=self.identities)
         self.assertEqual(state['identities'], {'EGX': self.identities, 'US': None})
@@ -210,6 +257,7 @@ class ProductShellContracts(unittest.TestCase):
                      'load_operational_state': lambda: self.source,
                      'load_scan_history': lambda: None,
                      'load_security_master_summary': lambda: self.identities,
+                     'load_validated_daily_observations': lambda: self.DAILY,
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())
@@ -218,6 +266,9 @@ class ProductShellContracts(unittest.TestCase):
         self.assertIn('EQUITY: 312', namespace['root']())
         self.assertNotIn('EQUITY: 312', namespace['root']('US'))
         self.assertEqual(namespace['product']('ALL')['identities']['EGX'], self.identities)
+        self.assertIn('tradingview_tvdatafeed_egx', namespace['root']())
+        self.assertNotIn('tradingview_tvdatafeed_egx', namespace['root']('US'))
+        self.assertEqual(namespace['product']('ALL')['daily_observations']['EGX'], self.DAILY)
         with self.assertRaises(HttpError) as error:
             namespace['product']('invalid')
         self.assertEqual(error.exception.status_code, 422)

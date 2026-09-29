@@ -9,7 +9,11 @@ from fastapi.responses import HTMLResponse
 from app.core.config import settings
 from app.ui.performance import render_performance_dashboard
 from app.ui.shadow import load_shadow_watchlist, render_shadow_watchlist
-from app.ui.today import load_security_master_summary, load_today_state
+from app.ui.today import (
+    load_security_master_summary,
+    load_today_state,
+    load_validated_daily_observations,
+)
 from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state
 from app.ui.product import product_state, render_product
@@ -32,11 +36,13 @@ def root(market: str = 'ALL', section: str = 'TODAY') -> HTMLResponse:
 
 @app.get('/api/product')
 def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
+    egx = market != "US"
     try:
         return product_state(load_operational_state(), market, section,
-                             scan_history=load_scan_history() if market != "US" else None,
-                             security_master=(load_security_master_summary()
-                                              if market != "US" else None))
+                             scan_history=load_scan_history() if egx else None,
+                             security_master=load_security_master_summary() if egx else None,
+                             daily_observations=(load_validated_daily_observations()
+                                                 if egx else None))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail='Unknown product view') from exc
 

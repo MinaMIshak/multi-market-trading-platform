@@ -10,6 +10,7 @@ from app.domain import (
 )
 from app.ui.today import (
     load_security_master_summary,
+    load_validated_daily_observations,
     load_today_state,
     render_today_dashboard,
 )
@@ -365,6 +366,36 @@ def test_security_master_summary_reads_identities_read_only(tmp_path, monkeypatc
         "latest_source_market_date": "2026-09-09",
     }
     assert path.read_bytes() == before
+
+
+def test_validated_daily_observations_read_only(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    con = sqlite3.connect(path)
+    con.execute(
+        "INSERT INTO daily_canonical_artifacts VALUES ("
+        "'SWDY', 'eodhd', 'SWDY.EGX', '2026-09-09', '2026-09-01',"
+        " '2026-09-09', 0, 7, 'QUARANTINED')"
+    )
+    con.commit()
+    con.close()
+    monkeypatch.setenv("EGX_DB_PATH", str(path))
+    before = path.read_bytes()
+
+    rows = load_validated_daily_observations()
+
+    assert [r["canonical_symbol"] for r in rows] == ["COMI"]
+    assert set(rows[0]) == {
+        "canonical_symbol", "provider", "source_snapshot_date",
+        "oldest_market_date", "newest_market_date",
+        "valid_bar_count", "quarantined_bar_count",
+    }
+    assert path.read_bytes() == before
+
+
+def test_validated_daily_observations_fail_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "missing.db"))
+    assert load_validated_daily_observations() is None
+    assert not (tmp_path / "missing.db").exists()
 
 
 def test_security_master_summary_fails_closed(tmp_path, monkeypatch):
