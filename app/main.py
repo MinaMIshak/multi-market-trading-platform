@@ -1,4 +1,6 @@
 from datetime import datetime
+import json
+import logging
 import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -20,6 +22,7 @@ from app.ui.product import product_state, render_product
 from app.egx_scan_history import load_scan_history
 from app.scheduler_heartbeat import load_heartbeat
 from app.path_safety import symlinked
+from app.runtime_state import startup_event
 
 
 app = FastAPI(
@@ -28,6 +31,12 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+# One structured record per process so operators can see which state it reads.
+# WARNING level: visible under Python's default last-resort handler without
+# any logging configuration. It carries origins only, never paths or secrets.
+logging.getLogger('egx.platform').warning(
+    json.dumps(startup_event(os.getenv('EGX_BUILD_REVISION')), sort_keys=True))
 
 
 @app.get("/", response_class=HTMLResponse)

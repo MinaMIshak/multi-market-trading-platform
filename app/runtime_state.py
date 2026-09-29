@@ -119,6 +119,17 @@ def _verify_bundle(bundle):
     return result
 
 
+def startup_event(build_revision=None):
+    """Structured, secret-free startup record: origins only, never paths or values."""
+    report = runtime_state_report()
+    snapshot = report['snapshot']
+    return {'event': 'api_startup', 'build_revision': build_revision or None,
+            'runtime_state_mode': report['mode'],
+            'input_origins': {name: item['origin'] for name, item in report['inputs'].items()},
+            'snapshot_status': snapshot['status'] if snapshot else None,
+            'warnings': report['warnings'], 'live_money': 'DISABLED'}
+
+
 def runtime_state_report():
     inputs = {}
     for name, (variable, _, _) in INPUTS.items():

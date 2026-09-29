@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 238: centralized runtime-state resolution. app/runtime_state.py resolves every reader input (product DB, receipts, heartbeat, scan history, scan ledger) from its explicit variable, else EGX_RUNTIME_STATE_DIR (snapshot bundle), else legacy default; writers unchanged (explicit only). /api/system runtime_state reports per-input origin/path, re-verifies bundle manifest hashes + integrity (VERIFIED/INVALID/UNAVAILABLE) and warns MIXED_STATE_SOURCES / SNAPSHOT_UNVERIFIED / RUNTIME_STATE_DIR_NOT_ABSOLUTE. Snapshot manifest schema 2 adds build_revision and missing list; tool prints only EGX_RUNTIME_STATE_DIR. End-to-end test snapshot->bundle->/api/product+/api/system with tamper detection. Local runtime validation: uvicorn on 127.0.0.1 with an artificial bundle served /health, /api/product, /api/system, TODAY, /system; snapshot VERIFIED, readiness EVIDENCE_BLOCKED, live DISABLED. Server/public endpoint NOT reachable from this agent session (egress policy denies 3-126-217-243.sslip.io; no /home/egx-agent host access).",
+  "current_capability": "Cycle 238 (continued): b5bf0b6 central runtime-state resolution + verified snapshot bundle; 1d58103 provider-neutral daily rows (adjusted_close optional audit-only); 305d646 tri-state readiness dimensions + ADMITTED_DATA_NOT_CURRENT; 18c4b66 financial-services re-check (upstream HEAD unchanged 574ed36); LIVE (near-current feed UNAVAILABLE, declared delay, never real-time) and PRE-SURGE (PreSurgeV7Engine contract, NO_ATTESTED_SCORER_ROWS) sections, with the live=DISABLED label protected; structured path-free api_startup event. A-X gap scan in docs/PLATFORM_STATUS.md: remaining items are COMPLETE or PARTIAL-BLOCKED on external dependencies.",
   "starting_head": "6c920fe",
-  "head": "6c920fe",
+  "head": "c0c18e6a59b6619dadaa253b0e08618db507123c",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,13 +47,13 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 238: new tests/test_runtime_state.py (6 incl. E2E x2); snapshot tests updated for manifest v2/single env var. Full suite: 3367 passed, 676 subtests passed in 275.68s. Offline/unit + local loopback uvicorn with artificial data only.",
+  "tests": "Final full suite: 3388 passed, 676 subtests passed in 280.15s (python 3.11 venv from requirements-dev.txt). Offline/unit + local loopback uvicorn with artificial data.",
   "deployment": "No deployment by this agent: this session is an isolated cloud container without access to the server (no /home/egx-agent, no uid-999 processes visible) and its egress policy denies the public endpoint. Operator-reported isolated runtime on 8002 (build 4525720) can switch to EGX_RUNTIME_STATE_DIR=<bundle> from tools/runtime_state_snapshot.py; see docs/RUNTIME_STATE_SNAPSHOT.md.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "Provider-neutral daily canonical parsing (adjusted_close optional audit field); explicit readiness dimensions; financial-services re-check record; LIVE/PRE-SURGE/US gap scan.",
+  "next_action": "External: admit a free EGX daily source with reviewed entitlement evidence; allow EGX/EGID hosts + public endpoint in the agent network policy or run docs/RUNTIME_STATE_SNAPSHOT.md on the host; provide dated authoritative universe, attested PRE-SURGE scorer, US runtime universe/source. No further safe local work identified beyond these dependencies.",
   "hard_blocker": null,
   "live_money": false,
-  "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
+  "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
   "capability_blockers": {
     "test_execution": "System Python lacks pytest/fastapi; reproducible via `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt` (requires PyPI access). Full suite takes ~11-13 minutes.",
     "deployment": "No safe deployment mechanism established in this cycle",

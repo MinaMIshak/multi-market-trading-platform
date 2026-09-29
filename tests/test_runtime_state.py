@@ -55,6 +55,20 @@ def test_split_explicit_databases_are_flagged(clean_env, tmp_path):
     assert runtime_state_report()['warnings'] == []
 
 
+def test_startup_event_is_structured_and_path_free(clean_env, tmp_path):
+    from app.runtime_state import startup_event
+    clean_env.setenv('EGX_RUNTIME_STATE_DIR', str(tmp_path))
+    clean_env.setenv('EGX_SCHEDULER_HEARTBEAT_PATH', '/secret-ish/location/beat.json')
+    event = startup_event('b' * 40)
+    assert event['event'] == 'api_startup' and event['live_money'] == 'DISABLED'
+    assert event['runtime_state_mode'] == 'SNAPSHOT_BUNDLE'
+    assert event['input_origins']['heartbeat'] == 'explicit'
+    assert event['snapshot_status'] == 'UNAVAILABLE'
+    assert 'MIXED_STATE_SOURCES' in event['warnings']
+    text = json.dumps(event)
+    assert str(tmp_path) not in text and '/secret-ish/' not in text
+
+
 def test_relative_bundle_is_ignored_and_warned(clean_env):
     clean_env.setenv('EGX_RUNTIME_STATE_DIR', 'relative/bundle')
     assert resolve('database') == ('/app/data/platform.db', 'default')
