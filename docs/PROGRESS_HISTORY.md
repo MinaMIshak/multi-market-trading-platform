@@ -71,3 +71,23 @@ record; each field below is its exact JSON string value, unchanged.
 ```json
 "Keep PROGRESS.json fields current-state only (append prior narrative to docs/PROGRESS_HISTORY.md, never here). app/experimental.py is now reviewed (cycle 189) \u2014 do not repeat absent new evidence. Every app/ package has now had at least one dedicated review pass. Next safe work: (a) re-examine the scheduled_free_acquisition blocker for an offline mitigation without fabricating a source (no new evidence since cycle 154\u2019s investigation \u2014 do not repeat that investigation absent new evidence); (b) run the full suite as a milestone check (last full run was cycle 156 at 4cb6ffa; several cycles of small fixes have landed since). Open policy decisions stay documented, not implemented from guesswork: HIGH_RISK/NO_CONFIRMATION BUY admission, pre-session action window back to information_cutoff, daily snapshot mark-age bound, dev-OOS labels resolving inside the frozen holdout (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
 ```
+
+## Cycle 192 checkpoint-1 fields (superseded in cycle 192 checkpoint 2)
+
+### current_capability
+
+```json
+"Cycle 192: authentic EGX security-master identities surfaced in TODAY (mission priority 1). app/ui/today.py load_today_state now reads canonical_instruments inside the same read-only snapshot transaction (total identity records, count by instrument_type, distinct source providers, latest updated_at, latest source_market_date) and fails closed with the rest of the snapshot (security_master=None). render_today_dashboard adds a 'Security Master Identities' card and a panel explicitly labelled identity/reference data only: NOT price, NOT a trading signal, NOT dated exchange membership or index constituency. Runtime finding fixed: authentic EGID rows have NULL source_market_date and the page leaked a Python 'None' literal; missing dates now render UNKNOWN. Local observation (read-only, research-data/paper-shadow-operational/platform.db): 319 identity records from egid (EQUITY 312, INDEX 7), latest capture 2026-09-26T07:59:16Z, source market date UNKNOWN. Known gap: the main product shell (/ TODAY) does not yet show these identities; /api/today exposes them only when the operational reader is unconfigured. Repo-local untracked state/ held three incomplete full-suite logs (no summaries, not evidence); relocated byte-identical to er1-autopilot/state/repo-state-relocated-cycle192/. PAPER/SHADOW ONLY."
+```
+
+### tests
+
+```json
+"Cycle 192 FULL SUITE with the TODAY security-master change: 3241 passed, 672 subtests passed, 0 failed (809s; er1-autopilot/state/cycle192-full-suite-wip.log). New tests in tests/test_today_ui.py: loader reads identity counts/providers/dates; dashboard renders the disclaimer panel and card; escaping; fail-closed states include security_master=None; test_today_dashboard_security_master_missing_dates_render_unknown failed pre-fix (Python 'None' leaked) and passes post-fix. Local runtime: uvicorn 127.0.0.1:8766 against the read-only operational DB returned /api/today security_master {319 records, EQUITY 312, INDEX 7, egid}; /, /system, /health, /api/system 200. Offline/unit and local runtime only; no deployed or live-market validation."
+```
+
+### next_action
+
+```json
+"Surface the same security-master identity summary in the product shell TODAY/SWING view (app/ui/product.py via app/main.py), EGX only, labelled identity/reference data, fail-closed to UNKNOWN; keep US UNKNOWN. Then design a vendor-neutral MarketDataProvider contract (dated daily/delayed OHLCV observations with provenance, raw evidence kept separately, freshness/quality validation) reusing existing app/data provider and daily_canonical structures rather than duplicating them. Keep PROGRESS.json fields current-state only (prior narrative goes to docs/PROGRESS_HISTORY.md). Open policy decisions stay documented, not implemented from guesswork (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
+```

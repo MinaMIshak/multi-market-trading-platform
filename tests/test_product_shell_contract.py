@@ -16,6 +16,55 @@ class ProductShellContracts(unittest.TestCase):
                                     'status': 'WATCH', 'trade_plan': {
                                         'entry_low': 1, 'entry_high': 2,
                                         'stop_price': 0.5, 'target_1': 3}}]}
+        self.identities = {'total_instruments': 319,
+                           'by_type': {'EQUITY': 312, 'INDEX': 7},
+                           'source_providers': ['egid'],
+                           'latest_snapshot_updated_at': '2026-09-26T07:59:16+00:00',
+                           'latest_source_market_date': None}
+
+    def test_egx_identity_summary_is_egx_only_and_never_coverage(self):
+        state = product_state(self.source, security_master=self.identities)
+        self.assertEqual(state['identities'], {'EGX': self.identities, 'US': None})
+        for counts in state['coverage'].values():
+            for key in ('universe', 'data_ready', 'scanned', 'candidates'):
+                self.assertIsNone(counts[key])
+        us = product_state(self.source, 'US', security_master=self.identities)
+        self.assertEqual(us['identities'], {'US': None})
+        self.assertNotIn('EQUITY: 312', render_product(us))
+
+    def test_identity_summary_renders_in_today_and_swing_with_disclaimer(self):
+        for section in ('TODAY', 'SWING'):
+            with self.subTest(section=section):
+                page = render_product(product_state(
+                    self.source, section=section, security_master=self.identities))
+                self.assertIn('EGX security-master identities', page)
+                self.assertIn('319 identity records', page)
+                self.assertIn('EQUITY: 312', page)
+                self.assertIn('INDEX: 7', page)
+                self.assertIn('egid', page)
+                self.assertIn('NOT price', page)
+                self.assertIn('NOT a trading signal', page)
+                self.assertIn('NOT dated exchange membership', page)
+                self.assertIn('Latest source market date: UNKNOWN', page)
+                self.assertNotIn('None', page)
+                self.assertIn('US security-master identities: UNKNOWN', page)
+        page = render_product(product_state(
+            self.source, section='LIVE', security_master=self.identities))
+        self.assertNotIn('EQUITY: 312', page)
+
+    def test_missing_identity_summary_is_unknown_not_zero(self):
+        page = render_product(product_state(self.source, market='EGX'))
+        self.assertIn('EGX security-master identities: UNKNOWN', page)
+        self.assertNotIn('0 identity records', page)
+
+    def test_identity_summary_text_is_escaped(self):
+        hostile = dict(self.identities, by_type={'<b>EQUITY</b>': 1},
+                       source_providers=['<i>egid</i>'],
+                       latest_snapshot_updated_at='<s>t</s>')
+        page = render_product(product_state(self.source, security_master=hostile))
+        for raw in ('<b>EQUITY</b>', '<i>egid</i>', '<s>t</s>'):
+            self.assertNotIn(raw, page)
+        self.assertIn('&lt;b&gt;EQUITY&lt;/b&gt;', page)
 
     def test_all_view_preserves_market_separation_and_unknown_counts(self):
         state = product_state(self.source)
@@ -160,10 +209,15 @@ class ProductShellContracts(unittest.TestCase):
         namespace = {'HTMLResponse': str, 'HTTPException': HttpError,
                      'load_operational_state': lambda: self.source,
                      'load_scan_history': lambda: None,
+                     'load_security_master_summary': lambda: self.identities,
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())
         self.assertNotIn('fixture', namespace['root']('US'))
+        # Identity summary is routed to EGX only; the US view never reads it.
+        self.assertIn('EQUITY: 312', namespace['root']())
+        self.assertNotIn('EQUITY: 312', namespace['root']('US'))
+        self.assertEqual(namespace['product']('ALL')['identities']['EGX'], self.identities)
         with self.assertRaises(HttpError) as error:
             namespace['product']('invalid')
         self.assertEqual(error.exception.status_code, 422)

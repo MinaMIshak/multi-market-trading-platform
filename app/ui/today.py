@@ -12,6 +12,73 @@ from app.core.schedule import CalendarTruth
 from app.domain import MarketSession, MarketSessionStatus
 
 
+def _read_security_master(con: sqlite3.Connection) -> dict:
+    """Aggregate identity/reference rows; never prices or dated membership."""
+    totals = con.execute(
+        """
+        SELECT
+            COUNT(*) AS total,
+            MAX(updated_at) AS latest_updated_at,
+            MAX(source_market_date) AS latest_source_market_date
+        FROM canonical_instruments
+        """
+    ).fetchone()
+
+    by_type = con.execute(
+        """
+        SELECT instrument_type, COUNT(*) AS count
+        FROM canonical_instruments
+        GROUP BY instrument_type
+        ORDER BY instrument_type
+        """
+    ).fetchall()
+
+    providers = con.execute(
+        """
+        SELECT DISTINCT source_provider
+        FROM canonical_instruments
+        ORDER BY source_provider
+        """
+    ).fetchall()
+
+    return {
+        "total_instruments": totals["total"],
+        "by_type": {
+            row["instrument_type"]: row["count"]
+            for row in by_type
+        },
+        "source_providers": [
+            row["source_provider"]
+            for row in providers
+        ],
+        "latest_snapshot_updated_at": totals["latest_updated_at"],
+        "latest_source_market_date": totals["latest_source_market_date"],
+    }
+
+
+def load_security_master_summary(
+    database_path: Path | None = None,
+) -> dict | None:
+    """Read-only identity summary for the product shell; None when unreadable."""
+    path = database_path if database_path is not None else Path(
+        os.getenv(
+            "EGX_DB_PATH",
+            "/app/data/platform.db",
+        )
+    )
+
+    try:
+        with closing(sqlite3.connect(
+            path.resolve().as_uri() + "?mode=ro",
+            uri=True,
+        )) as con:
+            con.row_factory = sqlite3.Row
+            con.execute("BEGIN")
+            return _read_security_master(con)
+    except Exception:
+        return None
+
+
 def load_today_state(
     database_path: Path | None = None,
     market_date: date | None = None,
@@ -178,46 +245,7 @@ def load_today_state(
                 ),
             }
 
-            security_master_totals = con.execute(
-                """
-                SELECT
-                    COUNT(*) AS total,
-                    MAX(updated_at) AS latest_updated_at,
-                    MAX(source_market_date) AS latest_source_market_date
-                FROM canonical_instruments
-                """
-            ).fetchone()
-
-            security_master_by_type = con.execute(
-                """
-                SELECT instrument_type, COUNT(*) AS count
-                FROM canonical_instruments
-                GROUP BY instrument_type
-                ORDER BY instrument_type
-                """
-            ).fetchall()
-
-            security_master_providers = con.execute(
-                """
-                SELECT DISTINCT source_provider
-                FROM canonical_instruments
-                ORDER BY source_provider
-                """
-            ).fetchall()
-
-            security_master = {
-                "total_instruments": security_master_totals["total"],
-                "by_type": {
-                    row["instrument_type"]: row["count"]
-                    for row in security_master_by_type
-                },
-                "source_providers": [
-                    row["source_provider"]
-                    for row in security_master_providers
-                ],
-                "latest_snapshot_updated_at": security_master_totals["latest_updated_at"],
-                "latest_source_market_date": security_master_totals["latest_source_market_date"],
-            }
+            security_master = _read_security_master(con)
 
             integrity = con.execute(
                 "PRAGMA quick_check"

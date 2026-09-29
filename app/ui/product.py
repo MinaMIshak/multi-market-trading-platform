@@ -111,7 +111,8 @@ def scan_run_state(history):
             'completion_evidence': evidence}
 
 
-def product_state(operational, market='ALL', section='TODAY', *, scan_history=None):
+def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
+                  security_master=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -132,6 +133,10 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         'scan_runs': {key: scan_run_state(scan_history if key == 'EGX' else None)
                       for key in selected},
         'performance': None,
+        # Identity/reference rows only (EGX security master); never coverage,
+        # readiness or dated membership. No US identity reader exists.
+        'identities': {key: security_master if key == 'EGX' else None
+                       for key in selected},
     }
     if section == 'RESEARCH':
         # Notes restate verified EGX receipts only; nothing is generated. US has no reader.
@@ -220,6 +225,30 @@ def render_research(research):
     return content
 
 
+def render_identities(identities):
+    def known(value):
+        return 'UNKNOWN' if value is None else escape(str(value))
+    html = ''
+    for key, summary in identities.items():
+        if summary is None:
+            html += f'<p>{key} security-master identities: UNKNOWN.</p>'
+            continue
+        types = ''.join(f'<li>{escape(str(kind))}: {escape(str(count))}</li>'
+                        for kind, count in summary['by_type'].items())
+        providers = ', '.join(escape(str(p)) for p in summary['source_providers']) or 'none'
+        html += (f'<section aria-label="{key} security-master identities">'
+                 f'<h2>{key} security-master identities</h2>'
+                 '<p>Identity/reference data only: ticker, name and provider alias mapping. '
+                 'NOT price, NOT a trading signal, NOT dated exchange membership or index '
+                 'constituency, and not scan coverage.</p>'
+                 f'<p>{escape(str(summary["total_instruments"]))} identity records from '
+                 f'source(s): {providers}.</p><ul>{types}</ul>'
+                 f'<p>Latest identity snapshot capture: {known(summary["latest_snapshot_updated_at"])}. '
+                 f'Latest source market date: {known(summary["latest_source_market_date"])}.</p>'
+                 '</section>')
+    return html
+
+
 def render_product(state):
     market, section = state['market'], state['section']
     def link(label, selected_market, selected_section):
@@ -255,6 +284,7 @@ def render_product(state):
             content += '</tbody></table>'
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
+        content += render_identities(state['identities'])
         for key, value in state['markets'].items():
             content += render_operational(value, fragment=True,
                                           heading=f'{key} operational Paper/Shadow')

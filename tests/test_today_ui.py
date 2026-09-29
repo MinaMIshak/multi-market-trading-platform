@@ -9,6 +9,7 @@ from app.domain import (
     MarketSessionStatus,
 )
 from app.ui.today import (
+    load_security_master_summary,
     load_today_state,
     render_today_dashboard,
 )
@@ -349,6 +350,32 @@ def test_today_dashboard_security_master_identities_are_escaped():
 
     assert "<b>EQUITY</b>" not in page and "&lt;b&gt;EQUITY&lt;/b&gt;" in page
     assert "<i>egid</i>" not in page and "&lt;i&gt;egid&lt;/i&gt;" in page
+
+
+def test_security_master_summary_reads_identities_read_only(tmp_path, monkeypatch):
+    path = make_ui_db(tmp_path)
+    monkeypatch.setenv("EGX_DB_PATH", str(path))
+    before = path.read_bytes()
+
+    assert load_security_master_summary() == {
+        "total_instruments": 3,
+        "by_type": {"EQUITY": 2, "INDEX": 1},
+        "source_providers": ["egid"],
+        "latest_snapshot_updated_at": "2026-09-09T07:00:00+00:00",
+        "latest_source_market_date": "2026-09-09",
+    }
+    assert path.read_bytes() == before
+
+
+def test_security_master_summary_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("EGX_DB_PATH", str(tmp_path / "missing.db"))
+    assert load_security_master_summary() is None
+    assert not (tmp_path / "missing.db").exists()
+
+    empty = tmp_path / "empty.db"
+    sqlite3.connect(empty).close()
+    monkeypatch.setenv("EGX_DB_PATH", str(empty))
+    assert load_security_master_summary() is None
 
 
 def test_today_state_fails_closed(
