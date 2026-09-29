@@ -51,3 +51,23 @@ record; each field below is its exact JSON string value, unchanged.
 ```json
 "Cycle 188: new test_operational_status_blocks_are_labelled_by_market failed pre-fix (2 subtests) and passes post-fix. Affected suites (test_product_shell_contract, test_operational_ui, test_system_visibility, test_product_scan_history_contract, test_er1c_nyse_corporate_actions_product, test_system_checkpoint_presentation): 67 passed, 145 subtests, 0 failed. Runtime: labelled headings observed on / (ALL/TODAY, US/SWING). Last FULL SUITE: 4cb6ffa, 3236 passed, 667 subtests, 0 failed (state/cycle156-full-suite-4cb6ffa.log); not re-run for this UI-label change. Offline/unit and local runtime only; no deployed or live-market validation."
 ```
+
+## Cycle 189 checkpoint fields (superseded in cycle 192)
+
+### current_capability
+
+```json
+"Cycle 189: verified the mission FIRST TASK is stale (render_project_checkpoint already implemented at app/ui/system.py:205; tests/test_system_checkpoint_presentation.py: 11 passed, 71 subtests) \u2014 consistent with cycles 116/129/149/150/151/153/154 finding the same. Corrected bookkeeping drift: HEAD had advanced to c5f02c1 (cycle 188 commit) while PROGRESS.json still recorded defb599/PENDING_COMMIT_BRIDGE_CYCLE188; verified worktree clean, no COMMIT_REQUEST.json pending, HEAD==LAST_COMMIT before starting new work (strict checkpoint serialization). Completed a dedicated offline review of app/experimental.py (76 lines), the only app/ module with no prior review record in docs/PROGRESS_HISTORY.md despite being exercised by tests/test_experimental_ui.py (35 tests): symlink-swap re-check on every request, strict ShadowWatchlistInput type gate (no subclassing), commit-identity regex, absolute/existing state-directory validation, and the double <body> banner/nav injection in root() all verified correct against existing behavior. No defects found; no code changed. PAPER/SHADOW ONLY."
+```
+
+### tests
+
+```json
+"Cycle 189: no source changes (review-only). tests/test_system_checkpoint_presentation.py: 11 passed, 71 subtests. tests/test_experimental_ui.py: 35 passed (app/experimental.py review, no defects). Affected suites re-run for the PROGRESS.json/docs bookkeeping change (test_experimental_ui, test_today_ui, test_shadow_producer, test_system_checkpoint_presentation, test_system_visibility, test_product_shell_contract): 115 passed, 140 subtests, 0 failed. Last FULL SUITE remains cycle 156 at 4cb6ffa: 3236 passed, 667 subtests, 0 failed (state/cycle156-full-suite-4cb6ffa.log); not re-run this cycle (docs/PROGRESS.json + review-only, no app code changed). Offline/unit and local runtime only; no deployed or live-market validation this cycle."
+```
+
+### next_action
+
+```json
+"Keep PROGRESS.json fields current-state only (append prior narrative to docs/PROGRESS_HISTORY.md, never here). app/experimental.py is now reviewed (cycle 189) \u2014 do not repeat absent new evidence. Every app/ package has now had at least one dedicated review pass. Next safe work: (a) re-examine the scheduled_free_acquisition blocker for an offline mitigation without fabricating a source (no new evidence since cycle 154\u2019s investigation \u2014 do not repeat that investigation absent new evidence); (b) run the full suite as a milestone check (last full run was cycle 156 at 4cb6ffa; several cycles of small fixes have landed since). Open policy decisions stay documented, not implemented from guesswork: HIGH_RISK/NO_CONFIRMATION BUY admission, pre-session action window back to information_cutoff, daily snapshot mark-age bound, dev-OOS labels resolving inside the frozen holdout (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md)."
+```

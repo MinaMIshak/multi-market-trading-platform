@@ -75,6 +75,58 @@ def make_ui_db(
     )
 
     con.execute(
+        """
+        CREATE TABLE canonical_instruments (
+            instrument_id TEXT PRIMARY KEY,
+            instrument_type TEXT NOT NULL,
+            canonical_ticker TEXT NOT NULL,
+            name_en TEXT,
+            name_ar TEXT,
+            short_name_en TEXT,
+            short_name_ar TEXT,
+            source_provider TEXT NOT NULL,
+            source_symbol_code TEXT NOT NULL,
+            reuters_raw TEXT,
+            reuters_normalized TEXT,
+            source_sha256 TEXT NOT NULL,
+            source_market_date TEXT,
+            normalization_notes_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    con.execute(
+        """
+        INSERT INTO canonical_instruments VALUES (
+            'i-comi', 'EQUITY', 'COMI', 'Commercial International Bank', NULL,
+            NULL, NULL, 'egid', '1', NULL, NULL, 'sha-comi', '2026-09-09',
+            '{}', '2026-09-09T07:00:00+00:00'
+        )
+        """
+    )
+
+    con.execute(
+        """
+        INSERT INTO canonical_instruments VALUES (
+            'i-swdy', 'EQUITY', 'SWDY', 'Elsewedy Electric', NULL,
+            NULL, NULL, 'egid', '2', NULL, NULL, 'sha-swdy', '2026-09-09',
+            '{}', '2026-09-09T07:00:00+00:00'
+        )
+        """
+    )
+
+    con.execute(
+        """
+        INSERT INTO canonical_instruments VALUES (
+            'i-egx30', 'INDEX', 'EGX30', 'EGX 30 Index', NULL,
+            NULL, NULL, 'egid', '3', NULL, NULL, 'sha-egx30', '2026-09-09',
+            '{}', '2026-09-09T07:00:00+00:00'
+        )
+        """
+    )
+
+    con.execute(
         "INSERT INTO data_ingestions VALUES ('i1')"
     )
 
@@ -165,6 +217,14 @@ def test_today_state_reads_validated_data(
         == "COMI"
     )
 
+    assert state["security_master"] == {
+        "total_instruments": 3,
+        "by_type": {"EQUITY": 2, "INDEX": 1},
+        "source_providers": ["egid"],
+        "latest_snapshot_updated_at": "2026-09-09T07:00:00+00:00",
+        "latest_source_market_date": "2026-09-09",
+    }
+
 
 def test_today_dashboard_is_trader_safe():
     state = {
@@ -209,6 +269,87 @@ def test_today_dashboard_is_trader_safe():
     assert "NO ADMITTED SETUP" in page
     assert "Current trading signals are unavailable" in page
 
+    # No security_master key supplied: the page must say so, never imply zero.
+    assert "NOT AVAILABLE" in page
+
+
+def test_today_dashboard_renders_security_master_identities_with_disclaimer():
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {},
+        "symbols": [],
+        "security_master": {
+            "total_instruments": 3,
+            "by_type": {"EQUITY": 2, "INDEX": 1},
+            "source_providers": ["egid"],
+            "latest_snapshot_updated_at": "2026-09-09T07:00:00+00:00",
+            "latest_source_market_date": "2026-09-09",
+        },
+    }
+
+    page = render_today_dashboard(state)
+
+    assert "Security master identities" in page
+    assert "NOT price" in page and "NOT a trading signal" in page
+    assert "dated exchange membership" in page
+    assert "EQUITY: 2" in page
+    assert "INDEX: 1" in page
+    assert "egid" in page
+    assert "2026-09-09T07:00:00+00:00" in page
+
+    cards = dict(re.findall(
+        r'<div class="label">([^<]+)</div>\s*<div class="value">([^<]+)</div>', page,
+    ))
+    assert cards["Security Master Identities"] == "3"
+
+
+def test_today_dashboard_security_master_missing_dates_render_unknown():
+    # Authentic EGID identity snapshots carry no source market date; the
+    # page must say UNKNOWN, never leak a Python "None" literal.
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {},
+        "symbols": [],
+        "security_master": {
+            "total_instruments": 1,
+            "by_type": {"EQUITY": 1},
+            "source_providers": ["egid"],
+            "latest_snapshot_updated_at": None,
+            "latest_source_market_date": None,
+        },
+    }
+
+    page = render_today_dashboard(state)
+
+    section = page[page.index("Security master identities"):]
+    section = section[:section.index("</section>")]
+    assert "None" not in section
+    assert re.search(r"capture:\s*UNKNOWN", section)
+    assert re.search(r"market date:\s*UNKNOWN", section)
+
+
+def test_today_dashboard_security_master_identities_are_escaped():
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {},
+        "symbols": [],
+        "security_master": {
+            "total_instruments": 1,
+            "by_type": {"<b>EQUITY</b>": 1},
+            "source_providers": ["<i>egid</i>"],
+            "latest_snapshot_updated_at": "2026-09-09T07:00:00+00:00",
+            "latest_source_market_date": "2026-09-09",
+        },
+    }
+
+    page = render_today_dashboard(state)
+
+    assert "<b>EQUITY</b>" not in page and "&lt;b&gt;EQUITY&lt;/b&gt;" in page
+    assert "<i>egid</i>" not in page and "&lt;i&gt;egid&lt;/i&gt;" in page
+
 
 def test_today_state_fails_closed(
     tmp_path,
@@ -229,6 +370,7 @@ def test_today_state_fails_closed(
     assert state["available"] is False
     assert state["symbols"] == []
     assert state["counts"] == {}
+    assert state["security_master"] is None
     assert state["error"] is not None
 
 
@@ -240,7 +382,7 @@ def test_late_query_failure_discards_partial_symbols(tmp_path, monkeypatch):
     state = load_today_state()
     assert state == {
         "available": False, "symbols": [], "counts": {},
-        "error": "OperationalError",
+        "security_master": None, "error": "OperationalError",
     }
     assert "COMI" not in render_today_dashboard(state)
 
@@ -297,7 +439,8 @@ def test_integrity_failure_discards_snapshot_and_closes(tmp_path, monkeypatch):
                         original_connect(*a, **kw, factory=BadIntegrityConnection))
     monkeypatch.setenv("EGX_DB_PATH", str(path))
     assert load_today_state() == {
-        "available": False, "symbols": [], "counts": {}, "error": "ValueError",
+        "available": False, "symbols": [], "counts": {},
+        "security_master": None, "error": "ValueError",
     }
     assert closed == [True]
 
@@ -422,6 +565,7 @@ def test_today_state_fails_closed_on_session_status_mismatch(
         "available": False,
         "symbols": [],
         "counts": {},
+        "security_master": None,
         "error": "ValueError",
     }
 

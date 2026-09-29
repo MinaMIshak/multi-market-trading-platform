@@ -35,6 +35,7 @@ def load_today_state(
         "available": False,
         "symbols": [],
         "counts": {},
+        "security_master": None,
         "error": None,
     }
 
@@ -177,6 +178,47 @@ def load_today_state(
                 ),
             }
 
+            security_master_totals = con.execute(
+                """
+                SELECT
+                    COUNT(*) AS total,
+                    MAX(updated_at) AS latest_updated_at,
+                    MAX(source_market_date) AS latest_source_market_date
+                FROM canonical_instruments
+                """
+            ).fetchone()
+
+            security_master_by_type = con.execute(
+                """
+                SELECT instrument_type, COUNT(*) AS count
+                FROM canonical_instruments
+                GROUP BY instrument_type
+                ORDER BY instrument_type
+                """
+            ).fetchall()
+
+            security_master_providers = con.execute(
+                """
+                SELECT DISTINCT source_provider
+                FROM canonical_instruments
+                ORDER BY source_provider
+                """
+            ).fetchall()
+
+            security_master = {
+                "total_instruments": security_master_totals["total"],
+                "by_type": {
+                    row["instrument_type"]: row["count"]
+                    for row in security_master_by_type
+                },
+                "source_providers": [
+                    row["source_provider"]
+                    for row in security_master_providers
+                ],
+                "latest_snapshot_updated_at": security_master_totals["latest_updated_at"],
+                "latest_source_market_date": security_master_totals["latest_source_market_date"],
+            }
+
             integrity = con.execute(
                 "PRAGMA quick_check"
             ).fetchone()[0]
@@ -188,6 +230,7 @@ def load_today_state(
             available=True,
             symbols=symbols,
             counts=counts,
+            security_master=security_master,
             integrity=integrity,
             market_session=market_session,
         )
@@ -225,6 +268,8 @@ def render_today_dashboard(
         CalendarTruth.UNVERIFIED.value,
     )
 
+    security_master = state.get("security_master")
+
     cards = [
         # Rows are per-snapshot artifacts; one symbol may have several.
         (
@@ -250,6 +295,12 @@ def render_today_dashboard(
         (
             "Calendar Truth",
             calendar_truth,
+        ),
+        (
+            "Security Master Identities",
+            security_master["total_instruments"]
+            if security_master is not None
+            else "NOT AVAILABLE",
         ),
     ]
 
@@ -313,6 +364,38 @@ def render_today_dashboard(
         )
         if not collection['candidates']:
             paper_content += '<p>Explicit frozen collection contains zero candidates; NOT SCORED.</p>'
+    if security_master is None:
+        security_master_html = (
+            "<p>NOT AVAILABLE. Security master identities were not read this cycle.</p>"
+        )
+    else:
+        type_rows = "".join(
+            f"<li>{html.escape(str(instrument_type))}: "
+            f"{html.escape(str(count))}</li>"
+            for instrument_type, count in security_master["by_type"].items()
+        ) or "<li>No instruments recorded.</li>"
+
+        providers = (
+            ", ".join(
+                html.escape(str(p))
+                for p in security_master["source_providers"]
+            )
+            or "none"
+        )
+
+        def _or_unknown(value):
+            return "UNKNOWN" if value is None else html.escape(str(value))
+
+        security_master_html = f"""
+        <p>{html.escape(str(security_master["total_instruments"]))} instruments
+           recorded from source(s): {providers}.</p>
+        <ul>{type_rows}</ul>
+        <p>Latest identity snapshot capture:
+           {_or_unknown(security_master["latest_snapshot_updated_at"])} ·
+           Latest source market date:
+           {_or_unknown(security_master["latest_source_market_date"])}</p>
+        """
+
     missed = (shadow_state or {}).get('missed')
     if missed is not None:
         paper_content += (
@@ -399,6 +482,14 @@ th{{color:#758a9a;font-weight:600}}
       </thead>
       <tbody>{row_html}</tbody>
     </table>
+  </section>
+
+  <section class="panel" style="padding:18px 20px">
+    <h2>Security master identities</h2>
+    <p>Instrument identity/reference data only &mdash; ticker, name and provider
+       alias mapping. NOT price, NOT a trading signal, and NOT proof of
+       dated exchange membership or index constituency.</p>
+    {security_master_html}
   </section>
 
   <section class="panel" style="padding:18px 20px">
