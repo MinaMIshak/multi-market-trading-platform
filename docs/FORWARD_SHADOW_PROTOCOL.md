@@ -379,6 +379,17 @@ both stop and target and their order is unknowable, the result is `UNKNOWN` and
 no exit fill is invented. The evaluated bar interval and availability are
 preserved without an invented intrabar timestamp.
 
+Admitted corporate actions gate the raw stop/target basis, matching replay policy
+`us-replay-actions-date-inclusive-v1`. Any action other than `CASH_DIVIDEND`
+effective on the entry session date, or on any calendar date of a continuation
+bundle (including intervening CLOSED dates), returns `UNKNOWN /
+UNSUPPORTED_CORPORATE_ACTION` with the sorted triggering `action_ids` and no exit
+fill; nothing is adjusted or inferred, so a post-split open cannot become a
+fabricated stop. `UNKNOWN` is terminal for continuation carry. `CASH_DIVIDEND` is
+non-transforming: raw prices and quantity are kept and no cash is credited
+(price-only P&L). An existing exit event that was evaluated before this gate
+over a transforming action no longer reaudits and fails closed.
+
 One atomic event per exact position and authenticated fact snapshot is stored
 under `exit-events/`. A later fact snapshot may append another immutable
 evaluation for a position that remained open; replaying the same snapshot cannot

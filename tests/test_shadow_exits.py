@@ -312,3 +312,29 @@ def test_backdated_exit_cannot_precede_later_fact_receipt(tmp_path, monkeypatch,
     with pytest.raises(ValueError, match="exit event does not bind authenticated inputs"):
         reader(tmp_path, *args, policy, evidence, **options)
     assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before
+
+
+@pytest.mark.parametrize("action_type, expected", [
+    ("SPLIT", ("UNKNOWN", "UNSUPPORTED_CORPORATE_ACTION")),
+    ("RIGHTS", ("UNKNOWN", "UNSUPPORTED_CORPORATE_ACTION")),
+    ("CASH_DIVIDEND", ("CLOSED", "STOP")),
+])
+def test_entry_session_action_gates_exit_basis(tmp_path, monkeypatch, action_type, expected):
+    """Raw stop/target cannot be compared across a transforming action effective on
+    the entry session; CASH_DIVIDEND stays price-only, matching replay policy."""
+    args, _, policy, _ = prepared_exit(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    facts = args[2]
+    action = shadow_facts.ForwardActionFact(
+        event_id="fixture-action", action_type=action_type,
+        effective_date=facts.session.market_date, terms="artificial fixture terms",
+    )
+    stop = facts.model_copy(update={
+        "bars": (facts.bars[0].model_copy(update={"low": Decimal("95")}),),
+        "action_coverage": facts.action_coverage.model_copy(update={"actions": (action,)}),
+    })
+    result = shadow_exits.evaluate_exit(position, stop, policy)
+    assert (result["status"], result["reason"]) == expected
+    if expected[0] == "UNKNOWN":
+        assert result["action_ids"] == ["fixture-action"]
+        assert result["exit"] is None

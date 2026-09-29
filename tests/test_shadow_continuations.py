@@ -14,6 +14,7 @@ from app.paper.shadow_continuations import (
 )
 from app.paper.shadow_facts import (
     ACTION_FIELDS, BAR_FIELDS, IDENTITY_FIELDS, SESSION_FIELDS, TRADING_STATUS_FIELDS,
+    ForwardActionFact,
 )
 from app.paper.shadow_records import ShadowEvidenceReference
 from tests.test_shadow_collection import package
@@ -641,3 +642,61 @@ def test_chain_resource_bound_before_io(tmp_path):
             tmp_path, None, None, None, None, None, None, None, None,
             predecessor_chain=chain,
         )
+
+
+def with_action(facts, effective_date, action_type="SPLIT"):
+    action = ForwardActionFact(
+        event_id=f"fixture-{action_type.lower()}", action_type=action_type,
+        effective_date=effective_date, terms="artificial fixture terms",
+    )
+    return facts.model_copy(update={"action_coverage": facts.action_coverage.model_copy(
+        update={"actions": (action,)},
+    )})
+
+
+GAP_BELOW_STOP = {"open": Decimal("47"), "high": Decimal("48"), "low": Decimal("46"),
+                  "close": Decimal("47.5"), "volume": 10}
+
+
+@pytest.mark.parametrize("action_type", ["SPLIT", "STOCK_DIVIDEND", "MERGER", "DELISTING", "OTHER"])
+def test_continuation_exit_fails_closed_on_session_date_corporate_action(
+        tmp_path, monkeypatch, action_type):
+    """A price/quantity-transforming action invalidates the raw stop/target basis;
+    a halved post-split open must never become a fabricated STOP_GAP loss."""
+    args, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    later = facts.model_copy(update={"bars": (facts.bars[0].model_copy(update=GAP_BELOW_STOP),)})
+    later = with_action(later, later.calendar_days[-1].market_date, action_type)
+    result = shadow_exits.evaluate_continuation_exit(position, later, continuation_exit_policy())
+    assert result["status"] == "UNKNOWN"
+    assert result["reason"] == "UNSUPPORTED_CORPORATE_ACTION"
+    assert result["action_ids"] == [f"fixture-{action_type.lower()}"]
+    assert result["exit"] is None
+
+
+def test_continuation_exit_fails_closed_on_intervening_closed_day_action(tmp_path, monkeypatch):
+    args, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    later, _, _ = successor(facts, closed_days=2, **GAP_BELOW_STOP)
+    later = with_action(later, later.calendar_days[1].market_date)
+    assert later.calendar_days[1].state == "CLOSED"
+    result = shadow_exits.evaluate_continuation_exit(position, later, continuation_exit_policy())
+    assert (result["status"], result["reason"], result["exit"]) == (
+        "UNKNOWN", "UNSUPPORTED_CORPORATE_ACTION", None,
+    )
+
+
+def test_continuation_exit_keeps_cash_dividend_and_prior_session_actions_raw(tmp_path, monkeypatch):
+    """CASH_DIVIDEND is price-only (no transform), matching replay policy; an action
+    dated at or before the predecessor session belongs to that session's gate."""
+    args, facts, _, _ = prepared_continuation(tmp_path, monkeypatch)
+    position = shadow_positions.audit_position_open_event(tmp_path, *args)
+    later = facts.model_copy(update={"bars": (facts.bars[0].model_copy(update={
+        "open": Decimal("94"), "high": Decimal("96"), "low": Decimal("93"),
+        "close": Decimal("95"), "volume": 10,
+    }),)})
+    policy = continuation_exit_policy()
+    dividend = with_action(later, later.calendar_days[-1].market_date, "CASH_DIVIDEND")
+    assert shadow_exits.evaluate_continuation_exit(position, dividend, policy)["reason"] == "STOP_GAP"
+    earlier = with_action(later, later.calendar_days[0].market_date - timedelta(days=1))
+    assert shadow_exits.evaluate_continuation_exit(position, earlier, policy)["reason"] == "STOP_GAP"

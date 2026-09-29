@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Context, Decimal, localcontext
 from pathlib import Path
 from typing import Literal
@@ -91,12 +91,28 @@ def _packages(policy, supplied, cutoff):
     return found
 
 
+def _unsupported_actions(coverage, first: date, last: date) -> list[str]:
+    # CASH_DIVIDEND is price-only (no transform), matching replay policy
+    # us-replay-actions-date-inclusive-v1. Any other action invalidates the raw
+    # stop/target/quantity basis; nothing is adjusted or inferred.
+    return sorted(action.event_id for action in coverage.actions
+                  if first <= action.effective_date <= last
+                  and action.action_type != "CASH_DIVIDEND")
+
+
 def evaluate_exit(position: dict, facts: ForwardFactBundle, policy: ShadowExitPolicy) -> dict:
     entry = position["entry"]
     if (policy.market != facts.session.market or policy.currency != entry["currency"]
             or str(facts.identity.instrument_id) != entry["instrument_id"]
             or facts.identity.ticker != entry["ticker"]):
         raise ValueError("exit inputs do not bind open position")
+    blocked = _unsupported_actions(
+        facts.action_coverage, facts.session.market_date, facts.session.market_date,
+    )
+    if blocked:
+        return {"status": "UNKNOWN", "reason": "UNSUPPORTED_CORPORATE_ACTION",
+                "action_ids": blocked,
+                "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
     stop, target = Decimal(position["initial_stop"]), Decimal(position["initial_targets"][0])
     entry_sequence = entry["bar_sequence"]
     outcome, reason, bar, raw = "OPEN", "NO_EXIT_OBSERVED", None, None
@@ -166,6 +182,13 @@ def evaluate_continuation_exit(position: dict, facts: ForwardContinuationBundle,
             or str(facts.identity.instrument_id) != entry["instrument_id"]
             or facts.identity.ticker != entry["ticker"]):
         raise ValueError("continuation exit inputs do not bind open position")
+    blocked = _unsupported_actions(
+        facts.action_coverage, facts.calendar_days[0].market_date, target_session.market_date,
+    )
+    if blocked:
+        return {"status": "UNKNOWN", "reason": "UNSUPPORTED_CORPORATE_ACTION",
+                "market_date": target_session.market_date.isoformat(), "action_ids": blocked,
+                "evaluated_through_sequence": facts.bars[-1].sequence, "exit": None}
     stop, target = Decimal(position["initial_stop"]), Decimal(position["initial_targets"][0])
     reason = None
     bar = None
