@@ -135,6 +135,17 @@ def admit_strategy_candidate(
             "and execution-disabled"
         )
 
+    # Explicit admission may be stricter than strategy state, never looser than an
+    # invalidated setup: a high score or operator choice cannot revive it as a BUY.
+    if (
+        candidate.state == "INVALIDATED"
+        and admission.decision_status == "BUY_CANDIDATE"
+    ):
+        raise ValueError(
+            "invalidated M4 setup cannot be admitted "
+            "as BUY_CANDIDATE"
+        )
+
     digest = strategy_candidate_sha256(candidate)
 
     provenance = (

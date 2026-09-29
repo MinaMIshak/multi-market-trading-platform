@@ -236,3 +236,18 @@ performance claims. M7/M8 semantics and production/runtime remain unchanged.
 Next: assess existing authenticated portfolio-series/M7 integration and genuine
 ETF/horizon/date-effective execution economics gaps. Authentic evidence and
 historical PIT admission remain separately unresolved; this is software integration.
+
+Cycle 128 corrections (paper/shadow review):
+
+- Exits: `evaluate_exit`/`evaluate_continuation_exit` ignored admitted corporate
+  actions, so a transforming action (e.g. a split) could turn a raw post-action
+  open into a fabricated stop exit and capital settlement. Any non-`CASH_DIVIDEND`
+  action on the entry session date or any continuation calendar date now yields
+  `UNKNOWN / UNSUPPORTED_CORPORATE_ACTION` (replay policy parity).
+- Triggers: the same action on the entry session date yields
+  `UNSUPPORTED_CORPORATE_ACTION`, so no trigger, fill or reservation follows.
+- Candidate admission: an M4 setup in state `INVALIDATED` can no longer be
+  explicitly admitted as `BUY_CANDIDATE` (it may still be recorded as WATCH/AVOID).
+  Explicit BUY admission from other M4 states (e.g. WATCH) remains the existing,
+  tested design; whether `HIGH_RISK`/`NO_CONFIRMATION` should also be refused is
+  an open policy decision, not implemented from guesswork.

@@ -221,3 +221,13 @@ def test_requires_exact_typed_inputs():
             candidate,
             admission.model_dump(),
         )
+
+
+def test_invalidated_strategy_setup_cannot_become_buy_candidate():
+    """Explicit admission may be stricter than strategy state, never looser than an
+    invalidated setup; the invalidated setup may still be recorded as WATCH/AVOID."""
+    with pytest.raises(ValueError, match="invalidated"):
+        admit_strategy_candidate(strategy_candidate(state="INVALIDATED"), buy_admission())
+    result = admit_strategy_candidate(strategy_candidate(state="INVALIDATED"), watch_admission())
+    assert (result.decision_status, result.paper_quantity) == ("WATCH", 0)
+    assert "state=INVALIDATED" in result.context[0]
