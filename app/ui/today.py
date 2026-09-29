@@ -226,7 +226,11 @@ def render_today_dashboard(
     )
 
     cards = [
-        ("Validated Symbols", len(symbols)),
+        # Rows are per-snapshot artifacts; one symbol may have several.
+        (
+            "Validated Symbols",
+            len({r["canonical_symbol"] for r in symbols}),
+        ),
         (
             "Daily Artifacts",
             counts.get("daily_artifacts", 0),
@@ -266,8 +270,8 @@ def render_today_dashboard(
           <td><span class="ok">VALIDATED</span></td>
           <td>{html.escape(r["provider"])}</td>
           <td>{html.escape(r["newest_market_date"])}</td>
-          <td>{r["valid_bar_count"]}</td>
-          <td>{r["quarantined_bar_count"]}</td>
+          <td>{html.escape(str(r["valid_bar_count"]))}</td>
+          <td>{html.escape(str(r["quarantined_bar_count"]))}</td>
           <td><span class="watch">NO ADMITTED SETUP</span></td>
         </tr>
         """

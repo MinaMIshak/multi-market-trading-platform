@@ -1,4 +1,5 @@
 from datetime import date
+import re
 import sqlite3
 
 import pytest
@@ -454,3 +455,57 @@ def test_today_dashboard_surfaces_market_session_truth():
         "Current trading signals are unavailable"
         in page
     )
+
+
+def test_validated_symbol_card_counts_distinct_symbols_not_artifacts():
+    # The schema admits one VALIDATED artifact per source snapshot, so a symbol
+    # with two snapshot artifacts must not be counted as two validated symbols.
+    def artifact(snapshot, bars, quarantined):
+        return {
+            "canonical_symbol": "COMI",
+            "provider": "eodhd",
+            "provider_symbol": "COMI.EGX",
+            "source_snapshot_date": snapshot,
+            "oldest_market_date": "2026-09-01",
+            "newest_market_date": snapshot,
+            "valid_bar_count": bars,
+            "quarantined_bar_count": quarantined,
+            "status": "VALIDATED",
+        }
+
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {"daily_artifacts": 2},
+        "symbols": [artifact("2026-09-08", 6, 0), artifact("2026-09-09", 7, 0)],
+    }
+
+    page = render_today_dashboard(state)
+    cards = dict(re.findall(
+        r'<div class="label">([^<]+)</div>\s*<div class="value">([^<]+)</div>', page,
+    ))
+
+    assert cards["Validated Symbols"] == "1"
+    assert cards["Daily Artifacts"] == "2"
+
+
+def test_inventory_counts_are_escaped():
+    # SQLite INTEGER affinity keeps non-numeric text, which also satisfies the
+    # table's >= 0 CHECKs; stored values must never reach the page as markup.
+    state = {
+        "available": True,
+        "integrity": "ok",
+        "counts": {},
+        "symbols": [{
+            "canonical_symbol": "COMI",
+            "provider": "eodhd",
+            "newest_market_date": "2026-09-09",
+            "valid_bar_count": "<b>7</b>",
+            "quarantined_bar_count": "<i>0</i>",
+        }],
+    }
+
+    page = render_today_dashboard(state)
+
+    assert "<b>7</b>" not in page and "&lt;b&gt;7&lt;/b&gt;" in page
+    assert "<i>0</i>" not in page and "&lt;i&gt;0&lt;/i&gt;" in page
