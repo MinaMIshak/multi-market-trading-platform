@@ -26,7 +26,9 @@ def test_summary_resolves_admission_for_injected_registry():
 
 
 def test_system_state_and_html_expose_source_admission(monkeypatch):
-    monkeypatch.delenv('EGX_PAPER_RUNTIME', raising=False)
+    for key in ('EGX_PAPER_RUNTIME', 'EGX_SCHEDULER_HEARTBEAT_PATH', 'EGX_SCAN_HISTORY_PATH'):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('EGX_DB_PATH', '/nonexistent/platform.db')
     state = system.load_system_state()
     assert state['daily_sources'] == daily_source_summary()
     html = system.render_system(state)
@@ -34,6 +36,10 @@ def test_system_state_and_html_expose_source_admission(monkeypatch):
     assert f'Admitted daily sources: 0 of {len(DAILY_SOURCE_DECLARATIONS)} declared.' in html
     assert '<td>tradingview_tvdatafeed_egx</td>' in html
     assert 'Undeclared sources are EVIDENCE_BLOCKED' in html
+    # Unconfigured runtime: components are explicit, never READY.
+    assert state['readiness']['scan_readiness'] == 'EVIDENCE_BLOCKED'
+    assert state['readiness']['scheduler_heartbeat'] == state['scheduler']['status']
+    assert 'EGX readiness' in html
 
 
 def test_source_rows_are_escaped():

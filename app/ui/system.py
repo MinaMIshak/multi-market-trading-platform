@@ -9,6 +9,8 @@ from app.ui.operational import load_operational_state
 from app.scheduler_heartbeat import load_heartbeat
 from app.egx_scan_history import load_scan_history
 from app.data.source_admission import daily_source_summary
+from app.ui.today import load_security_master_summary, load_validated_daily_observations
+from app.ui.readiness import render_readiness
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
 
 
@@ -73,7 +75,11 @@ def load_system_state():
     operational = load_operational_state()
     history = load_scan_history()
     observed = datetime.now(timezone.utc).isoformat()
-    product = product_state(operational, scan_history=history)
+    heartbeat = load_heartbeat()
+    product = product_state(operational, scan_history=history,
+                            security_master=load_security_master_summary(),
+                            daily_observations=load_validated_daily_observations(),
+                            heartbeat=heartbeat)
     egx = product['markets']['EGX']
     summary = product['coverage']['EGX']
     # Preserve legacy field names, but coverage requires independent evidence.
@@ -87,7 +93,8 @@ def load_system_state():
                   'source': 'deployment-injected EGX_BUILD_REVISION; unverified if absent'},
         'checkpoint': checkpoint,
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
-        'scheduler': load_heartbeat(),
+        'scheduler': heartbeat,
+        'readiness': product['readiness']['EGX'],
         'egx_scan_history': history,
         'scan_runs': product['scan_runs'],
         'markets': {
@@ -308,6 +315,7 @@ def render_system(state):
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
+            + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])
             + render_daily_sources(state.get('daily_sources') or [])
             + render_market_receipts('EGX', state['markets']['EGX'])

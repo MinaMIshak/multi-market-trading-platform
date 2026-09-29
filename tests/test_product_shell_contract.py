@@ -287,6 +287,7 @@ class ProductShellContracts(unittest.TestCase):
                      'load_scan_history': lambda: None,
                      'load_security_master_summary': lambda: self.identities,
                      'load_validated_daily_observations': lambda: self.DAILY,
+                     'load_heartbeat': lambda: {'status': 'UNKNOWN'},
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())
@@ -298,6 +299,10 @@ class ProductShellContracts(unittest.TestCase):
         self.assertIn('tradingview_tvdatafeed_egx', namespace['root']())
         self.assertNotIn('tradingview_tvdatafeed_egx', namespace['root']('US'))
         self.assertEqual(namespace['product']('ALL')['daily_observations']['EGX'], self.BLOCKED)
+        readiness = namespace['product']('ALL')['readiness']
+        self.assertEqual(readiness['EGX']['scan_readiness'], 'EVIDENCE_BLOCKED')
+        self.assertIsNone(readiness['US'])
+        self.assertNotIn('readiness', str(namespace['product']('US')['readiness']['US']))
         with self.assertRaises(HttpError) as error:
             namespace['product']('invalid')
         self.assertEqual(error.exception.status_code, 422)

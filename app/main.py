@@ -18,6 +18,7 @@ from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state
 from app.ui.product import product_state, render_product
 from app.egx_scan_history import load_scan_history
+from app.scheduler_heartbeat import load_heartbeat
 from app.path_safety import symlinked
 
 
@@ -42,7 +43,8 @@ def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
                              scan_history=load_scan_history() if egx else None,
                              security_master=load_security_master_summary() if egx else None,
                              daily_observations=(load_validated_daily_observations()
-                                                 if egx else None))
+                                                 if egx else None),
+                             heartbeat=load_heartbeat() if egx else None)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail='Unknown product view') from exc
 

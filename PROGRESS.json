@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 236c: SYSTEM daily source admission view. app/data/source_admission.daily_source_summary lists every declaration (provider, market, access, entitlement, delay, timezone, evidence) with resolved status/reason; /api/system exposes daily_sources and per-receipt source_status; SYSTEM HTML shows 'Admitted daily sources: 0 of 4 declared'. Prior this cycle: dabc8db SWING candidate eligibility gate on ADMITTED sources (observations/validation preserved, receipts labelled not rewritten; fixture admission test-only); 3605559 registry + TODAY/SWING source status. EGX daily OHLCV still UNQUALIFIED; no source admitted, so EGX SWING candidate generation is EVIDENCE_BLOCKED.",
-  "starting_head": "dabc8db",
-  "head": "dabc8db",
+  "current_capability": "Cycle 237: per-component EGX readiness + reproducible read-only runtime state snapshot. Root cause of isolated runtime (port 8002) reporting EGX configured=false/NOT_READY: markets.EGX.* comes only from load_operational_state, which reads EGX_PAPER_RUNTIME/platform.db (not EGX_DB_PATH); heartbeat and scan history are separate JSON files (EGX_SCHEDULER_HEARTBEAT_PATH, EGX_SCAN_HISTORY_PATH) never carried by a DB copy; scheduler defaults observe/scan disabled, and since dabc8db no unadmitted source can create receipts. app/ui/readiness.py reports canonical_data, security_master, daily_observations (with freshness counts), source_admission (registry only), scheduler_heartbeat, scan_history, operational_receipts, scan_readiness (EVIDENCE_BLOCKED without admitted source; NOT_READY with blockers; PREREQUISITES_MET otherwise; never READY) and explicit blocker codes, in /api/product, /api/system and TODAY/SWING/SYSTEM. tools/runtime_state_snapshot.py: mode=ro + query_only single-step SQLite backup (committed rows only, integrity_check), byte copies of heartbeat/history with original timestamps, manifest with hashes/counts, atomic no-overwrite 0444 layout, prints UI env. Documented in docs/RUNTIME_STATE_SNAPSHOT.md. Runtime on 8002 not observed by this agent (not reachable from this environment).",
+  "starting_head": "4525720",
+  "head": "4525720",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 236c: new tests/test_system_daily_sources.py (4); system suites 59 passed. Full suite: 3346 passed, 676 subtests passed in 262.71s (python 3.11 venv from requirements-dev.txt). Earlier this cycle: 3342 (dabc8db), 3336 (3605559). Offline/unit only; no live-source or deployed validation.",
-  "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
+  "tests": "Cycle 237: new tests/test_egx_readiness.py (10), tests/test_runtime_state_snapshot.py (5), readiness assertions in product-shell route and SYSTEM tests. Full suite: 3361 passed, 676 subtests passed in 263.55s (python 3.11 venv from requirements-dev.txt). Offline/unit only.",
+  "deployment": "No deployment by this agent. Operator reports an isolated runtime on port 8002 at build 4525720 reading an operational DB snapshot (identities 318, daily observations present); to show receipts/heartbeat/history it must be started from a tools/runtime_state_snapshot.py directory with the printed environment. Production deployment pending a safe mechanism.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "Qualify a free per-equity EGX daily/delayed source with reviewed entitlement and admit it in app/data/source_admission.py with evidence (egress to ticker.egidegypt.com / beta.egx.com.eg denied in this environment; needs an environment whose network policy allows those hosts, plus a browser/XHR inspection of the EGX SPA per ER1B notes). Independent code work: a provider adapter contract test harness that maps a candidate source's raw payload to canonical daily rows (date/open/high/low/close/volume) without assuming EODHD field names, ready for the first admitted source.",
+  "next_action": "Operator: re-snapshot with tools/runtime_state_snapshot.py (include --heartbeat/--scan-history if the scheduler writes them) and restart the 8002 runtime with the printed env; readiness should then show receipts CONFIGURED and heartbeat STALE/RECENT_POLL truthfully. Agent: make canonicalize_daily_row accept sources without adjusted_close (audit-only field per ER1_DATA_ACQUISITION_SPEC) while keeping existing artifacts byte-identical, so a first admitted free EGX source can be integrated; live source qualification still requires an environment allowing EGX/EGID hosts.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
@@ -65,5 +65,5 @@
     "network_egx_sources": "Cycle 236 execution environment: egress proxy rejected CONNECT to ticker.egidegypt.com and beta.egx.com.eg (organization policy). Live acquisition/qualification pending; not a mission-wide blocker.",
     "egx_daily_source_entitlement": "No EGX daily OHLCV source has a reviewed paper/shadow entitlement; SWING candidate generation is therefore EVIDENCE_BLOCKED for every EGX symbol until one is admitted with evidence."
   },
-  "commit_status": "COMMITTED_DIRECTLY_CYCLE236C"
+  "commit_status": "COMMITTED_DIRECTLY_CYCLE237"
 }

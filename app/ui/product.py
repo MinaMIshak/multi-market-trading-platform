@@ -7,6 +7,7 @@ from app.ui.operational import render_operational
 from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
+from app.ui.readiness import egx_readiness, render_readiness
 
 SECTIONS = ('TODAY', 'LIVE', 'PRE-SURGE', 'SWING', 'PERFORMANCE', 'RESEARCH', 'SYSTEM')
 MARKETS = ('EGX', 'US', 'ALL')
@@ -125,7 +126,7 @@ def admitted_daily_observations(rows, market):
 
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
-                  security_master=None, daily_observations=None):
+                  security_master=None, daily_observations=None, heartbeat=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -156,6 +157,13 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
                                     if key == 'EGX' else None
                                for key in selected},
     }
+    # Component readiness; data availability never implies scan readiness.
+    # US has no connected readers, so its readiness stays UNKNOWN.
+    state['readiness'] = {key: egx_readiness(
+        operational=egx, security_master=security_master,
+        daily_observations=state['daily_observations']['EGX'],
+        heartbeat=heartbeat, scan_history=scan_history) if key == 'EGX' else None
+        for key in selected}
     if section == 'RESEARCH':
         # Notes restate verified EGX receipts only; nothing is generated. US has no reader.
         notes = None
@@ -340,6 +348,8 @@ def render_product(state):
             for status, count in counts.items():
                 content += f'<tr><th scope="row">{status}</th><td>{count}</td></tr>'
             content += '</tbody></table>'
+    if section in ('TODAY', 'SWING', 'SYSTEM'):
+        content += render_readiness(state['readiness'])
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
         content += render_identities(state['identities'])
