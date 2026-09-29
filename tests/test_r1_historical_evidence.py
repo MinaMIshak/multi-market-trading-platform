@@ -106,6 +106,16 @@ def test_build_clock(target):
         admit(package(**kwargs))
 
 
+@pytest.mark.parametrize('target', ['raw', 'attachment'])
+def test_review_cannot_precede_reviewed_receipts(target):
+    # A reviewer cannot have attested to bytes that had not yet been received.
+    late = RECEIVED + timedelta(days=1, seconds=1)
+    with pytest.raises(ValueError, match='review precedes'):
+        admit(package(**{f'{target}_changes': {'local_received_at': late}}))
+    same_instant = RECEIVED + timedelta(days=1)
+    assert admit(package(**{f'{target}_changes': {'local_received_at': same_instant}}))
+
+
 @pytest.mark.parametrize('bad', [datetime(2020, 1, 1), '2020-01-02T00:00:00Z',
                                123, None, DECISION.astimezone(timezone(timedelta(hours=2)))])
 @pytest.mark.parametrize('target', ['decision_at', 'research_built_at', 'raw', 'attachment', 'review', 'availability'])

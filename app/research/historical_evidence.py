@@ -180,6 +180,10 @@ def require_historical_evidence(package, *, decision_at, research_built_at):
         raise ValueError('attachment receipt after research build')
     if package.review.reviewed_at > research_built_at:
         raise ValueError('review after research build')
+    received = [package.raw_receipt.local_received_at,
+                *(item.local_received_at for item in package.attachments)]
+    if package.review.reviewed_at < max(received):
+        raise ValueError('review precedes a receipt it attests to')
     if not package.review.approved:
         raise ValueError('approved review required')
     availability = package.evidence.availability
