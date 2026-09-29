@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 236b: source-admission eligibility gate for SWING candidate logic. Layers are now separate: observation existence (acquisition/raw store, ungated), canonical validation (ungated), source admission (app/data/source_admission.py registry), and candidate eligibility (app/paper/swing_launch.prepare_signal requires ADMITTED source for the bound raw manifest provider, else LaunchBlocked EVIDENCE_BLOCKED 'daily source not admitted for signals: <reason>'). Blocked verification writes no PAPER_SIGNAL_VERIFIED receipt and no publication; validated artifacts are untouched; egx_scan classifies it EVIDENCE_BLOCKED, scanned=0. Preserved receipts keep recorded status/plan but are labelled with current source admission (operational reader + render; misleading 'Admitted source' label replaced). Consequence: with no admitted EGX source, the TradingView-based COMI path can no longer produce new WATCH/READY_NO_SIGNAL receipts; its existing receipt remains, labelled EVIDENCE_BLOCKED. Test-only admission of the artificial 'fixture' provider lives in tests/test_paper_shadow_launch.py (monkeypatched registry), never in the production registry. Previous checkpoint 3605559: registry + TODAY/SWING observation source status.",
-  "starting_head": "3605559",
-  "head": "3605559",
+  "current_capability": "Cycle 236c: SYSTEM daily source admission view. app/data/source_admission.daily_source_summary lists every declaration (provider, market, access, entitlement, delay, timezone, evidence) with resolved status/reason; /api/system exposes daily_sources and per-receipt source_status; SYSTEM HTML shows 'Admitted daily sources: 0 of 4 declared'. Prior this cycle: dabc8db SWING candidate eligibility gate on ADMITTED sources (observations/validation preserved, receipts labelled not rewritten; fixture admission test-only); 3605559 registry + TODAY/SWING source status. EGX daily OHLCV still UNQUALIFIED; no source admitted, so EGX SWING candidate generation is EVIDENCE_BLOCKED.",
+  "starting_head": "dabc8db",
+  "head": "dabc8db",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 236b: +2 gate tests (tests/test_paper_shadow_launch.py incl. 3 parametrized unreviewed sources) and +2 receipt labelling tests (tests/test_operational_ui.py); affected launch/operational/research-notes suites 92 passed. Full suite: 3342 passed, 676 subtests passed in 264.66s (python 3.11 venv from requirements-dev.txt). Cycle 236 full suite: 3336 passed. Offline/unit only; no live-source or deployed validation.",
+  "tests": "Cycle 236c: new tests/test_system_daily_sources.py (4); system suites 59 passed. Full suite: 3346 passed, 676 subtests passed in 262.71s (python 3.11 venv from requirements-dev.txt). Earlier this cycle: 3342 (dabc8db), 3336 (3605559). Offline/unit only; no live-source or deployed validation.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "Qualify a free per-equity EGX daily/delayed source with reviewed entitlement (egress to EGX/EGID hosts denied this cycle; live qualification pending). Independent code work next: SYSTEM view of source admission (per-source access/entitlement/delay/evidence) so operators see why EGX signals are EVIDENCE_BLOCKED.",
+  "next_action": "Qualify a free per-equity EGX daily/delayed source with reviewed entitlement and admit it in app/data/source_admission.py with evidence (egress to ticker.egidegypt.com / beta.egx.com.eg denied in this environment; needs an environment whose network policy allows those hosts, plus a browser/XHR inspection of the EGX SPA per ER1B notes). Independent code work: a provider adapter contract test harness that maps a candidate source's raw payload to canonical daily rows (date/open/high/low/close/volume) without assuming EODHD field names, ready for the first admitted source.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
@@ -65,5 +65,5 @@
     "network_egx_sources": "Cycle 236 execution environment: egress proxy rejected CONNECT to ticker.egidegypt.com and beta.egx.com.eg (organization policy). Live acquisition/qualification pending; not a mission-wide blocker.",
     "egx_daily_source_entitlement": "No EGX daily OHLCV source has a reviewed paper/shadow entitlement; SWING candidate generation is therefore EVIDENCE_BLOCKED for every EGX symbol until one is admitted with evidence."
   },
-  "commit_status": "COMMITTED_DIRECTLY_CYCLE236B"
+  "commit_status": "COMMITTED_DIRECTLY_CYCLE236C"
 }

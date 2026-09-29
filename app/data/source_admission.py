@@ -174,3 +174,20 @@ DEFAULT_DAILY_SOURCE_REGISTRY = DailySourceRegistry()
 
 def daily_source_admission(provider: object, market: object) -> DailySourceAdmission:
     return DEFAULT_DAILY_SOURCE_REGISTRY.admission(provider, market)
+
+
+def daily_source_summary(
+    registry: DailySourceRegistry = DEFAULT_DAILY_SOURCE_REGISTRY,
+) -> list[dict]:
+    """Operator view of every declaration and its resolved admission."""
+    rows = []
+    for (provider, market), item in sorted(registry._index.items()):
+        admission = registry.admission(provider, market)
+        rows.append({
+            "provider": provider, "market": market,
+            "access": item.access.value, "entitlement": item.entitlement.value,
+            "delay": item.delay.value, "source_timezone": item.source_timezone,
+            "evidence": item.evidence,
+            "status": admission.status, "reason": admission.reason,
+        })
+    return rows

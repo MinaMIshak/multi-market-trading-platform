@@ -8,6 +8,7 @@ from pathlib import Path
 from app.ui.operational import load_operational_state
 from app.scheduler_heartbeat import load_heartbeat
 from app.egx_scan_history import load_scan_history
+from app.data.source_admission import daily_source_summary
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
 
 
@@ -100,15 +101,40 @@ def load_system_state():
                     'scope': summary['scope'],
                     'source': 'load_operational_state: receipt classifications only; data_ready/eligible/scanned require independent evidence',
                     'receipts': [{key: item.get(key) for key in (
-                        'symbol', 'status', 'provider', 'decision_at', 'valid_until',
-                        'last_verified_session', 'reason')} for item in egx['symbols']]},
+                        'symbol', 'status', 'provider', 'source_status', 'decision_at',
+                        'valid_until', 'last_verified_session', 'reason')}
+                        for item in egx['symbols']]},
             'US': {'configured_universe': None, 'data_ready': None, 'eligible': None,
                    'scanned': None, 'candidates': None, 'status': 'UNKNOWN',
                    'observed_symbols': None, 'status_counts': None,
                    'observed_at': None, 'observation_evidence': None,
                    'reason': 'No configured operational universe connected'}},
         'providers': provider_receipt_summary(egx),
+        # Repository declarations, not live source checks; only ADMITTED
+        # sources may feed signals or candidates.
+        'daily_sources': daily_source_summary(),
     }
+
+
+def render_daily_sources(sources):
+    def cell(value):
+        return '<td>' + escape(str(value)) + '</td>'
+    content = ('<h2>Daily source admission</h2><p>Repository declarations, not live source '
+               'checks. Only ADMITTED sources (reviewed paper/shadow entitlement) may feed '
+               'signals or candidates; others stay EVIDENCE_BLOCKED while their observations '
+               'remain preserved. Undeclared sources are EVIDENCE_BLOCKED.</p>')
+    admitted = sum(row['status'] == 'ADMITTED' for row in sources)
+    content += f'<p>Admitted daily sources: {admitted} of {len(sources)} declared.</p>'
+    content += ('<div class="table-scroll"><table aria-label="Daily source admission"><thead><tr>'
+                + ''.join(f'<th scope="col">{h}</th>' for h in (
+                    'Provider', 'Market', 'Access', 'Entitlement', 'Delay', 'Status',
+                    'Reason', 'Evidence'))
+                + '</tr></thead><tbody>')
+    for row in sources:
+        content += ('<tr>' + ''.join(cell(row[key]) for key in (
+            'provider', 'market', 'access', 'entitlement', 'delay', 'status',
+            'reason', 'evidence')) + '</tr>')
+    return content + '</tbody></table></div>'
 
 
 def render_provider_receipts(providers):
@@ -283,6 +309,7 @@ def render_system(state):
             '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
             + render_provider_receipts(state['providers'])
+            + render_daily_sources(state.get('daily_sources') or [])
             + render_market_receipts('EGX', state['markets']['EGX'])
             + render_market_receipts('US', state['markets']['US'])
             + render_scan_runs(state['scan_runs'])
