@@ -77,6 +77,22 @@ def test_fact_after_reader_observation_fails_closed_to_unknown():
     assert set(kinds(note)) == {'UNKNOWN'}
 
 
+@pytest.mark.parametrize('status', ['WATCH', 'READY_NO_SIGNAL'])
+@pytest.mark.parametrize('expires', [timedelta(0), -timedelta(minutes=1)])
+def test_expired_window_not_marked_stale_fails_closed_to_unknown(status, expires):
+    # A live status past valid_until must not be restated as a current fact.
+    expired = receipt(status=status, valid_until=(NOW + expires).isoformat())
+    (note,) = receipt_research_notes(market(expired))
+    assert set(kinds(note)) == {'UNKNOWN'}
+
+
+def test_inverted_stale_window_fails_closed_to_unknown():
+    # Expiry at/before the decision is not a verification window at all.
+    inverted = receipt(status='DATA_STALE', valid_until=(DECIDED - timedelta(minutes=1)).isoformat())
+    (note,) = receipt_research_notes(market(inverted))
+    assert set(kinds(note)) == {'UNKNOWN'}
+
+
 def test_malformed_receipt_fields_fail_closed_to_unknown():
     for broken in (receipt(pit_audit_id=''), receipt(decision_at='yesterday'),
                    receipt(bar_count='many'), receipt(provider=None)):

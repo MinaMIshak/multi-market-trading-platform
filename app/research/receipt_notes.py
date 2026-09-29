@@ -48,6 +48,10 @@ def _receipt_note(item, generated_at):
     bars = item.get('bar_count')
     if not _SHA256.match(raw_sha256) or type(bars) is not int or bars < 1 or history_start > session:
         raise ValueError('invalid history evidence')
+    if expiry <= decided:
+        raise ValueError('invalid verification window')
+    if status != 'DATA_STALE' and generated_at >= expiry:
+        raise ValueError('expired receipt not marked DATA_STALE')
     strategy = _text(item, 'strategy_id') + ' v' + _text(item, 'strategy_version')
     locator = 'audit_event:PIT_DATA_VALIDATED:' + _text(item, 'pit_audit_id')
     # The receipt is recorded at decision time; the reader overwrites an expired
