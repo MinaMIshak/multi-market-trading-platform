@@ -61,6 +61,10 @@ class IntradayEngine:
         self.config = config
 
     def output(self, rows, at, state='NO_CONFIRMATION', entry=None, stop=None, evidence_cutoff=None, **evidence):
+        if entry is not None and stop is not None and stop >= entry:
+            # LONG risk is undefined unless the stop is strictly below entry.
+            state, entry, stop = 'NO_CONFIRMATION', None, None
+            evidence['risk_geometry'] = 'STOP_NOT_BELOW_ENTRY'
         return candidate(self.strategy_id, self.config, rows[0].symbol, at,
                          max([b.available_at for b in rows] + ([evidence_cutoff] if evidence_cutoff else [])), state, entry, stop,
                          strategy_version='1', source_id=rows[0].source_id, provenance_id=rows[0].provenance_id,

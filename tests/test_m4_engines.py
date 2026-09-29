@@ -442,3 +442,21 @@ def test_non_vwap_engines_allow_missing_traded_value(engine, kwargs):
     rows = [bar(i, close=13. if i == 3 else 10., traded_value=None) for i in range(1, 4)]
     result = engine.evaluate(rows, decision_time=rows[-1].available_at, **kwargs)
     assert result.state in ('READY', 'CONTINUATION_CONFIRMED')
+
+
+def test_ready_long_setup_requires_stop_strictly_below_entry():
+    # A LONG READY setup whose stop is not below entry has undefined risk and
+    # must not be emitted as a candidate with entry/stop references.
+    rows = [bar(1, close=12., open=12., low=11.), bar(2), bar(3, close=11., open=10.5, low=10.5)]
+    at = rows[-1].available_at
+    assert vwap().evaluate(rows, decision_time=at).state == 'READY'
+    result = vwap(stop_lookback_bars=1).evaluate(rows, decision_time=at)
+    assert result.state == 'NO_CONFIRMATION'
+    assert result.entry_reference is None and result.stop_reference is None
+    assert evidence(result)['risk_geometry'] == 'STOP_NOT_BELOW_ENTRY'
+    flat = [bar(1), bar(2), bar(3, close=12., open=12., low=12.)]
+    result = momentum(stop_lookback_bars=1).evaluate(flat, decision_time=flat[-1].available_at)
+    assert result.state == 'NO_CONFIRMATION' and result.stop_reference is None
+    ok = momentum(stop_lookback_bars=2).evaluate(flat, decision_time=flat[-1].available_at)
+    assert ok.state == 'READY' and ok.stop_reference < ok.entry_reference
+    assert 'risk_geometry' not in evidence(ok)
