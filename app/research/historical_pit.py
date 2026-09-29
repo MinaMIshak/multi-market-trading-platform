@@ -36,6 +36,7 @@ from .models import _canonical
 PIT_INPUT_VERSION = "historical-pit-input-v1"
 PIT_OUTPUT_VERSION = "research-pit-daily-v1"
 TRANSFORMATION_VERSION = "split-only-v1-decimal34"
+TRANSFORMATION_VERSION_V2 = "explicit-action-effect-v2-decimal34"
 
 MarketState = Literal["TRADING_SESSION", "NON_SESSION"]
 InstrumentState = Literal[
@@ -547,7 +548,8 @@ class ResearchIndicatorBar(Contract):
     volume_factor: Decimal = Field(gt=0)
     event_ids: tuple[str, ...]
     transformation_version: Literal[
-        "split-only-v1-decimal34"
+        "split-only-v1-decimal34",
+        "explicit-action-effect-v2-decimal34",
     ] = TRANSFORMATION_VERSION
 
     @field_validator("event_ids", mode="before")
@@ -974,11 +976,28 @@ def derive_research_pit_daily(
 
     if any(
         action.action_type != "SPLIT"
+        and action.adjustment_effect is None
         for action in relevant_actions
     ):
         raise ValueError(
             "unsupported corporate action requires explicit semantics"
         )
+
+    ratio_actions = tuple(
+        action
+        for action in relevant_actions
+        if action.action_type == "SPLIT"
+        or action.adjustment_effect == "SHARE_RATIO"
+    )
+
+    derivation_transformation_version = (
+        TRANSFORMATION_VERSION_V2
+        if any(
+            action.adjustment_effect is not None
+            for action in relevant_actions
+        )
+        else TRANSFORMATION_VERSION
+    )
 
     indicator_rows: list[ResearchIndicatorBar] = []
 
@@ -992,7 +1011,7 @@ def derive_research_pit_daily(
 
             events = tuple(
                 action
-                for action in relevant_actions
+                for action in ratio_actions
                 if bar.market_date < action.effective_date
             )
 
@@ -1026,6 +1045,7 @@ def derive_research_pit_daily(
                         event.event_id
                         for event in events
                     ),
+                    transformation_version=derivation_transformation_version,
                 )
             )
 
@@ -1048,7 +1068,7 @@ def derive_research_pit_daily(
     derivation_payload = {
         "version": PIT_OUTPUT_VERSION,
         "input_version": PIT_INPUT_VERSION,
-        "transformation_version": TRANSFORMATION_VERSION,
+        "transformation_version": derivation_transformation_version,
         "instrument_id": str(instrument_id),
         "start_date": start_date.isoformat(),
         "decision_date": decision_date.isoformat(),

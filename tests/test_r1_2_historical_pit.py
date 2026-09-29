@@ -1048,6 +1048,71 @@ def test_non_split_relevant_action_fails_closed():
         _derive(source)
 
 
+def test_explicit_no_ratio_effect_action_is_supported_and_untransformed():
+    dividend = ActionEvidenceRow(
+        event_id="explicit-cash-dividend",
+        effective_date=D2,
+        action_type="DIVIDEND",
+        adjustment_effect="NONE",
+        details="explicit reviewed no-share-ratio effect",
+    )
+
+    source = _source(
+        action_coverage=_coverage(rows=(dividend,))
+    )
+
+    result = _derive(source)
+
+    first, second = result.indicator_rows
+
+    assert first.price_factor == Decimal("1")
+    assert first.volume_factor == Decimal("1")
+    assert first.event_ids == ()
+    assert second.price_factor == Decimal("1")
+    assert second.event_ids == ()
+
+    assert all(
+        row.transformation_version
+        == "explicit-action-effect-v2-decimal34"
+        for row in result.indicator_rows
+    )
+
+
+def test_explicit_share_ratio_non_split_action_adjusts():
+    bonus = ActionEvidenceRow(
+        event_id="explicit-bonus-shares",
+        effective_date=D2,
+        action_type="CAPITAL_INCREASE",
+        adjustment_effect="SHARE_RATIO",
+        new_shares=Decimal("11"),
+        old_shares=Decimal("10"),
+        details="one bonus share for every ten existing shares",
+    )
+
+    source = _source(
+        action_coverage=_coverage(rows=(bonus,))
+    )
+
+    result = _derive(source)
+
+    first, second = result.indicator_rows
+
+    assert first.price_factor == Decimal(
+        "0.9090909090909090909090909090909091"
+    )
+    assert first.volume_factor == Decimal("1.1")
+    assert first.event_ids == ("explicit-bonus-shares",)
+
+    assert second.price_factor == Decimal("1")
+    assert second.event_ids == ()
+
+    assert all(
+        row.transformation_version
+        == "explicit-action-effect-v2-decimal34"
+        for row in result.indicator_rows
+    )
+
+
 def test_duplicate_action_event_identity_is_rejected():
     first = ActionEvidenceRow(
         event_id="same-event",
