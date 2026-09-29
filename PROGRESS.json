@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 196: reproducible CLI for the offline calendar recovery pass (python -m app.core.calendar_backfill --start-date --end-date [--db-path], EGX_DB_PATH fallback matching scheduler_worker). Explicit range only, no network, fails closed. Exercised against a read-only sqlite backup copy of research-data/paper-shadow-operational/platform.db (never the shared file) for 2026-09-01..2026-09-29: before and after = 1 VERIFIED (2026-09-24) + 138 WEEKEND; no new sessions recorded. Finding: the backfill path is correct but calendar coverage cannot grow from already-admitted evidence; new admitted index/holiday evidence is required.",
+  "current_capability": "Cycle 232: reproducible CLI for the official-index refresh acquisition pass (python -m app.data.official_index_refresh_cli --start-date --end-date [--snapshot-date] [--db-path] [--data-root] [--page-size]). Fetches CASE30/EGX70_EWI/EGX100_EWI from the reviewed anonymous egx_official_public provider and admits canonicalized index evidence via the existing OfficialIndexRefreshJob (provider identity, range and snapshot checks fail closed). Explicit range only; snapshot date defaults to the current Africa/Cairo date; data root defaults to the db-path parent. Offline tests use a fake provider; no live acquisition claimed in this commit.",
   "starting_head": "d062d1c",
-  "head": "9b4a3e7cf3fd08a0d54015b479b9cf98237ba63b",
+  "head": "ba74fd1feda493f97376eaf1f15c75b7f5a08d10",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 196: tests/test_calendar_backfill_cli.py (4 tests) + tests/test_calendar_backfill.py: 11 passed; calendar/holiday/session regression slice (-k 'calendar or holiday or session'): 351 passed, 2 subtests, 0 failed. Full suite not rerun this cycle (last full: cycle 193, 3266 passed, 676 subtests, 0 failed). Offline/unit only; no runtime or live-market validation.",
+  "tests": "Cycle 232: tests/test_official_index_refresh_cli.py: 4 passed; regression slice (-k 'official_index or calendar or egx_official'): 163 passed, 0 failed. Full suite not rerun this cycle (last full: cycle 193, 3266 passed, 676 subtests, 0 failed). Offline/unit only; no runtime or live-market validation.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "Calendar coverage is evidence-limited, not tooling-limited: backfill over a DB copy yields no new VERIFIED/HOLIDAY sessions. Next: admit additional dated official EGX index/holiday evidence through existing reviewed admission paths (no fabrication), or continue assessing a reviewed free daily transport via MarketDataProvider + DailyBarIngestor + scheduler_acquisition_config gates. Do not write to the shared operational platform.db until uid-999 process ownership is confirmed.",
+  "next_action": "Use python -m app.data.official_index_refresh_cli against a disposable DB copy (never the shared operational platform.db until uid-999 process ownership is confirmed) to validate the live egx_official_public transport, then run python -m app.core.calendar_backfill on that copy to measure whether newly admitted official index evidence yields VERIFIED sessions. Record results truthfully; if the network is unavailable, record live validation as pending. Run the full suite at the next integration milestone.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD at cycle start; cycle changes submitted through supervisor commit bridge",
@@ -63,5 +63,5 @@
     "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
     "shared_database_ownership": "A scheduler_worker (PID 146267) and two uvicorn app.main:app processes (PID 1717126, 1861599, port 8000) are running under uid 999, not this agent's uid 1001; /proc/<pid>/environ is not readable by this agent, so their EGX_DB_PATH (and hence whether they write research-data/paper-shadow-operational/platform.db) is unconfirmed. This agent's own runtime checks against that file have historically been read-only; a direct backfill write was deferred this cycle for that reason rather than risk an unreviewed collision. Not a production-boundary violation (research-data is an authorized auxiliary path) but ownership of the live file is unconfirmed."
   },
-  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE196"
+  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE232"
 }
