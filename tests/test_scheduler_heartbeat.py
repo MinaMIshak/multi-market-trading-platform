@@ -78,6 +78,22 @@ class HeartbeatTests(unittest.TestCase):
                     path.write_text(payload)
                     self.assertEqual(load_heartbeat(now=now)['status'], 'UNKNOWN')
 
+    def test_pathological_heartbeat_file_fails_closed_without_breaking_system(self):
+        # Match load_scan_history: a damaged shared file must degrade to UNKNOWN,
+        # never raise out of the /api/system state loader.
+        now = datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'heartbeat.json'
+            with patch.dict('os.environ', {'EGX_SCHEDULER_HEARTBEAT_PATH': str(path)}, clear=True):
+                write_heartbeat(mode='observe', poll_seconds=30, now=now)
+                valid = json.loads(path.read_text())
+                oversized = json.dumps({**valid, 'padding': 'x' * 70_000})
+                for payload in ('[' * 100_000 + ']' * 100_000, oversized):
+                    with self.subTest(size=len(payload)):
+                        path.write_text(payload)
+                        self.assertEqual(load_heartbeat(now=now)['status'], 'UNKNOWN')
+                        self.assertEqual(load_system_state()['scheduler']['status'], 'UNKNOWN')
+
     def test_invalid_writer_input_preserves_previous_heartbeat(self):
         now = datetime(2026, 9, 26, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as directory:

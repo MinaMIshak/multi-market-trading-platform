@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import tempfile
 
+MAX_HEARTBEAT_BYTES = 64 * 1024
+
 
 def write_heartbeat(*, mode, poll_seconds, now=None):
     configured = os.getenv('EGX_SCHEDULER_HEARTBEAT_PATH')
@@ -40,7 +42,12 @@ def load_heartbeat(*, now=None):
     if not configured or not Path(configured).is_absolute():
         return unknown
     try:
-        raw = json.loads(Path(configured).read_text())
+        # Bound the operator-facing read; a valid heartbeat is well under this.
+        with Path(configured).open('rb') as stream:
+            payload = stream.read(MAX_HEARTBEAT_BYTES + 1)
+        if len(payload) > MAX_HEARTBEAT_BYTES:
+            return unknown
+        raw = json.loads(payload)
         if (type(raw['schema_version']) is not int or raw['schema_version'] != 1
                 or raw['market'] != 'EGX'
                 or raw['mode'] not in ('observe', 'paper_refresh')):
@@ -54,5 +61,5 @@ def load_heartbeat(*, now=None):
                 'market': 'EGX', 'mode': raw['mode'],
                 'observed_at': observed.isoformat(), 'valid_until': expires.isoformat(),
                 'reason': 'Completed worker poll; does not establish job success or scan coverage'}
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return unknown
