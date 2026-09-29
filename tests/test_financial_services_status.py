@@ -12,6 +12,8 @@ class FinancialServicesStatusTest(unittest.TestCase):
     def test_pinned_upstream_and_no_execution_authority(self):
         status = financial_services_status()
         self.assertEqual(status['upstream']['commit'], '574ed3624aebd0418c7e96cd101262f30210ab26')
+        self.assertEqual(status['upstream']['recheck_result'], 'UPSTREAM_HEAD_UNCHANGED')
+        self.assertEqual(status['upstream']['rechecked_on'], '2026-09-29')
         self.assertEqual(status['execution_authority'], 'NONE')
         self.assertEqual(status['layer'], 'RESEARCH_ONLY')
         self.assertEqual(status['status'], 'METHODOLOGY_REFERENCE_ONLY')

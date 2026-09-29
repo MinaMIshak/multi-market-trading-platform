@@ -20,6 +20,10 @@ _STATUS = {
         'committed_at': '2026-09-21T22:10:41+01:00',
         'license': 'Apache-2.0',
         'evaluated_on': '2026-09-28',
+        # Re-check only: upstream HEAD still equals the pinned commit and the
+        # recorded plugin versions, invalid MCP JSON and connector list match.
+        'rechecked_on': '2026-09-29',
+        'recheck_result': 'UPSTREAM_HEAD_UNCHANGED',
     },
     'plugins': [
         {'name': 'financial-analysis', 'version': '0.1.1', 'installed': False,

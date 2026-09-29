@@ -11,6 +11,30 @@ Status: **METHODOLOGY_REFERENCE_ONLY** (research layer; execution authority NONE
   `/home/egx-agent/research-data/vendor/financial-services` (auxiliary research
   workspace, not part of this repository and not installed as a plugin).
 
+## Re-check 2026-09-29
+
+A fresh shallow clone of upstream `main` resolved to the same commit
+`574ed3624aebd0418c7e96cd101262f30210ab26`. The recorded findings were
+re-verified against the files:
+- plugin versions financial-analysis 0.1.1, equity-research 0.1.2,
+  market-researcher 0.1.1;
+- `financial-analysis/.mcp.json` still fails to parse (JSON error at line 47);
+- the same 12 credentialed connectors.
+
+The upstream tree also contains agent plugins (earnings-reviewer,
+model-builder, valuation-reviewer, pitch-agent, kyc-screener, gl-reconciler,
+month-end-closer, statement-auditor, meeting-prep-agent) and vertical plugins
+(investment-banking, private-equity, fund-admin, operations). Beyond the
+research methodology already adapted, none supplies EGX/U.S. market data,
+admission evidence or execution. Their connectors need the same unavailable
+commercial credentials.
+
+The official plugin mechanism (`claude plugin`, Claude Code 2.1.285) is
+available in the agent session. Nothing was installed: it would change only
+the ephemeral agent environment, not the product, and every connector would
+fail closed without credentials. The next evaluation is needed only when
+upstream HEAD changes; review that diff before adopting anything.
+
 ## Findings
 
 | Plugin | Version | MCP config | Hooks |

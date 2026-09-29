@@ -213,6 +213,8 @@ def render_research(research):
                '<p>Research layer only; no trade execution authority. Upstream '
                + escape(upstream['repository']) + ' pinned at ' + escape(upstream['commit'][:7])
                + ' (' + escape(upstream['license']) + ', evaluated ' + escape(upstream['evaluated_on'])
+               + ', re-checked ' + escape(upstream.get('rechecked_on') or 'UNKNOWN') + ': '
+               + escape(upstream.get('recheck_result') or 'UNKNOWN')
                + '). Recorded evaluation, not a live connector check.</p>'
                '<table><caption>Evaluated plugins (not installed)</caption>'
                '<tr><th>Plugin</th><th>Version</th><th>MCP config</th></tr>')
