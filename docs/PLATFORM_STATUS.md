@@ -69,7 +69,7 @@ authoritative universe exists.
 
 | # | Scope | Status | Evidence / remaining dependency |
 |---|---|---|---|
-| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The agent's egress to EGX hosts is denied. |
+| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The cloud agent's egress to EGX hosts was denied. From the host, `beta.egx.com.eg` and `ticker.egidegypt.com` are reachable (2026-09-29): official index bars for 2026-09-27..29 were fetched and rehearsed (refresh + calendar backfill) on a copy only. Applying them to the operational DB awaits operator approval. |
 | B | Source admission | COMPLETE | Registry with typed access/entitlement/delay/evidence; exact-identity, fail-closed; gates SWING; shown in TODAY/SWING/LIVE/SYSTEM. No source is admitted (truthful). |
 | C | Canonical market data | COMPLETE | OHLC relationships, quarantine, duplicates, ordering, finite/positive checks; `adjusted_close` optional audit-only (`1d58103`); neutral row contract documented. |
 | D | Security master | PARTIAL-BLOCKED | EGID identities with provenance, fail-closed refresh (empty/truncated). Dated authoritative membership needs an authoritative dated source (external). |
@@ -99,7 +99,7 @@ authoritative universe exists.
 | Blocker | Owner / action | Unlocks |
 |---|---|---|
 | No admitted free EGX per-equity daily source | Operator/business: obtain a source with reviewed paper/shadow entitlement (or a written EGID/EGX data agreement), then add a `DailySourceDeclaration` with evidence | G, H (daily), I, J, K, L |
-| Agent egress to EGX/EGID hosts and the public endpoint denied | Operator: allow the hosts in the environment network policy | Live source probing, public endpoint validation |
+| Operational-DB write of official index/calendar evidence not yet approved | Operator: approve running `official_index_refresh_cli` + `calendar_backfill` (2026-09-25..29, `--data-root research-data/paper-shadow-operational/data`) on the operational DB; rollback snapshot `er1-autopilot/state/snapshots/operational-20260929T2100Z` | Verified sessions 2026-09-27..29; TODAY freshness moves from UNKNOWN to STALE truthfully |
 | uid-999 scheduler/app containers (root Docker) | Container owner: expose the scheduler heartbeat/scan history to a readable path, or deploy a newer build | Scheduler heartbeat evidence, runtime at current HEAD |
 | No dated authoritative EGX universe | Operator: a dated authoritative membership source | `authoritative_universe_available`, `overall_operational_ready` |
 | No attested PRE-SURGE scorer | Research owner: an attested scorer-row producer | I |
