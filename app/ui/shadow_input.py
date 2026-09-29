@@ -218,9 +218,15 @@ def read_shadow_execution(directory: Path, source):
         reader = (continuation_capital_settlement_view
                   if version == 'shadow-ui-continuation-settlement-v1'
                   else capital_settlement_view)
+    if version == 'shadow-ui-settlement-v2':
+        # v2 keeps the explicit (nullable) same-session evaluation facts that a
+        # single-session exit and its settlement were audited against.
+        fields['portfolio'] = ShadowPortfolioPolicy
+        reader = capital_settlement_view
     if (type(document) is not dict or set(document) != {'schema_version', *fields}
             or version not in ('shadow-ui-execution-v1', 'shadow-ui-continuation-v1',
-                               'shadow-ui-settlement-v1', 'shadow-ui-continuation-settlement-v1',
+                               'shadow-ui-settlement-v1', 'shadow-ui-settlement-v2',
+                               'shadow-ui-continuation-settlement-v1',
                                *early_readers)):
         raise ValueError('invalid execution envelope')
     decoded = {key: _decode(kind, document[key]) for key, kind in fields.items()}

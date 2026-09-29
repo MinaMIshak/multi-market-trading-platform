@@ -95,3 +95,77 @@ def test_open_trade_cannot_be_presented_as_settled(tmp_path, monkeypatch, contin
     settlement_input(tmp_path, monkeypatch, continuation, closed=False)
     assert main.shadow()['execution'] is None
     assert not (tmp_path / 'capital-settlements').exists()
+
+
+def later_fact_settlement_input(tmp_path, monkeypatch, *, with_extension=True):
+    from tests.test_shadow_report import setup_later_fact_settlement
+
+    def encode(value):
+        if isinstance(value, tuple):
+            return [encode(item) for item in value]
+        return value.model_dump(mode='json')
+
+    args, portfolio, policy, packages, _, extension = setup_later_fact_settlement(
+        tmp_path, monkeypatch,
+    )
+    (tmp_path / 'input.json').write_text(json.dumps({
+        'schema_version': 'shadow-ui-input-v1',
+        'watchlist': encode(args[0]), 'evidence_packages': encode(args[1]),
+    }))
+    document = dict(zip(
+        ('facts', 'fact_packages', 'fill_policy', 'fill_packages', 'exit_policy', 'exit_packages'),
+        map(encode, (*args[2:], policy, packages)), strict=True,
+    ))
+    document.update(
+        schema_version='shadow-ui-settlement-v2', portfolio=encode(portfolio),
+        evaluation_facts=encode(extension['evaluation_facts']) if with_extension else None,
+        evaluation_fact_packages=(
+            encode(extension['evaluation_fact_packages']) if with_extension else None
+        ),
+    )
+    path = tmp_path / 'execution.json'
+    path.write_text(json.dumps(document))
+    monkeypatch.setenv('EGX_SHADOW_DIRECTORY', str(tmp_path))
+    return path, document
+
+
+def test_settlement_v2_ui_reaudits_later_same_session_evaluation(tmp_path, monkeypatch):
+    later_fact_settlement_input(tmp_path, monkeypatch)
+    receipt = next((tmp_path / 'capital-settlements').glob('*.json'))
+    expected = json.loads(receipt.read_bytes())
+    before = {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    view = main.shadow()['execution']
+    assert view['collection_status'] == 'CAPITAL SETTLED'
+    assert view['position_status'] == 'CLOSED'
+    assert view['exit_evaluation']['evaluated_through_sequence'] == 2
+    for key in ('currency', 'capital_released', 'net_exit_proceeds'):
+        assert view['capital_settlement'][key] == expected[key]
+    assert view['performance']['nav'] is None
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+
+
+@pytest.mark.parametrize('damage', ['null', 'drop_packages', 'v1'])
+def test_settlement_v2_ui_fails_closed_without_bound_evaluation(tmp_path, monkeypatch, damage):
+    path, document = later_fact_settlement_input(
+        tmp_path, monkeypatch, with_extension=damage != 'null',
+    )
+    if damage == 'drop_packages':
+        del document['evaluation_fact_packages']
+    elif damage == 'v1':
+        document['schema_version'] = 'shadow-ui-settlement-v1'
+    path.write_text(json.dumps(document))
+    state = main.shadow()
+    assert state['available']
+    assert state['execution'] is None
+    assert str(tmp_path) not in json.dumps(state)
+
+
+def test_settlement_v2_ui_accepts_null_evaluation_for_entry_session_close(tmp_path, monkeypatch):
+    path, document, receipt = settlement_input(tmp_path, monkeypatch, False)
+    document.update(schema_version='shadow-ui-settlement-v2',
+                    evaluation_facts=None, evaluation_fact_packages=None)
+    path.write_text(json.dumps(document))
+    view = main.shadow()['execution']
+    assert view['collection_status'] == 'CAPITAL SETTLED'
+    expected = json.loads(receipt.read_bytes())
+    assert view['capital_settlement']['net_exit_proceeds'] == expected['net_exit_proceeds']

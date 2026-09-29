@@ -499,3 +499,81 @@ def test_continuation_report_reaudits_tampered_exit(tmp_path, monkeypatch):
             tmp_path, *args, chain, chain_packages,
             exit_policy, exit_packages,
         )
+
+
+def setup_later_fact_settlement(tmp_path, monkeypatch):
+    """Settle a position whose CLOSED exit is observed only on later admitted
+    same-session facts; the entry-session facts alone remain OPEN."""
+    from datetime import timedelta
+
+    from app.paper import shadow_allocations, shadow_facts
+    from app.paper.shadow_records import ShadowEvidenceReference
+    from tests.test_shadow_collection import package
+
+    args, portfolio, exit_policy, evidence, now = setup_settlement(
+        tmp_path, monkeypatch, closed=False,
+    )
+    bar = args[2].bars[0]
+    later_ref = ShadowEvidenceReference(
+        evidence_id="d" * 64, source_authority="official fixture authority",
+        source_locator="fixture://later-forward-bars", artifact_sha256="d" * 64,
+        available_at=bar.available_at + timedelta(minutes=1),
+    )
+    later_package = package(
+        "d", later_ref,
+        tuple(shadow_facts.BAR_FIELDS | shadow_facts.TRADING_STATUS_FIELDS),
+    )
+    later_bar = bar.model_copy(update={
+        "sequence": 2, "interval_start": bar.interval_end,
+        "interval_end": bar.interval_end + timedelta(minutes=1),
+        "available_at": bar.available_at + timedelta(minutes=1),
+        "low": Decimal("95"), "evidence_package_id": later_package.identity,
+    })
+    later_facts = args[2].model_copy(update={
+        "bars": (bar, later_bar),
+        "trading_status": args[2].trading_status.model_copy(update={
+            "coverage_end": later_bar.interval_end,
+            "evidence_package_id": later_package.identity,
+        }),
+    })
+    later_packages = args[3] + (later_package,)
+    later_now = now + timedelta(minutes=1)
+    monkeypatch.setattr(shadow_facts, "_now", lambda: later_now)
+    shadow_facts.append_forward_fact_event(
+        tmp_path, args[0], args[1], later_facts, later_packages,
+    )
+    monkeypatch.setattr(shadow_exits, "_now", lambda: later_now)
+    monkeypatch.setattr(shadow_allocations, "_now", lambda: later_now)
+    extension = {
+        "evaluation_facts": later_facts, "evaluation_fact_packages": later_packages,
+    }
+    shadow_exits.append_exit_event(tmp_path, *args, exit_policy, evidence, **extension)
+    shadow_allocations.append_capital_settlement(
+        tmp_path, *args, portfolio, exit_policy, evidence, **extension,
+    )
+    return args, portfolio, exit_policy, evidence, later_facts, extension
+
+
+def test_settlement_view_reaudits_later_same_session_fact_evaluation(tmp_path, monkeypatch):
+    """The settlement must be displayable through the same evaluation facts it
+    was audited against, and must still fail closed without them."""
+    args, portfolio, exit_policy, evidence, later_facts, extension = (
+        setup_later_fact_settlement(tmp_path, monkeypatch)
+    )
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+
+    view = capital_settlement_view(
+        tmp_path, *args, portfolio, exit_policy, evidence, **extension,
+    )
+
+    assert view["collection_status"] == "CAPITAL SETTLED"
+    assert view["position_status"] == "CLOSED"
+    assert view["exit_evaluation"]["evaluated_through_sequence"] == 2
+    assert view["audit_references"]["fact_record_id"] == later_facts.record_id
+    trade = view["closed_paper_trades"]["trade"]
+    assert view["capital_settlement"]["exit_notional"] == trade["exit_notional"]
+    assert view["capital_settlement"]["exit_cost"] == trade["exit_cost"]
+    assert all(value is None for key, value in view["performance"].items() if key != "status")
+    with pytest.raises(ValueError):
+        capital_settlement_view(tmp_path, *args, portfolio, exit_policy, evidence)
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}

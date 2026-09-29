@@ -189,6 +189,14 @@ The same-session settlement schema excludes the optional evaluation fields; the
 continuation schema requires complete ordered continuations and package arrays.
 These match the existing settlement readers' supported boundaries exactly.
 
+Cycle 124 correction: `append_capital_settlement`/`audit_capital_settlement`
+already accepted optional same-session `evaluation_facts`, but
+`capital_settlement_view` did not forward them, so a settlement whose CLOSED exit
+was observed only on later admitted same-session bars could not be displayed
+(it failed closed). The view now forwards both fields to the settlement audit and
+exit view. `shadow-ui-settlement-v2` carries both fields explicitly (nullable,
+both required); `shadow-ui-settlement-v1` is unchanged and still rejects them.
+
 Every read reaudits the frozen policy, reservation ownership, exit ancestry and
 native-currency settlement through the existing capital-settlement report readers.
 A CLOSED exit alone does not establish settlement. Missing receipts, altered

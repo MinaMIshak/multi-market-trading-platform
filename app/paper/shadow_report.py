@@ -503,15 +503,21 @@ def capital_settlement_view(
     portfolio: ShadowPortfolioPolicy,
     exit_policy: ShadowExitPolicy,
     exit_packages: tuple[HistoricalEvidencePackage, ...],
+    *, evaluation_facts: ForwardFactBundle | None = None,
+    evaluation_fact_packages: tuple[HistoricalEvidencePackage, ...] | None = None,
 ) -> dict:
     """Display authenticated native cash settlement without inferring NAV."""
     settlement = audit_capital_settlement(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, portfolio, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
     )
     exit_view = exit_evaluation_view(
         directory, watchlist, watchlist_packages, facts, fact_packages,
         fill_policy, fill_packages, exit_policy, exit_packages,
+        evaluation_facts=evaluation_facts,
+        evaluation_fact_packages=evaluation_fact_packages,
     )
     if exit_view["position_status"] != "CLOSED":
         raise ValueError("capital settlement requires authenticated closed trade")
