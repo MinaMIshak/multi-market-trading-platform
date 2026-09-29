@@ -255,8 +255,9 @@ def render_product(state):
             content += '</tbody></table>'
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
-        for value in state['markets'].values():
-            content += render_operational(value, fragment=True)
+        for key, value in state['markets'].items():
+            content += render_operational(value, fragment=True,
+                                          heading=f'{key} operational Paper/Shadow')
     else:
         messages = {
             'LIVE': 'Current scanner activity UNKNOWN. Historical classification does not prove scheduler completion.',

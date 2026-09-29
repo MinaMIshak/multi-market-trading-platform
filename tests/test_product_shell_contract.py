@@ -47,6 +47,19 @@ class ProductShellContracts(unittest.TestCase):
                     self.assertEqual('Entry band:' in body,
                                      section in ('TODAY', 'SWING') and market != 'US')
 
+    def test_operational_status_blocks_are_labelled_by_market(self):
+        # ALL renders one status block per market; an unlabelled NOT_READY next to
+        # an unlabelled UNKNOWN cannot be attributed to EGX or US by the reader.
+        for section in ('TODAY', 'SWING'):
+            with self.subTest(section=section):
+                body = render_product(product_state(self.source, 'ALL', section))
+                self.assertEqual(body.count('<h2>EGX operational Paper/Shadow</h2>'), 1)
+                self.assertEqual(body.count('<h2>US operational Paper/Shadow</h2>'), 1)
+                self.assertNotIn('<h2>Operational Paper/Shadow</h2>', body)
+                us = render_product(product_state(self.source, 'US', section))
+                self.assertIn('<h2>US operational Paper/Shadow</h2>', us)
+                self.assertNotIn('EGX operational', us)
+
     def test_receipt_text_is_escaped(self):
         body = render_product(product_state(self.source))
         self.assertNotIn('<fixture>', body)

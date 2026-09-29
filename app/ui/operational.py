@@ -75,7 +75,7 @@ def load_operational_state():
         return state | {'symbols': [], 'status': 'EVIDENCE_BLOCKED'}
 
 
-def render_operational(state, *, fragment=False):
+def render_operational(state, *, fragment=False, heading='Operational Paper/Shadow'):
     def text(value):
         return escape(str(value))
     # Reader admission only requires status fields; a hash-consistent receipt may
@@ -83,7 +83,7 @@ def render_operational(state, *, fragment=False):
     def field(source, key):
         value = source.get(key)
         return 'UNKNOWN' if value is None or value == '' else text(value)
-    content = '<h2>Operational Paper/Shadow</h2><p>LIVE MONEY DISABLED · Candidate != fill · No execution or performance inference</p>'
+    content = '<h2>' + text(heading) + '</h2><p>LIVE MONEY DISABLED · Candidate != fill · No execution or performance inference</p>'
     content += '<p>' + text(state['status']) + '</p>'
     for item in state['symbols']:
         content += '<article><h3>' + text(item['symbol']) + ' · ' + text(item['market']) + ' · ' + text(item['status']) + '</h3>'

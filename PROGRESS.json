@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 156: architecture/product review. Runtime (local uvicorn 127.0.0.1:8765, unconfigured, 4cb6ffa): /health, /api/system, /api/product (default and RESEARCH), /api/today, /api/paper-operational, /api/shadow, /, /system, /shadow, /performance all 200; unknown section/market 422. Finding: /api/system had grown to ~77 KB because PROGRESS.json current_capability/tests/next_action accumulated every cycle's narrative, so SYSTEM presented a history log rather than current state. Fix: accumulated fields archived verbatim to docs/PROGRESS_HISTORY.md (lossless, asserted); checkpoint fields now describe current state only; new regression test bounds them to 4000 chars. Package review coverage complete through cycle 154 (app/ui, risk, domain, strategies, top-level modules, storage, core, data, us, paper, performance, research) — see docs/PROGRESS_HISTORY.md; do not repeat absent new evidence. PAPER/SHADOW ONLY.",
+  "current_capability": "Cycle 188: architecture/product review. Local runtime (uvicorn 127.0.0.1:8765, unconfigured, defb599): /health, /api/system, /api/product (all sections incl. PRE-SURGE), /api/today, /, /system, /shadow, /performance 200; PRE_SURGE selector 422 (fail closed). Finding fixed: in TODAY/SWING the product shell rendered one status block per market under an identical unlabelled 'Operational Paper/Shadow' heading, so on ALL a NOT_READY and an UNKNOWN could not be attributed to EGX or US. render_operational now takes a heading; product shell labels each block by market ('EGX operational Paper/Shadow', 'US operational Paper/Shadow'). Standalone operational page heading unchanged. Earlier cycles: docs/PROGRESS_HISTORY.md. PAPER/SHADOW ONLY.",
   "starting_head": "d062d1c",
-  "head": "4cb6ffa506d715ad531d51537816a9b2b5b88e45",
+  "head": "defb599a4fc3de3edf06db0ac7b4739e9d57b882",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 156 FULL SUITE at 4cb6ffa (pre-change baseline): 3236 passed, 667 subtests passed, 0 failed (777s; state/cycle156-full-suite-4cb6ffa.log). (The cycle-155 run at the same HEAD was interrupted at 52% and is not evidence.) New test_repository_checkpoint_presents_current_state_not_history failed pre-fix (tests/next_action/current_capability over bound) and passes post-fix. Offline/unit and local runtime only; no deployed or live-market validation. Earlier results: docs/PROGRESS_HISTORY.md.",
+  "tests": "Cycle 188: new test_operational_status_blocks_are_labelled_by_market failed pre-fix (2 subtests) and passes post-fix. Affected suites (test_product_shell_contract, test_operational_ui, test_system_visibility, test_product_scan_history_contract, test_er1c_nyse_corporate_actions_product, test_system_checkpoint_presentation): 67 passed, 145 subtests, 0 failed. Runtime: labelled headings observed on / (ALL/TODAY, US/SWING). Last FULL SUITE: 4cb6ffa, 3236 passed, 667 subtests, 0 failed (state/cycle156-full-suite-4cb6ffa.log); not re-run for this UI-label change. Offline/unit and local runtime only; no deployed or live-market validation.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed.",
   "next_action": "Keep PROGRESS.json fields current-state only (append prior narrative to docs/PROGRESS_HISTORY.md, never here). Next safe work: (a) re-examine the scheduled_free_acquisition blocker for an offline mitigation without fabricating a source; (b) review app/egx_scan*.py/app/experimental.py product wiring against SYSTEM truth only if new evidence appears. Open policy decisions stay documented, not implemented from guesswork: HIGH_RISK/NO_CONFIRMATION BUY admission, pre-session action window back to information_cutoff, daily snapshot mark-age bound, dev-OOS labels resolving inside frozen holdout (docs/SOFTWARE_SPRINT_AUDIT.md, docs/FORWARD_SHADOW_PROTOCOL.md).",
@@ -62,5 +62,5 @@
     "performance": "Authentic canonical lifecycle observation source not connected",
     "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence."
   },
-  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE156"
+  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE188"
 }
