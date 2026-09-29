@@ -1,12 +1,13 @@
 # Platform Report — EGX + US Paper/Shadow Trading Platform
 
-Status as of 2026-09-29 (cycle 152). This is a current-state report, not a
+Status as of 2026-09-29 (cycle 156). This is a current-state report, not a
 claim of completion. PAPER/SHADOW ONLY. LIVE_MONEY=DISABLED.
 
 - Branch: `agent/er1c-free-acquisition`
-- Code HEAD at time of writing: `13465dd` (the commit that updates this report
+- Code HEAD at time of writing: `4cb6ffa` (the commit that updates this report
   follows it; see `git log`)
-- Checkpoint details: `PROGRESS.json`
+- Checkpoint details: `PROGRESS.json` (current state only); earlier cycle
+  narrative archived verbatim in `docs/PROGRESS_HISTORY.md`
 
 ## Start the UI
 
@@ -60,6 +61,13 @@ are documented in `README.md`. Container build: `docker compose up --build`.
 
 ## Test evidence
 
+- Full dependency-backed suite, cycle 156, on commit `4cb6ffa`:
+  **3236 passed, 667 subtests passed, 0 failed** (777 s). Log preserved at
+  `/home/egx-agent/er1-autopilot/state/cycle156-full-suite-4cb6ffa.log`.
+  (A cycle-155 run at the same commit stopped at 52% and is not evidence.)
+  The follow-up checkpoint-hygiene commit (PROGRESS.json + one new test) ran
+  the SYSTEM checkpoint/visibility suites: 23 passed, 117 subtests.
+
 - Full dependency-backed suite, cycle 152, on commit `261387f`:
   **3235 passed, 667 subtests passed, 0 failed** (773 s). Log preserved at
   `/home/egx-agent/er1-autopilot/state/cycle152-full-suite-261387f.log`.
@@ -80,6 +88,13 @@ are documented in `README.md`. Container build: `docker compose up --build`.
   integration tests.
 
 ## Runtime validation (local only)
+
+Cycle 156 at `4cb6ffa`, uvicorn on 127.0.0.1:8765, unconfigured: `/health`,
+`/api/system`, `/api/product` (default and RESEARCH), `/api/today`,
+`/api/paper-operational`, `/api/shadow`, `/`, `/system`, `/shadow` and
+`/performance` returned 200; unknown section/market returned 422.
+`/api/system` was ~77 KB because PROGRESS.json had accumulated every cycle's
+narrative; after the history was archived it is ~5.4 KB (`/system` ~7.7 KB).
 
 Cycle 152 at `261387f`, uvicorn on 127.0.0.1:8766, unconfigured: all 21
 section x market pages and 21 `/api/product` calls returned 200, as did `/`,

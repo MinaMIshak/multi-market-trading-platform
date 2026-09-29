@@ -196,6 +196,17 @@ class CheckpointPresentationTests(unittest.TestCase):
         self.assertIn(render_project_checkpoint(state), page)
         self.assertNotIn('<pre>', page)
 
+    def test_repository_checkpoint_presents_current_state_not_history(self):
+        # SYSTEM renders these fields verbatim; accumulated cycle history
+        # belongs in docs/PROGRESS_HISTORY.md and git, not the checkpoint.
+        root = Path(__file__).resolve().parents[1]
+        raw = json.loads((root / 'PROGRESS.json').read_text())
+        for key in ('current_capability', 'tests', 'next_action'):
+            with self.subTest(key=key):
+                self.assertIsInstance(raw[key], str)
+                self.assertLessEqual(len(raw[key]), 4000)
+        self.assertTrue((root / 'docs' / 'PROGRESS_HISTORY.md').is_file())
+
 
 if __name__ == '__main__':
     unittest.main()
