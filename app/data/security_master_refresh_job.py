@@ -10,6 +10,7 @@ from app.data.raw_store import (
     ImmutableRawStore,
 )
 from app.data.security_master import (
+    InstrumentType,
     build_canonical_security_master,
 )
 from app.data.security_master_ingestion import (
@@ -19,6 +20,13 @@ from app.data.security_master_ingestion import (
 
 
 EGID_PROVIDER = "egid"
+
+# A replacement snapshot may not drop more than
+# this fraction of the provider's admitted
+# instruments in one pass. Mass delisting in a
+# single day is implausible; a short or truncated
+# upstream response is not.
+MIN_RETAINED_FRACTION = 0.9
 
 
 class SecurityMasterRefreshJobError(
@@ -79,6 +87,48 @@ class SecurityMasterRefreshJob:
             .strip()
             .lower()
         )
+
+    def _require_complete_snapshot(
+        self,
+        *,
+        provider: str,
+        instruments: list,
+    ) -> None:
+        """
+        Fail closed before replacing the
+        admitted master with an empty,
+        equity-less or truncated snapshot.
+
+        The raw artifact stays preserved
+        either way; only admission is refused.
+        """
+
+        if not any(
+            instrument.instrument_type
+            is InstrumentType.EQUITY
+            for instrument in instruments
+        ):
+            raise ValueError(
+                "security master snapshot "
+                "contains no equities"
+            )
+
+        previous = (
+            self
+            .security_master_repository
+            .count_provider_instruments(
+                provider
+            )
+        )
+
+        if len(instruments) < (
+            previous * MIN_RETAINED_FRACTION
+        ):
+            raise ValueError(
+                "security master snapshot "
+                "contracted beyond the "
+                "retention threshold"
+            )
 
     def run(
         self,
@@ -154,6 +204,11 @@ class SecurityMasterRefreshJob:
                         .isoformat()
                     ),
                 )
+            )
+
+            self._require_complete_snapshot(
+                provider=ingestion.provider,
+                instruments=instruments,
             )
 
             (

@@ -202,3 +202,113 @@ def test_duplicate_symbol_code_fails_closed(
             provider=provider,
             snapshot_date=DAY,
         )
+
+
+def egid_records(count):
+    return [
+        egid_record(
+            symbol_code=f"EGS{index:05d}",
+            reuters=f"T{index:04d}.CA",
+        )
+        for index in range(count)
+    ]
+
+
+def provider_instrument_count(database):
+    with database.connect() as connection:
+        return connection.execute(
+            """
+            SELECT COUNT(*) FROM canonical_instruments
+            WHERE source_provider = ?
+            """,
+            (EGID_PROVIDER,),
+        ).fetchone()[0]
+
+
+def test_empty_snapshot_fails_closed_and_preserves_master(
+    tmp_path,
+):
+    database, runtime = build(tmp_path)
+
+    runtime.job.run(
+        provider=FakeEGIDProvider(egid_records(10)),
+        snapshot_date=DAY,
+    )
+
+    with pytest.raises(
+        SecurityMasterRefreshJobError,
+    ):
+        runtime.job.run(
+            provider=FakeEGIDProvider([]),
+            snapshot_date=date(2026, 9, 30),
+        )
+
+    assert provider_instrument_count(database) == 10
+
+
+def test_first_empty_snapshot_is_not_admitted(tmp_path):
+    database, runtime = build(tmp_path)
+
+    with pytest.raises(
+        SecurityMasterRefreshJobError,
+    ):
+        runtime.job.run(
+            provider=FakeEGIDProvider([]),
+            snapshot_date=DAY,
+        )
+
+    assert provider_instrument_count(database) == 0
+
+
+def test_snapshot_without_equities_fails_closed(tmp_path):
+    database, runtime = build(tmp_path)
+
+    with pytest.raises(
+        SecurityMasterRefreshJobError,
+    ):
+        runtime.job.run(
+            provider=FakeEGIDProvider(
+                [egid_record(symbol_code="EGX30", reuters=None)]
+            ),
+            snapshot_date=DAY,
+        )
+
+    assert provider_instrument_count(database) == 0
+
+
+def test_truncated_snapshot_fails_closed_and_preserves_master(
+    tmp_path,
+):
+    database, runtime = build(tmp_path)
+
+    runtime.job.run(
+        provider=FakeEGIDProvider(egid_records(100)),
+        snapshot_date=DAY,
+    )
+
+    with pytest.raises(
+        SecurityMasterRefreshJobError,
+    ):
+        runtime.job.run(
+            provider=FakeEGIDProvider(egid_records(89)),
+            snapshot_date=date(2026, 9, 30),
+        )
+
+    assert provider_instrument_count(database) == 100
+
+
+def test_small_contraction_is_admitted(tmp_path):
+    database, runtime = build(tmp_path)
+
+    runtime.job.run(
+        provider=FakeEGIDProvider(egid_records(100)),
+        snapshot_date=DAY,
+    )
+
+    result = runtime.job.run(
+        provider=FakeEGIDProvider(egid_records(90)),
+        snapshot_date=date(2026, 9, 30),
+    )
+
+    assert result.instrument_count == 90
+    assert provider_instrument_count(database) == 90

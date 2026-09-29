@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 235: EGID security-master refresh acquisition (identity only). New app/data/security_master_ingestion.py (immutable raw SECURITY_MASTER artifact + ingestion ledger, provider bytes preserved), security_master_refresh_job.py (egid-only, re-reads verified raw bytes, JSON-list + record_count checks, canonicalize via build_canonical_security_master, replace_provider_snapshot; fails closed with SecurityMasterRefreshJobError), security_master_refresh_runtime.py (composition; no network) and CLI python -m app.data.security_master_refresh_cli (--db-path/--data-root/--snapshot-date, Africa/Cairo default). Live-verified this cycle against a disposable DB only: anonymous getAllMarketWatchNames returned 319 records -> 319 instruments (312 EQUITY, 7 INDEX; e.g. COMI=Commercial International Bank-Egypt (CIB)). getSymbolHistory is HTTP 401 (auth-gated), so no EGX daily OHLCV source is admitted; shared platform.db NOT written. Previous: cycle 232 historical calendar-session verification (296e17b).",
+  "current_capability": "Cycle 235b: fail-closed completeness gate for EGID security-master refresh. SecurityMasterRefreshJob now refuses to replace the admitted master when the canonicalized snapshot has no EQUITY instruments (covers empty responses) or retains fewer than MIN_RETAINED_FRACTION=0.9 of the provider's currently admitted instruments (truncated upstream response); raw artifact is still preserved, admission refused, existing master untouched. New SecurityMasterRepository.count_provider_instruments. Previous checkpoint 254451c: EGID security-master refresh pipeline + CLI (live anonymous fetch: 319 records -> 312 EQUITY + 7 INDEX, disposable DB only). EGX daily OHLCV still UNQUALIFIED (EGID getSymbolHistory HTTP 401).",
   "starting_head": "d062d1c",
-  "head": "296e17baf23d7861c369d0cccbc3e635312c12fb",
+  "head": "254451c7e1794190c610a859a9f397afb72ca0c3",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,7 +47,7 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Cycle 235: focused security-master suites (ingestion, refresh runtime, refresh CLI, security_master, repository): 21 passed. Full suite (pytest -x, 3299 collected) ran to 100% without stopping, i.e. 0 failures (11m38s; log er1-autopilot/state/cycle235-full-suite.log; summary line suppressed by -qq). Offline/unit + one live anonymous identity fetch into a disposable DB; no deployed or live-market trading validation.",
+  "tests": "Cycle 235b: tests/test_security_master_refresh_runtime.py +5 (empty after admitted, first empty, no equities, 89/100 truncation rejected, 90/100 admitted); security-master/today/product/scheduler_worker keyword selection 127 passed; affected scan/launch/PIT suites 158 passed. Live replay of the CLI into a disposable copy: 319 instruments admitted. Full suite last run at cycle 235 checkpoint (3299 collected, -x run reached 100%); not re-run for this small change. Offline/unit + disposable-DB runtime only; no deployed or live-market trading validation.",
   "deployment": "No deployment performed. Repository Compose heartbeat wiring ready; safe deployment mechanism and runtime validation pending.",
   "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
   "next_action": "Run python -m app.data.security_master_refresh_cli against the operational DB only after shared platform.db writer ownership (uid-999 scheduler_worker) is confirmed; until then disposable copies only. EGX daily OHLCV remains UNQUALIFIED (EGID getSymbolHistory 401; egx.com.eg bulletins are disclosures; WAF blocks path enumeration). Next independent code work: provider-neutral daily-observation quality/freshness gates and TODAY/SWING wiring that stay EVIDENCE_BLOCKED without an admitted source.",
@@ -63,5 +63,5 @@
     "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
     "shared_database_ownership": "A scheduler_worker (PID 146267) and two uvicorn app.main:app processes (PID 1717126, 1861599, port 8000) are running under uid 999, not this agent's uid 1001; /proc/<pid>/environ is not readable by this agent, so their EGX_DB_PATH (and hence whether they write research-data/paper-shadow-operational/platform.db) is unconfirmed. This agent's own runtime checks against that file have historically been read-only; a direct backfill write was deferred this cycle for that reason rather than risk an unreviewed collision. Not a production-boundary violation (research-data is an authorized auxiliary path) but ownership of the live file is unconfirmed."
   },
-  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE235"
+  "commit_status": "PENDING_COMMIT_BRIDGE_CYCLE235B"
 }

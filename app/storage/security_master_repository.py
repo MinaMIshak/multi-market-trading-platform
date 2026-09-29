@@ -351,6 +351,26 @@ class SecurityMasterRepository:
             row["count"]
         )
 
+    def count_provider_instruments(
+        self,
+        provider: str,
+    ) -> int:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM canonical_instruments
+                WHERE source_provider = ?
+                """,
+                (
+                    provider.strip().lower(),
+                ),
+            ).fetchone()
+
+        return int(
+            row["count"]
+        )
+
     def count_aliases(
         self,
     ) -> int:
