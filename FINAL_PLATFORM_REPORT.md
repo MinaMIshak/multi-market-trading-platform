@@ -1,10 +1,10 @@
 # Platform Report — EGX + US Paper/Shadow Trading Platform
 
-Status as of 2026-09-28 (cycle 40). This is a current-state report, not a claim
-of completion. PAPER/SHADOW ONLY. LIVE_MONEY=DISABLED.
+Status as of 2026-09-29 (cycle 120). This is a current-state report, not a
+claim of completion. PAPER/SHADOW ONLY. LIVE_MONEY=DISABLED.
 
 - Branch: `agent/er1c-free-acquisition`
-- Code HEAD at time of writing: `d681291` (the commit that adds this report
+- Code HEAD at time of writing: `bb03063` (the commit that updates this report
   follows it; see `git log`)
 - Checkpoint details: `PROGRESS.json`
 
@@ -60,6 +60,9 @@ are documented in `README.md`. Container build: `docker compose up --build`.
 
 ## Test evidence
 
+- Full dependency-backed suite, cycle 120, on commit `bb03063`:
+  **3207 passed, 665 subtests passed, 0 failed** (685 s). Log preserved at
+  `/home/egx-agent/er1-autopilot/state/cycle120-full-suite.log`.
 - Full dependency-backed suite, cycle 40, on commit `eb65800`:
   **3145 passed, 653 subtests passed, 0 failed** (709 s). Log preserved at
   `/home/egx-agent/er1-autopilot/state/cycle40-full-suite.log`.
@@ -70,6 +73,12 @@ are documented in `README.md`. Container build: `docker compose up --build`.
   integration tests.
 
 ## Runtime validation (local only)
+
+Cycle 120 at `bb03063`, uvicorn on 127.0.0.1:8765, unconfigured: all 21
+section x market pages and 21 `/api/product` calls returned 200, as did `/`,
+`/system`, `/api/system`, `/performance` and `/health`. Invalid or lowercase
+section/market returned 422. `/api/product` TODAY/EGX reports NOT_READY with
+null coverage (no fabricated counts).
 
 Cycle 40 at `d681291`, uvicorn on 127.0.0.1:
 - Unconfigured: all 21 section x market pages and 21 `/api/product` calls
