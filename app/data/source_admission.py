@@ -79,6 +79,7 @@ class DailySourceDeclaration:
 
 
 _QUALIFICATION = "docs/ER1B_FREE_SOURCE_QUALIFICATION.md"
+_MARKET_WATCH_QUALIFICATION = "docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md"
 
 # Repository-recorded findings only; none establishes a reviewed entitlement.
 DAILY_SOURCE_DECLARATIONS: tuple[DailySourceDeclaration, ...] = (
@@ -101,6 +102,18 @@ DAILY_SOURCE_DECLARATIONS: tuple[DailySourceDeclaration, ...] = (
         source_timezone="Africa/Cairo",
         evidence=("paid token-gated API; final operation must not require paid "
                   "subscriptions (PROJECT_AUDIT.md)"),
+    ),
+    DailySourceDeclaration(
+        provider="egx_official_market_watch",
+        market="EGX",
+        access=SourceAccess.ANONYMOUS_PUBLIC,
+        entitlement=EntitlementStatus.NOT_ESTABLISHED,
+        delay=DataDelay.END_OF_DAY,
+        source_timezone="Africa/Cairo",
+        evidence=("official beta.egx.com.eg market-watch endpoint is technically "
+                  "reachable anonymously (216 securities, OHLCV with lastTradeDate, "
+                  "2026-09-30); the site links no terms of use and no reviewed paper/"
+                  "shadow usage right exists (" + _MARKET_WATCH_QUALIFICATION + ")"),
     ),
     DailySourceDeclaration(
         provider="tradingview_tvdatafeed",

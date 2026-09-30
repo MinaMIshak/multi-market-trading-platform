@@ -81,7 +81,7 @@ authoritative universe exists.
 
 | # | Scope | Status | Evidence / remaining dependency |
 |---|---|---|---|
-| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The cloud agent's egress to EGX hosts was denied. From the host, `beta.egx.com.eg` and `ticker.egidegypt.com` are reachable (2026-09-29): official index bars for 2026-09-27..29 were admitted to the operational DB on 2026-09-30. |
+| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The cloud agent's egress to EGX hosts was denied. From the host, `beta.egx.com.eg` and `ticker.egidegypt.com` are reachable (2026-09-29): official index bars for 2026-09-27..29 were admitted to the operational DB on 2026-09-30. The official `market-watch` endpoint (216 securities, per-equity OHLCV with lastTradeDate) is technically reachable and declared `egx_official_market_watch`, EVIDENCE_BLOCKED pending a usage-rights review (`docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md`). |
 | B | Source admission | COMPLETE | Registry with typed access/entitlement/delay/evidence; exact-identity, fail-closed; gates SWING; shown in TODAY/SWING/LIVE/SYSTEM. No source is admitted (truthful). |
 | C | Canonical market data | COMPLETE | OHLC relationships, quarantine, duplicates, ordering, finite/positive checks; `adjusted_close` optional audit-only (`1d58103`); neutral row contract documented. |
 | D | Security master | PARTIAL-BLOCKED | EGID identities with provenance, fail-closed refresh (empty/truncated). Dated authoritative membership needs an authoritative dated source (external). |
@@ -110,7 +110,7 @@ authoritative universe exists.
 
 | Blocker | Owner / action | Unlocks |
 |---|---|---|
-| No admitted free EGX per-equity daily source | Operator/business: obtain a source with reviewed paper/shadow entitlement (or a written EGID/EGX data agreement), then add a `DailySourceDeclaration` with evidence | G, H (daily), I, J, K, L |
+| No admitted free EGX per-equity daily source | Operator/business (highest priority): review usage rights for the official EGX `market-watch` data (`docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md`), or obtain a source with reviewed paper/shadow entitlement (or a written EGID/EGX data agreement), then add a `DailySourceDeclaration` with evidence | G, H (daily), I, J, K, L |
 | 8001 public-preview cutover (approved, blocked for the agent) | Operator: run `docs/PREVIEW_RUNTIME.md` section 4 with release `1211939…` and snapshot `operational-20260930T0740Z` | Public preview served from a pinned release and a verified snapshot |
 | uid-999 scheduler/app containers (root Docker) | Container owner: expose the scheduler heartbeat/scan history to a readable path, or deploy a newer build | Scheduler heartbeat evidence, runtime at current HEAD |
 | No dated authoritative EGX universe | Operator: a dated authoritative membership source | `authoritative_universe_available`, `overall_operational_ready` |
