@@ -47,6 +47,44 @@ adapter or scheduled acquisition exists.
   is supporting evidence for the universe, not an authoritative membership
   list, until its semantics are confirmed.
 
+## Semantics finding: `lastTradeDate` does not date the prices
+
+At 11:39 Cairo on 2026-09-30, with the session open, every row had
+`lastTradeDate` 2026-09-29 but carried today's live values. For example,
+ACAP: `prevClose` 7.91, `openPrice` 7.91, `closePrice` 7.70, `lastPrice` 7.75,
+`chgPer` −2.65 (7.70 against 7.91). Dating rows by `lastTradeDate` would
+record today's partial session as yesterday's completed bar. The adapter
+therefore never uses `lastTradeDate` alone.
+
+## Coverage and mapping (2026-09-30)
+
+With parameters `Page`/`PageSize` (taken from the site's own client code), all
+5 pages returned 217 rows, matching `totalCount`, with 217 unique ISINs, all
+`symbolType` C and `marketCode` NOPL. **All 217 Reuters codes map to canonical
+instruments** through the existing egid `REUTERS_RAW` aliases. No new mapping
+data is needed. If admitted, observed coverage would go from 1 symbol to 217.
+
+## Implementation (blocked, not scheduled)
+
+- `app/data/providers/egx_market_watch.py`: session warm-up, BFF headers,
+  full pagination, retry with exponential backoff (429/5xx/network), WAF HTML
+  detection, shape checks, total-count and duplicate-ISIN checks.
+  `completed_session_bars` produces neutral daily rows (`date`, `open`, `high`,
+  `low`, `close`, `volume`; no `adjusted_close`) only when `market-status` is
+  closed, the capture is on the session date after 16:00 Cairo, and each row's
+  `lastTradeDate` equals that date. Other rows are rejected with a reason
+  (`NOT_TRADED_IN_SESSION`, `OHLC_INCONSISTENT`, …), never repaired.
+- `python -m app.data.egx_market_watch_capture --out-root <dir>`: stores the
+  raw pages and a manifest (hashes, counts, gate verdict) as an immutable,
+  read-only evidence directory. It writes no database and admits nothing.
+- The existing per-symbol daily refresh path expects provider aliases and 260
+  bars of history, so it does not fit a forward, cross-sectional source.
+  Canonical storage of market-watch bars (one artifact per session) is the
+  follow-up once rights are reviewed and the closed-session semantics are
+  confirmed.
+- Live check at 11:58 Cairo: 217 rows in 5 pages; gate verdict
+  `SESSION_NOT_CLOSED:Open`, as intended.
+
 ## Open questions before any admission
 
 1. **Usage rights (blocking).** The beta site links no terms of use or
