@@ -47,9 +47,9 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Full suite at 84ad798 (Python 3.12, host): 3468 passed, 676 subtests passed.",
+  "tests": "Full suite at e146fab (Python 3.12, host): 3470 passed, 676 subtests passed.",
   "deployment": "Public preview 127.0.0.1:8001 (nginx basic auth) serves pinned release 1369bcc with snapshot operational-20260930T0800Z (operator cutover, browser-verified). Newer validated releases are applied by the operator from docs/PREVIEW_RUNTIME.md. nginx and uid-999 containers are root-owned (no sudo; ADMIN_REQUIRED).",
-  "scheduler": "egx-agent crontab: EGX_CALENDAR_MAINTENANCE daily 18:17 Africa/Cairo runs app.data.official_calendar_maintenance from pinned release d88b969 (completed sessions only, fail-closed, locked, idempotent; logs/status under er1-autopilot/state/egx-calendar-maintenance). Manual validation 2026-09-30 on the operational DB: integrity ok, lifecycle unchanged, repeat run idempotent; first scheduled run 2026-09-30 18:17 Cairo pending. The uid-999 scheduler_worker (root Docker) mounts no egx-agent path; its heartbeat/scan history remain MISSING/UNKNOWN. EGX_SCAN_MODE disabled.",
+  "scheduler": "egx-agent crontab: EGX_CALENDAR_MAINTENANCE daily 18:17 Africa/Cairo runs app.data.official_calendar_maintenance from pinned release e146fab (completed sessions only, fail-closed, locked, idempotent; logs/status under er1-autopilot/state/egx-calendar-maintenance). Manual validation 2026-09-30 on the operational DB: integrity ok, lifecycle unchanged, repeat run idempotent; first scheduled run 2026-09-30 18:17 Cairo pending. The uid-999 scheduler_worker (root Docker) mounts no egx-agent path; its heartbeat/scan history remain MISSING/UNKNOWN. EGX_SCAN_MODE disabled.",
   "next_action": "Operator: usage-rights decision for official EGX market-watch (docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md); apply the latest validated preview release. Agent: after rights and confirmed closed-session semantics, canonical per-session storage of market-watch bars and scheduled capture.",
   "hard_blocker": null,
   "live_money": false,

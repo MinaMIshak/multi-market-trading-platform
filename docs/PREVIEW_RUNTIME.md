@@ -137,7 +137,24 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Release update record (2026-09-30, coverage breakdown)
+### Latest validated release (2026-09-30 evening; the operator applies it)
+
+- Release `e146fab74b2194d78914ee90b0458fdd20175d82` (175 files, VERIFIED): the
+  coverage breakdown, the plain candidate header, SYSTEM calendar-maintenance
+  status, and the market-watch adapter (blocked, not scheduled).
+- Snapshot `operational-20260930T1520Z` (taken 15:20:59Z): integrity `ok`, 149
+  sessions, calendar-maintenance record bundled; heartbeat and scan history
+  MISSING.
+- All acceptance checks passed on 127.0.0.1:8011. Coverage: identities 319,
+  equities 312, universe UNKNOWN, observed 1, admitted 0, current 0,
+  scanned/candidates UNKNOWN; US all UNKNOWN. Calendar maintenance: SUCCESS /
+  CURRENT / `DEFERRED_SNAPSHOT_DATE_ALREADY_USED`.
+
+Apply it with the "Update 8001 from the running release" commands below, using
+this release and snapshot. Expected check output:
+`False e146fab74b2194d78914ee90b0458fdd20175d82 VERIFIED [] 319`.
+
+### Release update record (2026-09-30, coverage breakdown; superseded by the latest release above)
 
 - Release `39e9966b2429784dce4e92f64b9250cb963153b6` (172 files, VERIFIED).
   It adds the coverage breakdown and the plain "A candidate is not a fill"
