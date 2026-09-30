@@ -193,3 +193,16 @@ def test_capture_failure_leaves_nothing(tmp_path, capsys, monkeypatch):
     assert capture_module.main(["--out-root", str(tmp_path)]) == 1
     assert json.loads(capsys.readouterr().out)["status"] == "FAILED"
     assert list(tmp_path.rglob("*")) == []
+
+
+def test_cross_session_consistency_requires_every_close_to_become_prev_close():
+    from app.data.providers.egx_market_watch import cross_session_consistency
+    earlier = [row("AAA.CA", "EG1", closePrice=10.5), row("BBB.CA", "EG2", closePrice=20.0)]
+    later = [row("AAA.CA", "EG1", prevClose=10.5), row("BBB.CA", "EG2", prevClose=20.0),
+             row("CCC.CA", "EG3", prevClose=5.0)]
+    assert cross_session_consistency(earlier, later) == {
+        "compared": 2, "matched": 2, "mismatched": [], "only_earlier": 0,
+        "only_later": 1, "consistent": True}
+    later[1]["prevClose"] = 19.9
+    assert cross_session_consistency(earlier, later)["mismatched"] == ["EG2"]
+    assert cross_session_consistency([], later)["consistent"] is False

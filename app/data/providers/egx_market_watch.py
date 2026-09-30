@@ -214,3 +214,21 @@ def completed_session_bars(snapshot: MarketWatchSnapshot) -> tuple[date, dict, d
                      "close": str(values["close"]), "volume": str(values["volume"]),
                      "isin": row["isin"]}
     return session_date, bars, rejected
+
+
+def cross_session_consistency(earlier_rows, later_rows) -> dict:
+    """Compare an earlier capture's closePrice with a later capture's prevClose by ISIN.
+
+    Evidence only: full agreement across ISINs supports dating post-close rows
+    by the official closed-session date; it changes nothing by itself.
+    """
+    earlier = {row.get("isin"): _price(row.get("closePrice")) for row in earlier_rows}
+    later = {row.get("isin"): _price(row.get("prevClose")) for row in later_rows}
+    common = sorted(isin for isin in set(earlier) & set(later) if isin)
+    matched = [isin for isin in common
+               if earlier[isin] is not None and earlier[isin] == later[isin]]
+    return {"compared": len(common), "matched": len(matched),
+            "mismatched": sorted(set(common) - set(matched)),
+            "only_earlier": len(set(earlier) - set(later)),
+            "only_later": len(set(later) - set(earlier)),
+            "consistent": bool(common) and len(matched) == len(common)}
