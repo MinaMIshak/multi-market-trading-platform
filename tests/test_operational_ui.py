@@ -43,7 +43,7 @@ def test_verified_runtime_dashboard(launch, monkeypatch, scenario):
     before = (runtime / 'platform.db').read_bytes()
     state = main.paper_operational()
     body = main.root().body.decode()
-    assert 'LIVE MONEY DISABLED' in body and 'Candidate != fill' in body
+    assert 'LIVE MONEY DISABLED' in body and 'A candidate is not a fill' in body
     assert main.today() == state
     assert before == (runtime / 'platform.db').read_bytes()
     if scenario == 'tampered':

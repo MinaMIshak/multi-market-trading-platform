@@ -10,6 +10,7 @@ from app.scheduler_heartbeat import load_heartbeat
 from app.egx_scan_history import load_scan_history
 from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
+from app.ui.coverage import render_coverage
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
@@ -96,6 +97,9 @@ def load_system_state():
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': heartbeat,
         'readiness': product['readiness']['EGX'],
+        # Identities, universe, data, admission, freshness, scans and candidates
+        # as separate evidence levels; shared with /api/product.
+        'coverage_breakdown': product['coverage_breakdown'],
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
@@ -341,9 +345,10 @@ def render_system(state):
             'caption{text-align:left;margin-bottom:12px}</style>'
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
-            '<p>LIVE MONEY DISABLED · Candidate != fill · Unknown values appear as UNKNOWN (null in the API).</p>'
+            '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
+            + (render_coverage(state['coverage_breakdown']) if state.get('coverage_breakdown') else '')
             + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])
             + render_daily_sources(state.get('daily_sources') or [])

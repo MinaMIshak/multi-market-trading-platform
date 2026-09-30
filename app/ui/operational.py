@@ -89,7 +89,7 @@ def render_operational(state, *, fragment=False, heading='Operational Paper/Shad
     def field(source, key):
         value = source.get(key)
         return 'UNKNOWN' if value is None or value == '' else text(value)
-    content = '<h2>' + text(heading) + '</h2><p>LIVE MONEY DISABLED · Candidate != fill · No execution or performance inference</p>'
+    content = '<h2>' + text(heading) + '</h2><p>LIVE MONEY DISABLED · A candidate is not a fill · No execution or performance inference</p>'
     content += '<p>' + text(state['status']) + '</p>'
     for item in state['symbols']:
         content += '<article><h3>' + text(item['symbol']) + ' · ' + text(item['market']) + ' · ' + text(item['status']) + '</h3>'

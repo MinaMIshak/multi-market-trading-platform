@@ -7,6 +7,7 @@ from app.ui.operational import render_operational
 from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
+from app.ui.coverage import coverage_breakdown, render_coverage, unknown_breakdown
 from app.ui.readiness import egx_readiness, render_readiness
 from app.ui.sections import (live_state, pre_surge_state, render_live, render_pre_surge,
                              source_delay)
@@ -167,6 +168,11 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
         daily_observations=state['daily_observations']['EGX'],
         heartbeat=heartbeat, scan_history=scan_history) if key == 'EGX' else None
         for key in selected}
+    # Separate evidence levels (identities ... candidates); none implies the next.
+    state['coverage_breakdown'] = {key: coverage_breakdown(
+        security_master=security_master, daily_observations=state['daily_observations']['EGX'],
+        scan_runs=state['scan_runs']['EGX']) if key == 'EGX'
+        else unknown_breakdown('no US reader is connected') for key in selected}
     # US has no connected readers; its LIVE and PRE-SURGE state stays UNKNOWN.
     # Not 'live': that key is the LIVE_MONEY=DISABLED safety label.
     state['live_monitoring'] = {key: live_state(state['daily_observations']['EGX'])
@@ -334,12 +340,15 @@ def render_product(state):
         return f'<a href="/?{query}"{current}>{label}</a>'
     nav = '<nav aria-label="Product sections">' + ' '.join(link(s, market, s) for s in SECTIONS) + '</nav>'
     nav += '<nav aria-label="Markets">' + ' '.join(link(m, m, section) for m in MARKETS) + '</nav>'
-    content = f'<h1>{section} · {market}</h1><p>LIVE MONEY DISABLED · Candidate != fill</p>'
+    content = f'<h1>{section} · {market}</h1><p>LIVE MONEY DISABLED · A candidate is not a fill</p>'
     for key, value in state['markets'].items():
         observed = state['coverage'][key]['observed_symbols']
-        content += (f'<article><h2>{key}</h2><p>Status: {escape(str(value["status"]))}</p>'
-                    f'<p>Observed symbols: {observed if observed is not None else "UNKNOWN"}. '
-                    'Universe / data-ready / scanned / candidates: UNKNOWN.</p></article>')
+        content += (f'<article><h2>{key}</h2>'
+                    f'<p>Operational receipt status: {escape(str(value["status"]))}</p>'
+                    '<p>Symbols with operational Paper/Shadow receipts: '
+                    f'{observed if observed is not None else "UNKNOWN"}. '
+                    'Receipts are not universe, data or scan coverage; see the coverage '
+                    'breakdown on TODAY, SWING or SYSTEM.</p></article>')
         evidence = state['coverage'][key]['observation_evidence']
         content += '<p>Receipt reader observation: ' + escape(
             evidence['observed_at'] if evidence else 'UNKNOWN') + (
@@ -360,6 +369,7 @@ def render_product(state):
                 content += f'<tr><th scope="row">{status}</th><td>{count}</td></tr>'
             content += '</tbody></table>'
     if section in ('TODAY', 'SWING', 'SYSTEM'):
+        content += render_coverage(state['coverage_breakdown'])
         content += render_readiness(state['readiness'])
     if section in ('TODAY', 'SWING'):
         content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'

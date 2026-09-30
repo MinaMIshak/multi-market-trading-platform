@@ -173,7 +173,7 @@ class ProductShellContracts(unittest.TestCase):
                     self.assertEqual(body.count('<html'), 1)
                     self.assertEqual(body.count('aria-current="page"'), 2)
                     self.assertIn('LIVE MONEY DISABLED', body)
-                    self.assertIn('Candidate != fill', body)
+                    self.assertIn('A candidate is not a fill', body)
                     self.assertIn('href="/system"', body)
                     self.assertEqual('Entry band:' in body,
                                      section in ('TODAY', 'SWING') and market != 'US')
