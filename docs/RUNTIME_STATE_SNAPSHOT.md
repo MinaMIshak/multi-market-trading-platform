@@ -95,7 +95,8 @@ To refresh, take a new snapshot into a new directory, then restart the UI with
 the new path. To roll back, restart with the previous directory; old bundles
 are never modified.
 
-`--heartbeat` and `--scan-history` are optional; omit them if the files do not
+`--heartbeat`, `--scan-history` and `--calendar-maintenance-status` (the calendar
+job's `last-run.json`, shown in SYSTEM) are optional; omit them if the files do not
 exist. The tool:
 
 - opens the source with `mode=ro` and `PRAGMA query_only=ON`, and never uses

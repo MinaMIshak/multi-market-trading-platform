@@ -32,6 +32,8 @@ INPUTS = {
     'heartbeat': ('EGX_SCHEDULER_HEARTBEAT_PATH', 'scheduler-heartbeat.json', None),
     'scan_history': ('EGX_SCAN_HISTORY_PATH', 'egx-scan-history.json', None),
     'scan_ledger': ('EGX_SCAN_LEDGER_PATH', 'platform.db', None),
+    'calendar_maintenance': ('EGX_CALENDAR_MAINTENANCE_STATUS_PATH',
+                             'calendar-maintenance-last-run.json', None),
 }
 
 

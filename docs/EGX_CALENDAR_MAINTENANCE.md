@@ -117,8 +117,16 @@ then replace the entry (remove it as above, then add the new line).
 
 - `last-run.json` / `last-success.json` record status, outcome, fetch and
   backfill ranges, the snapshot date, evidence-table counts before and after,
-  and integrity. SYSTEM does not read these files yet. The runtime serves a
-  snapshot bundle, and the bundle does not carry them.
+  and integrity. SYSTEM (`/api/system` `calendar_maintenance` and the SYSTEM
+  page) shows the last record:
+  - status and outcome;
+  - freshness: CURRENT within 30 h of a success, otherwise STALE; FAILED;
+    UNKNOWN when the record is absent or malformed;
+  - the error, if any.
+
+  SYSTEM reads it from `EGX_CALENDAR_MAINTENANCE_STATUS_PATH`, or from a
+  bundle made with `tools/runtime_state_snapshot.py --calendar-maintenance-status
+  <state dir>/last-run.json`.
 - The job does not refresh the public snapshot bundle. The preview shows new
   sessions only after a new snapshot is taken and served
   (`docs/PREVIEW_RUNTIME.md`).

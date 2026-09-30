@@ -10,6 +10,7 @@ from app.scheduler_heartbeat import load_heartbeat
 from app.egx_scan_history import load_scan_history
 from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
+from app.calendar_maintenance_status import load_calendar_maintenance_status
 from app.ui.coverage import render_coverage
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
@@ -96,6 +97,8 @@ def load_system_state():
         'checkpoint': checkpoint,
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': heartbeat,
+        # Official-index/calendar maintenance job: last recorded outcome only.
+        'calendar_maintenance': load_calendar_maintenance_status(),
         'readiness': product['readiness']['EGX'],
         # Identities, universe, data, admission, freshness, scans and candidates
         # as separate evidence levels; shared with /api/product.
@@ -128,6 +131,19 @@ def load_system_state():
         # sources may feed signals or candidates.
         'daily_sources': daily_source_summary(),
     }
+
+
+def render_calendar_maintenance(record):
+    if not record:
+        return ''
+    rows = ''.join(f'<tr><th scope="row">{escape(key)}</th><td>'
+                   + escape('UNKNOWN' if value is None else str(value)) + '</td></tr>'
+                   for key, value in record.items())
+    return ('<h2>Calendar maintenance: ' + escape(record['status']) + ' / '
+            + escape(record['freshness']) + '</h2>'
+            '<p>Daily official-index and session-calendar evidence job. Its last recorded '
+            'outcome only: not a scan, a candidate or source admission.</p>'
+            '<table aria-label="Calendar maintenance"><tbody>' + rows + '</tbody></table>')
 
 
 def render_runtime_state(report):
@@ -348,6 +364,7 @@ def render_system(state):
             '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
+            + render_calendar_maintenance(state.get('calendar_maintenance'))
             + (render_coverage(state['coverage_breakdown']) if state.get('coverage_breakdown') else '')
             + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])
