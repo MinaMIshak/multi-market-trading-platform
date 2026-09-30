@@ -65,7 +65,7 @@ Add `--heartbeat`/`--scan-history` only when those files actually exist. See
 
 ```
 tmux new-session -d -s egx-preview-candidate -c <release> \
-  "env -i HOME=$HOME PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 \
+  "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 \
    EGX_SCAN_MODE=disabled EGX_RUNTIME_STATE_DIR=<snapshot> EGX_BUILD_REVISION=<full-sha> \
    /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
    --host 127.0.0.1 --port 8011 --proxy-headers"
@@ -114,20 +114,49 @@ immediately, restoring 8001 (health 200; public endpoint 401 without
 credentials). The public preview was briefly unavailable. The approved
 cutover has to be run by the operator.
 
+### Validation record (2026-09-30, pre-cutover refresh)
+
+The previous release and snapshot were superseded after the calendar
+maintenance (sessions 142→149).
+
+- Release `1369bcc1b4dc9924e67d7c882c2d382645a2f3e5` (171 files, VERIFIED).
+- Snapshot `operational-20260930T0800Z`, taken 2026-09-30T08:00:37Z by online
+  backup. Source and copy integrity are `ok`; 319 instruments, 149 sessions, 2
+  daily artifacts, 1 receipt. Heartbeat and scan history are MISSING. All six
+  lifecycle tables are at 0 and unchanged since the validated maintenance run.
+- All 24 acceptance checks passed on 127.0.0.1:8011:
+  - build and snapshot revision `1369bcc…`, exact snapshot path, `VERIFIED`,
+    no runtime warnings;
+  - `live_money` false and product `live` DISABLED;
+  - 319 identities (312 equities);
+  - `source_admission=NO_ADMITTED_SOURCE`, `scan_readiness=EVIDENCE_BLOCKED`,
+    `overall_operational_ready` false, daily freshness `STALE` (2);
+  - all seven sections return 200, and TODAY and SYSTEM show EVIDENCE_BLOCKED
+    with no ADMITTED claim.
+- 8001 was not touched.
+
 ## 4. Cut over port 8001 (operator-approved; the operator runs it)
 
-With the 2026-09-30 release and snapshot, the full cutover command is:
+Current validated pair: release `1369bcc1b4dc9924e67d7c882c2d382645a2f3e5`,
+snapshot `operational-20260930T0800Z`. Cutover:
 
 ```
 tmux send-keys -t egx-ui-preview C-c
+while ss -ltn | grep -q '127.0.0.1:8001 '; do sleep 0.5; done
 tmux new-session -d -s egx-preview-release \
-  -c /home/egx-agent/er1-autopilot/state/releases/1211939330a2a77c2d8f6eb81dc08df452117624 \
-  "env -i HOME=/home/egx-agent PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
-   EGX_RUNTIME_STATE_DIR=/home/egx-agent/er1-autopilot/state/snapshots/operational-20260930T0740Z \
-   EGX_BUILD_REVISION=1211939330a2a77c2d8f6eb81dc08df452117624 \
+  -c /home/egx-agent/er1-autopilot/state/releases/1369bcc1b4dc9924e67d7c882c2d382645a2f3e5 \
+  "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
+   EGX_RUNTIME_STATE_DIR=/home/egx-agent/er1-autopilot/state/snapshots/operational-20260930T0800Z \
+   EGX_BUILD_REVISION=1369bcc1b4dc9924e67d7c882c2d382645a2f3e5 \
    /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
-   --host 127.0.0.1 --port 8001 --proxy-headers"
+   --host 127.0.0.1 --port 8001 --proxy-headers 2>&1 | tee -a /home/egx-agent/er1-autopilot/state/preview-8001.log"
+until curl -sf -o /dev/null http://127.0.0.1:8001/health; do sleep 0.5; done
+curl -s http://127.0.0.1:8001/api/system | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['live_money'],d['build']['revision'],d['runtime_state']['snapshot']['status'],d['runtime_state']['warnings'])"
+curl -s -o /dev/null -w '%{http_code}\n' https://3-126-217-243.sslip.io/
 ```
+
+Expected output: `False 1369bcc1b4dc9924e67d7c882c2d382645a2f3e5 VERIFIED []`,
+then `401`. On any other output, run the rollback.
 
 General form:
 
