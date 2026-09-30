@@ -26,7 +26,7 @@ History: `/home/egx-agent/er1-autopilot/state/egx-scan/egx-scan-history.json`.
 
 ## Schedule
 
-The egx-agent crontab runs it daily at 18:45 Cairo, after the calendar
+The egx-agent crontab runs it daily at 18:45 Cairo (installed 2026-09-30), after the calendar
 maintenance job, from the same pinned release (marker `# EGX_UNIVERSE_SCAN`):
 
 ```

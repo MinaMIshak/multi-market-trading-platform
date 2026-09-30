@@ -111,7 +111,7 @@ Result:
 
 The module now defers in this case and records the full cause. The cron entry
 was moved to the release carrying the fix. 2026-09-30 is admitted by the
-2026-10-01 run (`HISTORICAL_OFFICIAL`).
+2026-10-01 run (`HISTORICAL_OFFICIAL`). Since 2026-09-30 evening the entry runs from release `e448206`, as the first step of the nightly chain (calendar 18:17 → universe scan 18:45 → verified publication 19:05).
 
 ## Commands
 
