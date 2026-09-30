@@ -23,7 +23,13 @@ membership or source entitlement, and it produces no candidates or signals.
    (weekend or holiday), it fetches nothing (`NO_NEW_SESSIONS`).
 5. Otherwise it runs the reviewed `egx_official_public` refresh job, with
    `snapshot_date` set to the Cairo date at acquisition (never pinned):
-   `ADMITTED_NEW_SESSIONS`.
+   `ADMITTED_NEW_SESSIONS`. Official index artifacts are immutable per
+   (index, snapshot date). If an earlier admission today already used today's
+   snapshot date, the fetch is skipped (`DEFERRED_SNAPSHOT_DATE_ALREADY_USED`),
+   and the next day's run admits those sessions under its own snapshot date.
+   If the refresh job fails, its raw ingestion may remain as `RECEIVED`: raw
+   bytes, never promoted and never read as data. The error records the full
+   cause.
 6. Runs the offline calendar backfill over the trailing 14 days up to the last
    completed session. It is deterministic: `VERIFIED` only from admitted
    official bars (`SAME_DAY_OFFICIAL`/`HISTORICAL_OFFICIAL`), `WEEKEND` by
@@ -89,6 +95,23 @@ credentials and no stray `EGX_*`. Cron supplies `HOME` itself.
   `crontab.before-egx-calendar-maintenance-20260930.txt`.
 - The first scheduled run is 2026-09-30 18:17 Cairo. It should admit the
   2026-09-30 session. Check it with the validation commands below.
+
+## First scheduled run (2026-09-30 18:17 Cairo) and fix
+
+The first cron run failed closed:
+`REFRESH_FAILED:OfficialIndexRefreshJobError`. The cause was
+`existing canonical artifact conflicts on canonical_path`. The approved morning
+catch-up had stored 2026-09-27..29 under snapshot date 2026-09-30. The evening
+run tried to store 2026-09-30 under the same snapshot date, and the
+repository rightly refused.
+
+Result:
+- Integrity `ok`; sessions unchanged at 149; lifecycle tables unchanged.
+- One CASE30 raw ingestion remains `RECEIVED`: evidence, not data.
+
+The module now defers in this case and records the full cause. The cron entry
+was moved to the release carrying the fix. 2026-09-30 is admitted by the
+2026-10-01 run (`HISTORICAL_OFFICIAL`).
 
 ## Commands
 

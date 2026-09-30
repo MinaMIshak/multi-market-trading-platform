@@ -12,20 +12,20 @@ from app.data import official_calendar_maintenance as maintenance
 INDICES = ("CASE30", "EGX70_EWI", "EGX100_EWI")
 
 
-def make_db(tmp_path, newest="2026-09-24", indices=INDICES):
+def make_db(tmp_path, newest="2026-09-24", indices=INDICES, snapshot="2026-09-24"):
     path = tmp_path / "platform.db"
     con = sqlite3.connect(path)
     con.execute("CREATE TABLE canonical_data_artifacts (provider, asset_type, status, "
-                "symbol, newest_market_date)")
+                "symbol, newest_market_date, source_snapshot_date)")
     for table in (*maintenance.LIFECYCLE_TABLES, "canonical_artifact_sources",
                   "data_ingestions", "market_sessions"):
         con.execute(f"CREATE TABLE {table} (x)")
     for name in indices:
         con.execute("INSERT INTO canonical_data_artifacts VALUES "
-                    "('egx_official_public','INDEX_BARS','VALIDATED',?,?)", (name, newest))
+                    "('egx_official_public','INDEX_BARS','VALIDATED',?,?,?)", (name, newest, snapshot))
     # A newer non-official artifact must not move the baseline.
     con.execute("INSERT INTO canonical_data_artifacts VALUES "
-                "('other','INDEX_BARS','VALIDATED','CASE30','2026-12-31')")
+                "('other','INDEX_BARS','VALIDATED','CASE30','2026-12-31','2026-09-30')")
     con.commit()
     con.close()
     return path
@@ -158,6 +158,43 @@ def test_refresh_failure_is_reported(tmp_path):
     with pytest.raises(maintenance.MaintenanceError, match="REFRESH_FAILED:ValueError"):
         call(tmp_path, db, Provider({n: 3 for n in INDICES}), cairo(2026, 9, 30, 18, 0),
              refresh_error=ValueError("invalid bar"))
+
+
+def test_same_day_snapshot_date_already_used_defers_without_fetch(tmp_path):
+    # Observed 2026-09-30: a morning catch-up used snapshot 09-30 for 09-27..29;
+    # the evening run must not collide with that immutable artifact identity.
+    db = make_db(tmp_path, newest="2026-09-29", snapshot="2026-09-30")
+    provider = Provider({name: 1 for name in INDICES})
+    result, calls = call(tmp_path, db, provider, cairo(2026, 9, 30, 18, 17))
+    assert result["outcome"] == "DEFERRED_SNAPSHOT_DATE_ALREADY_USED"
+    assert result["fetch_range"] == ["2026-09-30", "2026-09-30"]
+    assert provider.calls == [] and calls["refresh"] == []
+    assert calls["backfill"] == [(date(2026, 9, 16), date(2026, 9, 30))]
+    # Next day the snapshot date is free and the deferred session is admitted.
+    result, calls = call(tmp_path, db, Provider({n: 2 for n in INDICES}), cairo(2026, 10, 1, 18, 17))
+    assert result["outcome"] == "ADMITTED_NEW_SESSIONS"
+    assert calls["refresh"][0]["start_date"] == date(2026, 9, 30)
+    assert calls["refresh"][0]["snapshot_date"] == date(2026, 10, 1)
+
+
+def test_refresh_failure_records_secret_free_cause(tmp_path):
+    db = make_db(tmp_path)
+    class JobError(RuntimeError):
+        pass
+    def failing():
+        try:
+            raise ValueError("existing canonical artifact conflicts on canonical_path")
+        except ValueError as cause:
+            raise JobError("official index refresh failed:CASE30:ValueError") from cause
+    try:
+        failing()
+    except JobError as exc:
+        error_value = exc
+    with pytest.raises(maintenance.MaintenanceError) as caught:
+        call(tmp_path, db, Provider({n: 3 for n in INDICES}), cairo(2026, 9, 30, 18, 0),
+             refresh_error=error_value)
+    assert caught.value.code == ("REFRESH_FAILED:JobError:official index refresh failed:CASE30:"
+                                 "ValueError:ValueError:existing canonical artifact conflicts on canonical_path")
 
 
 def test_missing_baseline_index_fails_closed(tmp_path):

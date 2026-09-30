@@ -13,6 +13,11 @@ calendar backfill for unattended (cron) use:
   provider/network error, an index missing bars, or a disagreement between
   indices writes nothing (exit 1). No bars in range is a clean no-op
   (holidays and weekends stay whatever the evidence supports, usually UNKNOWN).
+  If the reviewed refresh job itself fails, its immutable raw ingestion may
+  remain as RECEIVED (never promoted, never read as data).
+- Official index artifacts are immutable per (index, snapshot date). If today's
+  snapshot date is already used, the fetch is deferred to the next run
+  (``DEFERRED_SNAPSHOT_DATE_ALREADY_USED``) and never collides.
 - Provenance: ``snapshot_date`` is the Cairo date at acquisition, never pinned.
 - Guarded: DB integrity must be ``ok`` before and after, and lifecycle tables
   (candidates, signals, positions, plans, outcomes, risk decisions) must not
@@ -93,6 +98,17 @@ def newest_official_bar_date(db_path: Path, index_names) -> date | None:
     return min(date.fromisoformat(newest[name]) for name in index_names)
 
 
+def snapshot_date_used(db_path: Path, index_names, snapshot_date: date) -> bool:
+    """True when any calendar index already has an official artifact for this snapshot date."""
+    marks = ",".join("?" for _ in index_names)
+    with closing(_read_only(db_path)) as con:
+        row = con.execute(
+            "SELECT COUNT(*) FROM canonical_data_artifacts WHERE provider=? "
+            f"AND asset_type='INDEX_BARS' AND source_snapshot_date=? AND symbol IN ({marks})",
+            (PROVIDER, snapshot_date.isoformat(), *index_names)).fetchone()
+    return row[0] > 0
+
+
 def probe(provider, index_names, start: date, end: date) -> int:
     """Records per index over [start, end]; all indices must agree."""
     counts = {}
@@ -151,7 +167,14 @@ def run(*, db_path: Path, data_root: Path, now: datetime, provider=None,
               "fetch_range": None, "fetched_records_per_index": 0,
               "snapshot_date": None, "outcome": "UP_TO_DATE"}
     start = newest + timedelta(days=1)
-    if start <= end:
+    snapshot_date = now.astimezone(CAIRO).date()
+    if start <= end and snapshot_date_used(db_path, index_names, snapshot_date):
+        # Official index artifacts are immutable per (index, snapshot date). An
+        # earlier admission today (e.g. a manual catch-up) owns this snapshot
+        # date, so the next day's run admits these sessions instead.
+        result["fetch_range"] = [start.isoformat(), end.isoformat()]
+        result["outcome"] = "DEFERRED_SNAPSHOT_DATE_ALREADY_USED"
+    elif start <= end:
         result["fetch_range"] = [start.isoformat(), end.isoformat()]
         provider = provider or EGXOfficialPublicProvider()
         records = probe(provider, index_names, start, end)
@@ -159,13 +182,15 @@ def run(*, db_path: Path, data_root: Path, now: datetime, provider=None,
         if records == 0:
             result["outcome"] = "NO_NEW_SESSIONS"
         else:
-            snapshot_date = now.astimezone(CAIRO).date()
             result["snapshot_date"] = snapshot_date.isoformat()
             try:
                 refresh.job.run(provider=provider, start_date=start, end_date=end,
                                 snapshot_date=snapshot_date, page_size=1000)
             except Exception as exc:
-                raise MaintenanceError(f"REFRESH_FAILED:{type(exc).__name__}") from exc
+                cause = exc.__cause__
+                detail = f"{type(exc).__name__}:{exc}" + (
+                    f":{type(cause).__name__}:{cause}" if cause is not None else "")
+                raise MaintenanceError(f"REFRESH_FAILED:{detail}"[:300]) from exc
             result["outcome"] = "ADMITTED_NEW_SESSIONS"
 
     backfill_start = end - timedelta(days=BACKFILL_WINDOW_DAYS)
