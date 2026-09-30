@@ -61,8 +61,34 @@ Crontab entry (user crontab of `egx-agent`, no root). `<sha>` is the full commit
 of the pinned release:
 
 ```
-17 18 * * * cd /home/egx-agent/er1-autopilot/state/releases/<sha> && env -i HOME=/home/egx-agent PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 TZ=Africa/Cairo EGX_BUILD_REVISION=<sha> /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m app.data.official_calendar_maintenance --db-path /home/egx-agent/research-data/paper-shadow-operational/platform.db --data-root /home/egx-agent/research-data/paper-shadow-operational/data --state-dir /home/egx-agent/er1-autopilot/state/egx-calendar-maintenance >> /home/egx-agent/er1-autopilot/state/egx-calendar-maintenance/logs/cron.log 2>&1 # EGX_CALENDAR_MAINTENANCE
+17 18 * * * cd /home/egx-agent/er1-autopilot/state/releases/<sha> && env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 TZ=Africa/Cairo EGX_BUILD_REVISION=<sha> /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m app.data.official_calendar_maintenance --db-path /home/egx-agent/research-data/paper-shadow-operational/platform.db --data-root /home/egx-agent/research-data/paper-shadow-operational/data --state-dir /home/egx-agent/er1-autopilot/state/egx-calendar-maintenance >> /home/egx-agent/er1-autopilot/state/egx-calendar-maintenance/logs/cron.log 2>&1 # EGX_CALENDAR_MAINTENANCE
 ```
+
+`env -i` gives the job only the variables it needs: no inherited
+credentials and no stray `EGX_*`. Cron supplies `HOME` itself.
+
+## Installation record (2026-09-30)
+
+- Pinned release `d88b9693318e79eb37cd004da37b649476627fc4` (171 files,
+  VERIFIED) in `er1-autopilot/state/releases/`.
+- Backup before the manual runs:
+  `er1-autopilot/state/snapshots/pre-maintenance-manual-20260930T0800Z`
+  (integrity `ok`).
+- Rehearsal on a copy of the pre-update DB: run 1 admitted 2026-09-25..29 with
+  `snapshot_date=2026-09-30`; run 2 was `UP_TO_DATE` with no count changes.
+- Manual runs on the operational DB from the pinned release, 10:55 Cairo, during
+  the open session:
+  - Run 1: `UP_TO_DATE`. The last completed session was 2026-09-29, so today
+    was not fetched. The backfill verified 2026-09-15..23 from bars already
+    admitted: `market_sessions` 142→149.
+  - Run 2: no changes.
+  - Both runs: integrity `ok`; lifecycle and audit tables unchanged.
+- Installed with `crontab <file>` from
+  `er1-autopilot/state/crontab.with-egx-calendar-maintenance-20260930.txt`.
+  The existing `# ER1_AUTOPILOT` line is kept. The previous crontab is saved at
+  `crontab.before-egx-calendar-maintenance-20260930.txt`.
+- The first scheduled run is 2026-09-30 18:17 Cairo. It should admit the
+  2026-09-30 session. Check it with the validation commands below.
 
 ## Commands
 

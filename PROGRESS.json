@@ -4,7 +4,7 @@
   "phase": "PLATFORM_REPORT",
   "current_capability": "Host session (2026-09-30): pinned preview release tooling (tools/preview_release.py) and host-verified runtime topology; approved official-index (2026-09-27..29, snapshot 2026-09-30) + calendar backfill applied to the operational DB with backup, integrity and count checks (sessions verified through 2026-09-29; COMI daily freshness truthfully STALE); release 1211939 + snapshot operational-20260930T0740Z pass all acceptance checks on loopback 8011; the 8001 cutover was blocked by the agent permission policy and rolled back within seconds.",
   "starting_head": "6c920fe",
-  "head": "1211939330a2a77c2d8f6eb81dc08df452117624",
+  "head": "d88b9693318e79eb37cd004da37b649476627fc4",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,10 +47,10 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Host full suite (Python 3.12 venv) at 99d0f41: exit 0. Focused/related (preview release, snapshot, runtime state, experimental): 84 passed at 1211939.",
+  "tests": "Host full suite (Python 3.12) at 99d0f41: exit 0. 2026-09-30: 18 new maintenance tests; 122 related calendar/index/TODAY/release tests passed at d88b969.",
   "deployment": "Public preview (nginx -> 127.0.0.1:8001) still runs --reload from the shared egx-trading-platform-us checkout with no EGX_* variables. The validated replacement is releases/1211939... + snapshots/operational-20260930T0740Z (docs/PREVIEW_RUNTIME.md section 4); the cutover is operator-approved but blocked for the agent, so the operator runs it. uid-999 containers (8000 at b0ebc08, 18001) are root Docker; updating them is ADMIN_REQUIRED.",
-  "scheduler": "uid-999 scheduler_worker (root Docker) mounts no egx-agent path: it does not write the operational DB and its heartbeat/DB are not visible to egx-agent (heartbeat and scan history stay MISSING/UNKNOWN). No scheduler maintains calendar evidence for the operational DB; official-index refresh + backfill are manual CLIs. EGX_SCAN_MODE disabled.",
-  "next_action": "Operator: run the 8001 cutover (docs/PREVIEW_RUNTIME.md section 4). Agent: continue the A-X gaps that are safe locally; external blockers are unchanged (admitted EGX daily source, dated universe, PRE-SURGE scorer, US universe/source).",
+  "scheduler": "egx-agent crontab: EGX_CALENDAR_MAINTENANCE daily 18:17 Africa/Cairo runs app.data.official_calendar_maintenance from pinned release d88b969 (completed sessions only, fail-closed, locked, idempotent; logs/status under er1-autopilot/state/egx-calendar-maintenance). Manual validation 2026-09-30 on the operational DB: integrity ok, lifecycle unchanged, repeat run idempotent; first scheduled run 2026-09-30 18:17 Cairo pending. The uid-999 scheduler_worker (root Docker) mounts no egx-agent path; its heartbeat/scan history remain MISSING/UNKNOWN. EGX_SCAN_MODE disabled.",
+  "next_action": "Operator: 8001 cutover (docs/PREVIEW_RUNTIME.md section 4). Verify the first scheduled calendar maintenance run after 2026-09-30 18:17 Cairo (last-run.json). Agent: remaining local A-X gaps; external blockers unchanged.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
