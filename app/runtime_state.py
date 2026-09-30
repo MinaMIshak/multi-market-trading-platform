@@ -5,7 +5,10 @@ identities from one database and receipts from another (or none) without
 noticing. Resolution order per input:
 
 1. explicit variable (e.g. ``EGX_DB_PATH``) -- preserved for compatibility;
-2. ``EGX_RUNTIME_STATE_DIR`` bundle file (see tools/runtime_state_snapshot.py);
+2. ``EGX_RUNTIME_STATE_DIR`` bundle file (see tools/runtime_state_snapshot.py),
+   or, when that is unset, the bundle named by the ``EGX_RUNTIME_STATE_POINTER``
+   file (see tools/publish_runtime_snapshot.py), re-read whenever it changes so
+   a verified snapshot can be published without restarting the process;
 3. the reader's legacy default (only the product DB has one).
 
 ``runtime_state_report`` records where each input came from, whether explicit
@@ -21,7 +24,9 @@ import os
 from pathlib import Path
 
 BUNDLE_VARIABLE = 'EGX_RUNTIME_STATE_DIR'
+POINTER_VARIABLE = 'EGX_RUNTIME_STATE_POINTER'
 MANIFEST_NAME = 'SNAPSHOT_MANIFEST.json'
+MAX_POINTER_BYTES = 4096
 MAX_MANIFEST_BYTES = 256 * 1024
 DEFAULT_DB_PATH = '/app/data/platform.db'
 
@@ -37,12 +42,43 @@ INPUTS = {
 }
 
 
+@lru_cache(maxsize=4)
+def _pointer_cached(path, size, mtime_ns):
+    with open(path, 'rb') as stream:
+        payload = stream.read(MAX_POINTER_BYTES + 1)
+    if len(payload) > MAX_POINTER_BYTES:
+        raise ValueError('pointer too large')
+    document = json.loads(payload)
+    if type(document) is not dict or type(document.get('bundle')) is not str:
+        raise ValueError('pointer malformed')
+    return document
+
+
+def read_pointer():
+    """(document or None, status); status is UNSET, OK or UNREADABLE."""
+    value = os.getenv(POINTER_VARIABLE)
+    if not value:
+        return None, 'UNSET'
+    path = Path(value)
+    try:
+        if not path.is_absolute() or path.is_symlink() or not path.is_file():
+            raise ValueError('pointer path invalid')
+        stat = path.stat()
+        document = _pointer_cached(str(path), stat.st_size, stat.st_mtime_ns)
+        if not Path(document['bundle']).is_absolute():
+            raise ValueError('pointer bundle not absolute')
+        return document, 'OK'
+    except (OSError, ValueError, TypeError):
+        return None, 'UNREADABLE'
+
+
 def _bundle():
     value = os.getenv(BUNDLE_VARIABLE)
-    if not value:
-        return None
-    path = Path(value)
-    return path if path.is_absolute() else None
+    if value:
+        path = Path(value)
+        return path if path.is_absolute() else None
+    document, status = read_pointer()
+    return Path(document['bundle']) if status == 'OK' else None
 
 
 def resolve(name):
@@ -141,6 +177,11 @@ def runtime_state_report():
     warnings = []
     if os.getenv(BUNDLE_VARIABLE) and bundle is None:
         warnings.append('RUNTIME_STATE_DIR_NOT_ABSOLUTE')
+    pointer, pointer_status = read_pointer()
+    if os.getenv(BUNDLE_VARIABLE) and pointer_status != 'UNSET':
+        warnings.append('BUNDLE_AND_POINTER_BOTH_SET')
+    if not os.getenv(BUNDLE_VARIABLE) and pointer_status == 'UNREADABLE':
+        warnings.append('RUNTIME_STATE_POINTER_UNREADABLE')
     if bundle is not None and any(item['origin'] == 'explicit' for item in inputs.values()):
         warnings.append('MIXED_STATE_SOURCES')
     if bundle is None:
@@ -154,5 +195,12 @@ def runtime_state_report():
     snapshot = _verify_bundle(bundle) if bundle is not None else None
     if snapshot is not None and snapshot['status'] != 'VERIFIED':
         warnings.append('SNAPSHOT_UNVERIFIED')
-    return {'mode': 'SNAPSHOT_BUNDLE' if bundle is not None else 'PER_VARIABLE',
-            'inputs': inputs, 'snapshot': snapshot, 'warnings': warnings}
+    via_pointer = bundle is not None and not os.getenv(BUNDLE_VARIABLE)
+    mode = ('SNAPSHOT_POINTER' if via_pointer else
+            'SNAPSHOT_BUNDLE' if bundle is not None else 'PER_VARIABLE')
+    report = {'mode': mode, 'inputs': inputs, 'snapshot': snapshot, 'warnings': warnings}
+    if pointer_status != 'UNSET':
+        report['pointer'] = {'status': pointer_status,
+                             'published_at': (pointer or {}).get('published_at'),
+                             'build_revision': (pointer or {}).get('build_revision')}
+    return report

@@ -7,7 +7,7 @@ that checkout changes. A release pins the served code to one commit:
         --out-root /abs/releases
     python tools/preview_release.py verify /abs/releases/<sha>
 
-The release holds only what ``app.main`` needs at runtime (``app/``,
+The release holds what ``app.main`` and the operational tools need (``app/``, ``tools/``,
 ``requirements.txt`` and the ``PROGRESS.json`` checkpoint shown by SYSTEM).
 It is built in a private temporary directory, made read-only, and renamed into
 place atomically; an existing release is never overwritten. It launches
@@ -29,7 +29,7 @@ import tempfile
 
 SCHEMA = 'preview-release-v1'
 MANIFEST = 'RELEASE.json'
-CONTENT = ('app', 'requirements.txt', 'PROGRESS.json')
+CONTENT = ('app', 'tools', 'requirements.txt', 'PROGRESS.json')
 
 
 def git(repository, *args):

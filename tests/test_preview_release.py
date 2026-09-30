@@ -27,6 +27,8 @@ def repository(tmp_path):
     (repo / 'PROGRESS.json').write_text('{"milestone": "M4"}\n')
     (repo / 'tests').mkdir()
     (repo / 'tests' / 'test_x.py').write_text('')
+    (repo / 'tools').mkdir()
+    (repo / 'tools' / 'publish.py').write_text('')
     (repo / 'secret.env').write_text('TOKEN=artificial')
 
     def git(*args):
@@ -70,7 +72,7 @@ def test_export_pins_exact_commit_read_only_with_manifest(tmp_path):
     assert not (out / 'tests').exists() and not (out / 'secret.env').exists()
     manifest = json.loads((out / release.MANIFEST).read_text())
     assert manifest['commit'] == first and manifest['schema'] == release.SCHEMA
-    assert set(manifest['files']) == {'app/__init__.py', 'app/ui/system.py',
+    assert set(manifest['files']) == {'app/__init__.py', 'app/ui/system.py', 'tools/publish.py',
                                       'requirements.txt', 'PROGRESS.json'}
     assert all(not p.stat().st_mode & 0o222 for p in [out, *out.rglob('*')])
     assert release.verify(out)['commit'] == first
@@ -161,4 +163,4 @@ def test_cli_verify(tmp_path, capsys):
     assert release.main(['export', '--repo', str(repo), '--commit', first,
                          '--out-root', str(root)]) == 0
     assert release.main(['verify', str(root / first)]) == 0
-    assert f'VERIFIED {first} files=4' in capsys.readouterr().out
+    assert f'VERIFIED {first} files=5' in capsys.readouterr().out

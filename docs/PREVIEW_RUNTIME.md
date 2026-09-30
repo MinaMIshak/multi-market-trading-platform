@@ -240,3 +240,55 @@ release or snapshot directory. Releases and snapshots are never modified.
 
 To publish new code or state, export a new release and/or take a new
 snapshot, validate it on a spare port (step 3), then repeat step 4.
+
+## 5. Pointer mode: nightly state publication without restarts
+
+A runtime started with `EGX_RUNTIME_STATE_POINTER=<file>` (and without
+`EGX_RUNTIME_STATE_DIR`) serves the bundle named in that JSON file. It re-reads
+the file whenever it changes. `tools/publish_runtime_snapshot.py publish`:
+1. takes a new snapshot;
+2. re-verifies it the way the runtime does;
+3. switches the pointer atomically, only when the snapshot is VERIFIED and holds
+   instruments.
+
+On any failure the pointer is left unchanged and the command exits 1. Every
+switch is appended to `<pointer>.history.jsonl`. SYSTEM shows mode
+`SNAPSHOT_POINTER`, the pointer status, the publish time and the build.
+Warnings: `RUNTIME_STATE_POINTER_UNREADABLE`, `BUNDLE_AND_POINTER_BOTH_SET`.
+Code releases still go through steps 1–4. Only state changes are published
+this way.
+
+Paths:
+- Pointer: `/home/egx-agent/er1-autopilot/state/public-bundle.json`
+- History: `/home/egx-agent/er1-autopilot/state/public-bundle.json.history.jsonl`
+- Published bundles: `/home/egx-agent/er1-autopilot/state/snapshots/published-<UTC>`
+
+Nightly publication (egx-agent crontab, 19:05 Cairo, after the calendar job
+at 18:17 and the universe scan at 18:45; marker `# EGX_PUBLISH_SNAPSHOT`):
+
+```
+5 19 * * * cd /home/egx-agent/er1-autopilot/state/releases/<sha> && env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 TZ=Africa/Cairo /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python tools/publish_runtime_snapshot.py publish --db /home/egx-agent/research-data/paper-shadow-operational/platform.db --snapshots-root /home/egx-agent/er1-autopilot/state/snapshots --pointer /home/egx-agent/er1-autopilot/state/public-bundle.json --build-revision <sha> --scan-history /home/egx-agent/er1-autopilot/state/egx-scan/egx-scan-history.json --calendar-maintenance-status /home/egx-agent/er1-autopilot/state/egx-calendar-maintenance/last-run.json >> /home/egx-agent/er1-autopilot/state/publish-snapshot.log 2>&1 # EGX_PUBLISH_SNAPSHOT
+```
+
+Until 8001 is restarted in pointer mode, the cron only maintains the pointer
+and the public site is unaffected. One-time adoption (operator, same shape as
+step 4). Swap `EGX_RUNTIME_STATE_DIR=<snapshot>` for
+`EGX_RUNTIME_STATE_POINTER=/home/egx-agent/er1-autopilot/state/public-bundle.json`:
+
+```
+tmux kill-session -t egx-preview-release
+while ss -ltn | grep -q '127.0.0.1:8001 '; do sleep 0.5; done
+tmux new-session -d -s egx-preview-release -c /home/egx-agent/er1-autopilot/state/releases/<sha> \
+  "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
+   EGX_RUNTIME_STATE_POINTER=/home/egx-agent/er1-autopilot/state/public-bundle.json \
+   EGX_BUILD_REVISION=<sha> /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
+   --host 127.0.0.1 --port 8001 --proxy-headers"
+```
+
+Check: `/api/system` → `runtime_state.mode` `SNAPSHOT_POINTER`,
+`snapshot.status` `VERIFIED`, `warnings` `[]`.
+
+Rollback of state: `tools/publish_runtime_snapshot.py rollback --pointer <pointer>`.
+Rollback of the mode: restart 8001 with `EGX_RUNTIME_STATE_DIR=<snapshot>` as
+in step 4. Disable publication:
+`crontab -l | grep -v '# EGX_PUBLISH_SNAPSHOT$' | crontab -`.
