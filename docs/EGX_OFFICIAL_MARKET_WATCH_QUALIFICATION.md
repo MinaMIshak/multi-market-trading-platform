@@ -85,6 +85,34 @@ data is needed. If admitted, observed coverage would go from 1 symbol to 217.
 - Live check at 11:58 Cairo: 217 rows in 5 pages; gate verdict
   `SESSION_NOT_CLOSED:Open`, as intended.
 
+## Post-close capture (2026-09-30 16:45 Cairo)
+
+Evidence directory
+`er1-autopilot/state/market-watch-evidence/2026-09-30/20260930T134525Z`: 5
+pages plus `market-status`, hashed and read-only.
+
+- `market-status`: `Closed`, `statusDate` 2026-09-30T16:45:27. This confirms
+  the closed-status vocabulary.
+- 221 rows, up from 217 at 11:58. The row set changes within a day, so it is
+  not a stable universe list.
+- The values are the day's final session values. For example, ACAP: close 7.55
+  against `prevClose` 7.91, `chgPer` −4.55, volume 531,014 (218,917 at 11:39).
+  For all 50 rows on page 1, `chgPer` matches close against `prevClose`.
+  `writeTime` is 2026-09-30 15:xx.
+- **`lastTradeDate` is still 2026-09-29 after the close.** It does not date the
+  values even then.
+- Gate verdict: `COMPLETED_SESSION` for 2026-09-30, with **0 bars**: all 221
+  rows rejected `NOT_TRADED_IN_SESSION`. The fail-closed rule held. No bar was
+  dated by a field that contradicts the values.
+
+Evidence needed before any dating rule changes: a cross-session consistency
+check. The next session's capture must show `prevClose` equal to this
+capture's `closePrice` for every ISIN, and the `writeTime` and closed-status
+dates must line up. Only then may post-close rows be dated by the official
+closed-session date instead of `lastTradeDate`. That change needs a test and
+a recorded review. It also changes nothing about admission, which still
+requires the rights review.
+
 ## Open questions before any admission
 
 1. **Usage rights (blocking).** The beta site links no terms of use or
