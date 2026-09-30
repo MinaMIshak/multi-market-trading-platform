@@ -133,7 +133,44 @@ maintenance (sessions 142→149).
     `overall_operational_ready` false, daily freshness `STALE` (2);
   - all seven sections return 200, and TODAY and SYSTEM show EVIDENCE_BLOCKED
     with no ADMITTED claim.
-- 8001 was not touched.
+- 8001 was not touched. The operator then performed this cutover and
+  verified it in a browser. 8001 has served release `1369bcc` with this
+  snapshot since then.
+
+### Release update record (2026-09-30, coverage breakdown)
+
+- Release `39e9966b2429784dce4e92f64b9250cb963153b6` (172 files, VERIFIED).
+  It adds the coverage breakdown and the plain "A candidate is not a fill"
+  header.
+- Snapshot `operational-20260930T0836Z`: integrity `ok`, 319 instruments, 149
+  sessions, heartbeat and scan history MISSING.
+- All acceptance checks passed on 127.0.0.1:8011. TODAY and `/api/system`
+  report the same breakdown: identities 319, equities 312, authoritative
+  universe UNKNOWN, observed 1, admitted 0, current 0, admitted and current 0,
+  scanned UNKNOWN, candidates UNKNOWN. US is all UNKNOWN, and the page
+  contains no `!=`.
+
+Update 8001 from the running release (the operator runs this):
+
+```
+tmux kill-session -t egx-preview-release
+while ss -ltn | grep -q '127.0.0.1:8001 '; do sleep 0.5; done
+tmux new-session -d -s egx-preview-release \
+  -c /home/egx-agent/er1-autopilot/state/releases/39e9966b2429784dce4e92f64b9250cb963153b6 \
+  "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
+   EGX_RUNTIME_STATE_DIR=/home/egx-agent/er1-autopilot/state/snapshots/operational-20260930T0836Z \
+   EGX_BUILD_REVISION=39e9966b2429784dce4e92f64b9250cb963153b6 \
+   /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
+   --host 127.0.0.1 --port 8001 --proxy-headers 2>&1 | tee -a /home/egx-agent/er1-autopilot/state/preview-8001.log"
+until curl -sf -o /dev/null http://127.0.0.1:8001/health; do sleep 0.5; done
+curl -s http://127.0.0.1:8001/api/system | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['live_money'],d['build']['revision'],d['runtime_state']['snapshot']['status'],d['runtime_state']['warnings'],{r['level']:r['count'] for r in d['coverage_breakdown']['EGX']}['identities'])"
+```
+
+Expected output: `False 39e9966b2429784dce4e92f64b9250cb963153b6 VERIFIED [] 319`.
+Otherwise, go back to the previous pair: run the same commands with release
+`1369bcc1b4dc9924e67d7c882c2d382645a2f3e5`, snapshot
+`operational-20260930T0800Z`, and drop the final `coverage_breakdown` field
+from the check.
 
 ## 4. Cut over port 8001 (operator-approved; the operator runs it)
 
