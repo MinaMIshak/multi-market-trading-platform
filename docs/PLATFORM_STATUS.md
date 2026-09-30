@@ -46,8 +46,20 @@ Details and procedures are in `docs/PREVIEW_RUNTIME.md`.
   a different database: 318 instruments, 5 daily artifacts, 24 ingestions,
   378 `scheduled_jobs`, no sessions.
 - Full suite on the host (Python 3.12 venv) at `99d0f41`: see PROGRESS.json.
-- A pinned release plus a verified snapshot was validated on 127.0.0.1:8011.
-  The public cutover is pending operator go-ahead.
+- 2026-09-30 (approved): official index bars 2026-09-27..29 were admitted to the
+  operational DB (`source_snapshot_date=2026-09-30`), and a calendar backfill
+  verified 2026-09-27..29 (`HISTORICAL_OFFICIAL`). Integrity was `ok` before and
+  after. Only `canonical_data_artifacts`/`canonical_artifact_sources` (6→9),
+  `data_ingestions` (12→15) and `market_sessions` (139→142) changed; every
+  lifecycle table stayed at 0. Backup: `er1-autopilot/state/snapshots/pre-calendar-write-20260930T0000Z`
+  and `pre-calendar-write-data-20260930.tgz`. A first run pinned the wrong
+  snapshot date (2026-09-29). It was rolled back from that backup before the
+  backfill, and its files were quarantined in `er1-autopilot/state/quarantine/`.
+- The pinned release `1211939` plus snapshot `operational-20260930T0740Z` passes
+  every acceptance check on 127.0.0.1:8011 (daily freshness now STALE). The 8001
+  cutover was attempted and blocked by the agent permission policy. 8001 was
+  restored to its previous `--reload` process within seconds. The cutover
+  awaits the operator (see `docs/PREVIEW_RUNTIME.md` section 4).
 
 ## Data and readiness flow
 
@@ -69,11 +81,11 @@ authoritative universe exists.
 
 | # | Scope | Status | Evidence / remaining dependency |
 |---|---|---|---|
-| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The cloud agent's egress to EGX hosts was denied. From the host, `beta.egx.com.eg` and `ticker.egidegypt.com` are reachable (2026-09-29): official index bars for 2026-09-27..29 were fetched and rehearsed (refresh + calendar backfill) on a copy only. Applying them to the operational DB awaits operator approval. |
+| A | Market data acquisition | PARTIAL-BLOCKED | Provider-neutral `MarketDataProvider`, raw store, EGID security master, official EGX index acquisition. No free per-equity EGX daily source is qualified: EGID history needs auth (401), EODHD is paid, TradingView rights are unreviewed. The cloud agent's egress to EGX hosts was denied. From the host, `beta.egx.com.eg` and `ticker.egidegypt.com` are reachable (2026-09-29): official index bars for 2026-09-27..29 were admitted to the operational DB on 2026-09-30. |
 | B | Source admission | COMPLETE | Registry with typed access/entitlement/delay/evidence; exact-identity, fail-closed; gates SWING; shown in TODAY/SWING/LIVE/SYSTEM. No source is admitted (truthful). |
 | C | Canonical market data | COMPLETE | OHLC relationships, quarantine, duplicates, ordering, finite/positive checks; `adjusted_close` optional audit-only (`1d58103`); neutral row contract documented. |
 | D | Security master | PARTIAL-BLOCKED | EGID identities with provenance, fail-closed refresh (empty/truncated). Dated authoritative membership needs an authoritative dated source (external). |
-| E | Calendar and sessions | PARTIAL-BLOCKED | Verified-session freshness (no weekday arithmetic), historical session verification from admitted index evidence. Future holidays are not invented; forward verification needs admitted evidence. |
+| E | Calendar and sessions | PARTIAL-BLOCKED | Verified-session freshness (no weekday arithmetic), historical session verification from admitted index evidence. Future holidays are not invented; forward verification needs admitted evidence. Operational DB sessions are verified through 2026-09-29 (official index evidence), so COMI (last bar 2026-09-24) is truthfully STALE. Session evidence advances only when the official index refresh and backfill are run again: no scheduler runs them against this DB. |
 | F | TODAY | COMPLETE | Identities, daily observations with freshness, source status, readiness components and dimensions, receipts labelled by current admission. |
 | G | SWING | PARTIAL-BLOCKED | Deterministic SWING v1 (Q03 plan), PIT, reviewed evidence binding, admission gate, publication. New candidates need an admitted, session-current source. |
 | H | LIVE | PARTIAL-BLOCKED | Shows the near-current feed as UNAVAILABLE plus declared source delay, latest market date and freshness; never real-time. Needs an admitted intraday/delayed feed. |
@@ -91,7 +103,7 @@ authoritative universe exists.
 | T | Configuration | COMPLETE | Central resolver, bundle mode, MIXED_STATE_SOURCES warning; writers stay explicit-only. |
 | U | Observability | COMPLETE | Structured, attributable records: raw manifests + `data_ingestions` (acquisition), `audit_events` (PIT validation, receipts), scan history JSON, heartbeat, snapshot manifest. Plus a path-free JSON `api_startup` event (build, runtime-state mode, input origins, snapshot status, warnings, LIVE_MONEY) logged once per process. |
 | V | Security | COMPLETE | 2026-09-29 sweep: no shell/eval/pickle; SQL interpolation only of module constants; list-argument subprocesses; read-only GET routes, docs disabled; no tracked secrets. |
-| W | Startup/deployment | PARTIAL | `tools/preview_release.py` (immutable, hash-verified release at an exact commit) + snapshot bundle, validated on host loopback 8011; runbook `docs/PREVIEW_RUNTIME.md` with cutover and rollback. The 8001 cutover is pending operator go-ahead. nginx is unchanged. Updating the uid-999 containers is ADMIN_REQUIRED. |
+| W | Startup/deployment | PARTIAL | `tools/preview_release.py` (immutable, hash-verified release at an exact commit) + snapshot bundle, validated on host loopback 8011; runbook `docs/PREVIEW_RUNTIME.md` with cutover and rollback. The 8001 cutover is operator-approved but blocked by the agent permission policy; the operator must run section 4 of the runbook. nginx is unchanged. Updating the uid-999 containers is ADMIN_REQUIRED. |
 | X | Documentation | COMPLETE | This file, runtime/snapshot, source qualification, financial-services evaluation. |
 
 ## External blockers and owners
@@ -99,7 +111,7 @@ authoritative universe exists.
 | Blocker | Owner / action | Unlocks |
 |---|---|---|
 | No admitted free EGX per-equity daily source | Operator/business: obtain a source with reviewed paper/shadow entitlement (or a written EGID/EGX data agreement), then add a `DailySourceDeclaration` with evidence | G, H (daily), I, J, K, L |
-| Operational-DB write of official index/calendar evidence not yet approved | Operator: approve running `official_index_refresh_cli` + `calendar_backfill` (2026-09-25..29, `--data-root research-data/paper-shadow-operational/data`) on the operational DB; rollback snapshot `er1-autopilot/state/snapshots/operational-20260929T2100Z` | Verified sessions 2026-09-27..29; TODAY freshness moves from UNKNOWN to STALE truthfully |
+| 8001 public-preview cutover (approved, blocked for the agent) | Operator: run `docs/PREVIEW_RUNTIME.md` section 4 with release `1211939…` and snapshot `operational-20260930T0740Z` | Public preview served from a pinned release and a verified snapshot |
 | uid-999 scheduler/app containers (root Docker) | Container owner: expose the scheduler heartbeat/scan history to a readable path, or deploy a newer build | Scheduler heartbeat evidence, runtime at current HEAD |
 | No dated authoritative EGX universe | Operator: a dated authoritative membership source | `authoritative_universe_available`, `overall_operational_ready` |
 | No attested PRE-SURGE scorer | Research owner: an attested scorer-row producer | I |

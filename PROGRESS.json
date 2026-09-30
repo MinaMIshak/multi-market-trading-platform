@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "PLATFORM_REPORT",
-  "current_capability": "Cycle 238 (continued): b5bf0b6 central runtime-state resolution + verified snapshot bundle; 1d58103 provider-neutral daily rows (adjusted_close optional audit-only); 305d646 tri-state readiness dimensions + ADMITTED_DATA_NOT_CURRENT; 18c4b66 financial-services re-check (upstream HEAD unchanged 574ed36); LIVE (near-current feed UNAVAILABLE, declared delay, never real-time) and PRE-SURGE (PreSurgeV7Engine contract, NO_ATTESTED_SCORER_ROWS) sections, with the live=DISABLED label protected; structured path-free api_startup event. A-X gap scan in docs/PLATFORM_STATUS.md: remaining items are COMPLETE or PARTIAL-BLOCKED on external dependencies.",
+  "current_capability": "Host session (2026-09-30): pinned preview release tooling (tools/preview_release.py) and host-verified runtime topology; approved official-index (2026-09-27..29, snapshot 2026-09-30) + calendar backfill applied to the operational DB with backup, integrity and count checks (sessions verified through 2026-09-29; COMI daily freshness truthfully STALE); release 1211939 + snapshot operational-20260930T0740Z pass all acceptance checks on loopback 8011; the 8001 cutover was blocked by the agent permission policy and rolled back within seconds.",
   "starting_head": "6c920fe",
-  "head": "c0c18e6a59b6619dadaa253b0e08618db507123c",
+  "head": "1211939330a2a77c2d8f6eb81dc08df452117624",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -47,24 +47,24 @@
     "scanned": null,
     "candidates": null
   },
-  "tests": "Final full suite: 3388 passed, 676 subtests passed in 280.15s (python 3.11 venv from requirements-dev.txt). Offline/unit + local loopback uvicorn with artificial data.",
-  "deployment": "No deployment by this agent: this session is an isolated cloud container without access to the server (no /home/egx-agent, no uid-999 processes visible) and its egress policy denies the public endpoint. Operator-reported isolated runtime on 8002 (build 4525720) can switch to EGX_RUNTIME_STATE_DIR=<bundle> from tools/runtime_state_snapshot.py; see docs/RUNTIME_STATE_SNAPSHOT.md.",
-  "scheduler": "OBSERVE preserved; EGX_SCAN_MODE defaults disabled. Worker opt-in acquisition configuration boundary wired and fixture-tested. Default free-provider factory fails closed because no reviewed free daily adapter is registered. No scheduled runtime observed by this agent, but a scheduler_worker process (PID 146267, uid 999) was found already running on this host outside this agent's ownership -- see capability_blockers.shared_database_ownership.",
-  "next_action": "External: admit a free EGX daily source with reviewed entitlement evidence; allow EGX/EGID hosts + public endpoint in the agent network policy or run docs/RUNTIME_STATE_SNAPSHOT.md on the host; provide dated authoritative universe, attested PRE-SURGE scorer, US runtime universe/source. No further safe local work identified beyond these dependencies.",
+  "tests": "Host full suite (Python 3.12 venv) at 99d0f41: exit 0. Focused/related (preview release, snapshot, runtime state, experimental): 84 passed at 1211939.",
+  "deployment": "Public preview (nginx -> 127.0.0.1:8001) still runs --reload from the shared egx-trading-platform-us checkout with no EGX_* variables. The validated replacement is releases/1211939... + snapshots/operational-20260930T0740Z (docs/PREVIEW_RUNTIME.md section 4); the cutover is operator-approved but blocked for the agent, so the operator runs it. uid-999 containers (8000 at b0ebc08, 18001) are root Docker; updating them is ADMIN_REQUIRED.",
+  "scheduler": "uid-999 scheduler_worker (root Docker) mounts no egx-agent path: it does not write the operational DB and its heartbeat/DB are not visible to egx-agent (heartbeat and scan history stay MISSING/UNKNOWN). No scheduler maintains calendar evidence for the operational DB; official-index refresh + backfill are manual CLIs. EGX_SCAN_MODE disabled.",
+  "next_action": "Operator: run the 8001 cutover (docs/PREVIEW_RUNTIME.md section 4). Agent: continue the A-X gaps that are safe locally; external blockers are unchanged (admitted EGX daily source, dated universe, PRE-SURGE scorer, US universe/source).",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
   "capability_blockers": {
     "test_execution": "System Python lacks pytest/fastapi; reproducible via `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt` (requires PyPI access). Full suite takes ~11-13 minutes.",
-    "deployment": "No safe deployment mechanism established in this cycle",
+    "deployment": "8001 cutover validated and operator-approved; blocked for the agent by its permission policy; the operator runs it.",
     "egx_universe": "Current authoritative dated membership not established; retain 224 target",
     "us_universe": "No configured operational universe found",
     "performance": "Authentic canonical lifecycle observation source not connected",
     "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
-    "shared_database_ownership": "A scheduler_worker (PID 146267) and two uvicorn app.main:app processes (PID 1717126, 1861599, port 8000) are running under uid 999, not this agent's uid 1001; /proc/<pid>/environ is not readable by this agent, so their EGX_DB_PATH (and hence whether they write research-data/paper-shadow-operational/platform.db) is unconfirmed. This agent's own runtime checks against that file have historically been read-only; a direct backfill write was deferred this cycle for that reason rather than risk an unreviewed collision. Not a production-boundary violation (research-data is an authorized auxiliary path) but ownership of the live file is unconfirmed.",
-    "network_egx_sources": "Cycle 236 execution environment: egress proxy rejected CONNECT to ticker.egidegypt.com and beta.egx.com.eg (organization policy). Live acquisition/qualification pending; not a mission-wide blocker.",
+    "shared_database_ownership": "RESOLVED 2026-09-29 (host): the operational platform.db is owned by egx-agent; the uid-999 app containers mount its directory read-only; the uid-999 scheduler mounts no egx-agent path.",
+    "network_egx_sources": "Host egress reaches beta.egx.com.eg and ticker.egidegypt.com (2026-09-29). Official index acquisition works; this does not establish per-equity daily entitlement.",
     "egx_daily_source_entitlement": "No EGX daily OHLCV source has a reviewed paper/shadow entitlement; SWING candidate generation is therefore EVIDENCE_BLOCKED for every EGX symbol until one is admitted with evidence.",
-    "server_access": "This agent session cannot reach the server (processes, nginx, scheduler ownership, live DB) or https://3-126-217-243.sslip.io (egress 403). Operator action: run the documented snapshot/startup commands on the host, or grant a session with host access and allow the endpoint host in the environment network policy."
+    "server_access": "RESOLVED: a host session as egx-agent has server access (no root). nginx/systemd/root Docker changes are ADMIN_REQUIRED."
   },
-  "commit_status": "COMMITTED_DIRECTLY_CYCLE238"
+  "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION"
 }

@@ -99,7 +99,37 @@ scan history MISSING). The candidate ran on 127.0.0.1:8011:
 - Daily freshness UNKNOWN: stored session evidence ends 2026-09-26.
 - All seven sections returned 200.
 
-## 4. Cut over port 8001 (pending operator go-ahead)
+### Validation record (2026-09-30)
+
+Release `1211939330a2a77c2d8f6eb81dc08df452117624` (VERIFIED), with snapshot
+`operational-20260930T0740Z` taken after the approved official-index and
+calendar update (integrity `ok`; 142 sessions). All 18 acceptance checks passed
+on 127.0.0.1:8011. Daily freshness is now `STALE` (2), because verified sessions
+on 2026-09-27..29 follow COMI's 2026-09-24 bar. `scan_readiness` is still
+`EVIDENCE_BLOCKED`, and `live_money` is false.
+
+Cutover attempt: the old preview was stopped, but the agent's permission
+policy blocked starting the release on 8001. The rollback below was run
+immediately, restoring 8001 (health 200; public endpoint 401 without
+credentials). The public preview was briefly unavailable. The approved
+cutover has to be run by the operator.
+
+## 4. Cut over port 8001 (operator-approved; the operator runs it)
+
+With the 2026-09-30 release and snapshot, the full cutover command is:
+
+```
+tmux send-keys -t egx-ui-preview C-c
+tmux new-session -d -s egx-preview-release \
+  -c /home/egx-agent/er1-autopilot/state/releases/1211939330a2a77c2d8f6eb81dc08df452117624 \
+  "env -i HOME=/home/egx-agent PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
+   EGX_RUNTIME_STATE_DIR=/home/egx-agent/er1-autopilot/state/snapshots/operational-20260930T0740Z \
+   EGX_BUILD_REVISION=1211939330a2a77c2d8f6eb81dc08df452117624 \
+   /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
+   --host 127.0.0.1 --port 8001 --proxy-headers"
+```
+
+General form:
 
 nginx is root-owned and stays unchanged. The cutover replaces the process
 behind 8001, which `egx-agent` owns:
@@ -119,6 +149,7 @@ tmux new-session -d -s egx-ui-preview -c /home/egx-agent/work/egx-trading-platfo
   '.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload'
 ```
 
+This rollback was exercised on 2026-09-30 and restored 8001 within seconds.
 To go back to an earlier release or snapshot instead, start step 4 with that
 release or snapshot directory. Releases and snapshots are never modified.
 
