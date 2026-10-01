@@ -63,7 +63,7 @@ def _require_publishable(bundle):
 
 
 def publish(*, db, snapshots_root, pointer, build_revision=None, heartbeat=None,
-            scan_history=None, calendar_maintenance=None, now=None):
+            scan_history=None, calendar_maintenance=None, ranking=None, now=None):
     for label, path in (('snapshots root', snapshots_root), ('pointer', pointer)):
         if not Path(path).is_absolute():
             raise PublishError(f'{label} must be absolute')
@@ -74,7 +74,8 @@ def publish(*, db, snapshots_root, pointer, build_revision=None, heartbeat=None,
     out = snapshots_root / ('published-' + now.strftime('%Y%m%dT%H%M%SZ'))
     optional = {name: value for name, value in (
         ('heartbeat', heartbeat), ('scan_history', scan_history),
-        ('calendar_maintenance', calendar_maintenance)) if value and Path(value).is_file()}
+        ('calendar_maintenance', calendar_maintenance), ('ranking', ranking))
+        if value and Path(value).is_file()}
     try:
         create_snapshot(db=db, out=str(out), build_revision=build_revision, now=now, **optional)
     except (SnapshotError, OSError, sqlite3.Error) as exc:
@@ -115,6 +116,7 @@ def main(argv=None):
     make.add_argument('--heartbeat')
     make.add_argument('--scan-history')
     make.add_argument('--calendar-maintenance-status')
+    make.add_argument('--ranking-report')
     back = commands.add_parser('rollback')
     back.add_argument('--pointer', required=True)
     args = parser.parse_args(argv)
@@ -123,7 +125,8 @@ def main(argv=None):
             document = publish(db=args.db, snapshots_root=args.snapshots_root,
                                pointer=args.pointer, build_revision=args.build_revision,
                                heartbeat=args.heartbeat, scan_history=args.scan_history,
-                               calendar_maintenance=args.calendar_maintenance_status)
+                               calendar_maintenance=args.calendar_maintenance_status,
+                               ranking=args.ranking_report)
         else:
             document = rollback(pointer=args.pointer)
     except PublishError as exc:

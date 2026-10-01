@@ -44,7 +44,7 @@ def test_snapshot_is_consistent_read_only_and_excludes_uncommitted(tmp_path):
     assert manifest['database']['table_counts']['canonical_instruments'] == 1
     assert manifest['database']['table_counts']['audit_events'] is None
     assert manifest['database']['paper_signal_receipts'] is None
-    assert manifest['files'] == {'heartbeat': None, 'scan_history': None, 'calendar_maintenance': None}
+    assert manifest['files'] == {'heartbeat': None, 'scan_history': None, 'calendar_maintenance': None, 'ranking': None}
     assert sorted(p.name for p in out.iterdir()) == ['SNAPSHOT_MANIFEST.json', 'platform.db']
     assert not os.access(out / 'platform.db', os.W_OK) or os.geteuid() == 0
     assert oct((out / 'platform.db').stat().st_mode & 0o777) == '0o444'
@@ -95,7 +95,7 @@ def test_snapshot_runtime_readers_keep_original_evidence_times(tmp_path, monkeyp
     manifest = create_snapshot(db=str(source), out=str(out), heartbeat=str(beat))
     env = runtime_environment(out, manifest)
     assert env == {'EGX_RUNTIME_STATE_DIR': str(out)}
-    assert manifest['missing'] == ['calendar_maintenance', 'scan_history']
+    assert manifest['missing'] == ['calendar_maintenance', 'ranking', 'scan_history']
     for key in INPUT_VARIABLES:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv('EGX_RUNTIME_STATE_DIR', str(out))

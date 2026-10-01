@@ -37,7 +37,10 @@ COUNTED_TABLES = ('canonical_instruments', 'daily_canonical_artifacts',
                   'market_sessions', 'scheduled_jobs', 'audit_events')
 SNAPSHOT_FILES = {'heartbeat': 'scheduler-heartbeat.json',
                   'scan_history': 'egx-scan-history.json',
-                  'calendar_maintenance': 'calendar-maintenance-last-run.json'}
+                  'calendar_maintenance': 'calendar-maintenance-last-run.json',
+                  'ranking': 'egx-ranking.json'}
+# Per-file size caps; the ranking report grows with candidate lifecycles.
+SIZE_LIMITS = {'ranking': 16 * 1024 * 1024}
 
 
 class SnapshotError(ValueError):
@@ -83,7 +86,7 @@ def _copy_database(source, destination):
 
 
 def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
-                    build_revision=None, calendar_maintenance=None):
+                    build_revision=None, calendar_maintenance=None, ranking=None):
     db = _source(db, 'database')
     out = Path(out)
     if not out.is_absolute():
@@ -94,7 +97,7 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
         raise SnapshotError('output parent directory must exist')
     extras = {key: _source(value, key) for key, value in
               (('heartbeat', heartbeat), ('scan_history', scan_history),
-               ('calendar_maintenance', calendar_maintenance)) if value}
+               ('calendar_maintenance', calendar_maintenance), ('ranking', ranking)) if value}
     partial = out.parent / f'.{out.name}.partial-{uuid.uuid4().hex}'
     partial.mkdir(mode=0o700)
     try:
@@ -112,7 +115,7 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
         }
         for key, source in extras.items():
             payload = source.read_bytes()
-            if len(payload) > MAX_JSON_BYTES:
+            if len(payload) > SIZE_LIMITS.get(key, MAX_JSON_BYTES):
                 raise SnapshotError(f'{key} file too large')
             copied = partial / SNAPSHOT_FILES[key]
             copied.write_bytes(payload)
@@ -151,6 +154,7 @@ def main(argv=None):
     parser.add_argument('--scan-history', help='absolute EGX scan history JSON')
     parser.add_argument('--calendar-maintenance-status',
                         help='absolute calendar maintenance last-run.json')
+    parser.add_argument('--ranking-report', help='absolute EGX ranking report JSON')
     parser.add_argument('--build-revision', default=os.getenv('EGX_BUILD_REVISION'),
                         help='git revision of the reading application (recorded only)')
     args = parser.parse_args(argv)
@@ -158,6 +162,7 @@ def main(argv=None):
         manifest = create_snapshot(db=args.db, out=args.out, heartbeat=args.heartbeat,
                                    scan_history=args.scan_history,
                                    calendar_maintenance=args.calendar_maintenance_status,
+                                   ranking=args.ranking_report,
                                    build_revision=args.build_revision)
     except (SnapshotError, OSError, sqlite3.Error) as exc:
         print(f'snapshot failed: {exc}', file=sys.stderr)

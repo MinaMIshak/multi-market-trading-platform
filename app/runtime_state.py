@@ -39,6 +39,7 @@ INPUTS = {
     'scan_ledger': ('EGX_SCAN_LEDGER_PATH', 'platform.db', None),
     'calendar_maintenance': ('EGX_CALENDAR_MAINTENANCE_STATUS_PATH',
                              'calendar-maintenance-last-run.json', None),
+    'ranking': ('EGX_RANKING_REPORT_PATH', 'egx-ranking.json', None),
 }
 
 

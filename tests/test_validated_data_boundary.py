@@ -9,6 +9,7 @@ APP = ROOT / "app"
 APPROVED_CANONICAL_METADATA = {
     Path("app/data/index_canonical_store.py"),
     Path("app/data/validated_index_repository.py"),
+    Path("app/data/validated_daily_repository.py"),
     Path("app/storage/database.py"),
     Path("app/storage/canonical_artifact_repository.py"),
     Path("app/storage/daily_canonical_artifact_repository.py"),
@@ -17,6 +18,7 @@ APPROVED_CANONICAL_METADATA = {
 APPROVED_CANONICAL_IO = {
     Path("app/data/index_canonical_store.py"),
     Path("app/data/validated_index_repository.py"),
+    Path("app/data/validated_daily_repository.py"),
 }
 
 CANONICAL_TOKENS = (

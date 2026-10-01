@@ -8,6 +8,10 @@ from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
 from app.ui.coverage import coverage_breakdown, render_coverage, unknown_breakdown
+from app.ui.ranking import (render_performance as render_ranking_performance,
+                            render_pre_surge as render_ranking_pre_surge,
+                            render_swing as render_ranking_swing,
+                            render_today as render_ranking_today, summary as ranking_summary)
 from app.ui.readiness import egx_readiness, render_readiness
 from app.ui.sections import (live_state, pre_surge_state, render_live, render_pre_surge,
                              source_delay)
@@ -130,7 +134,7 @@ def admitted_daily_observations(rows, market):
 
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
-                  security_master=None, daily_observations=None, heartbeat=None):
+                  security_master=None, daily_observations=None, heartbeat=None, ranking=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -171,12 +175,16 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     # Separate evidence levels (identities ... candidates); none implies the next.
     state['coverage_breakdown'] = {key: coverage_breakdown(
         security_master=security_master, daily_observations=state['daily_observations']['EGX'],
-        scan_runs=state['scan_runs']['EGX']) if key == 'EGX'
+        scan_runs=state['scan_runs']['EGX'], ranking=ranking_summary(ranking)) if key == 'EGX'
         else unknown_breakdown('no US reader is connected') for key in selected}
     # US has no connected readers; its LIVE and PRE-SURGE state stays UNKNOWN.
     # Not 'live': that key is the LIVE_MONEY=DISABLED safety label.
     state['live_monitoring'] = {key: live_state(state['daily_observations']['EGX'])
                      if key == 'EGX' else None for key in selected}
+    # EGX-RANK-v1 report as recorded (Paper/Shadow research); EGX only.
+    state['ranking'] = {key: ranking_summary(ranking) if key == 'EGX' else {'status': 'UNKNOWN'}
+                        for key in selected}
+    state['ranking_report'] = ranking if 'EGX' in selected else None
     state['pre_surge'] = {key: pre_surge_state(state['readiness']['EGX'])
                           if key == 'EGX' else None for key in selected}
     if section == 'RESEARCH':
@@ -392,6 +400,13 @@ def render_product(state):
         content += render_scan_runs(state['scan_runs'])
     if section == 'PRE-SURGE':
         content += render_pre_surge(state['pre_surge'])
+        content += render_ranking_pre_surge(state.get('ranking_report'))
+    if section == 'TODAY' and 'EGX' in state['markets']:
+        content += render_ranking_today(state.get('ranking_report'))
+    if section == 'SWING' and 'EGX' in state['markets']:
+        content += render_ranking_swing(state.get('ranking_report'))
+    if section == 'PERFORMANCE' and 'EGX' in state['markets']:
+        content += render_ranking_performance(state.get('ranking_report'))
     if section == 'RESEARCH':
         content += render_research(state['research'])
     content += ('<footer><a href="/system">SYSTEM details</a> · '

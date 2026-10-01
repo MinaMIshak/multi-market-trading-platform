@@ -25,7 +25,7 @@ def _symbols(rows, predicate):
     return len({row['canonical_symbol'] for row in rows if predicate(row)})
 
 
-def coverage_breakdown(*, security_master, daily_observations, scan_runs):
+def coverage_breakdown(*, security_master, daily_observations, scan_runs, ranking=None):
     """EGX coverage levels with a basis per level; inputs are existing reader outputs."""
     levels = {}
     if security_master is None:
@@ -57,7 +57,14 @@ def coverage_breakdown(*, security_master, daily_observations, scan_runs):
             _symbols(rows, lambda row: admitted(row) and current(row)),
             'the only data eligible for new candidates')
     run = (scan_runs or {}).get('run') if (scan_runs or {}).get('status') == 'HISTORICAL_RUN' else None
-    if run is None:
+    if ranking and ranking.get('status') == 'AVAILABLE':
+        counts, session = ranking['counts'], ranking['session']
+        levels['scanned_symbols'] = (ranking['symbols_ranked'],
+                                     f'{ranking["rank_version"]} evaluation for session {session}')
+        levels['candidates'] = (counts.get('STRONG_CANDIDATE', 0) + counts.get('CANDIDATE', 0),
+                                f'STRONG_CANDIDATE + CANDIDATE for session {session}; '
+                                'Paper/Shadow research, a candidate is not a fill')
+    elif run is None:
         levels['scanned_symbols'] = (None, 'no scan history recorded')
         levels['candidates'] = (None, 'no scan history recorded')
     else:
