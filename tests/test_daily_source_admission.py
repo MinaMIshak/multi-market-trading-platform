@@ -37,6 +37,7 @@ def test_no_egx_daily_source_is_admitted_in_repository_registry():
     ("tradingview_tvdatafeed", "source entitlement not established"),
     ("tradingview_tvdatafeed_egx", "source entitlement not established"),
     ("egx_official_market_watch", "source entitlement not established"),
+    ("twelve_data", "source entitlement not established"),
     ("eodhd", "paid subscription source not admissible"),
     ("unknown_feed", "undeclared daily source for market"),
 ])

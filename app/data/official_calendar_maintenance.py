@@ -131,10 +131,10 @@ def _write_status(path: Path, record: dict) -> None:
     os.replace(temporary, path)
 
 
-def _append_log(directory: Path, record: dict) -> None:
+def _append_log(directory: Path, record: dict, prefix: str = "egx-calendar-maintenance") -> None:
     directory.mkdir(parents=True, exist_ok=True)
     stamp = record["started_at"][:7].replace("-", "")
-    with (directory / f"egx-calendar-maintenance-{stamp}.jsonl").open("a") as log:
+    with (directory / f"{prefix}-{stamp}.jsonl").open("a") as log:
         log.write(json.dumps(record, sort_keys=True) + "\n")
 
 

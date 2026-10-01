@@ -80,6 +80,7 @@ class DailySourceDeclaration:
 
 _QUALIFICATION = "docs/ER1B_FREE_SOURCE_QUALIFICATION.md"
 _MARKET_WATCH_QUALIFICATION = "docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md"
+_TWELVE_DATA_RUNBOOK = "docs/TWELVE_DATA_PROVIDER.md"
 
 # Repository-recorded findings only; none establishes a reviewed entitlement.
 DAILY_SOURCE_DECLARATIONS: tuple[DailySourceDeclaration, ...] = (
@@ -102,6 +103,18 @@ DAILY_SOURCE_DECLARATIONS: tuple[DailySourceDeclaration, ...] = (
         source_timezone="Africa/Cairo",
         evidence=("paid token-gated API; final operation must not require paid "
                   "subscriptions (PROJECT_AUDIT.md)"),
+    ),
+    DailySourceDeclaration(
+        provider="twelve_data",
+        market="EGX",
+        access=SourceAccess.AUTHENTICATED,
+        entitlement=EntitlementStatus.NOT_ESTABLISHED,
+        delay=DataDelay.END_OF_DAY,
+        source_timezone="Africa/Cairo",
+        evidence=("operator-selected primary EGX provider (2026-10-01); XCAI reference "
+                  "lists 266 equities, all mapped by ISIN; no API key configured and the "
+                  "plan/terms covering XCAI daily data for internal paper/shadow use are "
+                  "not yet reviewed (" + _TWELVE_DATA_RUNBOOK + ")"),
     ),
     DailySourceDeclaration(
         provider="egx_official_market_watch",
