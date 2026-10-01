@@ -109,6 +109,22 @@ and shows counts only, never extrapolated metrics.
   (entry session = today) → universe scan → verified snapshot publication.
   Each step's exit code is logged in `<state>/nightly/<date>.log`.
 
+EGX trades Sunday to Thursday; **Friday and Saturday are closed**, and no
+Friday or Saturday session is ever expected. A run on any day processes the
+latest completed, VERIFIED session. The report and every new candidate
+record:
+- `based_on_session`: the completed session whose close was used;
+- `prepared_on`: the Cairo date the run happened;
+- `next_expected_session`: the next EGX weekday after it, skipping
+  Friday/Saturday and any verified HOLIDAY. It is labelled "holiday status
+  for this date not verified" because future holidays are never invented;
+- `prepared_note`: for example "Based on the Thursday 2026-10-01 close;
+  prepared on Friday 2026-10-02 for evaluation ahead of the next expected
+  EGX session, Sunday 2026-10-04."
+
+The one-off run on Friday 2026-10-02 at 08:30 is exactly that: it processes
+Thursday 2026-10-01 for Sunday 2026-10-04. It is not a Friday session.
+
 Why pre-market: candidates are produced before the session they would trade
 in. Each run also has its own acquisition date, so immutable
 (symbol, snapshot-date) artifacts never collide. The first evening run on

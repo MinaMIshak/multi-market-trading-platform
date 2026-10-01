@@ -58,7 +58,10 @@ def _header(report):
             f"source {escape(report['provider'])} ({escape(report['admission'])}; "
             f"licensing: {escape(report['licensing'])}) · generated {escape(report['generated_at'])}. "
             "Paper/Shadow research classification only. A candidate is not a fill; "
-            "LIVE MONEY DISABLED.</p>")
+            "LIVE MONEY DISABLED.</p>"
+            + (f"<p>{escape(report['prepared_note'])} "
+               f"({escape(report.get('next_session_basis') or '')})</p>"
+               if report.get("prepared_note") else ""))
 
 
 def _table(rows, columns, label):

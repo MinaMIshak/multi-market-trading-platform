@@ -177,6 +177,10 @@ def test_runner_ranks_records_candidates_once_and_simulates(tmp_path):
     assert report["symbols"][0]["ticker"] == "ACAP" and report["new_candidates"] == 1
     entry = json.loads(ledger.read_text())
     assert entry["origin"] == "SYSTEM_GENERATED" and entry["human_review"] == "OPTIONAL_NOT_REVIEWED"
+    # Tuesday 2026-09-29 close; next EGX weekday Wednesday 2026-09-30 (no holiday evidence).
+    assert (entry["based_on_session"], entry["next_expected_session"]) == ("2026-09-29", "2026-09-30")
+    assert "holiday status" in entry["next_session_basis"]
+    assert report["prepared_note"].startswith("Based on the Tuesday 2026-09-29 close")
     assert entry["live_money"] is False
     assert report["lifecycles"][0]["status"] == "PENDING_ENTRY"
     again = egx_ranking_run.run(db_path=db, data_root=data_root, report_path=report_path,
@@ -213,3 +217,13 @@ def test_renderers_show_evidence_and_safety_labels(tmp_path):
     assert "INSUFFICIENT_SAMPLE" in render_performance(report)
     assert summary(None) == {"status": "UNAVAILABLE"}
     assert "UNAVAILABLE" in render_today(None)
+    assert "Based on the" in render_swing(report) and "holiday status" in render_swing(report)
+
+
+def test_thursday_session_expects_sunday_and_verified_holidays_are_skipped(tmp_path):
+    db, _ = platform(tmp_path, {"ACAP": series()})
+    thursday = date(2026, 10, 1)
+    assert egx_ranking_run.next_expected_session(db, thursday)[0] == "2026-10-04"
+    with sqlite3.connect(db) as con:
+        con.execute("INSERT INTO market_sessions VALUES ('2026-10-04', 'HOLIDAY', '{}', 'x')")
+    assert egx_ranking_run.next_expected_session(db, thursday)[0] == "2026-10-05"

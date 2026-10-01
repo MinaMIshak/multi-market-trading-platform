@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -51,6 +52,29 @@ def _freshness(db_path: Path, as_of) -> dict:
     from app.ui.today import load_validated_daily_observations
     rows = load_validated_daily_observations(database_path=db_path, market_date=as_of) or []
     return {(r["canonical_symbol"], r["provider"], r["newest_market_date"]): r["freshness"] for r in rows}
+
+
+EGX_WEEKEND = (4, 5)  # Friday, Saturday
+
+
+def next_expected_session(db_path: Path, session) -> tuple[str, str]:
+    """Next EGX trading day after ``session``: an expectation, not verified fact.
+
+    Skips Friday/Saturday and any date recorded as a verified HOLIDAY. Future
+    holidays are not invented: without holiday evidence the basis says so.
+    """
+    from datetime import timedelta
+    with closing(sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)) as con:
+        holidays = {row[0] for row in con.execute(
+            "SELECT market_date FROM market_sessions WHERE status='HOLIDAY'")}
+    day = session
+    for _ in range(14):
+        day = day + timedelta(days=1)
+        if day.weekday() in EGX_WEEKEND or day.isoformat() in holidays:
+            continue
+        return day.isoformat(), ("EXPECTED: EGX Sunday-Thursday trading week; Friday/Saturday closed; "
+                                 "holiday status for this date not verified")
+    raise ValueError("NO_EXPECTED_SESSION_WITHIN_14_DAYS")
 
 
 def _read_ledger(path: Path) -> list[dict]:
@@ -90,6 +114,11 @@ def run(*, db_path: Path, data_root: Path, report_path: Path, candidates_path: P
         records.append(record)
     records.sort(key=lambda r: (ORDER.get(r["classification"], 9), -(r.get("score") or 0), r["ticker"]))
     generated_at = now.isoformat()
+    next_session, next_basis = next_expected_session(db_path, session)
+    prepared_on = now.astimezone(CAIRO).date()
+    note = (f"Based on the {session.strftime('%A')} {session.isoformat()} close; prepared on "
+            f"{prepared_on.strftime('%A')} {prepared_on.isoformat()} for evaluation ahead of the next "
+            f"expected EGX session, {datetime.fromisoformat(next_session).strftime('%A')} {next_session}.")
     ledger = _read_ledger(candidates_path)
     known = {item["candidate_id"] for item in ledger}
     new = []
@@ -102,6 +131,9 @@ def run(*, db_path: Path, data_root: Path, report_path: Path, candidates_path: P
         new.append({"candidate_id": candidate_id, "generated_at": generated_at, "session": session.isoformat(),
                     "origin": "SYSTEM_GENERATED", "human_review": "OPTIONAL_NOT_REVIEWED",
                     "live_money": False, "mode": "PAPER_SHADOW",
+                    "based_on_session": session.isoformat(), "prepared_on": prepared_on.isoformat(),
+                    "next_expected_session": next_session, "next_session_basis": next_basis,
+                    "prepared_note": note,
                     **{key: record.get(key) for key in (
                         "ticker", "company", "isin", "source", "licensing", "classification", "score",
                         "entry_zone", "entry_reference", "stop", "target_1", "target_2",
@@ -118,7 +150,10 @@ def run(*, db_path: Path, data_root: Path, report_path: Path, candidates_path: P
                            "session": candidate["session"], "classification": candidate["classification"],
                            **simulate(candidate, later)})
     report = {"schema": "egx-ranking-report-v1", "rank_version": VERSION, "generated_at": generated_at,
-              "session": session.isoformat(), "provider": provider, "admission": admission.status,
+              "session": session.isoformat(), "based_on_session": session.isoformat(),
+              "prepared_on": prepared_on.isoformat(), "next_expected_session": next_session,
+              "next_session_basis": next_basis, "prepared_note": note,
+              "provider": provider, "admission": admission.status,
               "admission_reason": admission.reason, "licensing": licensing, "live_money": False,
               "counts": dict(Counter(r["classification"] for r in records)),
               "symbols_ranked": len(records), "new_candidates": len(new),
