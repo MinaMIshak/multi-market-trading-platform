@@ -26,16 +26,38 @@ def declaration(**overrides):
     return DailySourceDeclaration(**values)
 
 
-def test_no_egx_daily_source_is_admitted_in_repository_registry():
-    for item in DAILY_SOURCE_DECLARATIONS:
-        assert item.entitlement != EntitlementStatus.REVIEWED_PAPER_SHADOW
-        assert daily_source_admission(item.provider, item.market).status == EVIDENCE_BLOCKED
+def test_only_the_operator_accepted_source_is_admitted_in_repository_registry():
+    from app.data.source_admission import licensing_label
+    admitted = [item for item in DAILY_SOURCE_DECLARATIONS
+                if daily_source_admission(item.provider, item.market).status == ADMITTED]
+    assert [(item.provider, item.entitlement) for item in admitted] == [
+        ("tradingview_tvdatafeed_egx", EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED)]
+    assert all(item.entitlement != EntitlementStatus.REVIEWED_PAPER_SHADOW
+               for item in DAILY_SOURCE_DECLARATIONS)
+    result = daily_source_admission("tradingview_tvdatafeed_egx", "EGX")
+    assert result.reason == "operator-accepted for internal Paper/Shadow research; no contractual licence"
+    assert licensing_label(result.declaration) == "NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED"
+    assert "operator decision" in result.declaration.evidence
+
+
+@pytest.mark.parametrize("overrides,message", [
+    ({"access": SourceAccess.AUTHENTICATED}, "free unlicensed access"),
+    ({"access": SourceAccess.PAID_SUBSCRIPTION}, "free unlicensed access"),
+    ({"delay": DataDelay.UNKNOWN}, "declared delay"),
+    ({"evidence": "someone said it is fine"}, "operator decision"),
+])
+def test_operator_acceptance_is_narrowly_constrained(overrides, message):
+    values = dict(entitlement=EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED,
+                  access=SourceAccess.UNOFFICIAL_CLIENT,
+                  evidence="operator decision 2026-10-01 fixture")
+    values.update(overrides)
+    with pytest.raises(ValueError, match=message):
+        declaration(**values)
 
 
 @pytest.mark.parametrize("provider,reason", [
     ("egid", "source entitlement not established"),
     ("tradingview_tvdatafeed", "source entitlement not established"),
-    ("tradingview_tvdatafeed_egx", "source entitlement not established"),
     ("egx_official_market_watch", "source entitlement not established"),
     ("twelve_data", "source entitlement not established"),
     ("eodhd", "paid subscription source not admissible"),

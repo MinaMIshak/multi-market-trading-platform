@@ -12,6 +12,7 @@ from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
 from app.calendar_maintenance_status import load_calendar_maintenance_status
 from app.ui.coverage import render_coverage
+from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
@@ -79,7 +80,8 @@ def load_system_state():
     history = load_scan_history()
     observed = datetime.now(timezone.utc).isoformat()
     heartbeat = load_heartbeat()
-    product = product_state(operational, scan_history=history,
+    ranking = load_ranking()
+    product = product_state(operational, scan_history=history, ranking=ranking,
                             security_master=load_security_master_summary(),
                             daily_observations=load_validated_daily_observations(),
                             heartbeat=heartbeat)
@@ -103,6 +105,8 @@ def load_system_state():
         # Identities, universe, data, admission, freshness, scans and candidates
         # as separate evidence levels; shared with /api/product.
         'coverage_breakdown': product['coverage_breakdown'],
+        # EGX-RANK-v1 summary (Paper/Shadow research; admission and licensing as recorded).
+        'ranking': product['ranking']['EGX'],
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
@@ -175,19 +179,20 @@ def render_daily_sources(sources):
     def cell(value):
         return '<td>' + escape(str(value)) + '</td>'
     content = ('<h2>Daily source admission</h2><p>Repository declarations, not live source '
-               'checks. Only ADMITTED sources (reviewed paper/shadow entitlement) may feed '
-               'signals or candidates; others stay EVIDENCE_BLOCKED while their observations '
-               'remain preserved. Undeclared sources are EVIDENCE_BLOCKED.</p>')
+               'checks. Only ADMITTED sources may feed signals or candidates: either a reviewed '
+               'paper/shadow entitlement, or an explicit recorded operator acceptance with NO '
+               'contractual licence (see Licensing). Others stay EVIDENCE_BLOCKED while their '
+               'observations remain preserved. Undeclared sources are EVIDENCE_BLOCKED.</p>')
     admitted = sum(row['status'] == 'ADMITTED' for row in sources)
     content += f'<p>Admitted daily sources: {admitted} of {len(sources)} declared.</p>'
     content += ('<div class="table-scroll"><table aria-label="Daily source admission"><thead><tr>'
                 + ''.join(f'<th scope="col">{h}</th>' for h in (
-                    'Provider', 'Market', 'Access', 'Entitlement', 'Delay', 'Status',
+                    'Provider', 'Market', 'Access', 'Entitlement', 'Licensing', 'Delay', 'Status',
                     'Reason', 'Evidence'))
                 + '</tr></thead><tbody>')
     for row in sources:
-        content += ('<tr>' + ''.join(cell(row[key]) for key in (
-            'provider', 'market', 'access', 'entitlement', 'delay', 'status',
+        content += ('<tr>' + ''.join(cell(row.get(key, 'UNKNOWN')) for key in (
+            'provider', 'market', 'access', 'entitlement', 'licensing', 'delay', 'status',
             'reason', 'evidence')) + '</tr>')
     return content + '</tbody></table></div>'
 

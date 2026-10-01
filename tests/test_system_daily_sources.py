@@ -6,11 +6,15 @@ from app.data.source_admission import (
 from app.ui import system
 
 
-def test_summary_lists_every_declaration_and_none_admitted():
+def test_summary_lists_every_declaration_and_only_operator_accepted_admitted():
     rows = daily_source_summary()
     assert {(r['provider'], r['market']) for r in rows} == {
         (d.provider, d.market) for d in DAILY_SOURCE_DECLARATIONS}
-    assert all(r['status'] == 'EVIDENCE_BLOCKED' for r in rows)
+    admitted = [r for r in rows if r['status'] == 'ADMITTED']
+    assert [(r['provider'], r['licensing']) for r in admitted] == [
+        ('tradingview_tvdatafeed_egx', 'NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED')]
+    assert all(r['status'] == 'EVIDENCE_BLOCKED' for r in rows if r not in admitted)
+    assert all(r['licensing'] == 'NOT_ESTABLISHED' for r in rows if r not in admitted)
     eodhd = next(r for r in rows if r['provider'] == 'eodhd')
     assert (eodhd['access'], eodhd['reason']) == (
         'PAID_SUBSCRIPTION', 'paid subscription source not admissible')
@@ -33,8 +37,9 @@ def test_system_state_and_html_expose_source_admission(monkeypatch):
     assert state['daily_sources'] == daily_source_summary()
     html = system.render_system(state)
     assert 'Daily source admission' in html
-    assert f'Admitted daily sources: 0 of {len(DAILY_SOURCE_DECLARATIONS)} declared.' in html
+    assert f'Admitted daily sources: 1 of {len(DAILY_SOURCE_DECLARATIONS)} declared.' in html
     assert '<td>tradingview_tvdatafeed_egx</td>' in html
+    assert '<td>NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED</td>' in html
     assert 'Undeclared sources are EVIDENCE_BLOCKED' in html
     # Unconfigured runtime: components are explicit, never READY.
     assert state['readiness']['scan_readiness'] == 'EVIDENCE_BLOCKED'

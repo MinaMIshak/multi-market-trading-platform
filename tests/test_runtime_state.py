@@ -91,7 +91,7 @@ def _operational_db(path):
             newest_market_date TEXT, valid_bar_count INTEGER, quarantined_bar_count INTEGER,
             status TEXT);
         INSERT INTO daily_canonical_artifacts VALUES
-            ('COMI','tradingview_tvdatafeed_egx','COMI','2026-09-24','2025-01-27',
+            ('COMI','tradingview_tvdatafeed','COMI','2026-09-24','2025-01-27',
              '2026-09-24',400,0,'VALIDATED');
         CREATE TABLE market_sessions (market_date TEXT PRIMARY KEY, status TEXT NOT NULL,
             payload_json TEXT NOT NULL, updated_at TEXT NOT NULL);
@@ -111,7 +111,7 @@ def test_snapshot_bundle_to_api_readiness_end_to_end(clean_env, tmp_path, tamper
     manifest = create_snapshot(db=str(live / 'platform.db'), out=str(bundle),
                                build_revision='a' * 40)
     writer.close()
-    assert manifest['missing'] == ['calendar_maintenance', 'heartbeat', 'scan_history']
+    assert manifest['missing'] == ['calendar_maintenance', 'heartbeat', 'ranking', 'scan_history']
     if tamper:
         (bundle / 'platform.db').chmod(0o644)
         with sqlite3.connect(bundle / 'platform.db') as con:
@@ -145,7 +145,7 @@ def test_snapshot_bundle_to_api_readiness_end_to_end(clean_env, tmp_path, tamper
     assert {item['origin'] for item in report['inputs'].values()} == {'bundle'}
     snapshot = report['snapshot']
     assert snapshot['build_revision'] == 'a' * 40
-    assert snapshot['missing'] == ['calendar_maintenance', 'heartbeat', 'scan_history']
+    assert snapshot['missing'] == ['calendar_maintenance', 'heartbeat', 'ranking', 'scan_history']
     if tamper:
         assert snapshot['status'] == 'INVALID'
         assert snapshot['mismatched'] == ['platform.db']

@@ -8,7 +8,7 @@ UNCONFIGURED = {'configured': False, 'available': False, 'status': 'NOT_READY', 
 IDENTITIES = {'total_instruments': 318, 'by_type': {'EQUITY': 311, 'INDEX': 7},
               'source_providers': ['egid'], 'latest_snapshot_updated_at': None,
               'latest_source_market_date': None}
-DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed_egx',
+DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed',
           'source_snapshot_date': '2026-09-24', 'oldest_market_date': '2025-01-27',
           'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
           'quarantined_bar_count': 0, 'freshness': 'STALE'}]

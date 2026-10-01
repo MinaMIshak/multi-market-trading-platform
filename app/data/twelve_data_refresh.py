@@ -229,7 +229,7 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, mode: str, now: date
                   credits_remaining=provider.limiter.remaining)
     (state_dir / "outcomes").mkdir(parents=True, exist_ok=True)
     _write_status(state_dir / "outcomes" / f"{snapshot_date.isoformat()}-{mode}.json",
-                  {"outcomes": outcomes, "cross_check": checked.results, **result})
+                  {**result, "symbol_outcomes": outcomes, "cross_check_detail": checked.results})
 
     after = inspect(db_path)
     result["integrity_after"] = after["integrity"]

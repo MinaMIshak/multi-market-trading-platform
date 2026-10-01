@@ -22,7 +22,7 @@ class ProductShellContracts(unittest.TestCase):
                            'latest_snapshot_updated_at': '2026-09-26T07:59:16+00:00',
                            'latest_source_market_date': None}
 
-    DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed_egx',
+    DAILY = [{'canonical_symbol': 'COMI', 'provider': 'tradingview_tvdatafeed',
               'source_snapshot_date': '2026-09-24', 'oldest_market_date': '2025-01-27',
               'newest_market_date': '2026-09-24', 'valid_bar_count': 400,
               'quarantined_bar_count': 0, 'freshness': 'UNKNOWN'}]
@@ -47,7 +47,7 @@ class ProductShellContracts(unittest.TestCase):
                     self.source, section=section, daily_observations=self.DAILY))
                 self.assertIn('EGX validated daily observations', page)
                 self.assertIn('<td>COMI</td>', page)
-                self.assertIn('tradingview_tvdatafeed_egx', page)
+                self.assertIn('tradingview_tvdatafeed', page)
                 self.assertIn('2025-01-27 to 2026-09-24', page)
                 self.assertIn('<td>400</td>', page)
                 self.assertIn('<td>UNKNOWN</td>', page)
@@ -66,7 +66,7 @@ class ProductShellContracts(unittest.TestCase):
         self.assertIn('EGX near-current feed: UNAVAILABLE', live)
         self.assertIn('Nothing below is real-time', live)
         self.assertLess(live.index('Nothing below is real-time'),
-                        live.index('tradingview_tvdatafeed_egx'))
+                        live.index('tradingview_tvdatafeed'))
 
     def test_daily_observations_unknown_and_empty_are_distinct(self):
         unknown = render_product(product_state(self.source, market='EGX'))
@@ -294,6 +294,7 @@ class ProductShellContracts(unittest.TestCase):
                      'load_security_master_summary': lambda: self.identities,
                      'load_validated_daily_observations': lambda: self.DAILY,
                      'load_heartbeat': lambda: {'status': 'UNKNOWN'},
+                     'load_ranking': lambda: None,
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())
@@ -302,8 +303,8 @@ class ProductShellContracts(unittest.TestCase):
         self.assertIn('EQUITY: 312', namespace['root']())
         self.assertNotIn('EQUITY: 312', namespace['root']('US'))
         self.assertEqual(namespace['product']('ALL')['identities']['EGX'], self.identities)
-        self.assertIn('tradingview_tvdatafeed_egx', namespace['root']())
-        self.assertNotIn('tradingview_tvdatafeed_egx', namespace['root']('US'))
+        self.assertIn('tradingview_tvdatafeed', namespace['root']())
+        self.assertNotIn('tradingview_tvdatafeed', namespace['root']('US'))
         self.assertEqual(namespace['product']('ALL')['daily_observations']['EGX'], self.BLOCKED)
         readiness = namespace['product']('ALL')['readiness']
         self.assertEqual(readiness['EGX']['scan_readiness'], 'EVIDENCE_BLOCKED')

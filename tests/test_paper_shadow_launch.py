@@ -644,8 +644,13 @@ def test_unadmitted_source_observations_persist_but_never_become_candidates(laun
     assert report['symbols'][0]['reason'].startswith('daily source not admitted for signals')
 
 
-@pytest.mark.parametrize('provider', ['tradingview_tvdatafeed_egx', 'eodhd', 'egid'])
+@pytest.mark.parametrize('provider', ['tradingview_tvdatafeed', 'eodhd', 'egid'])
 def test_declared_but_unreviewed_sources_are_not_candidate_inputs(provider):
     with pytest.raises(LaunchBlocked) as blocked:
         swing_launch._require_admitted_source(provider)
     assert blocked.value.status == 'EVIDENCE_BLOCKED'
+
+
+def test_operator_accepted_source_passes_the_admission_gate():
+    # Operator decision 2026-10-01 (docs/OPERATOR_DECISIONS.md): admitted, no contractual licence.
+    assert swing_launch._require_admitted_source('tradingview_tvdatafeed_egx') is None

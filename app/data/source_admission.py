@@ -30,6 +30,10 @@ class SourceAccess(StrEnum):
 class EntitlementStatus(StrEnum):
     NOT_ESTABLISHED = "NOT_ESTABLISHED"
     REVIEWED_PAPER_SHADOW = "REVIEWED_PAPER_SHADOW"
+    # Explicit, recorded operator decision (docs/OPERATOR_DECISIONS.md) to use
+    # a free source for internal Paper/Shadow research WITHOUT any contractual
+    # licence. Admits the source; the "no licence" label travels with it.
+    OPERATOR_ACCEPTED_UNLICENSED = "OPERATOR_ACCEPTED_UNLICENSED"
     DENIED = "DENIED"
 
 
@@ -76,6 +80,13 @@ class DailySourceDeclaration:
         if (self.entitlement == EntitlementStatus.REVIEWED_PAPER_SHADOW
                 and self.delay == DataDelay.UNKNOWN):
             raise ValueError("reviewed entitlement requires declared delay semantics")
+        if self.entitlement == EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED:
+            if self.access not in (SourceAccess.UNOFFICIAL_CLIENT, SourceAccess.ANONYMOUS_PUBLIC):
+                raise ValueError("operator acceptance applies only to free unlicensed access")
+            if self.delay == DataDelay.UNKNOWN:
+                raise ValueError("operator acceptance requires declared delay semantics")
+            if "operator decision" not in self.evidence.lower():
+                raise ValueError("operator acceptance must cite the recorded operator decision")
 
 
 _QUALIFICATION = "docs/ER1B_FREE_SOURCE_QUALIFICATION.md"
@@ -141,10 +152,14 @@ DAILY_SOURCE_DECLARATIONS: tuple[DailySourceDeclaration, ...] = (
         provider="tradingview_tvdatafeed_egx",
         market="EGX",
         access=SourceAccess.UNOFFICIAL_CLIENT,
-        entitlement=EntitlementStatus.NOT_ESTABLISHED,
-        delay=DataDelay.UNKNOWN,
+        entitlement=EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED,
+        delay=DataDelay.END_OF_DAY,
         source_timezone="Africa/Cairo",
-        evidence="unofficial client; TradingView rights unreviewed (PROJECT_AUDIT.md)",
+        evidence=("operator decision 2026-10-01 (zero-cost data strategy, "
+                  "docs/OPERATOR_DECISIONS.md): primary EGX daily source for internal "
+                  "Paper/Shadow research only; anonymous unofficial client of TradingView "
+                  "(data vendor ICE), split-adjusted series, completed sessions only, official "
+                  "EGX market-watch cross-check; no contractual licence or entitlement claimed"),
     ),
 )
 
@@ -189,10 +204,26 @@ class DailySourceRegistry:
             return blocked("source entitlement denied")
         if declaration.access == SourceAccess.PAID_SUBSCRIPTION:
             return blocked("paid subscription source not admissible")
+        if declaration.entitlement == EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED:
+            return DailySourceAdmission(
+                provider_text, market_text, ADMITTED,
+                "operator-accepted for internal Paper/Shadow research; no contractual licence",
+                declaration)
         if declaration.entitlement != EntitlementStatus.REVIEWED_PAPER_SHADOW:
             return blocked("source entitlement not established")
         return DailySourceAdmission(provider_text, market_text, ADMITTED,
                                     "reviewed paper/shadow entitlement", declaration)
+
+
+def licensing_label(declaration) -> str:
+    """Truthful rights label for operator views; never implies a licence that does not exist."""
+    if declaration is None:
+        return "UNDECLARED"
+    return {
+        EntitlementStatus.REVIEWED_PAPER_SHADOW: "REVIEWED_PAPER_SHADOW_ENTITLEMENT",
+        EntitlementStatus.OPERATOR_ACCEPTED_UNLICENSED: "NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED",
+        EntitlementStatus.DENIED: "DENIED",
+    }.get(declaration.entitlement, "NOT_ESTABLISHED")
 
 
 DEFAULT_DAILY_SOURCE_REGISTRY = DailySourceRegistry()
@@ -215,5 +246,6 @@ def daily_source_summary(
             "delay": item.delay.value, "source_timezone": item.source_timezone,
             "evidence": item.evidence,
             "status": admission.status, "reason": admission.reason,
+            "licensing": licensing_label(item),
         })
     return rows
