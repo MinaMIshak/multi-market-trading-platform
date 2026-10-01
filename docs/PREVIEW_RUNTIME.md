@@ -137,7 +137,36 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Latest validated release (2026-09-30 evening; the operator applies it)
+### Latest validated release (2026-10-01; the operator applies it)
+
+8001 already runs in pointer mode (on release `e448206`). Nightly publication
+refreshes its data, but rendering the ranking, licensing labels and coverage
+needs the new code, which takes one restart. Release
+`e1f0765085f3c4386995a7189742412709794104` passed all acceptance checks on
+127.0.0.1:8011:
+- TradingView admitted with the label `NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED`
+  (the only admitted source);
+- the ranking report is present, and TODAY/SWING show it with the licensing
+  label;
+- coverage: observed 219, admitted 219, current 0 until the nightly chain
+  verifies the latest sessions, ranked 219, candidates 0;
+- `overall_operational_ready` is false, and `live_money` is false.
+
+```
+tmux kill-session -t egx-preview-release
+while ss -ltn | grep -q '127.0.0.1:8001 '; do sleep 0.5; done
+tmux new-session -d -s egx-preview-release \
+  -c /home/egx-agent/er1-autopilot/state/releases/e1f0765085f3c4386995a7189742412709794104 \
+  "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
+   EGX_RUNTIME_STATE_POINTER=/home/egx-agent/er1-autopilot/state/public-bundle.json \
+   EGX_BUILD_REVISION=e1f0765085f3c4386995a7189742412709794104 \
+   /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
+   --host 127.0.0.1 --port 8001 --proxy-headers"
+```
+
+Rollback: the same commands with release `e4482062c896747fda65b4aa50faaf253edf0fe8`.
+
+### Earlier validated release (2026-09-30 evening)
 
 - Release `e146fab74b2194d78914ee90b0458fdd20175d82` (175 files, VERIFIED): the
   coverage breakdown, the plain candidate header, SYSTEM calendar-maintenance
