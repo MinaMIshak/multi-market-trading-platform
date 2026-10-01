@@ -1,14 +1,16 @@
 #!/bin/sh
-# EGX nightly chain (Paper/Shadow only; LIVE_MONEY=DISABLED).
+# EGX daily pre-market chain (Paper/Shadow only; LIVE_MONEY=DISABLED).
 #
 # Run from a pinned release directory (tools/preview_release.py) as egx-agent,
-# after the EGX session has completed (cron 18:10 Africa/Cairo):
-#   1. official market-watch post-close capture (verification evidence only)
-#   2. official-index / calendar maintenance (verified sessions)
-#   3. TradingView daily acquisition + official cross-check + quarantine
-#   4. EGX-RANK-v1 ranking, system Paper/Shadow candidates, lifecycles
-#   5. legacy universe classification scan history
-#   6. verified runtime snapshot publication (pointer switch)
+# before the EGX open (cron 08:30 Africa/Cairo, Sun-Thu). The previous
+# session is complete, and the official post-close capture was taken at 16:45
+# by a separate cron entry (app.data.egx_market_watch_capture). Each run has
+# its own acquisition date, so immutable artifacts never collide.
+#   1. official-index / calendar maintenance (previous session verified)
+#   2. TradingView daily acquisition + official cross-check (EGX-XCHECK-v2)
+#   3. EGX-RANK-v1 ranking, system Paper/Shadow candidates (entry today), lifecycles
+#   4. legacy universe classification scan history
+#   5. verified runtime snapshot publication (pointer switch)
 # Steps run in order. Every exit code is logged; a failed step never fabricates
 # downstream evidence (later steps read whatever is verified). One run at a time.
 set -u
@@ -34,7 +36,6 @@ step() {
   echo "$(date -u +%FT%TZ) END $name exit=$code" >> "$LOG"
   return 0
 }
-step market_watch_capture "$PY" -m app.data.egx_market_watch_capture --out-root "$STATE/market-watch-evidence"
 step calendar_maintenance "$PY" -m app.data.official_calendar_maintenance --db-path "$DB" --data-root "$DATA" \
   --state-dir "$STATE/egx-calendar-maintenance"
 step tradingview_daily "$PY" -m app.data.tradingview_refresh --db-path "$DB" --data-root "$DATA" \

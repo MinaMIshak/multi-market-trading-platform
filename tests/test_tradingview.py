@@ -261,3 +261,32 @@ def test_cli_records_failure_without_verified_session(tmp_path, monkeypatch, cap
                          "--state-dir", str(tmp_path / "state"), "--tv-python", "/tv/python"])
     assert code == refresh.EXIT_FAILED
     assert json.loads((tmp_path / "state" / "last-run.json").read_text())["error"] == "NO_VERIFIED_SESSION"
+
+
+def test_cross_check_policy_v2_separates_material_from_definitional_differences():
+    from decimal import Decimal
+    from app.data.daily_cross_check import DISCREPANCY, MATCH, MINOR, UNVERIFIED, compare
+    tol = Decimal("0.005")
+    bar = {"open": "10", "high": "11", "low": "9", "close": "10.5", "volume": "1000"}
+    official = {"openPrice": 10, "high": 11, "low": 9, "lastPrice": 10.5, "closePrice": 10.45,
+                "volume": 1000}
+    assert compare(bar, official, tolerance=tol)[0] == MATCH  # weighted close: report-only
+    verdict, detail = compare(dict(bar, low="8.73"), official, tolerance=tol)  # low 3 % lower
+    assert verdict == MINOR and detail["low"]["material"] is False
+    assert compare(dict(bar, open="10.2"), official, tolerance=tol)[0] == DISCREPANCY  # open 2 %
+    assert compare(dict(bar, close="10.8"), official, tolerance=tol)[0] == DISCREPANCY  # vs last 2.9 %
+    assert compare(dict(bar, high="11.3"), official, tolerance=tol)[0] == DISCREPANCY  # high 2.7 %
+    verdict, detail = compare(dict(bar, volume="1500"), official, tolerance=tol)
+    assert verdict == MINOR and detail["volume"]["material"] is False
+    fallback = dict(official)
+    fallback.pop("lastPrice")
+    assert compare(bar, fallback, tolerance=tol)[0] == MATCH  # close vs closePrice within 0.5 %
+    assert compare(bar, None, tolerance=tol)[0] == UNVERIFIED
+
+
+def test_same_day_snapshot_already_used_is_deferred_not_rejected(tmp_path):
+    platform(tmp_path)
+    run(tmp_path, STREAMS)
+    later = dict(STREAMS, ACAP=stream("ACAP", ACAP, close=11.0))
+    result = run(tmp_path, later)
+    assert result["outcomes"] == {"STORED": 2, "DEFERRED_SNAPSHOT_DATE_USED": 1}

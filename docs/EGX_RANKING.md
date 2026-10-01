@@ -97,10 +97,44 @@ win and loss, expectancy (R), summed net %, max drawdown (R) and average
 holding sessions. Below 20 closed trades it reports `INSUFFICIENT_SAMPLE`
 and shows counts only, never extrapolated metrics.
 
-## Nightly chain
+## Schedule (Africa/Cairo, Sunday–Thursday)
 
-`tools/egx_nightly.sh` (cron 18:10 Africa/Cairo, run from a pinned release
-with `sh`) runs, in order and one run at a time: market-watch capture →
-calendar maintenance → TradingView daily → ranking → universe scan →
-verified snapshot publication. Each step's exit code is logged in
-`<state>/nightly/<date>.log`.
+- **16:45**: official market-watch post-close capture
+  (`app.data.egx_market_watch_capture`, cron marker `# EGX_MW_CAPTURE`).
+  It is verification evidence for the session that just closed.
+- **08:30**: pre-market chain `tools/egx_nightly.sh` (run from a pinned release
+  with `sh`, marker `# EGX_DAILY_CHAIN`), in order and one run at a time:
+  calendar maintenance → TradingView daily acquisition with the cross-check
+  against the previous evening's capture → ranking and system candidates
+  (entry session = today) → universe scan → verified snapshot publication.
+  Each step's exit code is logged in `<state>/nightly/<date>.log`.
+
+Why pre-market: candidates are produced before the session they would trade
+in. Each run also has its own acquisition date, so immutable
+(symbol, snapshot-date) artifacts never collide. The first evening run on
+2026-10-01 collided with that morning's backfill: 135 symbols reported
+`DEFERRED_SNAPSHOT_DATE_USED`, with nothing overwritten.
+
+## Cross-check policy (EGX-XCHECK-v2)
+
+Calibrated on the 2026-10-01 field study (TradingView against the official
+post-close capture, n = 419 bar comparisons):
+
+| Field | Exact | ≤ 0.5 % | ≤ 2 % |
+|---|---|---|---|
+| Open | 100 % | 100 % | 100 % |
+| High | 98 % | 98 % | 99.5 % |
+| Low | 44 % | 67 % | 96 % |
+| Close vs official `lastPrice` | 79 % | 92 % | 99 % |
+| Close vs official `closePrice` | 74 % | 88 % | 98 % |
+| Volume | 62 % | 72 % | 82 % |
+
+- Material (quarantine): open > 0.5 %, high > 2 %, low > 5 %, or close vs
+  official `lastPrice` > 2 %.
+- MINOR_DIFFERENCE: anything else above 0.5 %, stored with every difference
+  recorded.
+- Volume and the official weighted `closePrice` are report-only (definitional
+  differences).
+- The first run's 0.5 %-on-every-field rule quarantined 82 symbols that were
+  mostly definitional differences in low and close. Those runs are recorded,
+  not rewritten.

@@ -77,6 +77,14 @@ class IsinVerifyingProvider:
         return response
 
 
+def _snapshot_used(db_path: Path, ticker: str, snapshot_date) -> bool:
+    with closing(_connect(db_path, read_only=True)) as con:
+        row = con.execute("SELECT COUNT(*) FROM daily_canonical_artifacts WHERE provider=? "
+                          "AND canonical_symbol=? AND source_snapshot_date=?",
+                          (PROVIDER, ticker, snapshot_date.isoformat())).fetchone()
+    return row[0] > 0
+
+
 def _store_pages(state_dir: Path, pages: list[bytes], now: datetime) -> list[dict]:
     directory = state_dir / "reference" / now.astimezone(CAIRO).date().isoformat()
     directory.mkdir(parents=True, exist_ok=True)
@@ -166,6 +174,11 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, now: datetime, provi
                 outcomes[ticker] = "QUARANTINED_CROSS_CHECK"
             elif isinstance(cause, TradingViewError):
                 outcomes[ticker] = f"REJECTED:{cause.code}"
+            elif (isinstance(cause, (ValueError, FileExistsError)) and "conflict" in str(cause)
+                    and _snapshot_used(db_path, ticker, snapshot_date)):
+                # Artifacts are immutable per (symbol, snapshot date): an earlier
+                # run today owns this date; the next day's run stores the update.
+                outcomes[ticker] = "DEFERRED_SNAPSHOT_DATE_USED"
             else:
                 outcomes[ticker] = f"REJECTED:{exc.cause_type}:{str(cause)[:80]}"
     tally, verdicts = {}, {}
