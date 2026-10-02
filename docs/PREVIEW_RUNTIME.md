@@ -137,13 +137,18 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Latest validated release (2026-10-02; the operator applies it)
+### Latest validated release (2026-10-02, research-first UI; the operator applies it)
 
 8001 already runs in pointer mode (on release `e448206`) and is already
 serving the 2026-10-02 published bundle. Rendering the ranking, candidates,
 licensing labels and coverage needs the new code, which takes one restart.
-Release `f618abb9aeea57b476764951081d9fbd7ecdff77` passed all acceptance
+Release `34dd2f536c3bd90ef1dc1a7046cf9c47b1db6c1e` passed all acceptance
 checks on 127.0.0.1:8011 against that same published bundle (pointer mode):
+- research-first layout (`docs/UI_INFORMATION_ARCHITECTURE.md`): TODAY opens
+  with session context, summary cards (221 scanned, 221 admitted, 220
+  current, 221 ranked, 20 candidates, 1 strong) and the sortable candidate
+  table (47 rows, no UNKNOWN cells). All 222 receipt verification-window lines
+  are collapsed in diagnostics;
 - TradingView admitted with the label `NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED`
   (the only admitted source);
 - the ranking report is present, and TODAY/SWING show it with the licensing
@@ -157,10 +162,10 @@ checks on 127.0.0.1:8011 against that same published bundle (pointer mode):
 tmux kill-session -t egx-preview-release
 while ss -ltn | grep -q '127.0.0.1:8001 '; do sleep 0.5; done
 tmux new-session -d -s egx-preview-release \
-  -c /home/egx-agent/er1-autopilot/state/releases/f618abb9aeea57b476764951081d9fbd7ecdff77 \
+  -c /home/egx-agent/er1-autopilot/state/releases/34dd2f536c3bd90ef1dc1a7046cf9c47b1db6c1e \
   "env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 EGX_SCAN_MODE=disabled \
    EGX_RUNTIME_STATE_POINTER=/home/egx-agent/er1-autopilot/state/public-bundle.json \
-   EGX_BUILD_REVISION=f618abb9aeea57b476764951081d9fbd7ecdff77 \
+   EGX_BUILD_REVISION=34dd2f536c3bd90ef1dc1a7046cf9c47b1db6c1e \
    /home/egx-agent/work/egx-trading-platform-us/.venv/bin/python -m uvicorn app.main:app \
    --host 127.0.0.1 --port 8001 --proxy-headers"
 ```
