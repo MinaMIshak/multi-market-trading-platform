@@ -120,7 +120,11 @@ def classify(*, ticker: str, company: str | None, isin: str | None, source: str,
     record = {"ticker": ticker, "company": company, "isin": isin, "source": source,
               "licensing": licensing, "freshness": freshness, "last_market_session": session,
               "rank_version": VERSION, "classification": "NO_TRADE", "score": None,
-              "rejection_reasons": [], "data_warnings": list(warnings)}
+              "rejection_reasons": [], "data_warnings": list(warnings),
+              # History quality evidence: valid bars used and rows quarantined upstream.
+              "history_bars": len(bars), "history_start": bars[0].date if bars else None,
+              "quarantined_rows": quarantined_rows, "price": str(bars[-1].close) if bars else None,
+              "selection_reason": None}
     if quarantined_rows:
         record["data_warnings"].append(f"QUARANTINED_ROWS:{quarantined_rows}")
     reasons = record["rejection_reasons"]
@@ -156,4 +160,32 @@ def classify(*, ticker: str, company: str | None, isin: str | None, source: str,
         record["classification"] = "WATCHLIST"
     else:
         reasons.append("DOWNTREND" if f["trend"] == "DOWN" else "LOW_SCORE")
+        return record
+    record["selection_reason"] = selection_reason(f)
     return record
+
+
+def selection_reason(f: dict) -> str:
+    """Concise, factual summary of why the rules scored the symbol; no opinion."""
+    parts = [{"UP": "uptrend (close > EMA20 > EMA50)", "NEUTRAL": "neutral trend",
+              "DOWN": "downtrend"}[f["trend"]]]
+    if f["breakout_20"]:
+        parts.append("20-session breakout")
+    parts.append(f"momentum {f['momentum_20'] * 100:+.1f}% (20s)")
+    parts.append(f"volume {f['volume_ratio_20']:.1f}× 20s avg")
+    parts.append(f"liquidity {f['avg_traded_value_20'] / 1_000_000:.1f}M EGP/day")
+    return "; ".join(parts)
+
+
+def apply_relative_strength(records: list[dict]) -> float | None:
+    """Cross-sectional RS for one session: 20-session momentum minus the median of
+    all scored symbols' momentum (percentage points). Same-session data only."""
+    values = sorted(r["momentum_20_pct"] for r in records if r.get("momentum_20_pct") is not None)
+    if not values:
+        return None
+    middle = len(values) // 2
+    median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+    for record in records:
+        value = record.get("momentum_20_pct")
+        record["relative_strength_20_pp"] = None if value is None else round(value - median, 2)
+    return round(median, 2)

@@ -36,7 +36,7 @@ from app.data.source_admission import ADMITTED, daily_source_admission, licensin
 from app.data.validated_daily_repository import ValidatedDailyArtifactRepository
 from app.data.twelve_data_refresh import latest_verified_session
 from app.paper.system_candidates import CANDIDATE_CLASSES, performance, simulate
-from app.strategies.egx_ranking import CLASSES, VERSION, Bar, classify
+from app.strategies.egx_ranking import CLASSES, VERSION, Bar, apply_relative_strength, classify
 
 DEFAULT_PROVIDER = "tradingview_tvdatafeed_egx"
 ORDER = {name: index for index, name in enumerate(CLASSES)}
@@ -111,7 +111,9 @@ def run(*, db_path: Path, data_root: Path, report_path: Path, candidates_path: P
                           session=session.isoformat(), bars=upto, quarantined_rows=quarantined,
                           warnings=tuple(warnings))
         record["artifact_id"] = artifact["artifact_id"]
+        record["evidence_snapshot_date"] = artifact.get("source_snapshot_date")
         records.append(record)
+    universe_momentum_median = apply_relative_strength(records)
     records.sort(key=lambda r: (ORDER.get(r["classification"], 9), -(r.get("score") or 0), r["ticker"]))
     generated_at = now.isoformat()
     next_session, next_basis = next_expected_session(db_path, session)
@@ -156,6 +158,7 @@ def run(*, db_path: Path, data_root: Path, report_path: Path, candidates_path: P
               "provider": provider, "admission": admission.status,
               "admission_reason": admission.reason, "licensing": licensing, "live_money": False,
               "counts": dict(Counter(r["classification"] for r in records)),
+              "universe_momentum_median_20_pct": universe_momentum_median,
               "symbols_ranked": len(records), "new_candidates": len(new),
               "symbols": records, "lifecycles": lifecycles, "performance": performance(lifecycles)}
     report_path.parent.mkdir(parents=True, exist_ok=True)

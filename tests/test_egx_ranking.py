@@ -50,6 +50,10 @@ def test_strong_uptrend_with_breakout_and_volume_is_strong_candidate():
     assert D(record["target_1"]) == pytest.approx(close + D("1.5") * risk, abs=D("0.02"))
     assert D(record["target_2"]) == pytest.approx(close + 3 * risk, abs=D("0.02"))
     assert D(record["risk_pct"]) >= D("3")
+    assert D(record["price"]) == D(record["entry_reference"]) and record["history_bars"] == 80
+    assert record["quarantined_rows"] == 0
+    assert record["selection_reason"].startswith("uptrend (close > EMA20 > EMA50); 20-session breakout")
+    assert classify_bars(series(start=20.0, step=-0.1))["selection_reason"] is None
 
 
 @pytest.mark.parametrize("overrides,reason", [

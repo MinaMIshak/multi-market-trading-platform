@@ -8,10 +8,13 @@ from app.egx_scan_history import valid_summary, valid_reconciliation
 from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
 from app.ui.coverage import coverage_breakdown, render_coverage, unknown_breakdown
+from app.ui.dashboard import (SCRIPT as DASHBOARD_SCRIPT, STYLE as DASHBOARD_STYLE, details,
+                              render_candidate_table, render_cards, render_legend, render_no_trade,
+                              render_session_context)
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
                             render_swing as render_ranking_swing,
-                            render_today as render_ranking_today, summary as ranking_summary)
+                            summary as ranking_summary)
 from app.ui.readiness import egx_readiness, render_readiness
 from app.ui.sections import (live_state, pre_surge_state, render_live, render_pre_surge,
                              source_delay)
@@ -349,48 +352,34 @@ def render_product(state):
     nav = '<nav aria-label="Product sections">' + ' '.join(link(s, market, s) for s in SECTIONS) + '</nav>'
     nav += '<nav aria-label="Markets">' + ' '.join(link(m, m, section) for m in MARKETS) + '</nav>'
     content = f'<h1>{section} · {market}</h1><p>LIVE MONEY DISABLED · A candidate is not a fill</p>'
-    for key, value in state['markets'].items():
-        observed = state['coverage'][key]['observed_symbols']
-        content += (f'<article><h2>{key}</h2>'
-                    f'<p>Operational receipt status: {escape(str(value["status"]))}</p>'
-                    '<p>Symbols with operational Paper/Shadow receipts: '
-                    f'{observed if observed is not None else "UNKNOWN"}. '
-                    'Receipts are not universe, data or scan coverage; see the coverage '
-                    'breakdown on TODAY, SWING or SYSTEM.</p></article>')
-        evidence = state['coverage'][key]['observation_evidence']
-        content += '<p>Receipt reader observation: ' + escape(
-            evidence['observed_at'] if evidence else 'UNKNOWN') + (
-            '. Classification time only; not source freshness or current coverage.</p>')
-        if evidence:
-            for row in evidence['receipt_windows']:
-                bounds = row['verification_window']
-                window = (bounds['decision_at'] + ' through ' + bounds['valid_until']
-                          + ' (expiry exclusive)' if bounds else 'UNKNOWN')
-                content += '<p>' + escape(row['symbol']) + ' verification window: ' + escape(window) + '</p>'
-        counts = state['coverage'][key]['status_counts']
-        if counts is not None:
-            content += (f'<table aria-label="{key} observed receipt statuses">'
-                        '<caption>Observed operational symbols only; not scan coverage</caption>'
-                        '<thead><tr><th scope="col">Receipt status</th>'
-                        '<th scope="col">Symbols</th></tr></thead><tbody>')
-            for status, count in counts.items():
-                content += f'<tr><th scope="row">{status}</th><td>{count}</td></tr>'
-            content += '</tbody></table>'
-    if section in ('TODAY', 'SWING', 'SYSTEM'):
-        content += render_coverage(state['coverage_breakdown'])
-        content += render_readiness(state['readiness'])
-    if section in ('TODAY', 'SWING'):
-        content += '<p>Verified operational receipts only. Observed symbols do not establish scan coverage.</p>'
-        content += render_identities(state['identities'])
-        content += render_daily_observations(state['daily_observations'])
-        for key, value in state['markets'].items():
-            content += render_operational(value, fragment=True,
-                                          heading=f'{key} operational Paper/Shadow')
-    else:
+    egx = 'EGX' in state['markets']
+    report = state.get('ranking_report') if egx else None
+    coverage = state['coverage_breakdown'].get('EGX') if egx else None
+
+    # 1. Research output first (session context, summary, candidates).
+    if section in ('TODAY', 'SWING', 'PRE-SURGE', 'PERFORMANCE') and egx:
+        content += render_session_context(report, coverage)
+    if section in ('TODAY', 'SWING') and egx:
+        content += render_cards(report, coverage)
+        content += render_candidate_table(report, table_id=f'{section.lower()}-candidates',
+                                          title='EGX candidates and watchlist')
+        content += render_legend()
+        content += render_no_trade(report)
+    if section == 'SWING' and egx:
+        content += render_ranking_swing(report)
+    if section == 'PRE-SURGE' and egx:
+        content += render_ranking_pre_surge(report)
+        content += details('PreSurgeV7 attested-scorer contract (inputs not validated; no scores published)',
+                           render_pre_surge(state['pre_surge']))
+    if section == 'PERFORMANCE' and egx:
+        content += render_ranking_performance(report)
+    if 'US' in state['markets']:
+        content += ('<p class="muted">US: UNKNOWN. No US universe or admitted US daily source is '
+                    'connected, so nothing is ranked for US.</p>')
+    if section in ('LIVE', 'RESEARCH', 'SYSTEM', 'PERFORMANCE'):
         messages = {
             'LIVE': 'Current scanner activity UNKNOWN. Historical classification does not prove scheduler completion.',
-            'PRE-SURGE': 'Pre-surge opportunities UNKNOWN. No validated operational feed is connected.',
-            'PERFORMANCE': 'Performance UNKNOWN. Authentic Paper/Shadow lifecycle evidence is required.',
+            'PERFORMANCE': 'Performance UNKNOWN unless closed Paper/Shadow lifecycles exist (shown above when available).',
             'RESEARCH': 'Research results do not authorize operational use.',
             'SYSTEM': 'Open SYSTEM for the detailed operator checkpoint and capability blockers.',
         }
@@ -398,17 +387,52 @@ def render_product(state):
     if section == 'LIVE':
         content += render_live(state['live_monitoring'])
         content += render_scan_runs(state['scan_runs'])
-    if section == 'PRE-SURGE':
-        content += render_pre_surge(state['pre_surge'])
-        content += render_ranking_pre_surge(state.get('ranking_report'))
-    if section == 'TODAY' and 'EGX' in state['markets']:
-        content += render_ranking_today(state.get('ranking_report'))
-    if section == 'SWING' and 'EGX' in state['markets']:
-        content += render_ranking_swing(state.get('ranking_report'))
-    if section == 'PERFORMANCE' and 'EGX' in state['markets']:
-        content += render_ranking_performance(state.get('ranking_report'))
     if section == 'RESEARCH':
         content += render_research(state['research'])
+
+    # 2. Diagnostics layer: complete, but collapsed below the research output.
+    receipts = ''
+    for key, value in state['markets'].items():
+        observed = state['coverage'][key]['observed_symbols']
+        receipts += (f'<article><h2>{key}</h2>'
+                     f'<p>Operational receipt status: {escape(str(value["status"]))}</p>'
+                     '<p>Symbols with operational Paper/Shadow receipts: '
+                     f'{observed if observed is not None else "UNKNOWN"}. '
+                     'Receipts are not universe, data or scan coverage; see the coverage '
+                     'breakdown on TODAY, SWING or SYSTEM.</p></article>')
+        evidence = state['coverage'][key]['observation_evidence']
+        receipts += '<p>Receipt reader observation: ' + escape(
+            evidence['observed_at'] if evidence else 'UNKNOWN') + (
+            '. Classification time only; not source freshness or current coverage.</p>')
+        if evidence:
+            for row in evidence['receipt_windows']:
+                bounds = row['verification_window']
+                window = (bounds['decision_at'] + ' through ' + bounds['valid_until']
+                          + ' (expiry exclusive)' if bounds else 'UNKNOWN')
+                receipts += '<p>' + escape(row['symbol']) + ' verification window: ' + escape(window) + '</p>'
+        counts = state['coverage'][key]['status_counts']
+        if counts is not None:
+            receipts += (f'<table aria-label="{key} observed receipt statuses">'
+                         '<caption>Observed operational symbols only; not scan coverage</caption>'
+                         '<thead><tr><th scope="col">Receipt status</th>'
+                         '<th scope="col">Symbols</th></tr></thead><tbody>')
+            for status, count in counts.items():
+                receipts += f'<tr><th scope="row">{status}</th><td>{count}</td></tr>'
+            receipts += '</tbody></table>'
+    if section in ('TODAY', 'SWING', 'SYSTEM'):
+        content += details('Data coverage and readiness (evidence levels, blockers)',
+                           render_coverage(state['coverage_breakdown']) + render_readiness(state['readiness']))
+    if section in ('TODAY', 'SWING'):
+        content += details('Validated daily observations (per artifact, freshness, source status)',
+                           render_daily_observations(state['daily_observations']))
+        content += details('Security-master identities', render_identities(state['identities']))
+        operational = ''.join(render_operational(value, fragment=True, heading=f'{key} operational Paper/Shadow')
+                              for key, value in state['markets'].items())
+        content += details('Operational receipt diagnostics (legacy reviewed SWING path, verification windows)',
+                           '<p>Verified operational receipts only. Observed symbols do not establish scan '
+                           'coverage.</p>' + receipts + operational)
+    else:
+        content += details('Operational receipt diagnostics', receipts)
     content += ('<footer><a href="/system">SYSTEM details</a> · '
                 '<a href="/shadow">Audited collection</a> · '
                 '<a href="/performance">Performance evidence</a></footer>')
@@ -419,5 +443,5 @@ def render_product(state):
             'nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}a{color:#8bd5b0}'
             '[aria-current]{font-weight:bold;text-decoration-thickness:3px}'
             'article{background:#0d1b26;border:1px solid #1e3241;border-radius:10px;padding:20px;margin:20px 0}'
-            'p{line-height:1.6}footer{margin-top:32px}</style></head><body>'
-            + nav + '<main>' + content + '</main></body></html>')
+            'p{line-height:1.6}footer{margin-top:32px}' + DASHBOARD_STYLE + '</style></head><body>'
+            + nav + '<main>' + content + '</main>' + DASHBOARD_SCRIPT + '</body></html>')
