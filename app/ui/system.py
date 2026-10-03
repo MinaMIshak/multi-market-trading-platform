@@ -144,6 +144,21 @@ def load_system_state():
     }
 
 
+def render_pipelines(state):
+    """US pipeline and research-context status (summaries of the recorded reports)."""
+    def table(label, record):
+        rows = ''.join(f'<tr><th scope="row">{escape(str(key))}</th><td>'
+                       + escape('UNKNOWN' if value is None else str(value)) + '</td></tr>'
+                       for key, value in (record or {'status': 'UNAVAILABLE'}).items())
+        return f'<h2>{escape(label)}</h2><table aria-label="{escape(label)}"><tbody>{rows}</tbody></table>'
+    from app.context.official import sec_contact, sec_status
+    sec = sec_status(sec_contact())
+    return (table('US pipeline (US-RANK-v1)', state.get('us'))
+            + table('Research context (CONTEXT-v1)', state.get('context'))
+            + table('SEC (US filings and fundamentals)', {'status': sec['status'], 'code': sec.get('code'),
+                                                          'reason': sec.get('reason')}))
+
+
 def render_calendar_maintenance(record):
     if not record:
         return ''
@@ -378,6 +393,7 @@ def render_system(state):
             + render_runtime_observation(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
             + render_calendar_maintenance(state.get('calendar_maintenance'))
+            + render_pipelines(state)
             + (render_coverage(state['coverage_breakdown']) if state.get('coverage_breakdown') else '')
             + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])

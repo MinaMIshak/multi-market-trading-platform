@@ -469,7 +469,11 @@ SEC_CONTACT_FILE = "/home/egx-agent/er1-autopilot/state/config/sec-contact.txt"
 
 
 def sec_contact(env=os.environ, path=SEC_CONTACT_FILE):
-    """The operator's SEC fair-access contact (an e-mail address), or None."""
+    """The operator's SEC fair-access contact (an e-mail address), or None.
+
+    Only an explicit operator setting counts: never git configuration, account
+    metadata, other environment variables or a guessed value.
+    """
     value = (env.get(SEC_CONTACT_ENV) or "").strip()
     if not value and Path(path).is_file():
         value = Path(path).read_text().strip()
@@ -479,5 +483,6 @@ def sec_contact(env=os.environ, path=SEC_CONTACT_FILE):
 def sec_status(contact):
     if contact:
         return {"status": "CONFIGURED", "evidence": "OFFICIAL_FACT"}
-    return {"status": "BLOCKED", "reason": "SEC fair-access policy requires a User-Agent with a contact e-mail; "
-                                           "none is configured (docs/PROVIDER_ARCHITECTURE.md)."}
+    return {"status": "BLOCKED", "code": "NO_OPERATOR_CONTACT_EMAIL",
+            "reason": "SEC fair-access policy requires a User-Agent with a contact e-mail; the operator has not "
+                      "provided one (docs/PROVIDER_ARCHITECTURE.md)."}

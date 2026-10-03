@@ -306,6 +306,7 @@ def test_sec_contact_gate(tmp_path):
     (tmp_path / "c").write_text("someone@example.org\n")
     assert official.sec_contact(env={}, path=str(tmp_path / "c")) == "someone@example.org"
     assert official.sec_status(None)["status"] == "BLOCKED"
+    assert official.sec_status(None)["code"] == "NO_OPERATOR_CONTACT_EMAIL"
     assert official.sec_status("a@b.org")["status"] == "CONFIGURED"
 
 

@@ -56,6 +56,15 @@ Market truth and context evidence never mix:
 
 ## SEC contact (the only optional user action)
 
+**Status:** BLOCKED, code `NO_OPERATOR_CONTACT_EMAIL`. The operator has not
+provided an SEC contact, and none is configured.
+
+**Privacy rule:** the platform takes the contact only from explicit operator
+configuration: the file below, or `EGX_SEC_CONTACT`. It never uses repository
+configuration, account or session metadata, or other environment variables,
+and it never guesses. `tests/test_privacy_guard.py` enforces this and also
+fails if a personal mail address appears in `app/` or `tools/`.
+
 The SEC requires a User-Agent that contains a contact e-mail. Without one,
 `data.sec.gov` answers 403. The platform does not invent or borrow a contact.
 To enable US filings, fundamentals and SEC listing verification, write one
