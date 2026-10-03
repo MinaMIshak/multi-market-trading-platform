@@ -75,8 +75,14 @@ licensing, calendar maintenance, ranking summary, scheduler, receipts.
 
 ## RESEARCH
 
-Today it shows the financial-services methodology reference and sourced
-research notes. **Not yet implemented**: macro, rates, FX, gold, Brent, news,
-geopolitical, fundamentals and cross-market evidence. Each needs a
-provenance-tracked source that is admitted under the same registry rules.
-They stay out of TODAY.
+1. **Macro and cross-asset context** (`docs/MACRO_CONTEXT.md`):
+   - US policy rate, 2-year and 10-year Treasury yields, the 2s10s curve, the
+     broad USD index, EUR/USD and Brent;
+   - each row shows its latest value and date, Δ 1 and Δ 20 observations,
+     freshness and the publisher; provenance is collapsed;
+   - context only.
+2. The list of capabilities not yet sourced (gold, USD/EGP and the CBE rate,
+   news, geopolitics, fundamentals), each with its reason.
+3. The financial-services methodology reference and sourced research notes.
+
+Macro context stays out of TODAY. It never changes a classification.

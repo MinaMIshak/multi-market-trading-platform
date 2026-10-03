@@ -13,6 +13,7 @@ from app.ui.today import load_security_master_summary, load_validated_daily_obse
 from app.calendar_maintenance_status import load_calendar_maintenance_status
 from app.ui.coverage import render_coverage
 from app.ui.dashboard import STYLE as DASHBOARD_STYLE
+from app.ui.macro import load_macro, summary as macro_summary
 from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
@@ -108,6 +109,7 @@ def load_system_state():
         'coverage_breakdown': product['coverage_breakdown'],
         # EGX-RANK-v1 summary (Paper/Shadow research; admission and licensing as recorded).
         'ranking': product['ranking']['EGX'],
+        'macro': macro_summary(load_macro()),
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
