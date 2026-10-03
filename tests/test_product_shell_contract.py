@@ -296,6 +296,7 @@ class ProductShellContracts(unittest.TestCase):
                      'load_heartbeat': lambda: {'status': 'UNKNOWN'},
                      'load_ranking': lambda: None, 'load_context': lambda: None,
                      'load_macro': lambda: None, 'load_us_ranking': lambda: None,
+                     'load_experiment': lambda: None,
                      'product_state': product_state, 'render_product': render_product}
         exec(compile(ast.Module(body=functions, type_ignores=[]), 'routes', 'exec'), namespace)
         self.assertIn('Entry band:', namespace['root']())

@@ -55,6 +55,17 @@ class ValidatedDailyArtifactRepository:
                 "ORDER BY a.canonical_symbol, a.source_snapshot_date, a.created_at", (provider,)).fetchall()
         return {row["canonical_symbol"]: dict(row) for row in rows}
 
+    def by_id(self, artifact_id: str) -> dict | None:
+        """One VALIDATED artifact by id (the exact evidence a decision was made on)."""
+        uri = self.database_path.resolve().as_uri() + "?mode=ro"
+        with closing(sqlite3.connect(uri, uri=True)) as con:
+            con.row_factory = sqlite3.Row
+            row = con.execute(
+                "SELECT a.*, i.name_en, i.source_symbol_code AS isin FROM daily_canonical_artifacts a "
+                "JOIN canonical_instruments i ON i.instrument_id = a.instrument_id "
+                "WHERE a.artifact_id=? AND a.status='VALIDATED'", (artifact_id,)).fetchone()
+        return dict(row) if row else None
+
     def load(self, artifact: dict) -> ValidatedDailyDataset:
         path = self._resolve(artifact["canonical_path"])
         payload = path.read_bytes()

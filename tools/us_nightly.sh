@@ -43,5 +43,6 @@ step publish flock "$STATE/publish.lock" "$PY" tools/publish_runtime_snapshot.py
   --ranking-report "$STATE/egx-ranking/egx-ranking.json" \
   --macro-report "$STATE/macro/macro-context.json" \
   --context-report "$STATE/context/context-report.json" \
-  --us-ranking-report "$STATE/us/us-ranking.json"
+  --us-ranking-report "$STATE/us/us-ranking.json" \
+  --egx-experiment-report "$STATE/egx-experiment/egx-experiment.json"
 echo "$(date -u +%FT%TZ) CHAIN_DONE live_money=DISABLED" >> "$LOG"

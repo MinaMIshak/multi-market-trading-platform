@@ -43,6 +43,7 @@ INPUTS = {
     'macro': ('EGX_MACRO_REPORT_PATH', 'macro-context.json', None),
     'context': ('EGX_CONTEXT_REPORT_PATH', 'context-report.json', None),
     'us_ranking': ('EGX_US_RANKING_REPORT_PATH', 'us-ranking.json', None),
+    'egx_experiment': ('EGX_EXPERIMENT_REPORT_PATH', 'egx-experiment.json', None),
 }
 
 

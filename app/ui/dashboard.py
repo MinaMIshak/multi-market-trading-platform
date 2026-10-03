@@ -218,7 +218,8 @@ def render_insights(report):
 
 
 COLUMNS = [
-    ("Symbol", "text", False), ("Class", "num", False), ("Score", "num", True), ("Context", "num", False),
+    ("Symbol", "text", False), ("Class", "num", False), ("Score", "num", True), ("Trade (V2D)", "text", False),
+    ("Context", "num", False),
     ("Price", "num", True),
     ("Entry zone", "num", True), ("Stop", "num", True), ("Target 1", "num", True), ("Target 2", "num", True),
     ("R:R", "num", True), ("Trend", "text", False), ("Mom. 20s %", "num", True), ("Vol ×20s", "num", True),
@@ -247,6 +248,8 @@ def _row(record):
           else f"{record['risk_reward_t1']} / {record.get('risk_reward_t2')}")
     ticker, company = record.get("ticker") or "UNKNOWN", record.get("company") or ""
     context = record.get("context") or {}
+    from app.ui.experiment import cell as experiment_cell, explanation as experiment_explanation
+    trade_cell = experiment_cell(record.get("experiment"))
     context_lines = ""
     if context:
         context_lines = (f'<br><b>Context ({escape(context["version"])}):</b> '
@@ -265,7 +268,7 @@ def _row(record):
                 f'<b>Freshness:</b> {escape(str(_u(record.get("freshness"))))} · '
                 f'<b>Evidence date:</b> {escape(str(_u(record.get("evidence_snapshot_date") or record.get("last_market_session"))))}<br>'
                 f'<b>Warnings:</b> {escape(", ".join(record.get("data_warnings") or []) or "none")}'
-                f'{context_lines}'
+                f'{context_lines}{experiment_explanation(record.get("experiment"))}'
                 f'</div></details>')
     cells = [
         f'<td data-v="{escape(ticker, quote=True)}"><span class="tk">{escape(ticker)}</span>'
@@ -273,6 +276,7 @@ def _row(record):
         f'<td data-v="{CLASS_ORDER.index(cls) if cls in CLASS_ORDER else 9}">'
         f'<span class="badge {escape(cls)}">{escape(cls)}</span></td>',
         _cell(record.get("score"), record.get("score"), True),
+        f'<td data-v="{escape(trade_cell[1], quote=True)}">{trade_cell[0]}</td>',
         (f'<td data-v="{escape(str(context.get("context_score", "")), quote=True)}">'
          f'<span class="badge {CONFIDENCE_TONE.get(context.get("context_confidence"), "NO_TRADE")}">'
          f'{escape(context.get("context_confidence") or "—")}</span>'
