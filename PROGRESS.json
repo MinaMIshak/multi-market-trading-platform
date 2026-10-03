@@ -51,9 +51,9 @@
     "session_verification": "VERIFIED",
     "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
   },
-  "tests": "Full suite at 1f34cec (Python 3.12, host): 3598 passed, 676 subtests passed.",
-  "deployment": "8001 serves 1f34cec in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks passed; public HTTPS 401). Rollback release 9cdd403 (VERIFIED).",
-  "scheduler": "egx-agent cron, release 1f34cec: Sun-Thu 16:45 capture, 08:30 EGX chain (with context); Tue-Sat 06:15 US chain; shared publish lock.",
+  "tests": "Full suite at f7df01f (Python 3.12, host): 3617 passed, 676 subtests passed.",
+  "deployment": "8001 serves f7df01f in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks incl. experiment passed; public HTTPS 401). Rollback release 1f34cec (VERIFIED).",
+  "scheduler": "egx-agent cron, release f7df01f: Sun-Thu 16:45 capture, 08:30 EGX chain (ranking -> experiment -> scan -> context -> publish); Tue-Sat 06:15 US chain; shared publish lock.",
   "next_action": "Mon 2026-10-05 US session and Sun 2026-10-04 EGX session start the first lifecycles; verify chain logs. Optional operator action: SEC contact e-mail in /home/egx-agent/er1-autopilot/state/config/sec-contact.txt to enable US filings/fundamentals.",
   "hard_blocker": null,
   "live_money": false,
@@ -73,5 +73,16 @@
     "us_sec": "BLOCKED: NO_OPERATOR_CONTACT_EMAIL. The operator has not provided an SEC contact; the platform uses explicit operator configuration only.",
     "cbe": "cbe.org.eg rejects automated access (WAF); CBE current policy rate and official USD/EGP blocked."
   },
-  "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION"
+  "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION",
+  "experiment": {
+    "strategy": "EGX-EXP-v1",
+    "config": "EGX-EXP-CFG-1",
+    "champion": "V1 (EGX-RANK-v1)",
+    "decisions": 20,
+    "v2a_pass": 20,
+    "v2b_v2d_pass": 4,
+    "resistance_rr_fail": 16,
+    "closed_trades": 0,
+    "status": "INSUFFICIENT_SAMPLE"
+  }
 }

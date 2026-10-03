@@ -137,7 +137,27 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-03, privacy hardening; cut over by the agent)
+### Current public release (2026-10-03, EGX champion vs challenger; cut over by the agent)
+
+Release `f7df01fa8b639cfb0efe6b795fa8bd00faca8537` (VERIFIED, 232 files) adds EGX-EXP-v1
+(`docs/EGX_EXPERIMENT.md`). Sequence:
+1. **Decision ledger seeded.** 20 V1 candidates, config `EGX-EXP-CFG-1`,
+   HEALTHY, V1 parity intact.
+2. **Bundle.** `published-20261003T195837Z`, with `--egx-experiment-report`.
+3. **Validation.** All acceptance checks passed on 8011 and, after the
+   cutover, on 8001 (`--expect-context --expect-experiment`):
+   - the Trade (V2D) column is shown;
+   - CPCI keeps STRONG_CANDIDATE and shows BLOCKED · WATCH ·
+     RESISTANCE_RR_FAIL;
+   - PERFORMANCE comparison, LIVE lifecycle states and SYSTEM configuration
+     are present.
+   Public HTTPS answers 401.
+4. **Crontab.** Moved to this release; the EGX chain runs step `experiment`
+   after `ranking`.
+
+Rollback: release `1f34cec804ea1e98b3230c76336bfbff9b1ac10c`.
+
+### Previous release (2026-10-03, privacy hardening; cut over by the agent)
 
 Release `1f34cec804ea1e98b3230c76336bfbff9b1ac10c` (VERIFIED, 228 files). Changes:
 - SEC stays BLOCKED with code `NO_OPERATOR_CONTACT_EMAIL`;
