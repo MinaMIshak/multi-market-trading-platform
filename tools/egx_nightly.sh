@@ -47,11 +47,13 @@ step ranking "$PY" -m app.egx_ranking_run --db-path "$DB" --data-root "$DATA" \
 step universe_scan "$PY" -m app.egx_universe_scan --db-path "$DB" --history-path "$STATE/egx-scan/egx-scan-history.json"
 step context "$PY" -m app.context.run --data-root "$DATA" --report "$STATE/context/context-report.json" \
   --macro-report "$STATE/macro/macro-context.json" --tv-python "$TVPY"
-step publish "$PY" tools/publish_runtime_snapshot.py publish --db "$DB" --snapshots-root "$STATE/snapshots" \
+step publish flock "$STATE/publish.lock" "$PY" tools/publish_runtime_snapshot.py publish --db "$DB" \
+  --snapshots-root "$STATE/snapshots" \
   --pointer "$STATE/public-bundle.json" --build-revision "$REVISION" \
   --scan-history "$STATE/egx-scan/egx-scan-history.json" \
   --calendar-maintenance-status "$STATE/egx-calendar-maintenance/last-run.json" \
   --ranking-report "$STATE/egx-ranking/egx-ranking.json" \
   --macro-report "$STATE/macro/macro-context.json" \
-  --context-report "$STATE/context/context-report.json"
+  --context-report "$STATE/context/context-report.json" \
+  --us-ranking-report "$STATE/us/us-ranking.json"
 echo "$(date -u +%FT%TZ) CHAIN_DONE live_money=DISABLED" >> "$LOG"

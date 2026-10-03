@@ -218,11 +218,21 @@ def render_insights(report):
 
 
 COLUMNS = [
-    ("Symbol", "text", False), ("Class", "num", False), ("Score", "num", True), ("Price", "num", True),
+    ("Symbol", "text", False), ("Class", "num", False), ("Score", "num", True), ("Context", "num", False),
+    ("Price", "num", True),
     ("Entry zone", "num", True), ("Stop", "num", True), ("Target 1", "num", True), ("Target 2", "num", True),
     ("R:R", "num", True), ("Trend", "text", False), ("Mom. 20s %", "num", True), ("Vol ×20s", "num", True),
     ("RS (pp)", "num", True), ("Liquidity/day", "num", True), ("Evidence", "text", False),
 ]
+
+
+CONFIDENCE_TONE = {"HIGH": "STRONG_CANDIDATE", "MEDIUM": "CANDIDATE", "LOW": "WATCHLIST"}
+
+
+def _context_text(context):
+    if not context:
+        return ""
+    return f'{context["context_adjustment"]:+d} → {context["context_score"]}'
 
 
 def _row(record):
@@ -236,12 +246,26 @@ def _row(record):
     rr = (None if record.get("risk_reward_t1") is None
           else f"{record['risk_reward_t1']} / {record.get('risk_reward_t2')}")
     ticker, company = record.get("ticker") or "UNKNOWN", record.get("company") or ""
+    context = record.get("context") or {}
+    context_lines = ""
+    if context:
+        context_lines = (f'<br><b>Context ({escape(context["version"])}):</b> '
+                         f'{escape("; ".join(context.get("notes") or []))}')
+        for catalyst in context.get("catalysts") or []:
+            context_lines += (f'<br><b>Catalyst:</b> {escape(catalyst["type"])} · '
+                              f'{escape(catalyst["published_at"][:10])} · {escape(str(catalyst.get("heading") or ""))}')
+        if context.get("fundamentals"):
+            f = context["fundamentals"]
+            context_lines += (f'<br><b>Disclosed result:</b> {escape(str(f.get("net_result")))} vs '
+                              f'{escape(str(f.get("comparative_net_result")))} ({escape(str(f.get("basis")))}, '
+                              f'period end {escape(str(f.get("period_end")))})')
     evidence = (f'<details><summary>details</summary><div>'
                 f'<b>Why:</b> {escape(str(_u(reason or None)))}<br>'
                 f'<b>History:</b> {escape(str(_u(quality)))}<br>'
                 f'<b>Freshness:</b> {escape(str(_u(record.get("freshness"))))} · '
                 f'<b>Evidence date:</b> {escape(str(_u(record.get("evidence_snapshot_date") or record.get("last_market_session"))))}<br>'
                 f'<b>Warnings:</b> {escape(", ".join(record.get("data_warnings") or []) or "none")}'
+                f'{context_lines}'
                 f'</div></details>')
     cells = [
         f'<td data-v="{escape(ticker, quote=True)}"><span class="tk">{escape(ticker)}</span>'
@@ -249,6 +273,10 @@ def _row(record):
         f'<td data-v="{CLASS_ORDER.index(cls) if cls in CLASS_ORDER else 9}">'
         f'<span class="badge {escape(cls)}">{escape(cls)}</span></td>',
         _cell(record.get("score"), record.get("score"), True),
+        (f'<td data-v="{escape(str(context.get("context_score", "")), quote=True)}">'
+         f'<span class="badge {CONFIDENCE_TONE.get(context.get("context_confidence"), "NO_TRADE")}">'
+         f'{escape(context.get("context_confidence") or "—")}</span>'
+         f'<span class="co">{escape(_context_text(context))}</span></td>'),
         _cell(record.get("price"), record.get("price"), True),
         _cell(None if not zone else f"{zone[0]}–{zone[1]}", zone[0] if zone else None, True),
         _cell(record.get("stop"), record.get("stop"), True),

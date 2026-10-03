@@ -73,16 +73,58 @@ The detailed operational and audit page: build, runtime state and snapshot
 verification, readiness dimensions, coverage breakdown, source registry with
 licensing, calendar maintenance, ranking summary, scheduler, receipts.
 
+## US (TODAY / SWING / PRE-SURGE / PERFORMANCE, market US or ALL)
+
+US output uses the same components from the US-RANK-v1 report (`app/ui/us.py`):
+- session context: NYSE session, next expected NYSE session;
+- KPI cards: acquired / current counts come from the US report;
+- quick insights and the US candidate table (`US candidates and watchlist`);
+- SWING: US Paper/Shadow lifecycles;
+- PRE-SURGE: the US volume screen;
+- PERFORMANCE: US performance;
+- collapsed US data evidence: universe rule, session verification, Yahoo
+  cross-check, costs.
+
+Without a verified US report the page says UNAVAILABLE and claims no
+readiness.
+
+## Context column (FUSION-v1)
+
+The candidate tables carry a sortable **Context** column:
+- confidence HIGH / MEDIUM / LOW / UNKNOWN, with the bounded adjustment and
+  the context score;
+- the per-row evidence lists the rule notes, official catalysts (recent EGX
+  disclosures or results) and the latest disclosed EGX result.
+
+The class and the market-data score are never changed by context.
+
 ## RESEARCH
 
-1. **Macro and cross-asset context** (`docs/MACRO_CONTEXT.md`):
-   - US policy rate, 2-year and 10-year Treasury yields, the 2s10s curve, the
-     broad USD index, EUR/USD and Brent;
-   - each row shows its latest value and date, Δ 1 and Δ 20 observations,
-     freshness and the publisher; provenance is collapsed;
-   - context only.
-2. The list of capabilities not yet sourced (gold, USD/EGP and the CBE rate,
-   news, geopolitics, fundamentals), each with its reason.
-3. The financial-services methodology reference and sourced research notes.
+Built from the context report (`app/ui/context.py`; sources in
+`docs/SOURCE_DECISION_MATRIX.md`):
 
-Macro context stays out of TODAY. It never changes a classification.
+1. **Market regime**: US and EGX equity regimes, context risk per market with
+   its flags, Fed stance, EGP, gold, Brent, Suez and the curve, each with its
+   rule.
+2. **Rates and monetary policy**: Fed target range, effective rate, 2y/10y,
+   2s10s, the FRED vs BIS cross-check, Egypt (IMF, lagged and labelled with
+   its age), and Fed monetary-policy releases.
+3. **FX**: USD/EGP market rate (ICE), the reference rate and their
+   reconciliation, the broad dollar index, EUR/USD. The official CBE rate is
+   BLOCKED.
+4. **Gold**: OANDA spot vs TVC composite (reconciled).
+5. **Brent / oil**: front-month futures vs EIA dated spot (the gap is
+   reported, not reconciled).
+6. **Equity indices**: EGX30, S&P 500, VIX, and EGX30 in USD terms.
+7. **News and catalysts**: EGX official disclosures and Fed releases. SEC
+   filings are BLOCKED until a contact is set.
+8. **Geopolitical context**: PortWatch chokepoints (Suez, Bab el-Mandeb,
+   Hormuz, Cape), OFAC SDN counts, and GDELT narrative, labelled as narrative.
+9. **Fundamentals**: EGX financial-statement disclosures (parsed or
+   UNPARSED_LAYOUT). US SEC XBRL status.
+10. **Cross-market evidence**: 60-common-session return correlations.
+11. Sources, freshness and provenance (collapsed). If no context report
+    exists, the macro panel is the fallback.
+
+Context never changes a classification. Media narrative is never a regime,
+fusion or ranking input.

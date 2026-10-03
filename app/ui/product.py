@@ -13,6 +13,7 @@ from app.ui.dashboard import (SCRIPT as DASHBOARD_SCRIPT, STYLE as DASHBOARD_STY
                               render_no_trade, render_session_context)
 from app.ui.context import render_context
 from app.ui.macro import render_macro
+from app.ui.us import render_us
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
                             render_swing as render_ranking_swing,
@@ -140,7 +141,7 @@ def admitted_daily_observations(rows, market):
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
                   security_master=None, daily_observations=None, heartbeat=None, ranking=None,
-                  macro=None, context=None):
+                  macro=None, context=None, us_ranking=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -190,7 +191,17 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     # EGX-RANK-v1 report as recorded (Paper/Shadow research); EGX only.
     state['ranking'] = {key: ranking_summary(ranking) if key == 'EGX' else {'status': 'UNKNOWN'}
                         for key in selected}
-    state['ranking_report'] = ranking if 'EGX' in selected else None
+    # Context overlay (FUSION-v1): copies of the reports; classifications are never changed.
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from app.context.fusion import apply as apply_context
+    now = datetime.now(timezone.utc)
+    state['ranking_report'] = (apply_context(ranking, market='EGX', context=context,
+                                             as_of=now.astimezone(ZoneInfo('Africa/Cairo')).date())
+                               if 'EGX' in selected else None)
+    state['us_ranking_report'] = (apply_context(us_ranking, market='US', context=context,
+                                                as_of=now.astimezone(ZoneInfo('America/New_York')).date())
+                                  if 'US' in selected else None)
     state['pre_surge'] = {key: pre_surge_state(state['readiness']['EGX'])
                           if key == 'EGX' else None for key in selected}
     if section == 'RESEARCH':
@@ -378,9 +389,8 @@ def render_product(state):
                            render_pre_surge(state['pre_surge']))
     if section == 'PERFORMANCE' and egx:
         content += render_ranking_performance(report)
-    if 'US' in state['markets']:
-        content += ('<p class="muted">US: UNKNOWN. No US universe or admitted US daily source is '
-                    'connected, so nothing is ranked for US.</p>')
+    if 'US' in state['markets'] and section in ('TODAY', 'SWING', 'PRE-SURGE', 'PERFORMANCE'):
+        content += render_us(state.get('us_ranking_report'), section)
     if section in ('LIVE', 'RESEARCH', 'SYSTEM', 'PERFORMANCE'):
         messages = {
             'LIVE': 'Current scanner activity UNKNOWN. Historical classification does not prove scheduler completion.',

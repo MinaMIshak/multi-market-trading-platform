@@ -15,6 +15,7 @@ from app.ui.coverage import render_coverage
 from app.ui.dashboard import STYLE as DASHBOARD_STYLE
 from app.ui.context import load_context, summary as context_summary
 from app.ui.macro import load_macro, summary as macro_summary
+from app.ui.us import load_us_ranking, summary as us_summary
 from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
@@ -112,6 +113,7 @@ def load_system_state():
         'ranking': product['ranking']['EGX'],
         'macro': macro_summary(load_macro()),
         'context': context_summary(load_context()),
+        'us': us_summary(load_us_ranking()),
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,

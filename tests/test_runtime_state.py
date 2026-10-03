@@ -111,7 +111,7 @@ def test_snapshot_bundle_to_api_readiness_end_to_end(clean_env, tmp_path, tamper
     manifest = create_snapshot(db=str(live / 'platform.db'), out=str(bundle),
                                build_revision='a' * 40)
     writer.close()
-    assert manifest['missing'] == ['calendar_maintenance', 'context', 'heartbeat', 'macro', 'ranking', 'scan_history']
+    assert manifest['missing'] == ['calendar_maintenance', 'context', 'heartbeat', 'macro', 'ranking', 'scan_history', 'us_ranking']
     if tamper:
         (bundle / 'platform.db').chmod(0o644)
         with sqlite3.connect(bundle / 'platform.db') as con:
@@ -145,7 +145,7 @@ def test_snapshot_bundle_to_api_readiness_end_to_end(clean_env, tmp_path, tamper
     assert {item['origin'] for item in report['inputs'].values()} == {'bundle'}
     snapshot = report['snapshot']
     assert snapshot['build_revision'] == 'a' * 40
-    assert snapshot['missing'] == ['calendar_maintenance', 'context', 'heartbeat', 'macro', 'ranking', 'scan_history']
+    assert snapshot['missing'] == ['calendar_maintenance', 'context', 'heartbeat', 'macro', 'ranking', 'scan_history', 'us_ranking']
     if tamper:
         assert snapshot['status'] == 'INVALID'
         assert snapshot['mismatched'] == ['platform.db']

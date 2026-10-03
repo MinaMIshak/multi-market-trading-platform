@@ -45,6 +45,19 @@ CLASSES = ("STRONG_CANDIDATE", "CANDIDATE", "WATCHLIST", "NO_TRADE")
 
 
 @dataclass(frozen=True)
+class Profile:
+    """Market-specific constants; the EGX profile reproduces EGX-RANK-v1 exactly."""
+    version: str
+    currency: str
+    min_traded_value: Decimal
+    liquidity_tiers: tuple  # (top, middle, floor) average traded value per day
+
+
+EGX_PROFILE = Profile(VERSION, "EGP", MIN_TRADED_VALUE, (20_000_000, 5_000_000, 1_000_000))
+US_PROFILE = Profile("US-RANK-v1", "USD", Decimal("20000000"), (500_000_000, 100_000_000, 20_000_000))
+
+
+@dataclass(frozen=True)
 class Bar:
     date: str
     open: Decimal
@@ -88,13 +101,14 @@ def features(bars: list[Bar]) -> dict:
             "avg_traded_value_20": traded_value, "atr14": atr14, "atr_pct": atr14 / close if close else 0.0}
 
 
-def score(f: dict) -> dict:
+def score(f: dict, profile: Profile = EGX_PROFILE) -> dict:
     trend = {"UP": 30, "NEUTRAL": 10, "DOWN": 0}[f["trend"]]
     momentum = max(0.0, min(25.0, f["momentum_20"] / 0.15 * 25))
     breakout = 15 if f["breakout_20"] else (7 if f["close"] >= 0.97 * f["high_20_prior"] else 0)
     volume = 15 if f["volume_ratio_20"] >= 1.5 else 8 if f["volume_ratio_20"] >= 1.0 else 0
     value = f["avg_traded_value_20"]
-    liquidity = 15 if value >= 20_000_000 else 10 if value >= 5_000_000 else 5 if value >= 1_000_000 else 0
+    top, middle, floor = profile.liquidity_tiers
+    liquidity = 15 if value >= top else 10 if value >= middle else 5 if value >= floor else 0
     parts = {"trend": trend, "momentum": round(momentum, 2), "breakout": breakout,
              "volume": volume, "liquidity": liquidity}
     return {"total": round(sum(parts.values()), 2), "components": parts}
@@ -116,10 +130,11 @@ def plan(f: dict) -> dict:
 
 def classify(*, ticker: str, company: str | None, isin: str | None, source: str, licensing: str,
              admitted: bool, freshness: str, session: str, bars: list[Bar],
-             quarantined_rows: int = 0, warnings: tuple[str, ...] = ()) -> dict:
+             quarantined_rows: int = 0, warnings: tuple[str, ...] = (),
+             profile: Profile = EGX_PROFILE) -> dict:
     record = {"ticker": ticker, "company": company, "isin": isin, "source": source,
               "licensing": licensing, "freshness": freshness, "last_market_session": session,
-              "rank_version": VERSION, "classification": "NO_TRADE", "score": None,
+              "rank_version": profile.version, "classification": "NO_TRADE", "score": None,
               "rejection_reasons": [], "data_warnings": list(warnings),
               # History quality evidence: valid bars used and rows quarantined upstream.
               "history_bars": len(bars), "history_start": bars[0].date if bars else None,
@@ -138,14 +153,14 @@ def classify(*, ticker: str, company: str | None, isin: str | None, source: str,
         reasons.append("INSUFFICIENT_HISTORY")
         return record
     f = features(bars)
-    s = score(f)
+    s = score(f, profile)
     record.update(score=s["total"], score_components=s["components"],
                   trend=f["trend"], momentum_20_pct=round(f["momentum_20"] * 100, 2),
                   breakout_20=f["breakout_20"], volume_confirmation=f["volume_ratio_20"] >= 1.5,
                   volume_ratio_20=round(f["volume_ratio_20"], 2),
                   liquidity_avg_traded_value_20=round(f["avg_traded_value_20"]),
                   atr_pct=round(f["atr_pct"] * 100, 2), **plan(f))
-    if Decimal(str(f["avg_traded_value_20"])) < MIN_TRADED_VALUE:
+    if Decimal(str(f["avg_traded_value_20"])) < profile.min_traded_value:
         reasons.append("ILLIQUID")
     if bars[-1].volume <= 0:
         reasons.append("ZERO_VOLUME_SESSION")
@@ -161,11 +176,11 @@ def classify(*, ticker: str, company: str | None, isin: str | None, source: str,
     else:
         reasons.append("DOWNTREND" if f["trend"] == "DOWN" else "LOW_SCORE")
         return record
-    record["selection_reason"] = selection_reason(f)
+    record["selection_reason"] = selection_reason(f, profile)
     return record
 
 
-def selection_reason(f: dict) -> str:
+def selection_reason(f: dict, profile: Profile = EGX_PROFILE) -> str:
     """Concise, factual summary of why the rules scored the symbol; no opinion."""
     parts = [{"UP": "uptrend (close > EMA20 > EMA50)", "NEUTRAL": "neutral trend",
               "DOWN": "downtrend"}[f["trend"]]]
@@ -173,7 +188,7 @@ def selection_reason(f: dict) -> str:
         parts.append("20-session breakout")
     parts.append(f"momentum {f['momentum_20'] * 100:+.1f}% (20s)")
     parts.append(f"volume {f['volume_ratio_20']:.1f}× 20s avg")
-    parts.append(f"liquidity {f['avg_traded_value_20'] / 1_000_000:.1f}M EGP/day")
+    parts.append(f"liquidity {f['avg_traded_value_20'] / 1_000_000:.1f}M {profile.currency}/day")
     return "; ".join(parts)
 
 

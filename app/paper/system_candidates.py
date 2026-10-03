@@ -40,8 +40,12 @@ def _d(value) -> Decimal:
     return Decimal(str(value))
 
 
-def simulate(candidate: dict, later_bars: list) -> dict:
-    """later_bars: Bar-like objects strictly after candidate['session'], ascending."""
+def simulate(candidate: dict, later_bars: list, *, slippage: Decimal = SLIPPAGE,
+             commission: Decimal = COMMISSION) -> dict:
+    """later_bars: Bar-like objects strictly after candidate['session'], ascending.
+
+    Costs default to the EGX assumptions; other markets pass their own.
+    """
     low_zone, high_zone = (_d(v) for v in candidate["entry_zone"])
     stop, t1, t2 = _d(candidate["stop"]), _d(candidate["target_1"]), _d(candidate["target_2"])
     result = {"status": "PENDING_ENTRY", "events": []}
@@ -56,7 +60,7 @@ def simulate(candidate: dict, later_bars: list) -> dict:
         raw_entry = high_zone
     else:
         return {"status": "NO_FILL_GAP_UP", "events": [{"date": first.date, "event": "NO_FILL_GAP_UP"}]}
-    entry = raw_entry * (1 + SLIPPAGE)
+    entry = raw_entry * (1 + slippage)
     risk = raw_entry - stop
     events = [{"date": first.date, "event": "ENTRY_FILLED", "price": str(raw_entry)}]
     remaining, exits = Decimal("1"), []
@@ -94,8 +98,8 @@ def simulate(candidate: dict, later_bars: list) -> dict:
         return {"status": "OPEN", "events": events, "entry": str(raw_entry),
                 "mae_r": str(round(mae, 2)), "mfe_r": str(round(mfe, 2)), "sessions_held": held + 1}
     gross_exit = sum(weight * price for weight, price in exits)
-    net_exit = sum(weight * price * (1 - SLIPPAGE) for weight, price in exits)
-    net_return = (net_exit * (1 - COMMISSION) - entry * (1 + COMMISSION)) / (entry * (1 + COMMISSION))
+    net_exit = sum(weight * price * (1 - slippage) for weight, price in exits)
+    net_return = (net_exit * (1 - commission) - entry * (1 + commission)) / (entry * (1 + commission))
     last = events[-1]["event"]
     status = {"EXIT_STOP": "CLOSED_STOP", "EXIT_BREAKEVEN": "CLOSED_BREAKEVEN",
               "EXIT_T2": "CLOSED_T2", "EXIT_TIME": "CLOSED_TIME"}[last]
