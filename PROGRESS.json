@@ -51,9 +51,9 @@
     "session_verification": "VERIFIED",
     "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
   },
-  "tests": "Full suite at 9cdd403 (Python 3.12, host): 3595 passed, 676 subtests passed.",
-  "deployment": "8001 serves 9cdd403 in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks incl. context and US passed; public HTTPS 401). Rollback release 1bd75ae (VERIFIED).",
-  "scheduler": "egx-agent cron, release 9cdd403: Sun-Thu 16:45 capture, 08:30 EGX chain (with context); Tue-Sat 06:15 US chain; shared publish lock.",
+  "tests": "Full suite at 1f34cec (Python 3.12, host): 3598 passed, 676 subtests passed.",
+  "deployment": "8001 serves 1f34cec in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks passed; public HTTPS 401). Rollback release 9cdd403 (VERIFIED).",
+  "scheduler": "egx-agent cron, release 1f34cec: Sun-Thu 16:45 capture, 08:30 EGX chain (with context); Tue-Sat 06:15 US chain; shared publish lock.",
   "next_action": "Mon 2026-10-05 US session and Sun 2026-10-04 EGX session start the first lifecycles; verify chain logs. Optional operator action: SEC contact e-mail in /home/egx-agent/er1-autopilot/state/config/sec-contact.txt to enable US filings/fundamentals.",
   "hard_blocker": null,
   "live_money": false,
@@ -70,7 +70,7 @@
     "egx_daily_source_entitlement": "tradingview_tvdatafeed_egx ADMITTED by operator decision 2026-10-01 with NO contractual licence (label NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED). twelve_data optional (paid for EGX); market-watch verification only.",
     "server_access": "RESOLVED: a host session as egx-agent has server access (no root). nginx/systemd/root Docker changes are ADMIN_REQUIRED.",
     "sudo": "egx-agent has no sudo (password required); root-owned changes are ADMIN_REQUIRED.",
-    "us_sec": "SEC fair-access requires a contact e-mail in the User-Agent; not configured.",
+    "us_sec": "BLOCKED: NO_OPERATOR_CONTACT_EMAIL. The operator has not provided an SEC contact; the platform uses explicit operator configuration only.",
     "cbe": "cbe.org.eg rejects automated access (WAF); CBE current policy rate and official USD/EGP blocked."
   },
   "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION"

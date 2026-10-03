@@ -137,7 +137,18 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-03, data-source stack, US market, fusion; cut over by the agent)
+### Current public release (2026-10-03, privacy hardening; cut over by the agent)
+
+Release `1f34cec804ea1e98b3230c76336bfbff9b1ac10c` (VERIFIED, 228 files). Changes:
+- SEC stays BLOCKED with code `NO_OPERATOR_CONTACT_EMAIL`;
+- the contact is taken from explicit operator configuration only;
+- a privacy guard test is added;
+- SYSTEM gains panels for the US pipeline, research context and SEC.
+
+All acceptance checks passed on 8011 and, after the cutover, on 8001 (`--expect-context`); public HTTPS answers 401. The
+three crontab entries were moved to this release. Rollback: release `9cdd403310ce1a2742f95d86f5920b1e8a3d1829`.
+
+### Previous release (2026-10-03, data-source stack, US market, fusion; cut over by the agent)
 
 Release `9cdd403310ce1a2742f95d86f5920b1e8a3d1829` (VERIFIED, 228 files).
 
