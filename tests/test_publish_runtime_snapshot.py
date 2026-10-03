@@ -97,7 +97,7 @@ def test_missing_optional_inputs_are_listed_not_invented(env):
     result = publisher.publish(db=str(make_db(tmp_path / "platform.db")),
                                snapshots_root=str(root), pointer=str(pointer),
                                heartbeat=str(tmp_path / "absent.json"), now=NOW)
-    assert set(result["missing"]) == {"heartbeat", "scan_history", "calendar_maintenance", "ranking", "macro"}
+    assert set(result["missing"]) == {"heartbeat", "scan_history", "calendar_maintenance", "ranking", "macro", "context"}
 
 
 def test_unreadable_pointer_warns_and_serves_no_bundle(env):

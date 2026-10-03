@@ -11,6 +11,7 @@ from app.ui.coverage import coverage_breakdown, render_coverage, unknown_breakdo
 from app.ui.dashboard import (SCRIPT as DASHBOARD_SCRIPT, STYLE as DASHBOARD_STYLE, details,
                               render_candidate_table, render_cards, render_insights, render_legend,
                               render_no_trade, render_session_context)
+from app.ui.context import render_context
 from app.ui.macro import render_macro
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
@@ -139,7 +140,7 @@ def admitted_daily_observations(rows, market):
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
                   security_master=None, daily_observations=None, heartbeat=None, ranking=None,
-                  macro=None):
+                  macro=None, context=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -199,7 +200,7 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
             from app.research.receipt_notes import receipt_research_notes
             notes = receipt_research_notes(egx)
         state['research'] = {'notes': notes, 'financial_services': financial_services_status(),
-                             'macro': macro}
+                             'macro': macro, 'context': context}
     return state
 
 
@@ -392,7 +393,9 @@ def render_product(state):
         content += render_live(state['live_monitoring'])
         content += render_scan_runs(state['scan_runs'])
     if section == 'RESEARCH':
-        content += render_macro(state['research'].get('macro'))
+        research_context = state['research'].get('context')
+        content += (render_context(research_context) if research_context is not None
+                    else render_macro(state['research'].get('macro')))
         content += render_research(state['research'])
 
     # 2. Diagnostics layer: complete, but collapsed below the research output.

@@ -93,7 +93,7 @@ def test_fetch_job_writes_report_and_fails_closed_per_series(tmp_path, capsys):
     status = {row["series_id"]: row["status"] for row in report["series"]}
     assert status.pop("DEXUSEU") == "UNAVAILABLE" and set(status.values()) == {"AVAILABLE"}
     assert len(list((tmp_path / "data" / "macro" / "raw").rglob("*.csv"))) == len(SERIES) - 1
-    assert '"macro_series_available": 5' in capsys.readouterr().out
+    assert f'"macro_series_available": {len(SERIES) - 1}' in capsys.readouterr().out
     assert main(["--data-root", str(tmp_path / "d2"), "--report", str(tmp_path / "r2.json")],
                 get=lambda url: (_ for _ in ()).throw(OSError("down")), now=lambda: NOW) == 1
 

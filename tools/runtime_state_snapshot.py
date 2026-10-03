@@ -39,9 +39,10 @@ SNAPSHOT_FILES = {'heartbeat': 'scheduler-heartbeat.json',
                   'scan_history': 'egx-scan-history.json',
                   'calendar_maintenance': 'calendar-maintenance-last-run.json',
                   'ranking': 'egx-ranking.json',
-                  'macro': 'macro-context.json'}
+                  'macro': 'macro-context.json',
+                  'context': 'context-report.json'}
 # Per-file size caps; the ranking report grows with candidate lifecycles.
-SIZE_LIMITS = {'ranking': 16 * 1024 * 1024}
+SIZE_LIMITS = {'ranking': 16 * 1024 * 1024, 'context': 8 * 1024 * 1024}
 
 
 class SnapshotError(ValueError):
@@ -87,7 +88,8 @@ def _copy_database(source, destination):
 
 
 def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
-                    build_revision=None, calendar_maintenance=None, ranking=None, macro=None):
+                    build_revision=None, calendar_maintenance=None, ranking=None, macro=None,
+                    context=None):
     db = _source(db, 'database')
     out = Path(out)
     if not out.is_absolute():
@@ -99,7 +101,7 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
     extras = {key: _source(value, key) for key, value in
               (('heartbeat', heartbeat), ('scan_history', scan_history),
                ('calendar_maintenance', calendar_maintenance), ('ranking', ranking),
-               ('macro', macro)) if value}
+               ('macro', macro), ('context', context)) if value}
     partial = out.parent / f'.{out.name}.partial-{uuid.uuid4().hex}'
     partial.mkdir(mode=0o700)
     try:
@@ -158,6 +160,7 @@ def main(argv=None):
                         help='absolute calendar maintenance last-run.json')
     parser.add_argument('--ranking-report', help='absolute EGX ranking report JSON')
     parser.add_argument('--macro-report', help='absolute macro context report JSON')
+    parser.add_argument('--context-report', help='absolute research context report JSON')
     parser.add_argument('--build-revision', default=os.getenv('EGX_BUILD_REVISION'),
                         help='git revision of the reading application (recorded only)')
     args = parser.parse_args(argv)
@@ -166,6 +169,7 @@ def main(argv=None):
                                    scan_history=args.scan_history,
                                    calendar_maintenance=args.calendar_maintenance_status,
                                    ranking=args.ranking_report, macro=args.macro_report,
+                                   context=args.context_report,
                                    build_revision=args.build_revision)
     except (SnapshotError, OSError, sqlite3.Error) as exc:
         print(f'snapshot failed: {exc}', file=sys.stderr)

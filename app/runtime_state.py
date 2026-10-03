@@ -41,6 +41,7 @@ INPUTS = {
                              'calendar-maintenance-last-run.json', None),
     'ranking': ('EGX_RANKING_REPORT_PATH', 'egx-ranking.json', None),
     'macro': ('EGX_MACRO_REPORT_PATH', 'macro-context.json', None),
+    'context': ('EGX_CONTEXT_REPORT_PATH', 'context-report.json', None),
 }
 
 

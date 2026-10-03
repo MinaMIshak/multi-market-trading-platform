@@ -19,6 +19,7 @@ from app.ui.today import (
 from app.ui.system import load_system_state, render_system
 from app.ui.operational import load_operational_state
 from app.ui.product import product_state, render_product
+from app.ui.context import load_context
 from app.ui.macro import load_macro
 from app.ui.ranking import load_ranking
 from app.egx_scan_history import load_scan_history
@@ -57,7 +58,8 @@ def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
                                                  if egx else None),
                              heartbeat=load_heartbeat() if egx else None,
                              ranking=load_ranking() if egx else None,
-                             macro=load_macro() if section == 'RESEARCH' else None)
+                             macro=load_macro() if section == 'RESEARCH' else None,
+                             context=load_context() if section == 'RESEARCH' else None)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail='Unknown product view') from exc
 

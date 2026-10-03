@@ -33,10 +33,13 @@ class MacroSeries:
     # Calendar days after which the latest observation is STALE. Set from the
     # publisher's normal lag (H.15 next business day; EIA Brent and H.10 weekly).
     max_age_days: int
+    rights: str = RIGHTS
 
 
 SERIES = (
     MacroSeries("DFF", "US effective federal funds rate", "%", "Federal Reserve Board (H.15)", "Rates", 5),
+    MacroSeries("DFEDTARU", "Fed funds target range, upper bound", "%", "Federal Reserve Board (FOMC)", "Rates", 5),
+    MacroSeries("DFEDTARL", "Fed funds target range, lower bound", "%", "Federal Reserve Board (FOMC)", "Rates", 5),
     MacroSeries("DGS2", "US Treasury 2-year yield (constant maturity)", "%", "Federal Reserve Board (H.15)",
                 "Rates", 5),
     MacroSeries("DGS10", "US Treasury 10-year yield (constant maturity)", "%", "Federal Reserve Board (H.15)",
@@ -44,6 +47,8 @@ SERIES = (
     MacroSeries("DTWEXBGS", "Nominal broad US dollar index", "index, Jan 2006 = 100",
                 "Federal Reserve Board (H.10)", "FX", 10),
     MacroSeries("DEXUSEU", "US dollars per euro", "USD", "Federal Reserve Board (H.10)", "FX", 10),
+    MacroSeries("VIXCLS", "Cboe Volatility Index (VIX), close", "index", "Cboe Exchange (via FRED)", "Volatility", 5,
+                "THIRD_PARTY_COPYRIGHT_CBOE_VIA_FRED_PERSONAL_RESEARCH"),
     MacroSeries("DCOILBRENTEU", "Brent crude oil spot (Europe)", "USD per barrel",
                 "U.S. Energy Information Administration", "Commodities", 10),
 )
@@ -145,7 +150,7 @@ def build_report(fetched, *, as_of, generated_at):
         source = fetched.get(series.series_id) or {"error": "not fetched"}
         row = {"series_id": series.series_id, "title": series.title, "unit": series.unit,
                "publisher": series.publisher, "group": series.group, "delivery": DELIVERY,
-               "rights": RIGHTS, "max_age_days": series.max_age_days,
+               "rights": series.rights, "max_age_days": series.max_age_days,
                "url": source.get("url"), "raw_sha256": source.get("sha256"),
                "retrieved_at": source.get("retrieved_at")}
         if "error" in source:
