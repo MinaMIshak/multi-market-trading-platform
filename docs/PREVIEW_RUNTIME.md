@@ -137,7 +137,22 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-03, polished dashboard; cut over by the agent)
+### Current public release (2026-10-03, macro context; cut over by the agent)
+
+Release `1bd75ae178eb8233c1466cf22a3435ae2b234cd3` (VERIFIED, 213 files) adds
+the RESEARCH macro panel (`docs/MACRO_CONTEXT.md`) and the `macro`
+runtime-state input. Sequence:
+1. A first live fetch: 6 of 6 series AVAILABLE and CURRENT; 2s10s +46 bp.
+2. Bundle `published-20261003T080647Z`, published with `--macro-report`. The
+   then-live b418403 still verified it, because unknown files are only hashed.
+3. All acceptance checks passed on 8011, then on 8001 after the cutover. Public
+   HTTPS answers 401.
+4. Crontab moved to this release; the 08:30 chain now runs step `macro` before
+   `publish`.
+
+Rollback: the adoption command with release `b418403055f3ebeae51d57c388b10a7dcdb80b6e`.
+
+### Previous release (2026-10-03, polished dashboard; cut over by the agent)
 
 Release `b418403055f3ebeae51d57c388b10a7dcdb80b6e` (exported, VERIFIED, 210
 files) passed all acceptance checks on 127.0.0.1:8011 against the published
