@@ -137,7 +137,37 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Latest validated release (2026-10-02, research-first UI; the operator applies it)
+### Current public release (2026-10-03, polished dashboard; cut over by the agent)
+
+Release `b418403055f3ebeae51d57c388b10a7dcdb80b6e` (exported, VERIFIED, 210
+files) passed all acceptance checks on 127.0.0.1:8011 against the published
+bundle `published-20261002T063119Z` (pointer mode). The agent then cut 8001
+over to it at the operator's standing authorisation (2026-10-03, Saturday):
+- post-cutover checks passed on 8001:
+  - health 200 and build `b418403…`;
+  - `SNAPSHOT_POINTER`, snapshot `VERIFIED`, warnings `[]`;
+  - `live_money` false, and `overall_operational_ready` false;
+  - the public HTTPS endpoint answers 401 without credentials, as before;
+  - nginx unchanged;
+- TODAY:
+  - context grid, with freshness "220 of 221 current";
+  - KPI cards: 221 / 221 / 220 / 221 / 20 / 1;
+  - quick insights, with top idea CPCI (STRONG, score 82.18);
+  - segmented filters: Actionable 47, All 221, Strong 1, Candidate 19,
+    Watchlist 27, No trade 174;
+  - search, and per-row collapsed evidence;
+- freshness fix: on weekends the readers showed 0 session-current, because
+  Friday has no stored session row. Missing Friday/Saturday rows now count as
+  non-trading by the operator's fixed weekend rule. A missing Sunday–Thursday
+  row is still never inferred;
+- crontab: both entries (16:45 capture, 08:30 chain, Sun–Thu) moved to this
+  release.
+
+Rollback: the step-5 adoption command with release
+`34dd2f536c3bd90ef1dc1a7046cf9c47b1db6c1e` (VERIFIED), and the crontab paths
+moved back the same way.
+
+### Previous release (2026-10-02, research-first UI; applied by the operator, now the rollback)
 
 8001 already runs in pointer mode (on release `e448206`) and is already
 serving the 2026-10-02 published bundle. Rendering the ranking, candidates,
