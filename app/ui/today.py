@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from app.core.base_trading_calendar import BaseTradingCalendarPolicy
 from app.core.schedule import CalendarTruth
 from app.runtime_state import resolved_path
 from app.domain import MarketSession, MarketSessionStatus
@@ -50,7 +51,7 @@ def _daily_freshness(
     as_of: date,
     truths: dict[date, CalendarTruth],
 ) -> str:
-    """CURRENT/STALE only from verified sessions; never weekday arithmetic.
+    """CURRENT/STALE from verified sessions plus the fixed Fri/Sat EGX weekend.
 
     STALE: a verified trading session lies strictly between the newest bar
     and as_of. CURRENT: every date in that gap is a verified non-trading day.
@@ -63,6 +64,20 @@ def _daily_freshness(
         newest_market_date + timedelta(days=offset)
         for offset in range(1, (as_of - newest_market_date).days)
     ]
+
+    # Dates without a stored session row fall back to the deterministic weekly
+    # boundary only: Friday/Saturday are known EGX weekends (the same rule the
+    # calendar backfill writes). Sunday-Thursday without evidence stay unverified.
+    policy = BaseTradingCalendarPolicy()
+    truths = {
+        **{
+            day: CalendarTruth.VERIFIED_NON_TRADING_DAY
+            for day in gap
+            if day not in truths
+            and policy.classify(day) == MarketSessionStatus.WEEKEND
+        },
+        **truths,
+    }
 
     if any(
         truths.get(day) == CalendarTruth.VERIFIED_TRADING_DAY

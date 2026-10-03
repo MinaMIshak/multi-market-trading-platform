@@ -432,8 +432,11 @@ def test_daily_freshness_current_only_across_verified_non_trading_days(tmp_path)
 
 def test_daily_freshness_unknown_without_complete_calendar(tmp_path):
     path = make_ui_db(tmp_path, session_status=MarketSessionStatus.HOLIDAY)
-    # 2026-09-11 has no session record: never infer it from the weekday.
-    assert _freshness(path, date(2026, 9, 12)) == "UNKNOWN"
+    # 2026-09-11 (Friday) has no session record. Friday/Saturday are the fixed
+    # EGX weekend by operator decision, so only they may be filled by rule.
+    assert _freshness(path, date(2026, 9, 12)) == "CURRENT"
+    # Sunday 2026-09-13 has no record: a Sunday-Thursday date is never inferred.
+    assert _freshness(path, date(2026, 9, 14)) == "UNKNOWN"
     # Unverified lifecycle states are not calendar truth either.
     other = tmp_path / "other"
     other.mkdir()

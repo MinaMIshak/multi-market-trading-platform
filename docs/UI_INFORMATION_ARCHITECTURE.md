@@ -9,24 +9,39 @@ recomputed or invented in the UI (`app/ui/dashboard.py`).
 
 ## TODAY · EGX (above the fold)
 
-1. **Session context**: latest completed session, next expected session
-   (labelled as an expectation: Friday/Saturday closed, holiday status not
-   verified), data freshness counts, source with admission and licensing label
-   (`NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED`), rule version, report time,
-   **LIVE MONEY DISABLED**, and the prepared note (for example "Based on the
-   Thursday 2026-10-01 close … ahead of … Sunday 2026-10-04").
-2. **Summary cards**: scanned (evaluated), admitted-source symbols, admitted
-   and session-current, ranked (scored), candidates, strong candidates.
-3. **Candidate table** (STRONG_CANDIDATE, CANDIDATE, WATCHLIST):
-   - columns: ticker, company, class, score, price, entry zone, stop, T1, T2,
-     R:R, trend, 20-session momentum, volume ratio (✓ = confirmation), liquidity
-     (average EGP traded per day), relative strength (pp against the
-     ranked-universe median for the same session), history quality (bars,
-     quarantined rows), freshness, evidence date, concise selection reason,
-     warnings;
-   - sortable by clicking a header, with filters by class.
-4. **Classification rules** (collapsed legend).
-5. **NO_TRADE symbols** (collapsed, with a reason histogram).
+1. **Session context** (compact grid): latest completed session, next expected
+   session (an expectation: Friday/Saturday closed, holiday status not
+   verified), data freshness ("N of M current"), source, rule version, report
+   time; below it **LIVE MONEY DISABLED**, the admission and licensing label
+   (`NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED`) and the prepared note.
+2. **KPI cards** (equal height, large number, small label): scanned, admitted
+   source, admitted & current, ranked, candidates, strong candidates.
+   "Admitted & current" counts validated daily rows whose source is ADMITTED and
+   whose freshness is CURRENT. Freshness uses stored verified sessions and the
+   fixed EGX weekend: a missing Friday/Saturday row counts as non-trading, while
+   a missing Sunday–Thursday row stays unverified (UNKNOWN). This fixes the
+   weekend "0 current" mismatch in the data path (`_daily_freshness`), not just
+   in the display.
+3. **Quick insights**: top idea (highest-scoring STRONG/CANDIDATE with its
+   score, entry zone and stop), strong, candidate and watchlist counts, and the
+   next evaluation session.
+4. **Candidate table** (all classes):
+   - filters: Actionable (default), All, Strong, Candidate, Watchlist, No trade;
+     ticker/company search; sorting by any header;
+   - layout: sticky header, zebra rows, right-aligned numerics, bold ticker with
+     the company name beneath;
+   - visible columns: class, score, price, entry zone, stop, T1, T2, R:R, trend,
+     20-session momentum, volume ratio (✓ = confirmation), relative strength
+     (pp against the ranked-universe median), liquidity;
+   - per-row expandable evidence: selection or rejection reason, history
+     quality, freshness, evidence date, warnings;
+   - without JavaScript every row is shown.
+5. **Classification rules** (collapsed legend) and **NO_TRADE reason histogram**
+   (collapsed).
+
+Theme: a single shared stylesheet (`app/ui/dashboard.py` STYLE) on every
+product page and SYSTEM. It uses a calm slate base, one soft accent and muted
+class colours. Amber is reserved for the safety label.
 
 Below, collapsed: data coverage and readiness (evidence levels, blockers),
 validated daily observations, security-master identities, and operational

@@ -9,8 +9,8 @@ from app.financial_services_status import financial_services_status
 from app.data.source_admission import daily_source_admission
 from app.ui.coverage import coverage_breakdown, render_coverage, unknown_breakdown
 from app.ui.dashboard import (SCRIPT as DASHBOARD_SCRIPT, STYLE as DASHBOARD_STYLE, details,
-                              render_candidate_table, render_cards, render_legend, render_no_trade,
-                              render_session_context)
+                              render_candidate_table, render_cards, render_insights, render_legend,
+                              render_no_trade, render_session_context)
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
                             render_swing as render_ranking_swing,
@@ -361,6 +361,7 @@ def render_product(state):
         content += render_session_context(report, coverage)
     if section in ('TODAY', 'SWING') and egx:
         content += render_cards(report, coverage)
+        content += render_insights(report)
         content += render_candidate_table(report, table_id=f'{section.lower()}-candidates',
                                           title='EGX candidates and watchlist')
         content += render_legend()
@@ -438,10 +439,5 @@ def render_product(state):
                 '<a href="/performance">Performance evidence</a></footer>')
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>EGX + US Paper/Shadow</title><style>'
-            'body{background:#071019;color:#e9f0f5;font:16px Arial,sans-serif;max-width:1100px;margin:auto;padding:24px}'
-            'nav{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0}a{color:#8bd5b0}'
-            '[aria-current]{font-weight:bold;text-decoration-thickness:3px}'
-            'article{background:#0d1b26;border:1px solid #1e3241;border-radius:10px;padding:20px;margin:20px 0}'
-            'p{line-height:1.6}footer{margin-top:32px}' + DASHBOARD_STYLE + '</style></head><body>'
+            '<title>EGX + US Paper/Shadow</title><style>' + DASHBOARD_STYLE + '</style></head><body>'
             + nav + '<main>' + content + '</main>' + DASHBOARD_SCRIPT + '</body></html>')

@@ -1,7 +1,8 @@
 import re
 
 from app.strategies.egx_ranking import apply_relative_strength
-from app.ui.dashboard import render_candidate_table, render_cards, render_session_context, summary_counts
+from app.ui.dashboard import (render_candidate_table, render_cards, render_insights, render_session_context,
+                              summary_counts)
 from app.ui.product import product_state, render_product
 
 
@@ -53,27 +54,36 @@ def test_today_puts_session_context_cards_and_candidates_before_diagnostics():
     html = page()
     main = html.split("<main>", 1)[1]
     positions = [main.index(marker) for marker in (
-        'aria-label="Session context"', 'aria-label="Summary"', 'aria-label="EGX candidates and watchlist"',
+        'aria-label="Session context"', 'aria-label="Summary"', 'aria-label="Quick insights"',
+        'aria-label="EGX candidates and watchlist"',
         "Data coverage and readiness", "Operational receipt diagnostics")]
     assert positions == sorted(positions)
     assert "verification window" not in outside_details(main)
-    assert "Next expected session</b>: 2026-10-04" in html and "LIVE MONEY DISABLED" in html
+    assert 'Next expected session</div><div class="v">Sun 2026-10-04' in html and "LIVE MONEY DISABLED" in html
     assert "NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED" in html
 
 
 def test_candidate_table_lists_candidates_and_watchlist_with_evidence_and_filters():
     html = render_candidate_table(REPORT, table_id="t")
-    rows = re.findall(r'<tr data-class="([A-Z_]+)">', html)
-    assert rows == ["STRONG_CANDIDATE", "CANDIDATE", "WATCHLIST"]
+    rows = re.findall(r'<tr data-class="([A-Z_]+)" data-search="([^"]*)">', html)
+    assert rows == [("STRONG_CANDIDATE", "AAA AAA Co"), ("CANDIDATE", "BBB BBB Co"), ("WATCHLIST", "CCC CCC Co"),
+                    ("NO_TRADE", "DDD DDD Co"), ("NO_TRADE", "EEE ")]
     for text in ("9.95–10.05", "9.70", "10.45", "10.90", "1.5 / 3", "1.6× ✓", "5.0M", "600 bars, 0 quarantined",
                  "uptrend; 20-session breakout", "SPLIT_ADJUSTED_SERIES"):
         assert text in html
-    assert html.count('type="checkbox"') == 3 and 'data-sortable' in html and 'data-sort="num"' in html
+    filters = re.findall(r'data-filter="([A-Z_]+)" aria-pressed="(true|false)"', html)
+    assert filters == [("ACTIONABLE", "true"), ("ALL", "false"), ("STRONG_CANDIDATE", "false"),
+                       ("CANDIDATE", "false"), ("WATCHLIST", "false"), ("NO_TRADE", "false")]
+    assert 'type="search"' in html and 'data-sortable' in html and 'data-sort="num"' in html
+    assert 'Actionable (3)' in html and 'All (5)' in html
+    # Evidence is per-row and collapsed; numerics are right-aligned.
+    assert html.count("<details><summary>details</summary>") == 5 and '<td class="num" data-v="82">' in html
+    assert '<span class="tk">AAA</span><span class="co">AAA Co</span>' in html
 
 
 def test_missing_engine_values_render_unknown_not_invented():
     html = render_candidate_table(REPORT, table_id="n", classes=("NO_TRADE",))
-    eee = re.search(r'<tr data-class="NO_TRADE"><td data-v="EEE">.*?</tr>', html, re.S).group(0)
+    eee = re.search(r'<tr data-class="NO_TRADE" data-search="EEE "><td data-v="EEE">.*?</tr>', html, re.S).group(0)
     assert eee.count(">UNKNOWN<") >= 10 and "INSUFFICIENT_HISTORY" in eee
     assert "DOWNTREND" in html
 
@@ -104,3 +114,12 @@ def test_relative_strength_is_cross_sectional_against_the_median():
     assert apply_relative_strength(rows) == 3.0
     assert [r.get("relative_strength_20_pp") for r in rows] == [-2.0, 0.0, 7.0, None]
     assert apply_relative_strength([{}]) is None
+
+
+def test_quick_insights_show_top_idea_counts_and_next_session():
+    html = render_insights(REPORT)
+    assert '<span class="tk">AAA</span>' in html and "score 82" in html and "entry 9.95–10.05" in html
+    assert "2026-10-04" in html and "Sun · expected" in html
+    empty = dict(REPORT, symbols=[r for r in REPORT["symbols"] if r["classification"] == "NO_TRADE"])
+    assert "No symbol passed all candidate rules." in render_insights(empty)
+    assert render_insights(None) == ""

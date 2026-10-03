@@ -12,6 +12,7 @@ from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
 from app.calendar_maintenance_status import load_calendar_maintenance_status
 from app.ui.coverage import render_coverage
+from app.ui.dashboard import STYLE as DASHBOARD_STYLE
 from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
@@ -363,7 +364,8 @@ def render_system(state):
             'background:#071019;color:#e9f0f5}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#8bd5b0}'
             '.table-scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}'
             'th,td{text-align:left;padding:10px;border-bottom:1px solid #344653;overflow-wrap:anywhere}'
-            'caption{text-align:left;margin-bottom:12px}</style>'
+            'caption{text-align:left;margin-bottom:12px}' + DASHBOARD_STYLE
+            + 'pre{white-space:pre-wrap;overflow-wrap:anywhere}td{overflow-wrap:anywhere}</style>'
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
