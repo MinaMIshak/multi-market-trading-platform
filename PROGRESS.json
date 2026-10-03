@@ -41,16 +41,20 @@
     }
   },
   "us": {
-    "configured_universe": null,
-    "data_ready": null,
-    "eligible": null,
-    "scanned": null,
-    "candidates": null
+    "configured_universe": 500,
+    "data_ready": 500,
+    "eligible": 500,
+    "scanned": 500,
+    "candidates": 75,
+    "strong_candidates": 3,
+    "session": "2026-10-02",
+    "session_verification": "VERIFIED",
+    "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
   },
-  "tests": "Full suite at 1bd75ae (Python 3.12, host): 3559 passed, 676 subtests passed.",
-  "deployment": "8001 serves 1bd75ae in SNAPSHOT_POINTER mode (agent cutover 2026-10-03, post-checks passed, public HTTPS 401). Rollback release b418403 (VERIFIED).",
-  "scheduler": "egx-agent cron, release 1bd75ae, Sun-Thu: 16:45 market-watch capture, 08:30 pre-market chain (now including the macro context step). Friday/Saturday are EGX weekend days and never expected sessions.",
-  "next_action": "Sunday 2026-10-04 08:30 chain: data, ranking, first candidate lifecycles, macro, publish; verify the run log. Remaining scope: lawful free sources for gold, USD/EGP, news/disclosures, fundamentals, and a US runtime universe.",
+  "tests": "Full suite at 9cdd403 (Python 3.12, host): 3595 passed, 676 subtests passed.",
+  "deployment": "8001 serves 9cdd403 in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks incl. context and US passed; public HTTPS 401). Rollback release 1bd75ae (VERIFIED).",
+  "scheduler": "egx-agent cron, release 9cdd403: Sun-Thu 16:45 capture, 08:30 EGX chain (with context); Tue-Sat 06:15 US chain; shared publish lock.",
+  "next_action": "Mon 2026-10-05 US session and Sun 2026-10-04 EGX session start the first lifecycles; verify chain logs. Optional operator action: SEC contact e-mail in /home/egx-agent/er1-autopilot/state/config/sec-contact.txt to enable US filings/fundamentals.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -65,7 +69,9 @@
     "network_egx_sources": "Host egress reaches beta.egx.com.eg and ticker.egidegypt.com (2026-09-29). Official index acquisition works; this does not establish per-equity daily entitlement.",
     "egx_daily_source_entitlement": "tradingview_tvdatafeed_egx ADMITTED by operator decision 2026-10-01 with NO contractual licence (label NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED). twelve_data optional (paid for EGX); market-watch verification only.",
     "server_access": "RESOLVED: a host session as egx-agent has server access (no root). nginx/systemd/root Docker changes are ADMIN_REQUIRED.",
-    "sudo": "egx-agent has no sudo (password required); root-owned changes are ADMIN_REQUIRED."
+    "sudo": "egx-agent has no sudo (password required); root-owned changes are ADMIN_REQUIRED.",
+    "us_sec": "SEC fair-access requires a contact e-mail in the User-Agent; not configured.",
+    "cbe": "cbe.org.eg rejects automated access (WAF); CBE current policy rate and official USD/EGP blocked."
   },
   "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION"
 }

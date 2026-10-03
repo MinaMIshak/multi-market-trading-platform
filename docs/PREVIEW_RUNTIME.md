@@ -137,7 +137,37 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-03, macro context; cut over by the agent)
+### Current public release (2026-10-03, data-source stack, US market, fusion; cut over by the agent)
+
+Release `9cdd403310ce1a2742f95d86f5920b1e8a3d1829` (VERIFIED, 228 files).
+
+Contents:
+- the researched source stack (`docs/SOURCE_DECISION_MATRIX.md`);
+- the context layer (`app/context/`): RESEARCH regime, rates, FX, gold,
+  Brent, indices, news, geopolitics, fundamentals and cross-market;
+- the first-class US pipeline (`app/us_run.py`);
+- the FUSION-v1 context overlay.
+
+Sequence:
+1. **Live runs.** US: 500/500 acquired and CURRENT for the Friday 2026-10-02
+   session, VERIFIED by S&P 500 bars; Yahoo cross-check 25/25 AGREE; 3 strong,
+   72 candidates, 81 watchlist. Context: every section AVAILABLE except SEC
+   (BLOCKED: contact needed).
+2. **Bundle.** `published-20261003T091154Z` was published with
+   `--context-report` and `--us-ranking-report` under the shared
+   `publish.lock`. The then-live 1bd75ae still verified it.
+3. **Validation.** All acceptance checks passed on 8011 and, after the
+   cutover, on 8001 (`--expect-context`): context and US AVAILABLE, US
+   sessions VERIFIED, all RESEARCH panels present, the EGX and US tables with
+   the Context column, US-only pages without EGX. EGX is unchanged (220/221
+   current, 20 candidates). Public HTTPS answers 401.
+4. **Crontab.** Moved to this release, plus the US chain
+   `15 6 * * 2-6 ... sh tools/us_nightly.sh # EGX_US_NIGHTLY`.
+
+Rollback: the adoption command with release `1bd75ae178eb8233c1466cf22a3435ae2b234cd3`, then
+point the two EGX crontab lines back and remove the `# EGX_US_NIGHTLY` line.
+
+### Previous release (2026-10-03, macro context; cut over by the agent)
 
 Release `1bd75ae178eb8233c1466cf22a3435ae2b234cd3` (VERIFIED, 213 files) adds
 the RESEARCH macro panel (`docs/MACRO_CONTEXT.md`) and the `macro`
