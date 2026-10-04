@@ -51,6 +51,11 @@ step experiment "$PY" -m app.egx_experiment_run --db-path "$DB" --data-root "$DA
 step universe_scan "$PY" -m app.egx_universe_scan --db-path "$DB" --history-path "$STATE/egx-scan/egx-scan-history.json"
 step context "$PY" -m app.context.run --data-root "$DATA" --report "$STATE/context/context-report.json" \
   --macro-report "$STATE/macro/macro-context.json" --tv-python "$TVPY"
+step learning "$PY" -m app.learning.daily --state "$STATE/learning" --report "$STATE/learning/learning-report.json" \
+  --egx-db "$DB" --egx-data "$DATA" --egx-evidence "$STATE/market-watch-evidence" \
+  --egx-ranking-report "$STATE/egx-ranking/egx-ranking.json" --snapshots-root "$STATE/snapshots" \
+  --us-data "${EGX_US_DATA:-/home/egx-agent/research-data/us-paper-shadow/data}" --us-report "$STATE/us/us-ranking.json" \
+  --context-report "$STATE/context/context-report.json" --build-revision "$REVISION"
 step publish flock "$STATE/publish.lock" "$PY" tools/publish_runtime_snapshot.py publish --db "$DB" \
   --snapshots-root "$STATE/snapshots" \
   --pointer "$STATE/public-bundle.json" --build-revision "$REVISION" \
@@ -60,5 +65,6 @@ step publish flock "$STATE/publish.lock" "$PY" tools/publish_runtime_snapshot.py
   --macro-report "$STATE/macro/macro-context.json" \
   --context-report "$STATE/context/context-report.json" \
   --us-ranking-report "$STATE/us/us-ranking.json" \
-  --egx-experiment-report "$STATE/egx-experiment/egx-experiment.json"
+  --egx-experiment-report "$STATE/egx-experiment/egx-experiment.json" \
+  --learning-report "$STATE/learning/learning-report.json"
 echo "$(date -u +%FT%TZ) CHAIN_DONE live_money=DISABLED" >> "$LOG"

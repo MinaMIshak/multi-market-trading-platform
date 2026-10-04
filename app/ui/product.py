@@ -14,6 +14,9 @@ from app.ui.dashboard import (SCRIPT as DASHBOARD_SCRIPT, STYLE as DASHBOARD_STY
 from app.ui.context import render_context
 from app.ui.macro import render_macro
 from app.ui.us import render_us
+from app.ui.learning import (render_performance as render_learning_performance,
+                             render_research as render_learning_research, render_review as render_learning_review,
+                             render_today as render_learning_today)
 from app.ui.experiment import render_live as render_experiment_live, render_performance as render_experiment_performance
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
@@ -142,7 +145,7 @@ def admitted_daily_observations(rows, market):
 
 def product_state(operational, market='ALL', section='TODAY', *, scan_history=None,
                   security_master=None, daily_observations=None, heartbeat=None, ranking=None,
-                  macro=None, context=None, us_ranking=None, experiment=None):
+                  macro=None, context=None, us_ranking=None, experiment=None, learning=None):
     if market not in MARKETS or section not in SECTIONS:
         raise ValueError('unknown product view')
     # Only EGX has a connected operational receipt reader. Do not imply US coverage.
@@ -203,6 +206,7 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     from app.ui.experiment import attach as attach_experiment
     state['ranking_report'] = attach_experiment(state['ranking_report'], experiment)
     state['experiment'] = experiment if 'EGX' in selected else None
+    state['learning'] = learning
     state['us_ranking_report'] = (apply_context(us_ranking, market='US', context=context,
                                                 as_of=now.astimezone(ZoneInfo('America/New_York')).date())
                                   if 'US' in selected else None)
@@ -390,6 +394,10 @@ def render_product(state):
                                           title='EGX candidates and watchlist')
         content += render_legend()
         content += render_no_trade(report)
+        if section == 'TODAY':
+            content += render_learning_today(state.get('learning'), 'EGX', ranking=report,
+                                             experiment=state.get('experiment'))
+            content += render_learning_review(state.get('learning'), 'EGX')
     if section == 'SWING' and egx:
         content += render_ranking_swing(report)
     if section == 'PRE-SURGE' and egx:
@@ -399,8 +407,12 @@ def render_product(state):
     if section == 'PERFORMANCE' and egx:
         content += render_ranking_performance(report)
         content += render_experiment_performance(state.get('experiment'))
+        content += render_learning_performance(state.get('learning'))
     if 'US' in state['markets'] and section in ('TODAY', 'SWING', 'PRE-SURGE', 'PERFORMANCE'):
         content += render_us(state.get('us_ranking_report'), section)
+        if section == 'TODAY':
+            content += render_learning_today(state.get('learning'), 'US', ranking=state.get('us_ranking_report'))
+            content += render_learning_review(state.get('learning'), 'US')
     if section in ('LIVE', 'RESEARCH', 'SYSTEM', 'PERFORMANCE'):
         messages = {
             'LIVE': 'Current scanner activity UNKNOWN. Historical classification does not prove scheduler completion.',
@@ -418,6 +430,7 @@ def render_product(state):
         research_context = state['research'].get('context')
         content += (render_context(research_context) if research_context is not None
                     else render_macro(state['research'].get('macro')))
+        content += render_learning_research(state.get('learning'))
         content += render_research(state['research'])
 
     # 2. Diagnostics layer: complete, but collapsed below the research output.

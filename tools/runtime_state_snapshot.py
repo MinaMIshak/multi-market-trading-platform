@@ -42,10 +42,11 @@ SNAPSHOT_FILES = {'heartbeat': 'scheduler-heartbeat.json',
                   'macro': 'macro-context.json',
                   'context': 'context-report.json',
                   'us_ranking': 'us-ranking.json',
-                  'egx_experiment': 'egx-experiment.json'}
+                  'egx_experiment': 'egx-experiment.json',
+                  'learning': 'learning-report.json'}
 # Per-file size caps; the ranking report grows with candidate lifecycles.
 SIZE_LIMITS = {'ranking': 16 * 1024 * 1024, 'context': 8 * 1024 * 1024, 'us_ranking': 16 * 1024 * 1024,
-               'egx_experiment': 16 * 1024 * 1024}
+               'egx_experiment': 16 * 1024 * 1024, 'learning': 16 * 1024 * 1024}
 
 
 class SnapshotError(ValueError):
@@ -92,7 +93,8 @@ def _copy_database(source, destination):
 
 def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
                     build_revision=None, calendar_maintenance=None, ranking=None, macro=None,
-                    context=None, us_ranking=None, egx_experiment=None):
+                    context=None, us_ranking=None, egx_experiment=None,
+                    learning=None):
     db = _source(db, 'database')
     out = Path(out)
     if not out.is_absolute():
@@ -105,7 +107,8 @@ def create_snapshot(*, db, out, heartbeat=None, scan_history=None, now=None,
               (('heartbeat', heartbeat), ('scan_history', scan_history),
                ('calendar_maintenance', calendar_maintenance), ('ranking', ranking),
                ('macro', macro), ('context', context),
-               ('us_ranking', us_ranking), ('egx_experiment', egx_experiment)) if value}
+               ('us_ranking', us_ranking), ('egx_experiment', egx_experiment),
+               ('learning', learning)) if value}
     partial = out.parent / f'.{out.name}.partial-{uuid.uuid4().hex}'
     partial.mkdir(mode=0o700)
     try:
@@ -167,6 +170,7 @@ def main(argv=None):
     parser.add_argument('--context-report', help='absolute research context report JSON')
     parser.add_argument('--us-ranking-report', help='absolute US ranking report JSON')
     parser.add_argument('--egx-experiment-report', help='absolute EGX experiment report JSON')
+    parser.add_argument('--learning-report', help='absolute learning report JSON')
     parser.add_argument('--build-revision', default=os.getenv('EGX_BUILD_REVISION'),
                         help='git revision of the reading application (recorded only)')
     args = parser.parse_args(argv)
@@ -176,7 +180,7 @@ def main(argv=None):
                                    calendar_maintenance=args.calendar_maintenance_status,
                                    ranking=args.ranking_report, macro=args.macro_report,
                                    context=args.context_report, us_ranking=args.us_ranking_report,
-                                   egx_experiment=args.egx_experiment_report,
+                                   egx_experiment=args.egx_experiment_report, learning=args.learning_report,
                                    build_revision=args.build_revision)
     except (SnapshotError, OSError, sqlite3.Error) as exc:
         print(f'snapshot failed: {exc}', file=sys.stderr)

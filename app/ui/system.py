@@ -16,6 +16,7 @@ from app.ui.dashboard import STYLE as DASHBOARD_STYLE
 from app.ui.context import load_context, summary as context_summary
 from app.ui.macro import load_macro, summary as macro_summary
 from app.ui.us import load_us_ranking, summary as us_summary
+from app.ui.learning import load_learning, render_system as render_learning_system, summary as learning_summary
 from app.ui.experiment import load_experiment, render_system as render_experiment_system, summary as experiment_summary
 from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
@@ -116,6 +117,7 @@ def load_system_state():
         'context': context_summary(load_context()),
         'us': us_summary(load_us_ranking()),
         'experiment': experiment_summary(load_experiment()),
+        'learning': learning_summary(load_learning()),
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
@@ -397,6 +399,7 @@ def render_system(state):
             + render_calendar_maintenance(state.get('calendar_maintenance'))
             + render_pipelines(state)
             + render_experiment_system(load_experiment())
+            + render_learning_system(load_learning())
             + (render_coverage(state['coverage_breakdown']) if state.get('coverage_breakdown') else '')
             + (render_readiness({'EGX': state['readiness']}) if state.get('readiness') else '')
             + render_provider_receipts(state['providers'])

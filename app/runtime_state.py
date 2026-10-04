@@ -44,6 +44,7 @@ INPUTS = {
     'context': ('EGX_CONTEXT_REPORT_PATH', 'context-report.json', None),
     'us_ranking': ('EGX_US_RANKING_REPORT_PATH', 'us-ranking.json', None),
     'egx_experiment': ('EGX_EXPERIMENT_REPORT_PATH', 'egx-experiment.json', None),
+    'learning': ('EGX_LEARNING_REPORT_PATH', 'learning-report.json', None),
 }
 
 

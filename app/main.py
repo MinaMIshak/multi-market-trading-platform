@@ -23,6 +23,7 @@ from app.ui.context import load_context
 from app.ui.macro import load_macro
 from app.ui.us import load_us_ranking
 from app.ui.experiment import load_experiment
+from app.ui.learning import load_learning
 from app.ui.ranking import load_ranking
 from app.egx_scan_history import load_scan_history
 from app.scheduler_heartbeat import load_heartbeat
@@ -65,7 +66,9 @@ def product(market: str = 'ALL', section: str = 'TODAY') -> dict:
                                       else None),
                              us_ranking=load_us_ranking() if market != 'EGX' else None,
                              experiment=(load_experiment() if market != 'US' and section in (
-                                 'TODAY', 'SWING', 'LIVE', 'PERFORMANCE') else None))
+                                 'TODAY', 'SWING', 'LIVE', 'PERFORMANCE') else None),
+                             learning=(load_learning() if section in ('TODAY', 'PERFORMANCE', 'RESEARCH')
+                                       else None))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail='Unknown product view') from exc
 
