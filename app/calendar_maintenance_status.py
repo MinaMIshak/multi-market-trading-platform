@@ -15,7 +15,8 @@ from app.runtime_state import resolved_path
 MAX_BYTES = 64 * 1024
 MAX_AGE = timedelta(hours=30)
 STATUSES = ('SUCCESS', 'FAILED', 'LOCKED')
-FIELDS = ('outcome', 'error', 'last_completed_session_date', 'newest_official_bar_before',
+FIELDS = ('outcome', 'error', 'completion_cutoff_date', 'last_completed_session', 'basis',
+          'last_verified_session', 'last_expected_session', 'newest_official_bar_before',
           'fetch_range', 'snapshot_date', 'verified_sessions_in_window', 'build_revision')
 
 

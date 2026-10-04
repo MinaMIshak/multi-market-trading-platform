@@ -280,12 +280,9 @@ def test_daily_refresh_stores_artifacts_idempotently(tmp_path):
 
 
 def market_watch_capture(root, rows):
-    directory = root / SESSION.isoformat() / "20260929T134500Z"
-    directory.mkdir(parents=True)
-    (directory / "MANIFEST.json").write_text(json.dumps({
-        "market_status": "Closed", "rows": len(rows),
-        "session_gate": {"verdict": "COMPLETED_SESSION", "session_date": SESSION.isoformat()}}))
-    (directory / "market-watch-page-0001.json").write_text(json.dumps({"data": {"data": rows}}))
+    from tests.egx_capture_fixture import official_row, write_capture
+    write_capture(root, SESSION, [official_row(row.pop("isin"), SESSION, lastPrice=None, volume=None, **row) for row in rows],
+                  name="20260929T134500Z")
 
 
 def test_cross_check_quarantines_material_discrepancy(tmp_path):

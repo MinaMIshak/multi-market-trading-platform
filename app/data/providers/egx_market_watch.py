@@ -4,13 +4,28 @@ Registry status: EVIDENCE_BLOCKED (entitlement NOT_ESTABLISHED, see
 docs/EGX_OFFICIAL_MARKET_WATCH_QUALIFICATION.md). This module fetches and
 interprets; it grants no admission and writes nothing.
 
-Semantics observed 2026-09-30: during an open session every row keeps
-``lastTradeDate`` at the previous session while its prices are today's live
-values. ``lastTradeDate`` alone therefore never dates a bar. A row becomes a
-daily bar only through ``completed_session_bars``: the official market-status
-must be closed, the capture must be after the Cairo completion cutoff, and
-the row's ``lastTradeDate`` must equal that session date. Everything else is
-rejected with a reason, never repaired.
+Row session semantics (field study 2026-10-05 over every stored capture;
+docs/EGX_SESSION_INTEGRITY.md):
+- ``lastTradeDate`` is the date of the row's ``prevClose`` (the previous close),
+  not the session of its prices. In the post-close captures of 2026-09-30 and
+  2026-10-01, the official volume equalled the admitted primary bar of the
+  ``writeTime`` date for 205/205 matched symbols, and 0/205 for the
+  ``lastTradeDate`` date. ``prevClose`` matched the primary close on
+  ``lastTradeDate`` for about 94% of rows.
+- ``lastTradeDate`` therefore never dates a bar, and neither does ``writeTime``,
+  the market status or the capture time alone.
+
+``row_observation`` assigns each row an observation session with its evidence:
+SESSION_ALIGNED only when every condition below holds; otherwise an explicit
+non-aligned status:
+- the market status is Closed;
+- the capture is after the Cairo completion cutoff on the status date;
+- the source write date equals the status date;
+- the row has trades in that session;
+- the previous-close date is strictly earlier.
+
+``completed_session_bars`` turns only SESSION_ALIGNED rows into verification
+bars. Nothing here repairs a row or grants admission.
 """
 from __future__ import annotations
 
@@ -165,6 +180,51 @@ def _price(value) -> Decimal | None:
     return number if number.is_finite() else None
 
 
+SESSION_ALIGNED, SECONDARY_STALE = "SESSION_ALIGNED", "SECONDARY_STALE"
+NOT_TRADED, AMBIGUOUS = "NOT_TRADED_IN_SESSION", "UNVERIFIED_AMBIGUOUS_SESSION"
+
+
+def _write_date(value):
+    text = str(value or "")
+    if len(text) < 8 or not text[:8].isdigit():
+        return None
+    try:
+        return date(int(text[:4]), int(text[4:6]), int(text[6:8]))
+    except ValueError:
+        return None
+
+
+def row_observation(row: dict, *, status_date: date, captured_at: datetime, market_closed: bool) -> dict:
+    """Times and observation-session status for one official row (pure; no repair)."""
+    local = captured_at.astimezone(CAIRO)
+    write_day = _write_date(row.get("writeTime"))
+    try:
+        previous_close_day = datetime.fromisoformat(str(row.get("lastTradeDate"))).date()
+    except ValueError:
+        previous_close_day = None
+    times = {"capture_timestamp": captured_at.isoformat(), "market_status_date": status_date.isoformat(),
+             "source_write_timestamp": str(row.get("writeTime")),
+             "provider_last_trade_date": previous_close_day.isoformat() if previous_close_day else None,
+             "provider_last_trade_date_meaning": "date of prevClose (previous close)"}
+    if not market_closed or local.date() != status_date or local.time() < SESSION_COMPLETE_AT:
+        return {**times, "status": AMBIGUOUS, "observation_session_date": None,
+                "reason": "capture not after a closed, completed session"}
+    if write_day is None or previous_close_day is None:
+        return {**times, "status": AMBIGUOUS, "observation_session_date": None, "reason": "missing writeTime/lastTradeDate"}
+    if write_day < status_date:
+        return {**times, "status": SECONDARY_STALE, "observation_session_date": None,
+                "reason": f"source write date {write_day} precedes session {status_date}"}
+    if write_day > status_date or previous_close_day >= status_date:
+        return {**times, "status": AMBIGUOUS, "observation_session_date": None,
+                "reason": "write date or previous-close date not consistent with the session"}
+    trades, volume = row.get("trades"), _price(row.get("volume"))
+    if (trades is not None and not trades) or volume == 0:
+        return {**times, "status": NOT_TRADED, "observation_session_date": None,
+                "reason": "no trades in the session (official price carried)"}
+    return {**times, "status": SESSION_ALIGNED, "observation_session_date": status_date.isoformat(),
+            "reason": "closed post-cutoff capture, write date = session, trades > 0, previous close earlier"}
+
+
 def completed_session_bars(snapshot: MarketWatchSnapshot) -> tuple[date, dict, dict]:
     """(session_date, bars by Reuters code, rejection reasons by Reuters code or ISIN).
 
@@ -185,16 +245,10 @@ def completed_session_bars(snapshot: MarketWatchSnapshot) -> tuple[date, dict, d
         if any(row.get(field) in (None, "") for field in REQUIRED_ROW_FIELDS):
             rejected[key] = "MISSING_FIELD"
             continue
-        try:
-            traded = datetime.fromisoformat(str(row["lastTradeDate"])).date()
-        except ValueError:
-            rejected[key] = "LAST_TRADE_DATE_INVALID"
-            continue
-        if traded < session_date:
-            rejected[key] = "NOT_TRADED_IN_SESSION"
-            continue
-        if traded > session_date:
-            rejected[key] = "LAST_TRADE_DATE_AFTER_SESSION"
+        observation = row_observation(row, status_date=session_date, captured_at=snapshot.captured_at,
+                                      market_closed=True)
+        if observation["status"] != SESSION_ALIGNED:
+            rejected[key] = observation["status"]
             continue
         values = {name: _price(row[field]) for name, field in (
             ("open", "openPrice"), ("high", "high"), ("low", "low"),

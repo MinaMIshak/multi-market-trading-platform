@@ -20,7 +20,15 @@ systematically slightly lower, and volume definitions differ. So per symbol
   ``tolerance`` (0.5 %); stored, and every difference is recorded;
 - MATCH: every compared field within ``tolerance``;
 - UNVERIFIED: no usable capture, the ISIN is absent, or the provider has no
-  bar for D. This is not a failure and not a confirmation.
+  bar for D. This is not a failure and not a confirmation;
+- UNAVAILABLE_STALE_SECONDARY: the official row exists but is not an
+  observation of session D (``row_observation`` status other than
+  SESSION_ALIGNED). No price comparison is made across sessions, and the
+  primary bar's admission is unaffected.
+
+Session alignment is decided per row from the capture's own evidence
+(app/data/providers/egx_market_watch.py, ``row_observation``), never from the
+folder name, the capture time, the market status or ``writeTime`` alone.
 Volume and the official ``closePrice`` are recorded for reporting only.
 """
 from __future__ import annotations
@@ -40,6 +48,7 @@ MATERIAL = (("open", ("openPrice",), Decimal("0.005")),
             ("close", ("lastPrice", "closePrice"), Decimal("0.02")))
 REPORT_ONLY = (("close_vs_official_close", "close", "closePrice"), ("volume", "volume", "volume"))
 MATCH, MINOR, DISCREPANCY, UNVERIFIED = "MATCH", "MINOR_DIFFERENCE", "DISCREPANCY", "UNVERIFIED"
+STALE_SECONDARY = "UNAVAILABLE_STALE_SECONDARY"
 
 
 class CrossCheckDiscrepancy(RuntimeError):
@@ -57,27 +66,65 @@ def _decimal(value):
     return number if number.is_finite() and number > 0 else None
 
 
-def load_completed_session(evidence_root: Path | None, session: date) -> dict | None:
-    """Rows by ISIN from the latest usable capture for ``session``; None if none."""
+@dataclass
+class SessionEvidence:
+    """Official evidence for primary session D, split into session-aligned and non-aligned rows."""
+
+    session: date
+    status: str                      # AVAILABLE / UNAVAILABLE_STALE_SECONDARY / UNAVAILABLE_NO_SECONDARY
+    rows: dict                       # ISIN -> official row observed in session D
+    not_aligned: dict                # ISIN -> row_observation (why it is not session D)
+    capture: dict | None = None      # capture-level times and distributions
+
+    def summary(self) -> dict:
+        from collections import Counter
+        return {"primary_session": self.session.isoformat(), "secondary_status": self.status,
+                "aligned_rows": len(self.rows),
+                "not_aligned": dict(Counter(o["status"] for o in self.not_aligned.values())),
+                **({"capture": self.capture} if self.capture else {})}
+
+
+def load_session_evidence(evidence_root: Path | None, session: date) -> SessionEvidence:
+    """Per-row session alignment from the latest complete capture taken on ``session``."""
+    from collections import Counter
+    from datetime import datetime
+    from app.data.providers.egx_market_watch import SESSION_ALIGNED, row_observation
+    empty = SessionEvidence(session, "UNAVAILABLE_NO_SECONDARY", {}, {})
     if evidence_root is None:
-        return None
+        return empty
     for directory in sorted(glob.glob(str(Path(evidence_root) / session.isoformat() / "*")), reverse=True):
         try:
             manifest = json.loads((Path(directory) / "MANIFEST.json").read_text())
-            gate = manifest["session_gate"]
-            if (manifest.get("market_status", "").lower() != "closed"
-                    or gate.get("verdict") != "COMPLETED_SESSION"
-                    or gate.get("session_date") != session.isoformat()):
-                continue
-            rows = {}
+            status = json.loads((Path(directory) / "market-status.json").read_text())["data"]
+            rows = []
             for page in sorted(Path(directory).glob("market-watch-page-*.json")):
-                for row in json.loads(page.read_text())["data"]["data"]:
-                    rows[row.get("isin")] = row
-            if len(rows) == manifest.get("rows"):
-                return rows
+                rows.extend(json.loads(page.read_text())["data"]["data"])
+            if len(rows) != manifest.get("rows"):
+                continue
+            status_day = datetime.fromisoformat(status["statusDate"]).date()
+            captured_at = datetime.fromisoformat(manifest["captured_at"])
         except (OSError, ValueError, KeyError, TypeError):
             continue
-    return None
+        closed = str(status.get("status", "")).strip().lower() == "closed"
+        aligned, not_aligned = {}, {}
+        for row in rows:
+            observation = row_observation(row, status_date=status_day, captured_at=captured_at, market_closed=closed)
+            if observation["status"] == SESSION_ALIGNED and observation["observation_session_date"] == session.isoformat():
+                aligned[row.get("isin")] = row
+            else:
+                not_aligned[row.get("isin")] = observation
+        capture = {"directory": directory, "capture_timestamp": captured_at.isoformat(),
+                   "market_status": status.get("status"), "market_status_timestamp": status.get("statusDate"),
+                   "source_write_dates": dict(Counter(str(r.get("writeTime"))[:8] for r in rows)),
+                   "provider_last_trade_dates": dict(Counter(str(r.get("lastTradeDate"))[:10] for r in rows))}
+        return SessionEvidence(session, "AVAILABLE" if aligned else STALE_SECONDARY, aligned, not_aligned, capture)
+    return empty
+
+
+def load_completed_session(evidence_root: Path | None, session: date) -> dict | None:
+    """Session-aligned official rows by ISIN for ``session``; None if none are aligned."""
+    evidence = load_session_evidence(evidence_root, session)
+    return evidence.rows or None
 
 
 def compare(bar: dict | None, official: dict | None, *, tolerance: Decimal) -> tuple[str, dict]:
@@ -115,6 +162,7 @@ class CrossCheckedProvider:
     isin_by_symbol: dict
     quarantine_dir: Path
     tolerance: Decimal = Decimal("0.005")
+    not_aligned_by_isin: dict | None = None
 
     def __post_init__(self):
         self.results: dict[str, dict] = {}
@@ -129,6 +177,12 @@ class CrossCheckedProvider:
         bar = next((row for row in rows if row.get("date") == self.session.isoformat()), None)
         isin = self.isin_by_symbol.get(symbol)
         official = (self.official_by_isin or {}).get(isin) if isin else None
+        stale = official is None and isin is not None and isin in (self.not_aligned_by_isin or {})
+        if stale and bar is not None:
+            # Never compare prices from different sessions; the primary bar's admission is unaffected.
+            self.results[symbol] = {"verdict": STALE_SECONDARY, "isin": isin,
+                                    "secondary_observation": self.not_aligned_by_isin[isin]}
+            return response
         verdict, detail = compare(bar, official, tolerance=self.tolerance)
         self.results[symbol] = {"verdict": verdict, "isin": isin, **({"differences": detail} if detail else {})}
         if verdict == DISCREPANCY:

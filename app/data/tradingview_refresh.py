@@ -40,7 +40,7 @@ import json
 import os
 from pathlib import Path
 
-from app.data.daily_cross_check import CrossCheckDiscrepancy, CrossCheckedProvider, load_completed_session
+from app.data.daily_cross_check import CrossCheckDiscrepancy, CrossCheckedProvider, load_session_evidence
 from app.data.official_calendar_maintenance import (
     CAIRO, LIFECYCLE_TABLES, _append_log, _write_status, last_completed_session_date,
 )
@@ -142,12 +142,13 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, now: datetime, provi
     if not pairs:
         raise RefreshStop("NO_TARGETS")
     isin_by_symbol = {m["provider_symbol"]: m["isin"] for m in mapping["matched"]}
-    official = load_completed_session(market_watch_evidence, session)
+    evidence = load_session_evidence(market_watch_evidence, session)
+    official = evidence.rows or None
     checked = CrossCheckedProvider(provider=IsinVerifyingProvider(provider, isin_by_symbol),
                                    session=session, official_by_isin=official,
                                    isin_by_symbol=isin_by_symbol,
                                    quarantine_dir=state_dir / "quarantine" / session.isoformat(),
-                                   tolerance=Decimal("0.005"))
+                                   tolerance=Decimal("0.005"), not_aligned_by_isin=evidence.not_aligned)
     database = Database(str(db_path))
     raw_store = ImmutableRawStore(data_root / "raw")
     resolver = SecurityMasterRepository(database)
@@ -191,7 +192,8 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, now: datetime, provi
               "session": session.isoformat(), "window": [start.isoformat(), session.isoformat()],
               "snapshot_date": snapshot_date.isoformat(), "targets": len(pairs), "outcomes": tally,
               "cross_check": verdicts,
-              "cross_check_source": "official market-watch capture" if official else "none available"}
+              "cross_check_source": "official market-watch capture" if official else "none available",
+              "cross_check_secondary": evidence.summary()}
     (state_dir / "outcomes").mkdir(parents=True, exist_ok=True)
     _write_status(state_dir / "outcomes" / f"{snapshot_date.isoformat()}.json",
                   {**result, "symbol_outcomes": outcomes, "cross_check_detail": checked.results,

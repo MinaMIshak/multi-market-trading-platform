@@ -58,6 +58,13 @@ def capture(out_root: Path, provider=None) -> Path:
             "captured_at": snapshot.captured_at.isoformat(), "cairo_time": local.isoformat(),
             "market_status": snapshot.status, "market_status_date": snapshot.status_date,
             "total_count": snapshot.total_count, "rows": len(snapshot.rows),
+            "observation_times": {
+                "capture_timestamp": snapshot.captured_at.isoformat(),
+                "market_status_timestamp": snapshot.status_date,
+                "source_write_dates": dict(sorted(Counter(str(r.get("writeTime"))[:8] for r in snapshot.rows).items())),
+                "provider_last_trade_dates": dict(sorted(Counter(str(r.get("lastTradeDate"))[:10]
+                                                                 for r in snapshot.rows).items())),
+                "provider_last_trade_date_meaning": "date of prevClose (previous close), never the price session"},
             "session_gate": gate, "files": files,
             "note": "Blocked evidence only; not admitted data, not a candidate input.",
         }

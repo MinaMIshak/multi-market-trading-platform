@@ -233,14 +233,10 @@ def test_resolved_isin_mismatch_is_rejected(tmp_path):
 
 def test_market_watch_discrepancy_quarantines_symbol(tmp_path):
     platform(tmp_path)
-    evidence = tmp_path / "evidence" / SESSION.isoformat() / "cap"
-    evidence.mkdir(parents=True)
-    official = [{"isin": ACAP, "openPrice": 10.0, "high": 11.0, "low": 9.0, "closePrice": 10.5},
-                {"isin": ABUK, "openPrice": 10.0, "high": 11.0, "low": 9.0, "closePrice": 13.0}]
-    (evidence / "MANIFEST.json").write_text(json.dumps({
-        "market_status": "Closed", "rows": 2,
-        "session_gate": {"verdict": "COMPLETED_SESSION", "session_date": SESSION.isoformat()}}))
-    (evidence / "market-watch-page-0001.json").write_text(json.dumps({"data": {"data": official}}))
+    from tests.egx_capture_fixture import official_row, write_capture
+    official = [official_row(ACAP, SESSION, openPrice=10.0, high=11.0, low=9.0, closePrice=10.5, lastPrice=None, volume=None),
+                official_row(ABUK, SESSION, openPrice=10.0, high=11.0, low=9.0, closePrice=13.0, lastPrice=None, volume=None)]
+    write_capture(tmp_path / "evidence", SESSION, official)
     result = run(tmp_path, STREAMS, market_watch_evidence=tmp_path / "evidence")
     assert result["cross_check"] == {"MATCH": 1, "DISCREPANCY": 1, "UNVERIFIED": 1}
     assert result["outcomes"] == {"STORED": 2, "QUARANTINED_CROSS_CHECK": 1}

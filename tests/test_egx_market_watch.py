@@ -13,10 +13,11 @@ from app.data.providers.egx_market_watch import (
 from app.data.source_admission import EVIDENCE_BLOCKED, daily_source_admission
 
 
-def row(reuters, isin, traded="2026-09-30", **overrides):
+def row(reuters, isin, traded="2026-09-29", **overrides):
+    # Observed format: lastTradeDate = previous-close date; writeTime = session date, 15:35.
     values = {"reuters": reuters, "isin": isin, "openPrice": 10.0, "high": 11.0, "low": 9.5,
-              "closePrice": 10.5, "lastPrice": 10.4, "volume": 1000,
-              "lastTradeDate": f"{traded}T00:00:00"}
+              "closePrice": 10.5, "lastPrice": 10.4, "volume": 1000, "trades": 40,
+              "writeTime": "202609301535", "lastTradeDate": f"{traded}T00:00:00"}
     values.update(overrides)
     return values
 
@@ -150,14 +151,16 @@ def test_capture_before_completion_cutoff_or_on_other_day_is_rejected():
 
 
 @pytest.mark.parametrize("overrides,reason", [
-    ({"lastTradeDate": "2026-09-29T00:00:00"}, "NOT_TRADED_IN_SESSION"),
-    ({"lastTradeDate": "2026-10-01T00:00:00"}, "LAST_TRADE_DATE_AFTER_SESSION"),
+    ({"trades": 0, "volume": 0}, "NOT_TRADED_IN_SESSION"),
+    ({"writeTime": "202609291535"}, "SECONDARY_STALE"),
+    ({"lastTradeDate": "2026-09-30T00:00:00"}, "UNVERIFIED_AMBIGUOUS_SESSION"),
+    ({"writeTime": "202610011535"}, "UNVERIFIED_AMBIGUOUS_SESSION"),
     ({"closePrice": None}, "MISSING_FIELD"),
     ({"volume": "n/a"}, "NON_NUMERIC_FIELD"),
     ({"low": 0}, "NON_POSITIVE_FIELD"),
     ({"closePrice": 12.0}, "OHLC_INCONSISTENT"),
     ({"high": 9.0}, "OHLC_INCONSISTENT"),
-    ({"lastTradeDate": "yesterday"}, "LAST_TRADE_DATE_INVALID"),
+    ({"lastTradeDate": "yesterday"}, "UNVERIFIED_AMBIGUOUS_SESSION"),
 ])
 def test_bad_rows_are_rejected_not_repaired(overrides, reason):
     _, bars, rejected = completed_session_bars(snapshot_of([row("AAA.CA", "EG1", **overrides)]))

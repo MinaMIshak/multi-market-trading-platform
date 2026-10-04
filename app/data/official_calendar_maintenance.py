@@ -61,11 +61,56 @@ class MaintenanceError(RuntimeError):
         self.code = code
 
 
-def last_completed_session_date(now: datetime) -> date:
+def completion_cutoff_date(now: datetime) -> date:
+    """Latest calendar date whose session (if any) is complete: an upper bound, not a session.
+
+    On a Sunday morning this is Saturday, which is never an EGX session. Use
+    ``resolve_completed_session`` for the session itself.
+    """
     local = now.astimezone(CAIRO)
     if local.time() >= SESSION_COMPLETE_AT:
         return local.date()
     return local.date() - timedelta(days=1)
+
+
+# Historical name kept for callers that use it as an upper bound (latest_verified_session(db, cutoff)).
+last_completed_session_date = completion_cutoff_date
+EGX_WEEKEND = (4, 5)
+NON_SESSION_STATUSES = ("HOLIDAY", "WEEKEND", "CLOSED")
+
+
+def resolve_completed_session(db_path: Path, now: datetime) -> dict:
+    """The latest completed EGX session from the verified calendar, with its basis.
+
+    VERIFIED_SESSION: the latest expected session ≤ cutoff is verified.
+    EXPECTED_SESSION_UNVERIFIED: a later Sunday–Thursday date (not a stored
+    holiday or closure) is expected but not yet verified; the last verified
+    session is reported alongside. UNKNOWN: no calendar evidence.
+    """
+    cutoff = completion_cutoff_date(now)
+    try:
+        with closing(_read_only(db_path)) as con:
+            verified = con.execute("SELECT MAX(market_date) FROM market_sessions WHERE status='VERIFIED' "
+                                   "AND market_date <= ?", (cutoff.isoformat(),)).fetchone()[0]
+            closed = {row[0] for row in con.execute(
+                "SELECT market_date FROM market_sessions WHERE status IN (?, ?, ?)", NON_SESSION_STATUSES)}
+    except sqlite3.Error:
+        return {"completion_cutoff_date": cutoff.isoformat(), "last_verified_session": None,
+                "last_expected_session": None, "last_completed_session": None,
+                "basis": "UNKNOWN", "reason": "calendar evidence unreadable"}
+    expected, day = None, cutoff
+    for _ in range(14):
+        if day.weekday() not in EGX_WEEKEND and day.isoformat() not in closed:
+            expected = day
+            break
+        day -= timedelta(days=1)
+    result = {"completion_cutoff_date": cutoff.isoformat(), "last_verified_session": verified,
+              "last_expected_session": expected.isoformat() if expected else None}
+    if verified is None and expected is None:
+        return {**result, "last_completed_session": None, "basis": "UNKNOWN"}
+    if verified is not None and (expected is None or verified >= expected.isoformat()):
+        return {**result, "last_completed_session": verified, "basis": "VERIFIED_SESSION"}
+    return {**result, "last_completed_session": expected.isoformat(), "basis": "EXPECTED_SESSION_UNVERIFIED"}
 
 
 def _read_only(db_path: Path) -> sqlite3.Connection:
@@ -162,7 +207,7 @@ def run(*, db_path: Path, data_root: Path, now: datetime, provider=None,
         # Bootstrapping a range is an explicit manual acquisition, not cron.
         raise MaintenanceError("NO_ADMITTED_OFFICIAL_INDEX_BASELINE")
 
-    result = {"last_completed_session_date": end.isoformat(),
+    result = {**resolve_completed_session(db_path, now),
               "newest_official_bar_before": newest.isoformat(),
               "fetch_range": None, "fetched_records_per_index": 0,
               "snapshot_date": None, "outcome": "UP_TO_DATE"}

@@ -48,7 +48,7 @@ from pathlib import Path
 import sqlite3
 import stat
 
-from app.data.daily_cross_check import CrossCheckDiscrepancy, CrossCheckedProvider, load_completed_session
+from app.data.daily_cross_check import CrossCheckDiscrepancy, CrossCheckedProvider, load_session_evidence
 from app.data.official_calendar_maintenance import (
     CAIRO, LIFECYCLE_TABLES, _append_log, _write_status, last_completed_session_date,
 )
@@ -182,13 +182,14 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, mode: str, now: date
         fetch_failures = provider.prefetch([p for _, p in pairs], start, session)
     except TwelveDataError as exc:
         raise RefreshStop(f"FETCH_FAILED:{exc.code}") from exc
-    official = load_completed_session(market_watch_evidence, session)
+    evidence = load_session_evidence(market_watch_evidence, session)
+    official = evidence.rows or None
     isin_by_symbol = {item["provider_symbol"]: item["isin"]
                       for item in mapping["matched_exact"] + mapping["matched_suffix"]}
     checked = CrossCheckedProvider(provider=provider, session=session, official_by_isin=official,
                                    isin_by_symbol=isin_by_symbol,
                                    quarantine_dir=state_dir / "quarantine" / session.isoformat(),
-                                   tolerance=Decimal("0.005"))
+                                   tolerance=Decimal("0.005"), not_aligned_by_isin=evidence.not_aligned)
     database = Database(str(db_path))
     raw_store = ImmutableRawStore(data_root / "raw")
     resolver = SecurityMasterRepository(database)
@@ -226,6 +227,7 @@ def run(*, db_path: Path, data_root: Path, state_dir: Path, mode: str, now: date
         verdicts[item["verdict"]] = verdicts.get(item["verdict"], 0) + 1
     result.update(outcomes=tally, cross_check=verdicts,
                   cross_check_source="official market-watch capture" if official else "none available",
+                  cross_check_secondary=evidence.summary(),
                   credits_remaining=provider.limiter.remaining)
     (state_dir / "outcomes").mkdir(parents=True, exist_ok=True)
     _write_status(state_dir / "outcomes" / f"{snapshot_date.isoformat()}-{mode}.json",

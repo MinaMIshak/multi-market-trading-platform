@@ -234,6 +234,11 @@ def render_scan_runs(scan_runs):
         label = (prefix + ' · ' + completion['market_date'] + ' · '
                  + completion['checkpoint'] + ' · attempt ' + str(completion['attempt_count'])
                  if completion else 'UNKNOWN')
+        if run['scope_reference'] == 'security-master-equity-universe':
+            content += ('<p class="muted">Legacy SWING launch-evidence scan over security-master equities. '
+                        'EVIDENCE_BLOCKED here means LAUNCH_EVIDENCE_NOT_ATTACHED (no per-symbol launch evidence '
+                        'is attached). It is not the EGX-RANK-v1 ranking scope, which covers symbols with admitted '
+                        'primary daily series; see the coverage breakdown for ranked and session-current counts.</p>')
         content += ('<p>Historical explicit selection only; not current readiness, universe coverage or fills. '
                     'Scheduler completion: ' + escape(label) + '.</p><p>Completed at: '
                     + escape(run['completed_at']) + ' · Scope: ' + escape(run['scope_reference'])
