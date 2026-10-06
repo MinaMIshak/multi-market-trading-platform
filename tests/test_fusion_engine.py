@@ -245,3 +245,16 @@ def test_session_metrics_topk():
 def test_live_money_stays_disabled():
     assert "LIVE" not in fusion.STRATEGY and fusion.final_action(
         opportunity_score=100, eligibility="BLOCKED", technical_class="STRONG_CANDIDATE", gate_action=None) != "PAPER_ENTRY"
+
+
+def test_reported_arm_must_beat_technical_out_of_sample():
+    def cache(results):
+        return {"evaluation": {"results": {arm: {"all": {"status": "OK", **m}} for arm, m in results.items()}}}
+    negative = cache({"DF0": {"spearman_mean": -0.03, "top10_mean_r3": 0.0138},
+                      "DF5": {"spearman_mean": -0.02, "top10_mean_r3": 0.0098}})
+    assert fusion_live.best_arm(negative)[0] == "DF0" and "NO_CHALLENGER" in fusion_live.best_arm(negative)[1]
+    us = cache({"US-DF0": {"spearman_mean": -0.0001, "top10_mean_r3": 0.0053},
+                "US-DF1": {"spearman_mean": 0.0039, "top10_mean_r3": 0.0070},
+                "US-DF6": {"spearman_mean": -0.0017, "top10_mean_r3": 0.0124}})
+    assert fusion_live.best_arm(us, "US")[0] == "US-DF1"     # US-DF6 has a higher return but a negative IC
+    assert fusion_live.best_arm(None)[0] == "DF0"

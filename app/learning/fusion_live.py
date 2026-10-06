@@ -23,15 +23,25 @@ from app.learning.fusion_eval import LIQUIDITY_FLOOR
 
 
 def best_arm(cache, market="EGX"):
+    """Report a challenger only if it beats the technical arm out of sample.
+
+    It needs a positive rank IC and a better Top-10 3-session return than the technical arm; ties go to the
+    simpler arm. Otherwise the technical arm is reported (NO_CHALLENGER_BEATS_TECHNICAL).
+    """
     config = fusion.MARKETS[market]
     results = ((cache or {}).get("evaluation") or {}).get("results") or {}
-    validated = [(arm, r["all"]) for arm, r in results.items() if (r.get("all") or {}).get("status") == "OK"]
     base = list(config["arms"])[0]
-    if not validated:
+    base_metrics = (results.get(base) or {}).get("all") or {}
+    if base_metrics.get("status") != "OK":
         return base, "NO_VALIDATED_CHALLENGER (walk-forward not run or insufficient)", None
     order = {arm: k for k, arm in enumerate(config["arms"])}
-    arm, metrics = max(validated, key=lambda item: ((item[1].get("spearman_mean") or -1), -order.get(item[0], 99)))
-    return arm, "VALIDATED_OUT_OF_SAMPLE_EXPERIMENTAL", metrics
+    better = [(arm, r["all"]) for arm, r in results.items() if arm != base and (r.get("all") or {}).get("status") == "OK"
+              and (r["all"].get("spearman_mean") or 0) > 0
+              and (r["all"].get("top10_mean_r3") or 0) > (base_metrics.get("top10_mean_r3") or 0)]
+    if not better:
+        return base, "NO_CHALLENGER_BEATS_TECHNICAL (technical arm reported; challengers EXPERIMENTAL)", base_metrics
+    arm, metrics = max(better, key=lambda item: (item[1]["top10_mean_r3"], -order.get(item[0], 99)))
+    return arm, "VALIDATED_OUT_OF_SAMPLE_EXPERIMENTAL (beats technical on top-10 return with positive IC)", metrics
 
 
 def _us_catalyst(snapshot, earnings, features):

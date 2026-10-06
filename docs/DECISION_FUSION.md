@@ -81,6 +81,19 @@ forecast 15, catalyst 8, regime 7.
 
 Correlations between components are reported. The largest was technical~quant at 0.33 (EGX).
 
+## Reported arm (TOP QUANT OPPORTUNITIES)
+
+A challenger is reported only if, out of sample, it has a **positive rank IC and a better Top-10
+3-session return than the technical arm**. Otherwise the technical arm is reported, with the status
+NO_CHALLENGER_BEATS_TECHNICAL.
+
+Results on 2026-10-06:
+- **EGX reports DF0.** Every EGX arm has a negative IC, and none beats DF0's Top-10 return.
+- **US reports US-DF1** (IC +0.004; Top-10 +0.70% vs +0.53%). US-DF6 has the higher return but a
+  negative IC, so it is not reported.
+
+The reported arm is still EXPERIMENTAL. Nothing is promoted.
+
 ## Confidence
 
 | Level | Rule |
