@@ -51,10 +51,10 @@
     "session_verification": "VERIFIED",
     "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
   },
-  "tests": "Full suite at f7df01f (Python 3.12, host): 3617 passed, 676 subtests passed.",
-  "deployment": "8001 serves f7df01f in SNAPSHOT_POINTER mode (agent cutover 2026-10-03; all checks incl. experiment passed; public HTTPS 401). Rollback release 1f34cec (VERIFIED).",
-  "scheduler": "egx-agent cron, release f7df01f: Sun-Thu 16:45 capture, 08:30 EGX chain (ranking -> experiment -> scan -> context -> publish); Tue-Sat 06:15 US chain; shared publish lock.",
-  "next_action": "Mon 2026-10-05 US session and Sun 2026-10-04 EGX session start the first lifecycles; verify chain logs. Optional operator action: SEC contact e-mail in /home/egx-agent/er1-autopilot/state/config/sec-contact.txt to enable US filings/fundamentals.",
+  "tests": "Full suite at 61b97f0 (Python 3.12, host): 3677 passed, 676 subtests passed.",
+  "deployment": "8001 serves 61b97f0 in SNAPSHOT_POINTER mode (agent cutover 2026-10-06; all checks incl. learning and fusion passed; public HTTPS 401). Rollback release 687eebf (VERIFIED).",
+  "scheduler": "egx-agent cron, release 61b97f0: Sun-Thu 16:45 capture, 08:30 EGX chain (with EGX learning); Tue-Sat 06:15 US chain (with US learning); Sat 10:00 weekly learning (sequential walk-forwards). Locks: publish.lock, learning.lock.",
+  "next_action": "Accumulate matured frozen forecasts/fusion snapshots (20/50/100-session checkpoints); US snapshot fields populate from the next US chain; no promotion without out-of-sample evidence.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -84,5 +84,22 @@
     "resistance_rr_fail": 16,
     "closed_trades": 0,
     "status": "INSUFFICIENT_SAMPLE"
+  },
+  "learning": {
+    "egx": {
+      "sessions": "2024-01-09..2026-10-05",
+      "forecast_champion": "FC-BASE-v1",
+      "fusion_reported_arm": "DF0 (no challenger beats technical)",
+      "status": "EXPERIMENTAL"
+    },
+    "us": {
+      "sessions": "2025-07..2026-10-05",
+      "fusion_reported_arm": "US-DF1",
+      "status": "EXPERIMENTAL"
+    },
+    "memory_peak_mb": {
+      "daily": 163,
+      "weekly": 183
+    }
   }
 }

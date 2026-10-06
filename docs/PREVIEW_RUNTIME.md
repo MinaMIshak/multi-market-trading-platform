@@ -137,7 +137,27 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-03, EGX champion vs challenger; cut over by the agent)
+### Current public release (2026-10-06, learning, forecasting and Decision Fusion; cut over by the agent)
+
+Release `61b97f05eb8984d03060e4acb0392c9ee5845947` (VERIFIED, 248 files). It includes:
+- the Phase 1 session-integrity fixes (released earlier as `687eebf`);
+- memory-safe columnar learning (`docs/LEARNING_AND_FORECASTING.md`);
+- EGX and US Decision Fusion (`docs/DECISION_FUSION.md`).
+
+Sequence:
+1. **Weekly heavy job** (`tools/learning_weekly.sh`), run from the release, strictly sequential:
+   8 min 35 s, peak 183 MB.
+2. **Daily learning:** EGX then US, under `learning.lock`; about 163 MB each.
+3. **Bundle:** `published-20261006T083859Z`, with `--learning-report`.
+4. **Validation:** all acceptance checks passed on 8011 and, after the cutover, on 8001
+   (`--expect-context --expect-experiment --expect-learning --expect-fusion`). Public HTTPS answers 401.
+5. **Crontab:** the three entries moved to this release, plus
+   `0 10 * * 6 ... sh tools/learning_weekly.sh # EGX_LEARNING_WEEKLY`.
+
+Rollback: the adoption command with release `687eebf927c224633cd144c55db699630da163a7`. Then point the
+crontab back and remove the `# EGX_LEARNING_WEEKLY` line.
+
+### Previous releases (2026-10-05, Phase 1 session integrity `687eebf`; 2026-10-03, EGX champion vs challenger `f7df01f`)
 
 Release `f7df01fa8b639cfb0efe6b795fa8bd00faca8537` (VERIFIED, 232 files) adds EGX-EXP-v1
 (`docs/EGX_EXPERIMENT.md`). Sequence:
