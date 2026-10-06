@@ -119,7 +119,7 @@ SCRIPT = """<script>
 
 
 def _u(value):
-    return "UNKNOWN" if value is None or value == "" else value
+    return "UNKNOWN" if value is None or value == "" else str(value)
 
 
 def _cell(display, sort_value=None, numeric=False):
@@ -218,22 +218,49 @@ def render_insights(report):
 
 
 COLUMNS = [
-    ("Symbol", "text", False), ("Class", "num", False), ("Score", "num", True), ("Trade (V2D)", "text", False),
-    ("Context", "num", False),
-    ("Price", "num", True),
-    ("Entry zone", "num", True), ("Stop", "num", True), ("Target 1", "num", True), ("Target 2", "num", True),
-    ("R:R", "num", True), ("Trend", "text", False), ("Mom. 20s %", "num", True), ("Vol ×20s", "num", True),
-    ("RS (pp)", "num", True), ("Liquidity/day", "num", True), ("Evidence", "text", False),
+    ("Symbol", "text", False), ("Class", "num", False), ("Tech", "num", True), ("Opportunity", "num", True),
+    ("Conf.", "num", False), ("Trade", "text", False), ("Price", "num", True), ("Entry", "num", True),
+    ("Stop", "num", True), ("Targets", "num", True), ("Trend", "text", False), ("Evidence", "text", False),
 ]
 
-
 CONFIDENCE_TONE = {"HIGH": "STRONG_CANDIDATE", "MEDIUM": "CANDIDATE", "LOW": "WATCHLIST"}
+CONFIDENCE_ORDER = {"HIGH": 3, "MEDIUM": 2, "LOW": 1, "INSUFFICIENT_SAMPLE": 0}
 
 
 def _context_text(context):
     if not context:
         return ""
     return f'{context["context_adjustment"]:+d} → {context["context_score"]}'
+
+
+def _fusion_lines(fused):
+    """Decision-Fusion details: components, evidence quality, explanation, US earnings/gaps/gates."""
+    if not fused:
+        return "<br><b>Decision Fusion:</b> UNKNOWN (no learning report for this session)"
+    components = ", ".join(f"{k} {'UNKNOWN' if v is None else v}" for k, v in fused["components"].items())
+    quality = ", ".join(f"{k} {v}" for k, v in fused["evidence_quality"].items())
+    explanation = " · ".join(f"{k} {v}" for k, v in fused["explanation"].items()) or "none available"
+    forecast = fused.get("forecast") or {}
+    p = forecast.get("p") or {}
+    lines = (f'<br><b>Decision Fusion ({escape(fused["arm"])}):</b> Opportunity {escape(_u(fused["opportunity"]))} '
+             f'(Tech {escape(_u(fused["technical_score"]))}) · confidence {escape(fused["confidence"])} · weight '
+             f'available {escape(_u(fused["available_weight_share"]))}'
+             f'<br><b>Components:</b> {escape(components)}'
+             f'<br><b>Why high / low:</b> {escape(explanation)}'
+             f'<br><b>Forecast (3s):</b> E[r] {escape(_u(forecast.get("expected_r3")))}, P(+5%) {escape(_u(p.get("5")))}, '
+             f'P(+10%) {escape(_u(p.get("10")))}, P(+20%) {escape(_u(p.get("20")))}, adverse {escape(_u(forecast.get("expected_mae3")))}'
+             f'<br><b>Evidence quality:</b> {escape(quality)}')
+    if fused.get("market") == "US":
+        gates = ", ".join(f"{k} {v}" for k, v in (fused.get("gates") or {}).items())
+        lines += (f'<br><b>Industry:</b> {escape(_u(fused.get("industry")))} · <b>Earnings:</b> '
+                  f'{escape(_u(fused.get("earnings_state")))} · <b>Gap state:</b> {escape(_u(fused.get("gap_state")))} · '
+                  f'<b>Options:</b> {escape(_u(fused.get("options_context")))}'
+                  f'<br><b>US hard gates:</b> {escape(gates)} → {escape(_u(fused.get("trade_eligibility")))} '
+                  f'/ {escape(_u(fused.get("final_action")))}')
+    for catalyst in fused.get("catalysts") or []:
+        lines += (f'<br><b>Catalyst:</b> {escape(_u(catalyst.get("event_type")))} · '
+                  f'{escape(_u(catalyst.get("published_at") or catalyst.get("detail")))}')
+    return lines
 
 
 def _row(record):
@@ -248,12 +275,19 @@ def _row(record):
           else f"{record['risk_reward_t1']} / {record.get('risk_reward_t2')}")
     ticker, company = record.get("ticker") or "UNKNOWN", record.get("company") or ""
     context = record.get("context") or {}
+    fused = record.get("fusion")
     from app.ui.experiment import cell as experiment_cell, explanation as experiment_explanation
     trade_cell = experiment_cell(record.get("experiment"))
+    if not trade_cell[0] and fused and fused.get("final_action"):
+        tone = "STRONG_CANDIDATE" if fused["final_action"] == "PAPER_ENTRY" else "WATCHLIST"
+        failures = ", ".join(fused.get("gate_failures") or [])
+        trade_cell = (f'<span class="badge {tone}">{escape(fused["trade_eligibility"])}</span>'
+                      f'<span class="co">{escape(fused["final_action"])}{" · " + escape(failures) if failures else ""}</span>',
+                      fused["final_action"])
     context_lines = ""
     if context:
-        context_lines = (f'<br><b>Context ({escape(context["version"])}):</b> '
-                         f'{escape("; ".join(context.get("notes") or []))}')
+        context_lines = (f'<br><b>Context ({escape(context["version"])}):</b> {escape(_context_text(context))} · '
+                         f'{escape(context.get("context_confidence") or "")} · {escape("; ".join(context.get("notes") or []))}')
         for catalyst in context.get("catalysts") or []:
             context_lines += (f'<br><b>Catalyst:</b> {escape(catalyst["type"])} · '
                               f'{escape(catalyst["published_at"][:10])} · {escape(str(catalyst.get("heading") or ""))}')
@@ -262,36 +296,39 @@ def _row(record):
             context_lines += (f'<br><b>Disclosed result:</b> {escape(str(f.get("net_result")))} vs '
                               f'{escape(str(f.get("comparative_net_result")))} ({escape(str(f.get("basis")))}, '
                               f'period end {escape(str(f.get("period_end")))})')
+    liquidity = _millions(record.get("liquidity_avg_traded_value_20"))
     evidence = (f'<details><summary>details</summary><div>'
                 f'<b>Why:</b> {escape(str(_u(reason or None)))}<br>'
+                f'<b>Plan:</b> T1 {escape(_u(record.get("target_1")))} · T2 {escape(_u(record.get("target_2")))} · '
+                f'R:R {escape(_u(rr))}<br>'
+                f'<b>Signals:</b> momentum 20s {escape(_u(record.get("momentum_20_pct")))}% · volume '
+                f'{escape(_u(volume_text))} · RS {escape(_u(record.get("relative_strength_20_pp")))} pp · liquidity '
+                f'{escape(_u(liquidity))}/day<br>'
                 f'<b>History:</b> {escape(str(_u(quality)))}<br>'
                 f'<b>Freshness:</b> {escape(str(_u(record.get("freshness"))))} · '
                 f'<b>Evidence date:</b> {escape(str(_u(record.get("evidence_snapshot_date") or record.get("last_market_session"))))}<br>'
                 f'<b>Warnings:</b> {escape(", ".join(record.get("data_warnings") or []) or "none")}'
-                f'{context_lines}{experiment_explanation(record.get("experiment"))}'
+                f'{_fusion_lines(fused)}{context_lines}{experiment_explanation(record.get("experiment"))}'
                 f'</div></details>')
+    opportunity = (fused or {}).get("opportunity")
+    confidence = (fused or {}).get("confidence")
+    targets = (None if record.get("target_1") is None
+               else f'{record["target_1"]} / {record.get("target_2")}')
     cells = [
         f'<td data-v="{escape(ticker, quote=True)}"><span class="tk">{escape(ticker)}</span>'
         f'<span class="co">{escape(company)}</span></td>',
         f'<td data-v="{CLASS_ORDER.index(cls) if cls in CLASS_ORDER else 9}">'
         f'<span class="badge {escape(cls)}">{escape(cls)}</span></td>',
         _cell(record.get("score"), record.get("score"), True),
+        _cell(opportunity, opportunity, True),
+        (f'<td data-v="{CONFIDENCE_ORDER.get(confidence, -1)}"><span class="badge '
+         f'{CONFIDENCE_TONE.get(confidence, "NO_TRADE")}">{escape(_u(confidence))}</span></td>'),
         f'<td data-v="{escape(trade_cell[1], quote=True)}">{trade_cell[0]}</td>',
-        (f'<td data-v="{escape(str(context.get("context_score", "")), quote=True)}">'
-         f'<span class="badge {CONFIDENCE_TONE.get(context.get("context_confidence"), "NO_TRADE")}">'
-         f'{escape(context.get("context_confidence") or "—")}</span>'
-         f'<span class="co">{escape(_context_text(context))}</span></td>'),
         _cell(record.get("price"), record.get("price"), True),
         _cell(None if not zone else f"{zone[0]}–{zone[1]}", zone[0] if zone else None, True),
         _cell(record.get("stop"), record.get("stop"), True),
-        _cell(record.get("target_1"), record.get("target_1"), True),
-        _cell(record.get("target_2"), record.get("target_2"), True),
-        _cell(rr, record.get("risk_reward_t1"), True),
+        _cell(targets, record.get("target_1"), True),
         _cell(record.get("trend"), record.get("trend")),
-        _cell(record.get("momentum_20_pct"), record.get("momentum_20_pct"), True),
-        _cell(volume_text, volume, True),
-        _cell(record.get("relative_strength_20_pp"), record.get("relative_strength_20_pp"), True),
-        _cell(_millions(record.get("liquidity_avg_traded_value_20")), record.get("liquidity_avg_traded_value_20"), True),
         f'<td>{evidence}</td>',
     ]
     search = escape(f"{ticker} {company}", quote=True)

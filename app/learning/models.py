@@ -1,104 +1,101 @@
-"""Short-horizon forecast models (reproducible, interpretable, pure Python).
+"""Short-horizon forecast models (reproducible, interpretable, pure Python, columnar fitting).
 
 FC-BASE-v1 (forecast champion): a hierarchical bucket-frequency model. Each
 training row is bucketed by 20-session momentum tercile × relative-volume
 bucket × EMA trend stack. Probabilities are smoothed empirical frequencies,
 calibrated by construction. The expected return and adverse excursion are
 winsorised bucket means. A bucket with fewer than ``MIN_BUCKET`` rows falls
-back to the coarser momentum-tercile bucket, then to the global rate.
+back to the momentum-tercile bucket, then to the global rate.
 
 FC-BASE-SECTOR-v1 (challenger): the same, with a sector-breadth tercile added
 to the finest bucket.
 
 FC-RIDGE-v1 (challenger): ridge regression of the h-session return on the
 standardised FEAT-v1 features (missing → feature mean). Threshold
-probabilities come from the empirical distribution of training residuals:
-P(r ≥ t) = share of residuals ≥ t − prediction.
+probabilities come from the empirical training-residual distribution.
 
-A probability is reported only when its training support has at least
-``MIN_EVENTS`` threshold events and ``MIN_BUCKET`` rows; otherwise it is
+``fit(ds, rows, cutoff=None)`` reads columns of a LEARN-DATA-v2 dataset. With a
+cutoff (a session index), a label counts only if it matured strictly before
+that session (no look-ahead). A probability with fewer than ``MIN_EVENTS``
+training events is flagged ``LOW_EVENT_COUNT``. Without support a forecast is
 ``INSUFFICIENT_SAMPLE``. No model is an LLM; nothing here guarantees a return.
 """
 from __future__ import annotations
 
+from array import array
 from bisect import bisect_left
+from math import isnan
 
-from app.learning.dataset import FEATURES, HORIZONS, THRESHOLDS
+from app.learning.dataset import FEATURES, HORIZONS, THRESHOLD_KEYS, THRESHOLDS
 
 MIN_BUCKET = 50
 MIN_EVENTS = 30
 FORECAST_HORIZONS = (1, 2, 3)
-THRESHOLD_KEYS = tuple(f"{int(t * 100)}" for t in THRESHOLDS)
-
-
-def _valid(row, h, cutoff=None):
-    """A usable training label: VALID and, under a walk-forward cutoff, matured strictly before it."""
-    label = row["labels"].get(h) or {}
-    return label.get("status") == "VALID" and (cutoff is None or label["label_end"] < cutoff)
-
-
-def _winsor(values, q=0.01):
-    if not values:
-        return []
-    ordered = sorted(values)
-    lo, hi = ordered[int(q * (len(ordered) - 1))], ordered[int((1 - q) * (len(ordered) - 1))]
-    return [min(max(v, lo), hi) for v in values]
 
 
 def _terciles(values):
-    ordered = sorted(v for v in values if v is not None)
+    ordered = sorted(v for v in values if v is not None and not isnan(v))
     if len(ordered) < 3:
         return None
     return ordered[len(ordered) // 3], ordered[2 * len(ordered) // 3]
 
 
 def _bucket(value, cuts):
-    if value is None or cuts is None:
+    if value is None or cuts is None or isnan(value):
         return None
     return 0 if value < cuts[0] else 1 if value < cuts[1] else 2
+
+
+def _winsor_mean(values, q=0.01):
+    ordered = sorted(values)
+    lo, hi = ordered[int(q * (len(ordered) - 1))], ordered[int((1 - q) * (len(ordered) - 1))]
+    return sum(min(max(v, lo), hi) for v in ordered) / len(ordered)
 
 
 class BucketModel:
     version = "FC-BASE-v1"
     use_sector = False
 
-    def fit(self, rows, cutoff=None):
-        self.cuts = {"r20": _terciles([r["features"]["r20"] for r in rows]),
-                     "sector_breadth5": _terciles([r["features"].get("sector_breadth5") for r in rows])}
-        self.stats = {}
-        self.train_rows = len(rows)
-        for row in rows:
-            for key in self._keys(row["features"]):
-                for h in FORECAST_HORIZONS:
-                    if not _valid(row, h, cutoff):
-                        continue
-                    cell = self.stats.setdefault((key, h), {"n": 0, "hits": dict.fromkeys(THRESHOLD_KEYS, 0),
-                                                            "rets": [], "maes": []})
-                    label = row["labels"][h]
-                    cell["n"] += 1
-                    cell["rets"].append(label["ret"])
-                    cell["maes"].append(label["mae"])
-                    for t in THRESHOLD_KEYS:
-                        cell["hits"][t] += label["hits"][t]
-        for cell in self.stats.values():
-            rets, maes = _winsor(cell.pop("rets")), _winsor(cell.pop("maes"))
-            cell["mean_ret"] = sum(rets) / len(rets)
-            cell["mean_mae"] = sum(maes) / len(maes)
-        return self
-
-    def _keys(self, f):
-        momentum = _bucket(f["r20"], self.cuts["r20"])
-        rvol = None if f.get("rvol") is None else 0 if f["rvol"] < 1.0 else 1 if f["rvol"] < 1.5 else 2
-        fine = ("fine", momentum, rvol, f["ema_stack"])
+    def _keys(self, get):
+        momentum = _bucket(get("r20"), self.cuts["r20"])
+        rvol = get("rvol")
+        rvol_bucket = None if rvol is None or isnan(rvol) else 0 if rvol < 1.0 else 1 if rvol < 1.5 else 2
+        fine = ("fine", momentum, rvol_bucket, get("ema_stack"))
         if self.use_sector:
-            fine = fine + (_bucket(f.get("sector_breadth5"), self.cuts["sector_breadth5"]),)
-        return [fine, ("coarse", momentum), ("global",)]
+            fine = fine + (_bucket(get("sector_breadth5"), self.cuts["sector_breadth5"]),)
+        return (fine, ("coarse", momentum), ("global",))
+
+    def fit(self, ds, rows=None, cutoff=None):
+        rows = range(ds.n) if rows is None else rows
+        f = ds.f
+        self.cuts = {"r20": _terciles(f["r20"][i] for i in rows),
+                     "sector_breadth5": _terciles(f["sector_breadth5"][i] for i in rows)}
+        cells = {}
+        for i in rows:
+            keys = self._keys(lambda name: f[name][i])
+            for h in FORECAST_HORIZONS:
+                if not ds.valid(h, i, cutoff):
+                    continue
+                ret, mae = ds.ret[h][i], ds.mae[h][i]
+                for key in keys:
+                    cell = cells.get((key, h))
+                    if cell is None:
+                        cell = cells[(key, h)] = (array("d"), array("d"))
+                    cell[0].append(ret)
+                    cell[1].append(mae)
+        self.stats = {}
+        for key, (rets, maes) in cells.items():
+            hits = {k: sum(1 for r in rets if r >= t) for t, k in zip(THRESHOLDS, THRESHOLD_KEYS)}
+            self.stats[key] = {"n": len(rets), "hits": hits, "mean_ret": _winsor_mean(rets),
+                               "mean_mae": _winsor_mean(maes)}
+        self.train_rows = len(rows)
+        return self
 
     def predict(self, features):
         out = {}
         for h in FORECAST_HORIZONS:
             cell, key = None, None
-            for candidate in self._keys(features):
+            for candidate in self._keys(lambda name: features.get(name)):
                 found = self.stats.get((candidate, h))
                 if found and found["n"] >= MIN_BUCKET and None not in candidate:
                     cell, key = found, candidate
@@ -143,53 +140,61 @@ class RidgeModel:
     version = "FC-RIDGE-v1"
     lam = 10.0
 
-    def _vector(self, f):
-        return [1.0] + [((f.get(k) if f.get(k) is not None else self.means[k]) - self.means[k]) / self.stds[k]
-                        for k in FEATURES]
+    def _vector(self, get):
+        out = [1.0]
+        for k in FEATURES:
+            value = get(k)
+            if value is None or isnan(value):
+                value = self.means[k]
+            out.append((value - self.means[k]) / self.stds[k])
+        return out
 
-    def fit(self, rows, cutoff=None):
+    def fit(self, ds, rows=None, cutoff=None):
+        rows = range(ds.n) if rows is None else rows
+        f = ds.f
         self.means, self.stds = {}, {}
         for k in FEATURES:
-            values = [r["features"].get(k) for r in rows if r["features"].get(k) is not None]
+            column = f[k]
+            values = [column[i] for i in rows if not isnan(column[i])]
             mean = sum(values) / len(values) if values else 0.0
             var = sum((v - mean) ** 2 for v in values) / len(values) if values else 1.0
             self.means[k], self.stds[k] = mean, (var ** 0.5) or 1.0
-        self.coef, self.residuals, self.support = {}, {}, {}
+        self.coef, self.residuals, self.events = {}, {}, {}
         p = len(FEATURES) + 1
         for h in FORECAST_HORIZONS:
             xtx = [[0.0] * p for _ in range(p)]
             xty = [0.0] * p
-            data = []
-            for row in rows:
-                if not _valid(row, h, cutoff):
+            used = array("i")
+            for i in rows:
+                if not ds.valid(h, i, cutoff):
                     continue
-                x = self._vector(row["features"])
-                y = max(min(row["labels"][h]["ret"], 1.0), -0.6)  # clip extreme labels for stability
-                data.append((x, row["labels"][h]["ret"]))
-                for i in range(p):
-                    xty[i] += x[i] * y
-                    xi = x[i]
-                    row_i = xtx[i]
-                    for j in range(i, p):
-                        row_i[j] += xi * x[j]
-            if len(data) < MIN_BUCKET:
+                x = self._vector(lambda name: f[name][i])
+                y = max(min(ds.ret[h][i], 1.0), -0.6)  # clip extreme labels for stability
+                used.append(i)
+                for a in range(p):
+                    xa = x[a]
+                    xty[a] += xa * y
+                    row_a = xtx[a]
+                    for b in range(a, p):
+                        row_a[b] += xa * x[b]
+            if len(used) < MIN_BUCKET:
                 continue
-            for i in range(p):
-                for j in range(i):
-                    xtx[i][j] = xtx[j][i]
-                if i:
-                    xtx[i][i] += self.lam
+            for a in range(p):
+                for b in range(a):
+                    xtx[a][b] = xtx[b][a]
+                if a:
+                    xtx[a][a] += self.lam
             coef = _solve(xtx, xty)
             self.coef[h] = coef
-            residuals = sorted(y - sum(c * v for c, v in zip(coef, x)) for x, y in data)
-            self.residuals[h] = residuals
-            self.support[h] = len(data)
+            self.events[h] = {k: sum(1 for i in used if ds.ret[h][i] >= t) for t, k in zip(THRESHOLDS, THRESHOLD_KEYS)}
+            self.residuals[h] = array("d", sorted(
+                ds.ret[h][i] - sum(c * v for c, v in zip(coef, self._vector(lambda name: f[name][i]))) for i in used))
         self.train_rows = len(rows)
         return self
 
     def predict(self, features):
         out = {}
-        x = self._vector(features)
+        x = self._vector(lambda name: features.get(name))
         for h in FORECAST_HORIZONS:
             if h not in self.coef:
                 out[h] = {"status": "INSUFFICIENT_SAMPLE"}
@@ -200,7 +205,7 @@ class RidgeModel:
             probabilities = {}
             for t, key in zip(THRESHOLDS, THRESHOLD_KEYS):
                 above = n - bisect_left(residuals, t - pred)
-                events = sum(1 for r in residuals if r >= t)  # unconditional support for the threshold
+                events = self.events[h][key]
                 probabilities[key] = {"p": round((above + 1) / (n + 2), 4), "events": events,
                                       "status": "OK" if events >= MIN_EVENTS else "LOW_EVENT_COUNT"}
             contributions = sorted(((FEATURES[i - 1], round(self.coef[h][i] * x[i], 5)) for i in range(1, len(x))),

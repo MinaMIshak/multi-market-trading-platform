@@ -209,6 +209,112 @@ def render_system(report):
                     f"{escape(_u(m.get('latest_session')))}; frozen forecast files {escape(_u((m.get('forecast') or {}).get('frozen_files')))}; "
                     f"walk-forward {escape(_u(wf.get('generated_at')) if wf else 'NOT_RUN_YET')}; labels "
                     f"{escape(json.dumps(m.get('labels')))}</td></tr>")
+    from app.learning.registry import REGISTRY
+    registry = "".join(f"<tr><th>{escape(k)}</th><td>{escape(json.dumps(v, default=str))}</td></tr>"
+                       for k, v in REGISTRY.items())
+    rows.append(f'<tr><th>Registry</th><td><table aria-label="Model registry"><tbody>{registry}</tbody></table></td></tr>')
     return (f'<h2>Learning and forecasting</h2><p>Report {escape(report["generated_at"])} · build '
             f'{escape(_u(report.get("build_revision")))} · {escape(report.get("use", ""))}</p>'
             f'<table aria-label="Learning audit"><tbody>{"".join(rows)}</tbody></table>')
+
+
+def attach_fusion(report, learning, market):
+    """Copy of a ranking report whose rows carry the same market's same-session Decision-Fusion snapshot."""
+    fused = (((learning or {}).get("markets") or {}).get(market) or {}).get("fusion") or {}
+    if report is None or not fused or fused.get("session") != report.get("session"):
+        return report
+    symbols = fused.get("symbols") or {}
+    return {**report, "symbols": [{**r, "fusion": symbols[r["ticker"]]} if r.get("ticker") in symbols else r
+                                  for r in report["symbols"]]}
+
+
+def render_top_opportunities(report, market, *, ranking=None, experiment=None):
+    title = f"Top {market} quant opportunities — next 1–3 sessions"
+    fused = (((report or {}).get("markets") or {}).get(market) or {}).get("fusion")
+    if not fused:
+        return f'<section aria-label="{escape(title)}"><h2>{escape(title)}</h2><p>UNAVAILABLE: no Decision-Fusion output.</p></section>'
+    technical = {r["ticker"]: r for r in (ranking or {}).get("symbols", [])}
+    trade = (experiment or {}).get("current") or {}
+    rows = []
+    for ticker in fused.get("top", [])[:15]:
+        s = fused["symbols"][ticker]
+        p = (s.get("forecast") or {}).get("p") or {}
+        if market == "US":
+            eligibility = f'{_u(s.get("trade_eligibility"))} / {_u(s.get("final_action"))}'
+        else:
+            view = trade.get(ticker) or {}
+            eligibility = (f'{view.get("eligibility")} / {view.get("final_action")}'
+                           if view.get("eligibility") not in (None, "NOT_APPLICABLE") else
+                           f'{_u(technical.get(ticker, {}).get("classification"))} (no V2D decision)')
+        positives = ", ".join(f"{k} {v}" for k, v in s["explanation"].items() if v.startswith("+")) or "—"
+        risks = [k for k, v in s["explanation"].items() if v in ("−",)]
+        if market == "US" and s.get("gate_failures"):
+            risks = s["gate_failures"] + risks
+        vol = (s.get("risk") or {}).get("volatility20")
+        if vol and vol > 0.04:
+            risks.append(f"high volatility {vol * 100:.1f}%/day")
+        catalyst = "; ".join(c.get("event_type") or "" for c in s.get("catalysts") or []) or "none known"
+        rows.append([str(s.get("opportunity_rank")), f'<span class="tk">{escape(ticker)}</span><span class="co">'
+                     f'{escape(_u(s.get("sector")))}{" · " + escape(s["industry"]) if s.get("industry") else ""}</span>',
+                     escape(_u(s["opportunity"])), escape(_u(s["technical_score"])), escape(s["confidence"]),
+                     escape(_pct((s.get("forecast") or {}).get("expected_r3"), 2)),
+                     escape(_prob({"p": p, "p_status": (s.get("forecast") or {}).get("p_status")}, "5")),
+                     escape(_prob({"p": p, "p_status": (s.get("forecast") or {}).get("p_status")}, "10")),
+                     escape(_prob({"p": p, "p_status": (s.get("forecast") or {}).get("p_status")}, "20")),
+                     escape(_u(s.get("earnings_state")) if market == "US" else "—"), escape(catalyst),
+                     escape(eligibility), escape(positives), escape(", ".join(risks) or "none flagged")])
+    head = ["#", "Symbol", "Opportunity", "Tech", "Confidence", "E[r] 3s", "P(+5%)", "P(+10%)", "P(+20%)",
+            "Earnings", "Catalyst", "Trade eligibility / action", "Key evidence", "Main risk"]
+    note = (f'EXPERIMENTAL {escape(fused["strategy"])} ({escape(fused["config"])}) · reported arm '
+            f'{escape(fused["arm"])}: {escape(fused["arm_status"])} · session {escape(fused["session"])}. The '
+            'Opportunity Score ranks research quality; hard trade gates are applied separately and are never '
+            'overridden. Technical Score / the technical arm stays the champion.')
+    return (f'<section aria-label="{escape(title)}"><h2>{escape(title)}</h2><p class="muted">{note}</p>'
+            + _table(head, rows, (0, 2, 3, 5, 6, 7, 8)) + "</section>")
+
+
+def render_fusion_performance(report):
+    if report is None:
+        return ""
+    out = ""
+    for market, m in (report.get("markets") or {}).items():
+        summary = m.get("fusion_walkforward")
+        title = f"{market} Decision-Fusion performance"
+        if not summary:
+            out += (f'<section aria-label="{escape(title)}"><h2>{escape(title)}</h2><p>NOT_RUN_YET: the periodic '
+                    'walk-forward has not produced results; every arm is EXPERIMENTAL / INSUFFICIENT_SAMPLE.</p></section>')
+            continue
+        rows = []
+        for arm, result in (summary.get("results") or {}).items():
+            a = result.get("all") or {}
+            excess = ", ".join(f"{k} {v:+.4f}" for k, v in (a.get("top10_excess_r3_vs") or {}).items()) or "—"
+            rows.append([escape(arm), escape(_u(a.get("sample_label") or a.get("status"))), escape(_u(a.get("sessions"))),
+                         escape(_u(a.get("spearman_mean"))), escape(_u(a.get("recall_top10_in_top10"))),
+                         escape(_u(a.get("recall_top10_in_top20"))), escape(_u(a.get("recall_top20_in_top20"))),
+                         escape(_u(a.get("precision_at_10"))), escape(_u(a.get("top10_mean_r1"))),
+                         escape(_u(a.get("top10_mean_r3"))), escape(_u(a.get("benchmark_r3"))), escape(excess),
+                         escape(_u(a.get("top10_mean_mae3"))), escape(_u(a.get("profit_factor_r3"))),
+                         escape(_u(a.get("max_drawdown_cum_r1")))])
+        increments = "".join(f"<li>{escape(k)}: " + escape(", ".join(f"{m2} {v:+.4f}" for m2, v in item.items())
+                                                            if item.get("status") is None else item["status"]) + "</li>"
+                             for k, item in (summary.get("incremental") or {}).items())
+        live = m.get("fusion_live_scoring") or {}
+        live_items = ", ".join(f'{a} {v["matured_sessions"]} sessions ({v["status"]})'
+                               for a, v in (live.get("arms") or {}).items()) or "no matured frozen snapshots yet"
+        research = json.dumps(summary.get("factor_research") or {}, indent=1, default=str)[:6000]
+        gaps = json.dumps(summary.get("gap_research") or {}, indent=1, default=str)[:4000]
+        out += (f'<section aria-label="{escape(title)}"><h2>{escape(title)}</h2><p class="muted">'
+                f'{escape(_u(summary.get("strategy")))} {escape(_u(summary.get("config")))} · evaluation '
+                f'{escape(_u(summary.get("evaluation_start")))} → {escape(_u(summary.get("evaluation_end")))} · '
+                f'{escape(_u(summary.get("evaluated_rows")))} out-of-sample rows · run {escape(_u(summary.get("generated_at"))[:16])}. '
+                f'{escape(_u(summary.get("promotion")))}. Market results are never combined.</p>'
+                + _table(["Arm", "Sample", "Sessions", "Rank IC", "Recall top10@10", "Recall top10@20",
+                          "Recall top20@20", "P@10", "Top-10 r1", "Top-10 r3", "Universe r3", "Excess r3 vs benchmarks",
+                          "Top-10 MAE3", "Profit factor", "Max DD (cum r1)"], rows, tuple(range(2, 15)))
+                + f'<h3>Incremental value</h3><ul>{increments}</ul><p>Live frozen snapshots: {escape(live_items)}.</p>'
+                f'<details><summary>Redundancy, DF learned weights, regime and segment splits</summary><pre>'
+                f'{escape(json.dumps({"redundancy": summary.get("redundancy"), "learned_weights": summary.get("df5_latest_weights"), "splits": {a: {k: v for k, v in r.items() if k != "all"} for a, r in (summary.get("results") or {}).items()}}, indent=1, default=str)[:8000])}'
+                f'</pre></details><details><summary>Factor research (descriptive, in-sample)</summary><pre>{escape(research)}</pre></details>'
+                + (f'<details><summary>Gap research (descriptive)</summary><pre>{escape(gaps)}</pre></details>'
+                   if summary.get("gap_research") else "") + "</section>")
+    return out

@@ -16,7 +16,8 @@ from app.ui.macro import render_macro
 from app.ui.us import render_us
 from app.ui.learning import (render_performance as render_learning_performance,
                              render_research as render_learning_research, render_review as render_learning_review,
-                             render_today as render_learning_today)
+                             render_today as render_learning_today, render_top_opportunities,
+                             render_fusion_performance)
 from app.ui.experiment import render_live as render_experiment_live, render_performance as render_experiment_performance
 from app.ui.ranking import (render_performance as render_ranking_performance,
                             render_pre_surge as render_ranking_pre_surge,
@@ -210,6 +211,9 @@ def product_state(operational, market='ALL', section='TODAY', *, scan_history=No
     state['us_ranking_report'] = (apply_context(us_ranking, market='US', context=context,
                                                 as_of=now.astimezone(ZoneInfo('America/New_York')).date())
                                   if 'US' in selected else None)
+    from app.ui.learning import attach_fusion
+    state['ranking_report'] = attach_fusion(state['ranking_report'], learning, 'EGX')
+    state['us_ranking_report'] = attach_fusion(state['us_ranking_report'], learning, 'US')
     state['pre_surge'] = {key: pre_surge_state(state['readiness']['EGX'])
                           if key == 'EGX' else None for key in selected}
     if section == 'RESEARCH':
@@ -395,6 +399,8 @@ def render_product(state):
         content += render_legend()
         content += render_no_trade(report)
         if section == 'TODAY':
+            content += render_top_opportunities(state.get('learning'), 'EGX', ranking=report,
+                                                experiment=state.get('experiment'))
             content += render_learning_today(state.get('learning'), 'EGX', ranking=report,
                                              experiment=state.get('experiment'))
             content += render_learning_review(state.get('learning'), 'EGX')
@@ -407,10 +413,12 @@ def render_product(state):
     if section == 'PERFORMANCE' and egx:
         content += render_ranking_performance(report)
         content += render_experiment_performance(state.get('experiment'))
+        content += render_fusion_performance(state.get('learning'))
         content += render_learning_performance(state.get('learning'))
     if 'US' in state['markets'] and section in ('TODAY', 'SWING', 'PRE-SURGE', 'PERFORMANCE'):
         content += render_us(state.get('us_ranking_report'), section)
         if section == 'TODAY':
+            content += render_top_opportunities(state.get('learning'), 'US', ranking=state.get('us_ranking_report'))
             content += render_learning_today(state.get('learning'), 'US', ranking=state.get('us_ranking_report'))
             content += render_learning_review(state.get('learning'), 'US')
     if section in ('LIVE', 'RESEARCH', 'SYSTEM', 'PERFORMANCE'):

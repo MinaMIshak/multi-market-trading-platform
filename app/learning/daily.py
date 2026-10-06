@@ -299,26 +299,52 @@ def live_scoring(state_dir, dataset, *, market):
                        for name, preds in per_model.items()}}
 
 
+def _load_json(path):
+    try:
+        return json.loads(Path(path).read_text()) if path and Path(path).is_file() else None
+    except ValueError:
+        return None
+
+
 def run_market(*, market, series, state_dir, now, build_revision, context=None, snapshots_root=None,
-               ranking_report=None):
+               ranking_report=None, records_report=None):
+    from app.learning import fusion_live
     state_dir = Path(state_dir)
-    dataset = build(series)
-    sessions = dataset["sessions"]
+    ds = build(series)
+    sessions = ds.sessions
     latest = sessions[-1]
-    walkforward_path = state_dir / "walkforward.json"
-    walkforward = json.loads(walkforward_path.read_text()) if walkforward_path.is_file() else None
-    models = {name: cls().fit(dataset["rows"]) for name, cls in MODELS.items()}
-    counts = label_counts(dataset)
-    # Memory: after fitting keep only sessions still needed (latest, prior, frozen-forecast sessions).
+    walkforward = _load_json(state_dir / "walkforward.json")
+    fusion_cache = _load_json(state_dir / "fusion_walkforward.json")
+    models = {name: cls().fit(ds) for name, cls in MODELS.items()}
+    counts = label_counts(ds)
+    events = event_layer.extract(context, market=market)
+    # Market-own records only (EGX V1 ranking or US ranking): technical class, freshness, plan, US snapshot.
+    report = _load_json(records_report or ranking_report) or {}
+    records = {r["ticker"]: r for r in report.get("symbols", [])} if report.get("session") == latest else {}
+    latest_index = ds.rows_for(latest)
+    forecasts = {ds.ticker(i): {name: _compact(model.predict(ds.features(i))) for name, model in models.items()}
+                 for i in latest_index}
+    fused = fusion_live.score_session(ds, market=market, session=latest, forecasts=forecasts,
+                                      events_by_isin=events["by_isin"], cache=fusion_cache, now_iso=now.isoformat(),
+                                      records=records)
+    fused["records_session_match"] = bool(records)
+    _write_once(state_dir / "fusion" / f"{latest}.json", {
+        "schema": "frozen-fusion-v1", "market": market, "session": latest, "generated_at": now.isoformat(),
+        "build_revision": build_revision, "strategy": fused["strategy"], "config": fused["config"],
+        "arm": fused["arm"], "scores": {t: {"opportunity_by_arm": v["opportunity_by_arm"],
+                                            "technical_score": v["technical_score"], "liquid": v["liquid"]}
+                                        for t, v in fused["symbols"].items()}})
+    # Memory: after fitting keep only sessions still needed (latest, prior, frozen-forecast sessions),
+    # as a small dict view for the review, scoring and sector steps.
     frozen_sessions = {Path(p).stem for p in glob.glob(str(state_dir / "forecasts" / "*.json"))}
     keep = {latest, sessions[-2] if len(sessions) > 1 else latest} | frozen_sessions
-    dataset["rows"] = [r for r in dataset["rows"] if r["session"] in keep]
+    small = ds.keep_sessions(keep)
+    del ds
+    dataset = {"sessions": sessions, "rows": [small.row(i) for i in range(small.n)]}
+    del small
     latest_rows = [r for r in dataset["rows"] if r["session"] == latest]
-    forecasts = {r["ticker"]: {name: _compact(model.predict(r["features"])) for name, model in models.items()}
-                 for r in latest_rows}
     top, illiquid_excluded = upside_ranking(latest_rows, forecasts, market=market,
                                             walkforward=(walkforward or {}).get("models"))
-    events = event_layer.extract(context, market=market)
     frozen = {"schema": "frozen-forecast-v1", "market": market, "session": latest, "generated_at": now.isoformat(),
               "forecast_cutoff": now.isoformat(), "feature_snapshot_session": latest, "build_revision": build_revision,
               "data_version": DATA_VERSION, "feature_schema": FEATURE_SCHEMA, "champion": CHAMPION,
@@ -344,7 +370,69 @@ def run_market(*, market, series, state_dir, now, build_revision, context=None, 
                          "upside_top": top, "illiquid_excluded": illiquid_excluded,
                          "liquidity_floor": LIQUIDITY_FLOOR[market]},
             "walkforward": walkforward, "live_scoring": live_scoring(state_dir, dataset, market=market),
-            "winners": review, "sectors": sector_analytics(dataset), "events": events["summary"]}
+            "winners": review, "sectors": sector_analytics(dataset), "events": events["summary"],
+            "fusion": fused, "fusion_walkforward": _fusion_summary(fusion_cache),
+            "fusion_live_scoring": fusion_scoring(state_dir, dataset, market=market),
+            "outcome_classes": outcome_classes(dataset, prior_frozen, state_dir, sessions)}
+
+
+def _fusion_summary(cache):
+    if not cache:
+        return None
+    evaluation = cache.get("evaluation") or {}
+    return {"generated_at": cache.get("generated_at"), "strategy": evaluation.get("strategy"),
+            "config": evaluation.get("config"), "evaluation_start": evaluation.get("evaluation_start"),
+            "evaluation_end": evaluation.get("evaluation_end"), "evaluated_rows": evaluation.get("evaluated_rows"),
+            "results": evaluation.get("results"), "incremental": evaluation.get("incremental"),
+            "redundancy": evaluation.get("redundancy"), "df5_latest_weights": evaluation.get("df5_latest_weights"),
+            "factor_research": cache.get("factor_research"), "gap_research": cache.get("gap_research"),
+            "promotion": cache.get("promotion")}
+
+
+def fusion_scoring(state_dir, dataset, *, market):
+    """Live out-of-sample scoring of frozen fusion snapshots: mean realised r1 of each arm's top 10 (liquid)."""
+    by_key = {(r["session"], r["ticker"]): r for r in dataset["rows"]}
+    per_arm = {}
+    files = sorted(glob.glob(str(Path(state_dir) / "fusion" / "*.json")))
+    for path in files:
+        document = _load_json(path) or {}
+        session = document.get("session")
+        arms = {}
+        for ticker, item in (document.get("scores") or {}).items():
+            row = by_key.get((session, ticker))
+            label = (row or {}).get("labels", {}).get(1) or {}
+            if not item.get("liquid") or label.get("status") != "VALID":
+                continue
+            for arm, value in item["opportunity_by_arm"].items():
+                if value is not None:
+                    arms.setdefault(arm, []).append((value, label["ret"]))
+        for arm, pairs in arms.items():
+            if len(pairs) < 25:
+                continue
+            top = sorted(pairs, key=lambda p: -p[0])[:10]
+            per_arm.setdefault(arm, []).append(sum(r for _, r in top) / 10 - sum(r for _, r in pairs) / len(pairs))
+    return {"frozen_fusion_files": len(files),
+            "arms": {arm: {"matured_sessions": len(v), "mean_top10_excess_r1": round(sum(v) / len(v), 5),
+                           "status": "OK" if len(v) >= 20 else "INSUFFICIENT_SAMPLE"} for arm, v in per_arm.items()}}
+
+
+def outcome_classes(dataset, prior_frozen, state_dir, sessions):
+    """CAUGHT_WINNER / MISSED_WINNER / FALSE_POSITIVE / CORRECT_AVOID for the latest session vs the prior frozen
+    forecast (forecast-time evidence only)."""
+    if prior_frozen is None or len(sessions) < 2:
+        return {"status": "NO_FROZEN_FORECAST_FOR_PRIOR_SESSION"}
+    latest = sessions[-1]
+    today = {r["ticker"]: r["features"]["r1"] for r in dataset["rows"] if r["session"] == latest}
+    ranked = [item["ticker"] for item in prior_frozen.get("upside_top", [])]
+    predicted_top = set(ranked[:20])
+    actual = sorted(today, key=lambda t: -today[t])
+    winners = set(actual[:20])
+    losers = set(actual[-20:])
+    return {"status": "AVAILABLE", "session": latest, "prior_session": prior_frozen["session"],
+            "CAUGHT_WINNER": sorted(winners & predicted_top), "MISSED_WINNER": sorted(winners - predicted_top),
+            "FALSE_POSITIVE": sorted(t for t in predicted_top if today.get(t, 0) < 0),
+            "CORRECT_AVOID": len(losers - predicted_top), "definition": "winners/losers = top/bottom 20 by session "
+            "return; predicted = prior frozen upside top 20"}
 
 
 def write_report(path, markets, *, now, build_revision):
@@ -393,7 +481,10 @@ def main(argv=None):
                 continue
             markets[market] = run_market(market=market, series=series, state_dir=Path(args.state) / market.lower(),
                                          now=now, build_revision=args.build_revision, context=context,
-                                         snapshots_root=args.snapshots_root, ranking_report=args.egx_ranking_report)
+                                         snapshots_root=args.snapshots_root,
+                                         ranking_report=args.egx_ranking_report if market == "EGX" else None,
+                                         records_report=args.egx_ranking_report if market == "EGX" else args.us_report)
+            del series
             status[market] = "LEARNED"
         except Exception as exc:  # one market failing never blocks the other
             status[market] = f"FAILED:{type(exc).__name__}:{str(exc)[:120]}"

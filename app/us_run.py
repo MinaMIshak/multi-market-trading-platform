@@ -49,6 +49,8 @@ from app.us.universe import (NASDAQ_LISTED_URL, OTHER_LISTED_URL, SCANNER_BODY, 
                              parse_master, parse_scanner)
 
 SCHEMA = "us-ranking-report-v1"
+SNAPSHOT_FIELDS = ("industry", "market_cap", "earnings_next", "earnings_last", "eps_surprise_pct",
+                   "revenue_surprise_pct", "revenue_growth_ttm", "net_margin", "roe", "pe_ttm")
 ORDER = {name: index for index, name in enumerate(CLASSES)}
 US_SLIPPAGE, US_COMMISSION = Decimal("0.0005"), Decimal("0.0005")
 SPX = MarketSpec("SPX", "SP:SPX", "S&P 500 index", "Equity indices", "points", "index", "America/New_York", "NYSE",
@@ -228,7 +230,8 @@ def rank(acquired, universe, sessions, *, now, ledger_path):
                           quarantined_rows=item["quarantined_rows"], warnings=("SPLIT_ADJUSTED_SERIES",),
                           profile=US_PROFILE)
         record.update(evidence_snapshot_date=item["newest"], sector=member.get("sector"),
-                      artifact_status=item["artifact_status"])
+                      artifact_status=item["artifact_status"],
+                      snapshot={k: member.get(k) for k in SNAPSHOT_FIELDS})
         records.append(record)
     median = apply_relative_strength(records)
     records.sort(key=lambda r: (ORDER.get(r["classification"], 9), -(r.get("score") or 0), r["ticker"]))
@@ -268,6 +271,9 @@ def run(*, data_root, state_dir, tv_python, tv_script, size=500, now=None, fetch
     state_dir = Path(state_dir)
     fetcher = fetcher or Fetcher(spacing={"query1.finance.yahoo.com": 1.0})
     universe = collect_universe(fetcher, data_root, size=size)
+    from app.us import benchmarks as us_benchmarks
+    benchmark_status = us_benchmarks.fetch_and_store(data_root, now=now, tv_python=tv_python, tv_script=tv_script,
+                                                     fetch=fetch)
     spx_doc = fetch(SPX.symbol, python_path=tv_python, fetch_script=tv_script, n_bars=120)
     store_raw(data_root, "tradingview_us", json.dumps(spx_doc, sort_keys=True).encode(), "json")
     sessions = verify_sessions(completed_bars(parse_stream(spx_doc["raw"]), SPX, now=now), now=now)
@@ -294,6 +300,7 @@ def run(*, data_root, state_dir, tv_python, tv_script, size=500, now=None, fetch
         "universe_momentum_median_20_pct": median, "new_candidates": len(new),
         "universe": {k: v for k, v in universe.items() if k != "members"},
         "acquisition": dict(status), "freshness": dict(fresh), "sessions": sessions, "cross_check": checks,
+        "benchmarks": benchmark_status, "snapshot_source": "TradingView scanner at retrieval time (no licence)",
         "costs": {"slippage": str(US_SLIPPAGE), "commission": str(US_COMMISSION)},
         "symbols": records, "lifecycles": lifecycles, "performance": performance(lifecycles)}
     state_dir.mkdir(parents=True, exist_ok=True)

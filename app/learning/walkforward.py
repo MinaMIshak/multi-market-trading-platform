@@ -1,30 +1,31 @@
-"""Chronological walk-forward evaluation of the forecast models (never shuffled).
+"""Chronological walk-forward evaluation of the forecast models (never shuffled; columnar, memory-bounded).
 
 Folds are calendar months of observed sessions after ``MIN_TRAIN_SESSIONS``.
-For a fold starting on session S, training uses only rows whose label for the
-horizon matured strictly before S (``label_end < S``), so no outcome known
-after the cutoff can leak into the model. Each fold's predictions are frozen
-and then scored against realised labels.
+For a fold starting at session S, training uses only rows before S and labels
+that matured strictly before S (``label_end < S``), so no outcome known after
+the cutoff can leak into the model. Each fold's predictions are frozen into
+typed arrays and then scored against realised labels.
 
 Metrics per model and horizon:
-- error: MAE and median absolute error of the expected return; directional
-  accuracy;
+- error: MAE and median absolute error; directional accuracy;
 - ranking: mean per-session Spearman rank correlation; Precision@K (predicted
   Top-K ∩ actual Top-K, over K); recall of the actual Top-10/Top-20 gainers
   within the predicted Top-10/Top-20; mean and median realised return of the
   predicted Top-K vs the equal-weight universe benchmark; the false-positive
-  share (predicted Top-K that fell);
-- calibration: Brier score and calibration buckets per threshold, with event
+  share;
+- calibration: Brier score vs the climatology Brier, calibration buckets, event
   counts.
 
-Only liquid symbols are ranked (20-session average turnover ≥ the market
-floor), so illiquid names cannot dominate on percentage forecasts.
+Only liquid symbols are ranked, so illiquid names cannot dominate.
 """
 from __future__ import annotations
 
+from array import array
+from math import isnan, nan
 from statistics import median
 
-from app.learning.models import FORECAST_HORIZONS, MODELS, THRESHOLD_KEYS
+from app.learning.dataset import THRESHOLD_KEYS
+from app.learning.models import FORECAST_HORIZONS, MODELS
 
 MIN_TRAIN_SESSIONS = 120
 K_VALUES = (5, 10, 20)
@@ -32,10 +33,9 @@ K_VALUES = (5, 10, 20)
 
 def folds(sessions, *, min_train=MIN_TRAIN_SESSIONS):
     out, current = [], None
-    for day in sessions[min_train:]:
-        month = day[:7]
-        if current is None or current["month"] != month:
-            current = {"month": month, "start": day, "sessions": []}
+    for k, day in enumerate(sessions[min_train:], start=min_train):
+        if current is None or current["month"] != day[:7]:
+            current = {"month": day[:7], "start": day, "start_index": k, "sessions": []}
             out.append(current)
         current["sessions"].append(day)
     return out
@@ -80,44 +80,74 @@ def calibration_buckets(pairs, edges=(0.0, 0.05, 0.1, 0.2, 0.3, 0.5, 1.01)):
     return out
 
 
-def evaluate_predictions(predictions, *, liquidity_floor):
-    """predictions: [{session, ticker, features, labels, forecast}] for one model."""
+class Predictions:
+    """Parallel arrays: one entry per scored (session, symbol)."""
+
+    def __init__(self):
+        self.session, self.ticker, self.turnover20 = [], [], array("d")
+        self.label = {h: array("d") for h in FORECAST_HORIZONS}       # realised return, NaN if invalid
+        self.pred = {h: array("d") for h in FORECAST_HORIZONS}        # expected return, NaN if no forecast
+        self.prob = {h: {t: array("d") for t in THRESHOLD_KEYS} for h in FORECAST_HORIZONS}
+
+    def add(self, session, ticker, turnover20, labels, forecast):
+        self.session.append(session)
+        self.ticker.append(ticker)
+        self.turnover20.append(nan if turnover20 is None else turnover20)
+        for h in FORECAST_HORIZONS:
+            label = labels.get(h) or {}
+            self.label[h].append(label["ret"] if label.get("status") == "VALID" else nan)
+            item = forecast.get(h) or {}
+            ok = item.get("status") == "OK"
+            self.pred[h].append(item["expected_return"] if ok else nan)
+            for t in THRESHOLD_KEYS:
+                self.prob[h][t].append(item["probabilities"][t]["p"] if ok else nan)
+
+    def __len__(self):
+        return len(self.session)
+
+
+def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
+    from app.learning.dataset import THRESHOLDS
+    thresholds = dict(zip(THRESHOLD_KEYS, THRESHOLDS))
     report = {}
     for h in FORECAST_HORIZONS:
-        scored = [p for p in predictions if p["labels"].get(h, {}).get("status") == "VALID"
-                  and p["forecast"].get(h, {}).get("status") == "OK"]
+        scored = [i for i in range(len(preds)) if not isnan(preds.label[h][i]) and not isnan(preds.pred[h][i])]
         if not scored:
             report[h] = {"status": "INSUFFICIENT_SAMPLE", "n": 0}
             continue
-        errors = [abs(p["forecast"][h]["expected_return"] - p["labels"][h]["ret"]) for p in scored]
-        direction = [(p["forecast"][h]["expected_return"] > 0) == (p["labels"][h]["ret"] > 0) for p in scored]
+        errors = [abs(preds.pred[h][i] - preds.label[h][i]) for i in scored]
+        direction = [(preds.pred[h][i] > 0) == (preds.label[h][i] > 0) for i in scored]
         by_session = {}
-        for p in scored:
-            by_session.setdefault(p["session"], []).append(p)
-        spearmans, precision, recall10, recall20, top_returns, bench, false_pos = [], {k: [] for k in K_VALUES}, [], [], {k: [] for k in K_VALUES}, [], {k: [] for k in K_VALUES}
+        for i in scored:
+            by_session.setdefault(preds.session[i], []).append(i)
+        spearmans, recall10, recall20, bench = [], [], [], []
+        precision, top_returns, false_pos = ({k: [] for k in K_VALUES} for _ in range(3))
         for members in by_session.values():
-            liquid = [m for m in members if (m["features"].get("turnover20") or 0) >= liquidity_floor]
+            liquid = [i for i in members if not isnan(preds.turnover20[i]) and preds.turnover20[i] >= liquidity_floor]
             if len(liquid) < 25:
                 continue
-            preds = [m["forecast"][h]["expected_return"] for m in liquid]
-            actual = [m["labels"][h]["ret"] for m in liquid]
-            rho = spearman(preds, actual)
+            p = [preds.pred[h][i] for i in liquid]
+            a = [preds.label[h][i] for i in liquid]
+            rho = spearman(p, a)
             if rho is not None:
                 spearmans.append(rho)
-            by_pred = sorted(range(len(liquid)), key=lambda i: (-preds[i], liquid[i]["ticker"]))
-            by_actual = sorted(range(len(liquid)), key=lambda i: (-actual[i], liquid[i]["ticker"]))
-            bench.append(sum(actual) / len(actual))
+            by_pred = sorted(range(len(liquid)), key=lambda j: (-p[j], preds.ticker[liquid[j]]))
+            by_actual = sorted(range(len(liquid)), key=lambda j: (-a[j], preds.ticker[liquid[j]]))
+            bench.append(sum(a) / len(a))
             for k in K_VALUES:
                 top_pred, top_act = set(by_pred[:k]), set(by_actual[:k])
                 precision[k].append(len(top_pred & top_act) / k)
-                top_returns[k].append(sum(actual[i] for i in by_pred[:k]) / k)
-                false_pos[k].append(sum(1 for i in by_pred[:k] if actual[i] < 0) / k)
+                top_returns[k].append(sum(a[j] for j in by_pred[:k]) / k)
+                false_pos[k].append(sum(1 for j in by_pred[:k] if a[j] < 0) / k)
             recall10.append(len(set(by_pred[:10]) & set(by_actual[:10])) / 10)
             recall20.append(len(set(by_pred[:20]) & set(by_actual[:20])) / 20)
         calibration = {}
         for t in THRESHOLD_KEYS:
-            pairs = [(p["forecast"][h]["probabilities"][t]["p"], 1.0 if p["labels"][h]["hits"][t] else 0.0)
-                     for p in scored]
+            pairs = [(preds.prob[h][t][i], 1.0 if preds.label[h][i] >= thresholds[t] else 0.0) for i in scored
+                     if not isnan(preds.prob[h][t][i])]
+            if not pairs:
+                calibration[t] = {"status": "INSUFFICIENT_SAMPLE", "n": 0}
+                continue
             events = int(sum(y for _, y in pairs))
             calibration[t] = {"brier": brier(pairs), "events": events, "n": len(pairs),
                               "base_rate": round(events / len(pairs), 4),
@@ -141,29 +171,36 @@ def evaluate_predictions(predictions, *, liquidity_floor):
     return report
 
 
-def run(dataset, *, liquidity_floor, model_names=tuple(MODELS), min_train=MIN_TRAIN_SESSIONS):
-    sessions = dataset["sessions"]
-    plan = folds(sessions, min_train=min_train)
-    by_session = {}
-    for row in dataset["rows"]:
-        by_session.setdefault(row["session"], []).append(row)
+def evaluate_predictions(items, *, liquidity_floor):
+    """Dict-based entry point (live frozen-forecast scoring): items with session, ticker, features, labels, forecast."""
+    preds = Predictions()
+    for item in items:
+        preds.add(item["session"], item["ticker"], (item.get("features") or {}).get("turnover20"), item["labels"],
+                  item["forecast"])
+    return evaluate(preds, liquidity_floor=liquidity_floor)
+
+
+def run(ds, *, liquidity_floor, model_names=tuple(MODELS), min_train=MIN_TRAIN_SESSIONS):
+    plan = folds(ds.sessions, min_train=min_train)
+    by_session = ds.by_session()
     results = {}
     for name in model_names:
-        predictions = []
+        preds = Predictions()
         for fold in plan:
-            # Rows before the fold; labels count only if they matured before the fold start (no copies made).
-            train = [r for r in dataset["rows"] if r["session"] < fold["start"]]
+            train = array("i", (i for i in range(ds.n) if ds.row_session[i] < fold["start_index"]))
             if len(train) < 500:
                 continue
-            model = MODELS[name]().fit(train, cutoff=fold["start"])
+            model = MODELS[name]().fit(ds, train, cutoff=fold["start_index"])
             del train
             for day in fold["sessions"]:
-                for row in by_session.get(day, []):
-                    predictions.append({"session": day, "ticker": row["ticker"], "features": row["features"],
-                                        "labels": row["labels"], "forecast": model.predict(row["features"])})
-        evaluated = evaluate_predictions(predictions, liquidity_floor=liquidity_floor)
-        results[name] = {"folds": len([f for f in plan]), "predictions": len(predictions),
+                for i in by_session.get(ds.session_index[day], []):
+                    preds.add(day, ds.ticker(i), ds.value("turnover20", i), ds.labels(i),
+                              model.predict(ds.features(i)))
+            del model
+        results[name] = {"folds": len(plan), "predictions": len(preds),
                          "evaluation_start": plan[0]["start"] if plan else None,
                          "evaluation_end": plan[-1]["sessions"][-1] if plan else None,
-                         "training_start": sessions[0] if sessions else None, "metrics": evaluated}
+                         "training_start": ds.sessions[0] if ds.sessions else None,
+                         "metrics": evaluate(preds, liquidity_floor=liquidity_floor)}
+        del preds
     return results

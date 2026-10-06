@@ -78,12 +78,15 @@ def test_features_are_point_in_time_and_missing_history_is_unavailable():
     assert dataset.symbol_features(truncated)[t] == feats[t]     # future bars cannot change past features
     assert days[30] not in feats                                 # fewer than 60 sessions: FEATURE_UNAVAILABLE
     built = dataset.build(series)
-    row = next(r for r in built["rows"] if r["session"] == t and r["ticker"] == target.ticker)
-    r20s = sorted(r["features"]["r20"] for r in built["rows"] if r["session"] == t)
+    i = next(k for k in range(built.n) if built.session(k) == t and built.ticker(k) == target.ticker)
+    row = built.row(i)
+    r20s = sorted(built.f["r20"][k] for k in built.rows_for(t))
     assert row["features"]["rs20"] == pytest.approx(row["features"]["r20"] - (r20s[5] + r20s[6]) / 2)
     assert row["features"]["sector_breadth5"] is not None
     counts = dataset.label_counts(built)
-    assert counts["observations"] == len(built["rows"]) and counts["h1_valid"] > 0
+    assert counts["observations"] == built.n and counts["h1_valid"] > 0
+    # Columnar storage keeps missing values explicit (NaN / None), never zero.
+    assert built.value("rvol", i) is not None and built.labels(i)[1]["status"] in ("VALID", "NOT_MATURED")
 
 
 def test_turnover_acceleration_and_breakout():
@@ -102,40 +105,39 @@ def test_models_return_bounded_versioned_probabilities_and_insufficient_samples(
     series, _ = universe(30, 220)
     built = dataset.build(series)
     for name, cls in models.MODELS.items():
-        model = cls().fit(built["rows"])
-        forecast = model.predict(built["rows"][-1]["features"])
+        model = cls().fit(built)
+        forecast = model.predict(built.features(built.n - 1))
         assert model.version == name
         for h in models.FORECAST_HORIZONS:
             item = forecast[h]
             if item["status"] == "OK":
                 assert all(0 < v["p"] < 1 for v in item["probabilities"].values())
                 assert item["probabilities"]["20"]["p"] <= item["probabilities"]["3"]["p"] + 1e-9
-    tiny = models.BucketModel().fit(built["rows"][:30])
-    assert tiny.predict(built["rows"][-1]["features"])[1]["status"] == "INSUFFICIENT_SAMPLE"
+    tiny = models.BucketModel().fit(built, range(30))
+    assert tiny.predict(built.features(built.n - 1))[1]["status"] == "INSUFFICIENT_SAMPLE"
 
 
 def test_walk_forward_is_chronological_without_label_leakage(monkeypatch):
     series, _ = universe(30, 220)
     built = dataset.build(series)
-    plan = walkforward.folds(built["sessions"], min_train=120)
+    plan = walkforward.folds(built.sessions, min_train=120)
     assert plan and all(f["sessions"] == sorted(f["sessions"]) for f in plan)
     assert all(a["sessions"][-1] < b["start"] for a, b in zip(plan, plan[1:]))
     cutoffs = []
 
     class Spy(models.BucketModel):
-        def fit(self, rows, cutoff=None):
-            assert cutoff is not None and all(r["session"] < cutoff for r in rows)
-            leaked = [r for r in rows for h, lab in r["labels"].items()
-                      if lab.get("status") == "VALID" and lab["label_end"] >= cutoff]
+        def fit(self, ds, rows=None, cutoff=None):
+            assert cutoff is not None and all(ds.row_session[i] < cutoff for i in rows)
+            leaked = [(i, h) for i in rows for h in models.FORECAST_HORIZONS
+                      if ds.status[h][i] == 0 and ds.end[h][i] >= cutoff]
             assert leaked, "fixture should contain labels maturing after the cutoff"
-            assert not any(models._valid(r, h, cutoff) for r in leaked for h in models.FORECAST_HORIZONS
-                           if r["labels"].get(h, {}).get("label_end", "") >= cutoff)
+            assert not any(ds.valid(h, i, cutoff) for i, h in leaked)
             cutoffs.append(cutoff)
-            return super().fit(rows, cutoff)
+            return super().fit(ds, rows, cutoff)
     monkeypatch.setitem(models.MODELS, "SPY", Spy)
     monkeypatch.setattr(walkforward, "MODELS", models.MODELS)
     result = walkforward.run(built, liquidity_floor=0, model_names=("SPY",), min_train=120)
-    assert result["SPY"]["predictions"] > 0 and cutoffs == [f["start"] for f in plan][:len(cutoffs)]
+    assert result["SPY"]["predictions"] > 0 and cutoffs == [f["start_index"] for f in plan][:len(cutoffs)]
 
 
 def test_metrics_brier_spearman_and_topk():

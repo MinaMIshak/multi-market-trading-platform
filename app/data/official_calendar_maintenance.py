@@ -259,6 +259,8 @@ def run(*, db_path: Path, data_root: Path, now: datetime, provider=None,
                if before["counts"][table] != after["counts"][table]]
     if changed:
         raise MaintenanceError("LIFECYCLE_TABLES_CHANGED:" + ",".join(changed))
+    # Resolve again after this run's admissions and backfill, so the report reflects the calendar it produced.
+    result.update(resolve_completed_session(db_path, now))
     return result
 
 

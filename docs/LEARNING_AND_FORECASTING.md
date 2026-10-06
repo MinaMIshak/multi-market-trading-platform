@@ -20,7 +20,14 @@ primary bars:
 
 The official market-watch source is never a label or feature price.
 
-## Dataset (`app/learning/dataset.py`, LEARN-DATA-v1 / FEAT-v1)
+## Dataset (`app/learning/dataset.py`, LEARN-DATA-v2 columnar / FEAT-v1)
+
+**Storage (v2):** columnar typed arrays, with NaN or -1 for missing and never 0. The v1 dict-per-row
+design peaked at 880 MB for EGX on this 1.9 GB host. v2 peaks at about 157 MB for the EGX daily run
+and about 176 MB for the EGX walk-forward. The rules are unchanged.
+
+Added extras: the session gap and the intraday move. They are used by US research and gates; they are
+not FEAT-v1 model features.
 
 **Observed sessions:** market-wide dates on which at least max(10, 30%)
 symbols have a bar. Weekends and sparse dates are never sessions.
@@ -90,12 +97,15 @@ A threshold probability with fewer than 30 training events is labelled
   - calibration: Brier score vs the climatology (base-rate) Brier, buckets and
     event counts for every threshold.
 - Run weekly: `tools/learning_weekly.sh`, Saturday 10:00 Cairo, a non-session
-  day. Results are cached in `walkforward.json`, and no model is promoted
-  automatically.
+  day. The four heavy jobs run strictly in sequence under `learning.lock`.
+  Results are cached in `walkforward.json` and `fusion_walkforward.json`, and
+  no model is promoted automatically.
+- Daily: `learning_egx` runs in the EGX chain and `learning_us` in the US chain.
+  Each processes only its own market, and both share `learning.lock`.
 
 ## Daily operations (`app/learning/daily.py`)
 
-The nightly step `learning` runs in both chains:
+The nightly steps `learning_egx` (EGX chain) and `learning_us` (US chain) each run one market:
 1. Build the dataset and fit every model on matured labels.
 2. Forecast every symbol at the latest session.
 3. Freeze `forecasts/<session>.json` (written once) with the build revision,

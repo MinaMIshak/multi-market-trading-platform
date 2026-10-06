@@ -36,12 +36,13 @@ def main(argv=None):
     series = (sources.load_egx(args.egx_db, args.egx_data, args.egx_evidence) if args.market == "EGX"
               else sources.load_us(args.us_data, args.us_report))
     dataset = build(series)
+    del series
     results = walk_forward(dataset, liquidity_floor=LIQUIDITY_FLOOR[args.market])
     document = {"schema": "walkforward-v1", "market": args.market, "generated_at": started.isoformat(),
                 "finished_at": datetime.now(timezone.utc).isoformat(), "build_revision": args.build_revision,
                 "data_version": DATA_VERSION, "feature_schema": FEATURE_SCHEMA, "champion": CHAMPION,
                 "min_train_sessions": MIN_TRAIN_SESSIONS, "fold": "calendar month, expanding window",
-                "sessions": [dataset["sessions"][0], dataset["sessions"][-1]], "labels": label_counts(dataset),
+                "sessions": [dataset.sessions[0], dataset.sessions[-1]], "labels": label_counts(dataset),
                 "models": results, "promotion": "NONE: comparison evidence only; operator decision"}
     _write_atomic(Path(args.state) / args.market.lower() / "walkforward.json", document)
     print(json.dumps({"market": args.market, "models": {k: v["predictions"] for k, v in results.items()},

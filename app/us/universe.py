@@ -29,7 +29,9 @@ SCANNER_BODY = {
                {"left": "exchange", "operation": "in_range", "right": ["NASDAQ", "NYSE", "AMEX"]},
                {"left": "is_primary", "operation": "equal", "right": True}],
     "columns": ["name", "description", "exchange", "type", "subtype", "average_volume_30d_calc", "close",
-                "market_cap_basic", "sector", "isin"],
+                "market_cap_basic", "sector", "isin", "industry", "earnings_release_next_date",
+                "earnings_release_date", "eps_surprise_percent_fq", "revenue_surprise_percent_fq",
+                "total_revenue_yoy_growth_ttm", "net_margin", "return_on_equity", "price_earnings_ttm"],
     "sort": {"sortBy": "market_cap_basic", "sortOrder": "desc"}, "range": [0, 6000]}
 
 
@@ -88,7 +90,16 @@ def parse_scanner(payload: bytes) -> list[dict]:
             continue
         out.append({"tv_symbol": item["s"], "ticker": normalize(values["name"]), "exchange": values["exchange"],
                     "name": values.get("description"), "isin": values.get("isin"), "sector": values.get("sector"),
-                    "avg_dollar_volume_30d": volume * close, "close": close})
+                    "avg_dollar_volume_30d": volume * close, "close": close,
+                    # Snapshot attributes (TradingView scanner, retrieval-time evidence; never historical truth).
+                    "industry": values.get("industry"), "market_cap": values.get("market_cap_basic"),
+                    "earnings_next": values.get("earnings_release_next_date"),
+                    "earnings_last": values.get("earnings_release_date"),
+                    "eps_surprise_pct": values.get("eps_surprise_percent_fq"),
+                    "revenue_surprise_pct": values.get("revenue_surprise_percent_fq"),
+                    "revenue_growth_ttm": values.get("total_revenue_yoy_growth_ttm"),
+                    "net_margin": values.get("net_margin"), "roe": values.get("return_on_equity"),
+                    "pe_ttm": values.get("price_earnings_ttm")})
     if len(out) < 1000:
         raise UniverseError(f"scanner returned too few rows ({len(out)})")
     return out

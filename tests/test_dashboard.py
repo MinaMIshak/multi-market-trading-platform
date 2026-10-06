@@ -84,7 +84,8 @@ def test_candidate_table_lists_candidates_and_watchlist_with_evidence_and_filter
 def test_missing_engine_values_render_unknown_not_invented():
     html = render_candidate_table(REPORT, table_id="n", classes=("NO_TRADE",))
     eee = re.search(r'<tr data-class="NO_TRADE" data-search="EEE "><td data-v="EEE">.*?</tr>', html, re.S).group(0)
-    assert eee.count(">UNKNOWN<") >= 10 and "INSUFFICIENT_HISTORY" in eee
+    # Consolidated columns: every main data cell UNKNOWN, the moved metrics UNKNOWN in the details.
+    assert eee.count(">UNKNOWN<") >= 8 and eee.count("UNKNOWN") >= 14 and "INSUFFICIENT_HISTORY" in eee
     assert "DOWNTREND" in html
 
 
