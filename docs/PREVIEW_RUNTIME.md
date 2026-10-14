@@ -137,7 +137,23 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-06, learning, forecasting and Decision Fusion; cut over by the agent)
+### Current public release (2026-10-14, EGX strategy audit observability; cut over by the agent)
+
+Release `7667e41397ef87d78477548b09a8c2af66ed2b09` (VERIFIED, 262 files). Reporting
+only: the V1 performance block gains net-R fields and independent exposure, and the
+experiment arms gain one-position-per-ticker rows (`docs/EGX_STRATEGY_AUDIT_2026-10-14.md`).
+Strategy semantics are unchanged. Sequence:
+1. **Full suite:** 3681 passed (676 subtests) in 12 min 17 s, peak 165 MB.
+2. **8011:** all acceptance checks passed on the current pointer bundle
+   (`--expect-context --expect-experiment --expect-learning --expect-fusion`).
+3. **8001:** cut over; the same checks passed; public HTTPS answers 401.
+4. **Crontab:** all four entries moved to this release (backup
+   `state/crontab.before-7667e41.txt`).
+
+Rollback: the adoption command with release `61b97f05eb8984d03060e4acb0392c9ee5845947`, then
+restore the crontab from `state/crontab.before-7667e41.txt`.
+
+### Previous release (2026-10-06, learning, forecasting and Decision Fusion; cut over by the agent)
 
 Release `61b97f05eb8984d03060e4acb0392c9ee5845947` (VERIFIED, 248 files). It includes:
 - the Phase 1 session-integrity fixes (released earlier as `687eebf`);
