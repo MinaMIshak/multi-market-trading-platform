@@ -97,6 +97,20 @@ win and loss, expectancy (R), summed net %, max drawdown (R) and average
 holding sessions. Below 20 closed trades it reports `INSUFFICIENT_SAMPLE`
 and shows counts only, never extrapolated metrics.
 
+`expectancy_r` and `max_drawdown_r` keep their original **gross** basis (before
+costs), as `r_basis` states. `expectancy_r_net` and `max_drawdown_r_net` give
+the same metrics after costs, with drawdown in exit-date order. V1 can record a
+new candidate on a ticker that is already held, so the summary also reports
+independent exposure:
+- `closed_distinct_tickers`;
+- `closed_distinct_ticker_exit_events`;
+- `closed_overlapping_same_ticker`;
+- `first_entry_per_ticker_*`, where a repeat candidate counts only after the
+  earlier position closed.
+
+All of these fields are reporting only and leave V1 unchanged (audit
+2026-10-14, `docs/EGX_STRATEGY_AUDIT_2026-10-14.md`).
+
 ## Schedule (Africa/Cairo, Sunday–Thursday)
 
 - **16:45**: official market-watch post-close capture

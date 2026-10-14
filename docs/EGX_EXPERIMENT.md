@@ -132,6 +132,9 @@ Per arm:
   interval for expectancy from 20 closed trades. V2D adds closed P&L in EGP
   and the return on model capital.
 - **Net R** = net return × entry / (entry − stop).
+- **One position per ticker** (reporting only): entries, closed trades, wins, expectancy and
+  cumulative R if a repeat candidate on a ticker that is still held were ignored.
+  Arm semantics are unchanged.
 
 **Sample policy:** below 20 closed trades the label is INSUFFICIENT_SAMPLE.
 Then come EARLY_CHECKPOINT_20, CHECKPOINT_50 and CHECKPOINT_100. Promotion is

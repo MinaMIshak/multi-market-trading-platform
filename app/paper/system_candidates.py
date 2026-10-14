@@ -19,11 +19,15 @@ and re-running it is idempotent. Rules:
   moves to the entry price. The rest exits at T2. A gap through a level fills
   at the open. Otherwise the position closes at the close of the
   ``MAX_HOLD``-th session after the fill bar;
-- results: gross R-multiple, net return % after costs, MAE/MFE in R, holding
-  sessions.
+- results: gross R-multiple, net R-multiple and net return % after costs,
+  MAE/MFE in R, holding sessions.
 
 Performance uses CLOSED trades only and reports INSUFFICIENT_SAMPLE below
-``MIN_SAMPLE`` closed trades.
+``MIN_SAMPLE`` closed trades. ``expectancy_r`` and ``max_drawdown_r`` keep
+their original gross (before costs) basis; the ``*_net`` fields are after
+costs, with drawdown in exit-date order. Repeated candidates on one ticker can
+be held at the same time, so the independent-exposure fields also count an
+entry only when no earlier lifecycle of the same ticker is still held.
 """
 from __future__ import annotations
 
@@ -105,8 +109,57 @@ def simulate(candidate: dict, later_bars: list, *, slippage: Decimal = SLIPPAGE,
               "EXIT_T2": "CLOSED_T2", "EXIT_TIME": "CLOSED_TIME"}[last]
     return {"status": status, "events": events, "entry": str(raw_entry),
             "r_multiple_gross": str(round((gross_exit - raw_entry) / risk, 3)),
+            "r_multiple_net": str(round(net_return * raw_entry / risk, 3)),
             "net_return_pct": str(round(net_return * 100, 3)),
             "mae_r": str(round(mae, 2)), "mfe_r": str(round(mfe, 2)), "sessions_held": held + 1}
+
+
+def first_entry_per_ticker(items: list[dict]) -> list[dict]:
+    """items: ticker, entry_date, exit_date (None while open). Keeps an entry only if no earlier one is held."""
+    kept, held_until = [], {}
+    for item in sorted((i for i in items if i.get("entry_date")), key=lambda i: (i["entry_date"], i["ticker"])):
+        until = held_until.get(item["ticker"], "")
+        if until is None or until >= item["entry_date"]:
+            continue
+        kept.append(item)
+        held_until[item["ticker"]] = item.get("exit_date")
+    return kept
+
+
+def _drawdown(values) -> Decimal:
+    equity, peak, drawdown = Decimal("0"), Decimal("0"), Decimal("0")
+    for value in values:
+        equity += value
+        peak = max(peak, equity)
+        drawdown = min(drawdown, equity - peak)
+    return drawdown
+
+
+def _dates(lifecycle: dict) -> dict:
+    events = lifecycle.get("events") or []
+    entry = next((e["date"] for e in events if e.get("event") == "ENTRY_FILLED"), None)
+    closed = lifecycle["status"].startswith("CLOSED")
+    return {"ticker": lifecycle.get("ticker"), "entry_date": entry,
+            "exit_date": events[-1]["date"] if closed and events else None, "lifecycle": lifecycle}
+
+
+def independent_exposure(lifecycles: list[dict]) -> dict:
+    """Reporting only: how many closed results are independent positions rather than repeats of one ticker."""
+    items = [_dates(i) for i in lifecycles if i.get("ticker")]
+    closed = [i for i in items if i["exit_date"]]
+    overlapping = sum(1 for i in closed if any(
+        o is not i and o["ticker"] == i["ticker"] and o["entry_date"] and o["entry_date"] <= i["exit_date"]
+        and (o["exit_date"] is None or o["exit_date"] >= i["entry_date"]) for o in items))
+    first = [i for i in first_entry_per_ticker(items) if i["exit_date"]]
+    first_r = [Decimal(i["lifecycle"]["r_multiple_net"]) for i in first if i["lifecycle"].get("r_multiple_net")]
+    summary = {"closed_distinct_tickers": len({i["ticker"] for i in closed}),
+               "closed_distinct_ticker_exit_events": len({(i["ticker"], i["exit_date"]) for i in closed}),
+               "closed_overlapping_same_ticker": overlapping,
+               "first_entry_per_ticker_closed": len(first),
+               "first_entry_per_ticker_wins": sum(1 for i in first if Decimal(i["lifecycle"]["net_return_pct"]) > 0)}
+    if first_r and len(first_r) == len(first):
+        summary["first_entry_per_ticker_expectancy_r_net"] = str(round(sum(first_r) / len(first_r), 3))
+    return summary
 
 
 def performance(lifecycles: list[dict]) -> dict:
@@ -124,11 +177,7 @@ def performance(lifecycles: list[dict]) -> dict:
     r_values = [Decimal(i["r_multiple_gross"]) for i in closed]
     wins = [r for r in returns if r > 0]
     losses = [r for r in returns if r <= 0]
-    equity, peak, drawdown = Decimal("0"), Decimal("0"), Decimal("0")
-    for r in r_values:
-        equity += r
-        peak = max(peak, equity)
-        drawdown = min(drawdown, equity - peak)
+    drawdown = _drawdown(r_values)
     summary.update(
         wins=len(wins), losses=len(losses),
         win_rate_pct=str(round(Decimal(len(wins)) / len(closed) * 100, 1)),
@@ -137,5 +186,12 @@ def performance(lifecycles: list[dict]) -> dict:
         expectancy_r=str(round(sum(r_values) / len(r_values), 3)),
         net_return_sum_pct=str(round(sum(returns), 3)),
         max_drawdown_r=str(round(drawdown, 3)),
-        average_holding_sessions=str(round(Decimal(sum(i["sessions_held"] for i in closed)) / len(closed), 1)))
+        average_holding_sessions=str(round(Decimal(sum(i["sessions_held"] for i in closed)) / len(closed), 1)),
+        r_basis="expectancy_r and max_drawdown_r: gross R before costs; *_net: after slippage and commission")
+    if all(i.get("r_multiple_net") for i in closed):
+        by_exit = sorted(closed, key=lambda i: (_dates(i)["exit_date"] or "", i.get("ticker") or ""))
+        net = [Decimal(i["r_multiple_net"]) for i in by_exit]
+        summary.update(expectancy_r_net=str(round(sum(net) / len(net), 3)),
+                       max_drawdown_r_net=str(round(_drawdown(net), 3)))
+    summary.update(independent_exposure(lifecycles))
     return summary

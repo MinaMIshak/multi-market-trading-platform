@@ -61,6 +61,20 @@ def test_horizon_labels_use_the_next_observed_sessions_and_never_cross_gaps():
     assert labels[t][3]["hits"]["3"] is (labels[t][3]["ret"] >= 0.03)
 
 
+def test_market_holiday_is_skipped_and_labels_mature_on_the_next_real_session():
+    # Audit 2026-10-14: 2026-10-08 had no EGX session; the 10-07 h1 label must end on 10-11, not on a filler day.
+    days = [d for d in egx_days(40, start=date(2026, 9, 6)) if d != "2026-10-08"]
+    closes = [10.0 + i * 0.1 for i in range(len(days))]
+    series = [make_series(f"H{k}", closes, days) for k in range(12)]
+    sessions = dataset.observed_sessions(series)
+    assert "2026-10-08" not in sessions
+    labels = dataset.forward_labels(series[0], sessions)
+    k = days.index("2026-10-07")
+    assert labels["2026-10-07"][1]["status"] == "VALID" and labels["2026-10-07"][1]["label_end"] == "2026-10-11"
+    assert labels["2026-10-07"][1]["ret"] == pytest.approx(closes[k + 1] / closes[k] - 1)
+    assert labels["2026-10-06"][3]["label_end"] == "2026-10-12"
+
+
 def test_weekends_are_not_sessions_and_sparse_dates_are_ignored():
     series, days = universe(12, 90)
     sessions = dataset.observed_sessions(series)

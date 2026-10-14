@@ -8,7 +8,7 @@ import uuid
 import pytest
 
 from app import egx_ranking_run
-from app.paper.system_candidates import MIN_SAMPLE, performance, simulate
+from app.paper.system_candidates import MIN_SAMPLE, first_entry_per_ticker, performance, simulate
 from app.strategies.egx_ranking import Bar, classify, features
 from app.ui.ranking import render_performance, render_pre_surge, render_swing, render_today, summary
 
@@ -124,6 +124,46 @@ def test_performance_requires_closed_sample():
     result = performance(closed * MIN_SAMPLE)
     assert result["status"] == "MEASURED" and result["win_rate_pct"] == "50.0"
     assert result["expectancy_r"] == "0.625" and Decimal(result["max_drawdown_r"]) <= 0
+
+
+def test_net_r_is_reported_beside_the_unchanged_gross_headline():
+    stop = simulate(CANDIDATE, [bar("d1", 10.0, 10.1, 9.6, 9.65)])
+    assert Decimal(stop["r_multiple_gross"]) == Decimal("-1") and Decimal(stop["r_multiple_net"]) < Decimal("-1")
+    entry, risk = Decimal(stop["entry"]), Decimal(stop["entry"]) - Decimal(CANDIDATE["stop"])
+    assert abs(Decimal(stop["r_multiple_net"]) - Decimal(stop["net_return_pct"]) / 100 * entry / risk) < Decimal("0.001")
+    closed = [{"status": "CLOSED_T2", "net_return_pct": "6.0", "r_multiple_gross": "2.25", "r_multiple_net": "2.1",
+               "sessions_held": 3},
+              {"status": "CLOSED_STOP", "net_return_pct": "-3.5", "r_multiple_gross": "-1", "r_multiple_net": "-1.05",
+               "sessions_held": 1}]
+    result = performance(closed * MIN_SAMPLE)
+    assert result["expectancy_r"] == "0.625"                       # gross basis kept for continuity
+    assert result["expectancy_r_net"] == "0.525" and "gross" in result["r_basis"]
+
+
+def life(ticker, entry, exit_=None, *, net="-10", r_net="-1.05"):
+    events = [{"date": entry, "event": "ENTRY_FILLED"}]
+    if exit_:
+        events.append({"date": exit_, "event": "EXIT_STOP"})
+    return {"ticker": ticker, "status": "CLOSED_STOP" if exit_ else "OPEN", "events": events,
+            "net_return_pct": net, "r_multiple_gross": "-1", "r_multiple_net": r_net, "sessions_held": 2}
+
+
+def test_independent_exposure_counts_repeat_candidates_of_a_held_ticker_once():
+    # Audit 2026-10-14: 70 V1 stop-losses were only 41 distinct (ticker, exit day) events.
+    lives = [life("AAA", "2026-10-04", "2026-10-12"), life("AAA", "2026-10-05", "2026-10-12"),
+             life("AAA", "2026-10-13", "2026-10-14"), life("BBB", "2026-10-04", "2026-10-06", net="9", r_net="1.5"),
+             life("CCC", "2026-10-04"), life("CCC", "2026-10-05", "2026-10-06")]
+    first = first_entry_per_ticker([{"ticker": l["ticker"], "entry_date": l["events"][0]["date"],
+                                     "exit_date": l["events"][-1]["date"] if l["status"] != "OPEN" else None}
+                                    for l in lives])
+    assert [(i["ticker"], i["entry_date"]) for i in first] == [
+        ("AAA", "2026-10-04"), ("BBB", "2026-10-04"), ("CCC", "2026-10-04"), ("AAA", "2026-10-13")]
+    perf = performance(lives)
+    assert perf["closed_distinct_ticker_exit_events"] == 4 and perf["closed_distinct_tickers"] == 3
+    assert perf["closed_overlapping_same_ticker"] == 3          # both AAA 10-12 exits and the CCC repeat
+    assert perf["first_entry_per_ticker_closed"] == 3 and perf["first_entry_per_ticker_wins"] == 1
+    assert perf["first_entry_per_ticker_expectancy_r_net"] == "-0.200"
+    assert perf["closed"] == 5                                   # the headline still counts every lifecycle
 
 
 # ----- runner end-to-end on a temporary platform DB -----

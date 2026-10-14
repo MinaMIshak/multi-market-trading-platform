@@ -212,6 +212,18 @@ def test_performance_metrics_and_sample_labels():
     assert exp.performance([], eligible=0, blocked=0)["status"] == "INSUFFICIENT_SAMPLE"
 
 
+def test_non_overlapping_view_is_reporting_only():
+    def held(ticker, r, entry, exit_):
+        return {**trade(r, "CLOSED_STOP" if r < 0 else "CLOSED_T2", exit_ or "2026-10-20"), "ticker": ticker,
+                "entry_date": entry, "exit_date": exit_, **({} if exit_ else {"status": "OPEN", "net_r": None})}
+    trades = [held("AAA", -1.0, "2026-10-04", "2026-10-12"), held("AAA", -1.0, "2026-10-05", "2026-10-12"),
+              held("BBB", 2.0, "2026-10-04", "2026-10-07"), held("CCC", -1.0, "2026-10-04", None)]
+    perf = exp.performance(trades, eligible=4, blocked=0)
+    assert perf["closed"] == 3 and perf["expectancy_r"] == 0.0     # arm metrics unchanged
+    assert perf["non_overlapping_entries"] == 3 and perf["non_overlapping_closed"] == 2
+    assert perf["non_overlapping_expectancy_r"] == 0.5 and perf["non_overlapping_wins"] == 1
+
+
 # --- CPCI regression / explanation fixture --------------------------------------------------------------------------------
 
 def test_cpci_fixture_reproduces_v1_plan_and_explains_the_gates():

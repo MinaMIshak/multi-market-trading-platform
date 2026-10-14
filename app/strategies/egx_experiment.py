@@ -18,7 +18,7 @@ from __future__ import annotations
 from decimal import ROUND_DOWN, Decimal
 from statistics import mean, median, pstdev
 
-from app.paper.system_candidates import COMMISSION, SLIPPAGE, simulate
+from app.paper.system_candidates import COMMISSION, SLIPPAGE, first_entry_per_ticker, simulate
 
 D0 = Decimal(0)
 
@@ -244,4 +244,12 @@ def performance(trades, *, eligible, blocked):
         expectancy_r_double_costs=round(mean(stressed), 3) if stressed else None,
         expectancy_ci95_approx=([round(mean(rs) - 1.96 * sd / n ** 0.5, 3), round(mean(rs) + 1.96 * sd / n ** 0.5, 3)]
                                 if n >= 20 else "NOT_COMPUTED_BELOW_20"))
+    # Reporting only: one position per ticker at a time (repeat candidates of a held ticker are not counted).
+    closed_ids = {id(t) for t in closed}
+    first = first_entry_per_ticker([t for t in trades if t["status"] == "OPEN" or id(t) in closed_ids])
+    first_rs = [t["net_r"] for t in first if id(t) in closed_ids]
+    summary.update(non_overlapping_entries=len(first), non_overlapping_closed=len(first_rs),
+                   non_overlapping_wins=sum(1 for r in first_rs if r > 0),
+                   non_overlapping_expectancy_r=round(mean(first_rs), 3) if first_rs else None,
+                   non_overlapping_cumulative_r=round(sum(first_rs), 3) if first_rs else None)
     return summary

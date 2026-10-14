@@ -20,7 +20,12 @@ METRICS = (("eligible_setups", "Eligible setups"), ("blocked", "Blocked"), ("sim
            ("t2_hit_rate", "T2 hit rate"), ("stop_hit_rate", "Stop hit rate"), ("average_mae_r", "Average MAE (R)"),
            ("average_mfe_r", "Average MFE (R)"), ("average_holding_sessions", "Average holding (sessions)"),
            ("expectancy_r_double_costs", "Expectancy at 2× costs (R)"), ("pnl_egp_closed", "V2D closed P&L (EGP)"),
-           ("return_on_model_capital_pct", "V2D return on model capital (%)"))
+           ("return_on_model_capital_pct", "V2D return on model capital (%)"),
+           ("non_overlapping_entries", "One position per ticker: entries"),
+           ("non_overlapping_closed", "One position per ticker: closed"),
+           ("non_overlapping_wins", "One position per ticker: wins"),
+           ("non_overlapping_expectancy_r", "One position per ticker: expectancy (R)"),
+           ("non_overlapping_cumulative_r", "One position per ticker: cumulative R"))
 
 
 def load_experiment():
