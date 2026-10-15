@@ -109,6 +109,18 @@ account. A diversification claim is made only when these numbers support it.
 - **Checkpoints:** 20, 50 and 100 forward sessions.
 - **Top-K recall:** unchanged by construction, because V2E emits the same signals as V1.
 
+## Deployment and forward start
+
+- **Release:** `1124598ff424b1fe8d4befc5bf19be7156d0305c`, cut over on 8001 on 2026-10-15; cron moved to it.
+- **Registration:** `EXPLICIT_AT_DEPLOYMENT`.
+  - `deployed_at`: 2026-10-15T09:06:17Z (12:06 Cairo)
+  - `last_retrospective_session`: 2026-10-14
+- **First official forward session:** the first V1 report session after 2026-10-14 evaluated
+  after deployment. That is expected to be **2026-10-15**, recorded by the EGX chain on Sunday
+  2026-10-18 08:30 Cairo. Its candidates are generated after deployment and enter the session on
+  2026-10-18. The exact value is written once to `first_forward_session` when recorded.
+- **Checkpoints:** 20, 50 and 100 forward sessions; no promotion before an operator decision.
+
 ## Retrospective diagnostic at registration (2026-10-15)
 
 Implementation check only. This is not evidence and not the official scorecard. The ledger held

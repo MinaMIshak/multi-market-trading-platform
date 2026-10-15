@@ -137,7 +137,24 @@ maintenance (sessions 142→149).
   verified it in a browser. 8001 has served release `1369bcc` with this
   snapshot since then.
 
-### Current public release (2026-10-14, EGX strategy audit observability; cut over by the agent)
+### Current public release (2026-10-15, V2E one-position-per-ticker challenger; cut over by the agent)
+
+Release `1124598ff424b1fe8d4befc5bf19be7156d0305c` (VERIFIED, 263 files). It adds the pre-registered challenger
+V2E `EGX-EXP-V2E-ONE-POSITION-v1` (`docs/EGX_V2E_ONE_POSITION.md`); V1–V2D are unchanged. Sequence:
+1. **Full suite:** 3693 passed (676 subtests) in 12 min 6 s, peak 166 MB.
+2. **8011:** all acceptance checks passed on the existing bundle.
+3. **8001:** cut over; all checks passed; public HTTPS answers 401.
+4. **Crontab:** all four entries moved to this release (backup `state/crontab.before-1124598.txt`).
+5. **V2E registration:** `EXPLICIT_AT_DEPLOYMENT`, `deployed_at` 2026-10-15T09:06:17Z.
+6. **Experiment step re-run:** new decisions 0, HEALTHY, V1 parity intact.
+7. **Bundle:** `published-20261015T090618Z`.
+8. **Final checks:** 8001 and 8011 pass all checks plus `--expect-v2e`. The rows, performance, attribution,
+   decisions and config of V1–V2D are identical to the 7667e41 bundle `published-20261015T054211Z`.
+
+Rollback: the adoption command with release `7667e41397ef87d78477548b09a8c2af66ed2b09`, then restore the crontab
+from `state/crontab.before-1124598.txt`. The 7667e41 code ignores the extra V2E keys in the experiment report.
+
+### Previous release (2026-10-14, EGX strategy audit observability; cut over by the agent)
 
 Release `7667e41397ef87d78477548b09a8c2af66ed2b09` (VERIFIED, 262 files). Reporting
 only: the V1 performance block gains net-R fields and independent exposure, and the
