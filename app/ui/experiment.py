@@ -101,7 +101,59 @@ def explanation(view):
              f"<b>Entry:</b> {escape(_u(entry.get('state') or view.get('lifecycle_status')))} · expiry "
              f"{escape(_u(entry.get('expiry_session')))} · gap vs zone top {escape(_u(entry.get('gap_vs_zone_top_pct')))}% "
              f"(max chase {escape(_u(entry.get('max_chase_pct')))}%)"]
+    one = view.get("one_position")
+    if one:
+        state = "PASS" if one.get("status") == "PASS" else f"BLOCKED — {_u(one.get('attribution'))}"
+        lines.append(f"<b>One-position-per-ticker challenger (V2E):</b> {escape(state)} "
+                     f"<span class=\"co\">{escape(_u(one.get('sample')))}</span>")
     return "<br>" + "<br>".join(lines)
+
+
+def _fmt(value):
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return _u(value)
+
+
+def render_challenger(report):
+    """Compact V2E scorecard: forward (official) and retrospective (diagnostic only)."""
+    item = (report or {}).get("challengers", {}).get("V2E")
+    if not item:
+        return ""
+    forward, retro, reg = item["forward"], item["retrospective"], item["registration"]
+    verdict = forward.get("verdict") or {}
+    keys = (("candidate_signals", "Candidate signals"), ("eligible_setups", "Eligible positions"),
+            ("duplicate_ticker_blocks", "Duplicate-ticker blocks"), ("closed", "Closed positions"),
+            ("win_rate", "Win rate"), ("expectancy_r_net", "Net expectancy (R)"),
+            ("expectancy_r_gross", "Gross expectancy (R)"), ("profit_factor", "Profit factor"),
+            ("max_drawdown_r", "Max drawdown (R, net)"))
+    arms = [a for a in ("V1", "V2D", "V2E") if a in retro["scorecard"]]
+
+    def table(section, label):
+        head = "".join(f'<th class="num">{escape(a)}</th>' for a in arms)
+        body = "".join(f"<tr><th>{escape(name)}</th>" + "".join(
+            f'<td class="num">{escape(_fmt((section["scorecard"].get(a) or {}).get(key)))}</td>' for a in arms) + "</tr>"
+            for key, name in keys)
+        return (f'<h4>{escape(label)}</h4><div class="table-wrap"><table><thead><tr><th>Metric</th>{head}</tr></thead>'
+                f'<tbody>{body}</tbody></table></div>')
+    dup = retro["duplicates"]
+    exposure = retro.get("exposure") or {}
+    expo = "; ".join(f"{a}: max {_u(e.get('max_simultaneous_positions'))} positions, max {_u(e.get('max_positions_same_ticker'))} "
+                     f"on one ticker, max gross {_u(e.get('max_gross_exposure_egp'))} EGP"
+                     for a, e in exposure.items() if e.get("status") == "MEASURED")
+    return ('<section aria-label="One-position-per-ticker challenger"><h3>One-position-per-ticker challenger '
+            f'({escape(item["challenger"])})</h3>'
+            f'<p><b>Verdict:</b> {escape(_u(verdict.get("verdict")))} · {escape(_u(verdict.get("checkpoint")))} · '
+            f'forward sessions {escape(_u(forward.get("sessions")))} (first {escape(_u(forward.get("first_forward_session")))}, '
+            f'deployed {escape(_u(reg.get("deployed_at")))}) · {escape(item["promotion"])}</p>'
+            f'<p class="muted">{escape(_u(verdict.get("reason")))}. {escape(item["promotion_policy"])}</p>'
+            + table(forward, "FORWARD_OUT_OF_SAMPLE (official scorecard; same forward candidates for every arm)")
+            + '<details><summary>RETROSPECTIVE_DIAGNOSTIC (implementation check only; not evidence of edge)</summary>'
+            + table(retro, "RETROSPECTIVE_DIAGNOSTIC")
+            + f'<p class="co">Blocked duplicates {escape(_u(dup.get("blocked_duplicates")))}: '
+              f'{escape(", ".join(f"{k} {v}" for k, v in dup.get("by_classification", {}).items()))}. '
+              f'Losses avoided {escape(_u(dup.get("losses_avoided_r")))}R; incremental winners blocked '
+              f'{escape(_u(dup.get("incremental_winners_blocked_r")))}R. Exposure: {escape(expo)}.</p></details></section>')
 
 
 def render_performance(report):
@@ -128,7 +180,7 @@ def render_performance(report):
             f'{escape(report["config_version"])}. Net R after the V1 cost model; 2× costs shown as a sensitivity.</p>'
             f'<div class="table-wrap"><table><thead><tr><th>Metric</th>{head}</tr></thead><tbody>{rows}</tbody></table></div>'
             f'<h3>Gate attribution</h3><ul>{attr}</ul><details><summary>Arm definitions</summary><ul>{arms_list}</ul>'
-            '</details></section>')
+            '</details>' + render_challenger(report) + '</section>')
 
 
 def render_live(report):
@@ -165,8 +217,14 @@ def render_system(report):
                      if k != "rationale")
     rationale = "".join(f"<li><b>{escape(k)}</b>: {escape(v)}</li>" for k, v in report["config"].get("rationale", {}).items())
     health = "".join(f"<tr><th>{escape(k)}</th><td>{escape(str(v))}</td></tr>" for k, v in report["health"].items())
+    v2e = (report.get("challengers") or {}).get("V2E")
+    registration = "".join(f"<tr><th>{escape(k)}</th><td>{escape(str(v))}</td></tr>"
+                           for k, v in (v2e or {}).get("registration", {}).items())
     return (f'<h2>Strategy experiment: {escape(report["strategy"])} · {escape(report["config_version"])}</h2>'
             f'<p>Champion {escape(report["champion"])} (EGX-RANK-v1, unchanged). {escape(report["promotion_policy"])}</p>'
             f'<table aria-label="Experiment health"><tbody>{health}</tbody></table>'
             f'<table aria-label="Experiment configuration"><tbody>{config}</tbody></table>'
-            f'<details><summary>Threshold rationale</summary><ul>{rationale}</ul></details>')
+            f'<details><summary>Threshold rationale</summary><ul>{rationale}</ul></details>'
+            + (f'<h3>Challenger {escape(v2e["challenger"])} ({escape(v2e["config_version"])})</h3>'
+               f'<p>{escape(v2e["definition"])}</p>'
+               f'<table aria-label="V2E registration"><tbody>{registration}</tbody></table>' if v2e else ""))

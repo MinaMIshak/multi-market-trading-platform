@@ -25,6 +25,10 @@ the champion until evidence supports promotion. There is no auto-promotion.
 | V2C | V2B + entry-zone validity, gap/chase protection, setup expiry |
 | V2D | V2C + risk-based Paper sizing with a portfolio open-risk cap |
 
+A separately versioned challenger, **V2E** (`EGX-EXP-V2E-ONE-POSITION-v1`), is reported beside these arms:
+V1 plus one open position per ticker. It has its own forward-only scorecard and does not change V1–V2D
+(`docs/EGX_V2E_ONE_POSITION.md`).
+
 ## Same-evidence design (`app/egx_experiment_run.py`)
 
 - **Inputs:** the V1 candidate ledger, the V1 report and the validated daily

@@ -5,6 +5,7 @@ code (labels, walk-forward, metrics) but never datasets, fitted parameters, weig
 """
 from app.learning import dataset, fusion, models
 from app.strategies.egx_experiment_config import ACTIVE_CONFIG as TRADE_CONFIG, STRATEGY as TRADE_STRATEGY
+from app.strategies.egx_one_position import CHALLENGER as ONE_POSITION, CONFIG_VERSION as ONE_POSITION_CONFIG
 from app.strategies.egx_ranking import US_PROFILE, VERSION as EGX_RANK
 
 REGISTRY = {
@@ -12,6 +13,7 @@ REGISTRY = {
                "walk_forward": "calendar-month folds, expanding window, labels matured before each fold",
                "metrics": "rank IC, Precision@K, top-gainer recall, Top-K realised returns, Brier/calibration"},
     "EGX": {"technical_champion": EGX_RANK, "trade_experiment": f"{TRADE_STRATEGY} ({TRADE_CONFIG}): V1, V2A-V2D",
+            "trade_challengers": [f"V2E {ONE_POSITION} ({ONE_POSITION_CONFIG}): forward-only scorecard, not promoted"],
             "feature_schema": dataset.FEATURE_SCHEMA, "forecast_champion": models.CHAMPION,
             "forecast_challengers": [m for m in models.MODELS if m != models.CHAMPION],
             "decision_fusion": f"{fusion.STRATEGY} ({fusion.CONFIG}, effective {fusion.EFFECTIVE_DATE})",

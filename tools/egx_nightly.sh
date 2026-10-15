@@ -47,7 +47,8 @@ step ranking "$PY" -m app.egx_ranking_run --db-path "$DB" --data-root "$DATA" \
   --report "$STATE/egx-ranking/egx-ranking.json" --candidates "$STATE/egx-ranking/system-candidates.jsonl"
 step experiment "$PY" -m app.egx_experiment_run --db-path "$DB" --data-root "$DATA" \
   --candidates "$STATE/egx-ranking/system-candidates.jsonl" --ranking-report "$STATE/egx-ranking/egx-ranking.json" \
-  --state "$STATE/egx-experiment"
+  --state "$STATE/egx-experiment" --fusion-dir "$STATE/learning/egx/fusion" \
+  --market-watch-evidence "$STATE/market-watch-evidence"
 step universe_scan "$PY" -m app.egx_universe_scan --db-path "$DB" --history-path "$STATE/egx-scan/egx-scan-history.json"
 step context "$PY" -m app.context.run --data-root "$DATA" --report "$STATE/context/context-report.json" \
   --macro-report "$STATE/macro/macro-context.json" --tv-python "$TVPY"
