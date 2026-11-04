@@ -594,3 +594,39 @@ must not substitute for it. Routing consumer, temporary-resource cleanup, host
 isolation verification, service provisioning, supervisor wiring and real acceptance
 remain pending. Tests simulate systemd and API observations, with no host service
 or socket access; their passing results do not establish deployment health.
+
+## Reporting routing consumer
+
+`tools/delivery_routing.py:ReportingRouter` is a WSGI consumer of the production
+backend's atomic `{commit, live_money}` pointer. Protected host policy supplies a
+unique loopback port per retained SHA and an exact public path allowlist. The
+pointer and every ancestor must have the configured trusted owner and no group
+or world write permission; symlink traversal, duplicate JSON fields, unknown
+releases and enabled live money fail closed. Every request reads the current
+pointer, so cutover and rollback need no cached-target reload.
+
+Only GET/HEAD with no query string or request body are supported. This is a
+reporting-only surface, not a general replacement for mutation APIs. The host
+must explicitly select the required reporting and static paths and preserve its
+existing authentication boundary. Client headers, cookies and credentials are
+not forwarded; any upstream authentication requirement needs separate reviewed
+host wiring. No user-supplied upstream or redirects/proxies are accepted. Response
+bodies are buffered with a 4 MiB cap and deadline checks; only a validated content
+type and locally generated length/cache/security headers are returned. Failures
+return a generic unavailable response without exposing host details.
+
+The required `verify_service(sha)` callback must independently observe the
+specific configured port's exact release identity, disabled LIVE_MONEY, API and
+runtime compatibility, and its persistent-service containment. It must not probe
+this router (which would recurse), return cached acceptance or merely echo policy.
+The callback runs before and after fetching; the pointer is reread before response
+publication. A mid-request cutover discards the buffered old response. Requests
+already completing when a pointer changes can finish on the retained old release;
+this is not a connection-draining protocol. The production observer still probes
+the public routing endpoint to establish actual cutover acceptance.
+
+No listener, service, host policy or production route was installed by this work.
+Tests use disposable filesystem pointers and simulated HTTP, including cutover,
+rollback, tampering, unknown identities, safety violations, response limits and
+request-time drift. Independent containment verification, composition/provisioning,
+public endpoint acceptance and exact-release socket tests remain required.
