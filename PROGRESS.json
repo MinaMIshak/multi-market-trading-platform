@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_SCHEDULE_BINDING",
-  "current_capability": "Added host-owned dedicated cron file binding with exact release-local daily jobs, strict prepared-release verification, atomic durable installation/readback and restart rollback through ProductionBackend. Actual daemon adoption, service/routing/containment bindings and host acceptance remain pending.",
-  "starting_head": "e184c88fa8b30c1e1951bca55a24c4e5c9513c81",
-  "head": "e184c88fa8b30c1e1951bca55a24c4e5c9513c81",
+  "phase": "AUTONOMOUS_DELIVERY_WEEKLY_SCHEDULE_POLICY",
+  "current_capability": "Extended dedicated cron binding to daily/weekday module and release-local shell chains, quoted arguments and allowlisted host configuration; pins script interpreter/build identity and validates restart rollback. Host installation and acceptance remain pending.",
+  "starting_head": "d1791f26a9a0f65ab121d5f88f4c274a209e4b27",
+  "head": "d1791f26a9a0f65ab121d5f88f4c274a209e4b27",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected schedule/production/host/runner/supervisor/status suite: 229 passed in 8.83s. Initial focused schedule/production suite: 45 passed. git diff --check passed. Tests use disposable cron files and simulated services; no daemon, deployment or socket acceptance evidence.",
+  "tests": "Affected schedule/production/host/runner/supervisor/status suite: 297 passed in 8.77s. Includes real disposable shell execution proving literal arguments and pinned environment, daily/weekly rollback and simulated production failures. git diff --check passed. No socket or daemon acceptance claimed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Complete trusted persistent-service, routing-consumer and containment bindings; extend host schedule policy for required weekly/non-daily chains and verify daemon adoption/heartbeats. Wire protected policies and supervisor, provision reporting-only source, then run exact-release host full/socket/runtime/spare-port gates before cutover. No strategy promotion.",
+  "next_action": "Complete trusted persistent-service, routing-consumer and containment bindings. Provision full daily/weekly host policy with verified daemon timezone, adoption and heartbeats; wire supervisor and protected policies. Approve isolated reporting-only source and run exact-release host full/socket/runtime/spare-port acceptance before cutover. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Production transaction and dedicated daily cron binding implemented/tested; persistent service, routing consumer, containment, complete host schedule policy, daemon observation, supervisor installation and exact-release acceptance remain pending."
+    "delivery": "Production transaction and daily/weekly cron bindings tested; persistent service, routing consumer, containment, complete installed host policy, daemon observations, supervisor installation and exact-release acceptance remain pending."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
@@ -202,12 +202,12 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "SCHEDULE_BINDING_TESTED_HOST_INSTALLATION_PENDING",
+    "status": "WEEKLY_SCHEDULE_POLICY_TESTED_HOST_INSTALLATION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "Historical rev 3/3a read; release-local cron concern applies to the missing host binding. This cycle implements its dedicated file component; historical host socket claims do not establish current-release acceptance. No strategy work.",
+    "claude_review": "Historical rev 3/3a read as advisory; independently inspected learning_weekly.sh and confirmed its worktree-interpreter fallback. Generated script jobs now supply release-local EGX_PYTHON and build SHA. Historical socket claims do not establish current-release acceptance.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
@@ -222,6 +222,6 @@
     "candidate_acceptance": "ReleaseCandidate binds runtime receipt and policy pins, copies approved state, reserves a spare localhost port, passes its FD to release-local Python, validates exact identity/LIVE_MONEY and HTTP/API/compatibility/SIG-v1 fields, and publishes ACCEPTED only after cleanup and revalidation. Incomplete receipts remain latched. Socket/HTTP tests simulated; actual host acceptance not performed. Host-owned factory/policies and cgroup/filesystem containment remain required.",
     "host_composition": "ComposedHost connects all acceptance components and can use ProductionBackend. Host-owned service bindings and installation remain pending; no deployment claimed.",
     "production_backend": "Implemented durable full schedule/digest backup, guarded atomic JSON routing pointer, staged-service acceptance, production observation, schedule readback and independent idempotent restoration. Real temporary filesystem plus simulated services tested through delivery/recovery. No actual routing consumer, cron or cgroup verification performed.",
-    "schedule_binding": "ReleaseSchedule implements exact daily cron.d policy, clean release-local Python commands, strict release verifier, safe reads, atomic fsynced install and readback. Real disposable filesystem and production rollback integration tested. Host ownership/provisioning, full chain policy including weekly jobs, daemon adoption and heartbeat observation pending."
+    "schedule_binding": "Daily or sorted weekday cron policy supports release-local modules/scripts, literal quoted arguments and allowlisted absolute state/data configuration. Scripts receive exact release-local EGX_PYTHON and build SHA. Missing/symlink scripts, cron percent/control injection and safety overrides rejected. Disposable shell execution and daily/weekly restart/production rollback tested. Host job selection, timezone, daemon adoption and heartbeats remain pending."
   }
 }

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
+import shlex
 import tempfile
 
 from tools.delivery_runner import SHA, require
@@ -17,27 +18,50 @@ from tools.delivery_runner import SHA, require
 class CronJob:
     minute: int
     hour: int
-    module: str
+    module: str | None = None
+    weekdays: tuple[int, ...] = ()  # empty means daily; Sunday=0
+    script: str | None = None
+    arguments: tuple[str, ...] = ()
 
 
 class ReleaseSchedule:
-    def __init__(self, target, environments, bundles, user, jobs, verify_release):
+    def __init__(self, target, environments, bundles, user, jobs, verify_release,
+                 configuration=()):
         self.target = Path(target)
         self.environments, self.bundles = Path(environments), Path(bundles)
         self.user, self.jobs, self.verify_release = user, tuple(jobs), verify_release
+        self.configuration = tuple(configuration)
+        allowed = {'EGX_STATE', 'EGX_OPERATIONAL_DB', 'EGX_OPERATIONAL_DATA', 'EGX_US_DATA'}
+        require(all(isinstance(item, tuple) and len(item) == 2
+                    and item[0] in allowed and isinstance(item[1], str)
+                    and re.fullmatch(r'/[A-Za-z0-9_./-]+', item[1])
+                    and '..' not in Path(item[1]).parts for item in self.configuration),
+                'invalid schedule configuration')
+        require(len({item[0] for item in self.configuration}) == len(self.configuration),
+                'duplicate schedule configuration')
         for path in (self.target.parent, self.environments, self.bundles):
             require(path.is_absolute() and path.resolve() == path and path.is_dir(),
                     'unsafe schedule root')
             require(re.fullmatch(r'/[A-Za-z0-9_./-]+', str(path)), 'unsafe cron path')
         require(re.fullmatch(r'[A-Za-z0-9_-]+', self.target.name), 'invalid cron filename')
         require(re.fullmatch(r'[a-z_][a-z0-9_-]*', user), 'invalid cron user')
-        require(self.jobs and len(set(self.jobs)) == len(self.jobs), 'invalid cron jobs')
+        require(self.jobs and all(isinstance(job, CronJob) for job in self.jobs),
+                'invalid cron jobs')
         for job in self.jobs:
             require(type(job.minute) is int and 0 <= job.minute <= 59
                     and type(job.hour) is int and 0 <= job.hour <= 23
-                    and isinstance(job.module, str)
-                    and re.fullmatch(r'[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*', job.module),
-                    'invalid cron job')
+                    and isinstance(job.weekdays, tuple)
+                    and all(type(day) is int and 0 <= day <= 6 for day in job.weekdays)
+                    and tuple(sorted(set(job.weekdays))) == job.weekdays
+                    and isinstance(job.arguments, tuple)
+                    and all(isinstance(arg, str) and all(32 <= ord(c) < 127 for c in arg)
+                            and '%' not in arg for arg in job.arguments), 'invalid cron job')
+            require((isinstance(job.module, str) and job.script is None
+                     and re.fullmatch(r'[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*', job.module))
+                    or (job.module is None and isinstance(job.script, str)
+                        and re.fullmatch(r'tools/[A-Za-z0-9_/-]+\.sh', job.script)
+                        and '..' not in Path(job.script).parts), 'invalid cron entrypoint')
+        require(len(set(self.jobs)) == len(self.jobs), 'duplicate cron jobs')
 
     def release_schedule(self, sha):
         require(isinstance(sha, str) and SHA.fullmatch(sha), 'full SHA required')
@@ -50,10 +74,21 @@ class ReleaseSchedule:
         # request command. Trusted modules read their host-provisioned configuration.
         lines = ['# delivery-release ' + sha, 'SHELL=/bin/sh',
                  'PATH=/usr/bin:/bin', 'LIVE_MONEY=false', 'PYTHONNOUSERSITE=1']
+        environment = ['PATH=/usr/bin:/bin', 'LIVE_MONEY=false', 'PYTHONNOUSERSITE=1',
+                       f'EGX_PYTHON={python}', f'EGX_BUILD_REVISION={sha}']
+        environment.extend(f'{key}={value}' for key, value in self.configuration)
         for job in self.jobs:
-            lines.append(f'{job.minute} {job.hour} * * * {self.user} cd {source} && '
-                         f'/usr/bin/env -i PATH=/usr/bin:/bin LIVE_MONEY=false '
-                         f'PYTHONNOUSERSITE=1 {python} -m {job.module}')
+            days = ','.join(map(str, job.weekdays)) if job.weekdays else '*'
+            if job.script is not None:
+                script = source / job.script
+                require(script.is_file() and script.resolve() == script,
+                        'release-local script missing or unsafe')
+                command = ['/bin/sh', str(script)]
+            else:
+                command = [str(python), '-m', job.module]
+            command.extend(job.arguments)
+            lines.append(f'{job.minute} {job.hour} * * {days} {self.user} cd {source} && '
+                         + shlex.join(['/usr/bin/env', '-i', *environment, *command]))
         return '\n'.join(lines) + '\n'
 
     def verify_schedule(self, sha, text):

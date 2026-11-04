@@ -9,8 +9,8 @@ from tools.delivery_schedule import CronJob, ReleaseSchedule
 OLD, NEW = 'b' * 40, 'a' * 40
 
 
-@pytest.fixture
-def schedule(tmp_path):
+@pytest.fixture(params=[False, True], ids=["daily", "daily-and-weekly"])
+def schedule(tmp_path, request):
     env, bundles, cron = [tmp_path / n for n in ('env', 'bundles', 'cron')]
     for path in (env, bundles, cron):
         path.mkdir()
@@ -20,9 +20,16 @@ def schedule(tmp_path):
         python.write_text('fixture interpreter, never executed')
         python.chmod(0o755)
         (bundles / sha / 'source').mkdir(parents=True)
+    jobs = [CronJob(15, 4, 'tools.nightly')]
+    if request.param:
+        jobs.append(CronJob(0, 10, weekdays=(6,), script='tools/weekly.sh'))
+        for sha in (OLD, NEW):
+            script = bundles / sha / 'source/tools/weekly.sh'
+            script.parent.mkdir(exist_ok=True)
+            script.write_text('# fixture, never executed\n')
     target = cron / 'egx-delivery'
     result = ReleaseSchedule(target, env, bundles, 'egx',
-                             [CronJob(15, 4, 'tools.nightly')], Mock(return_value=True))
+                             jobs, Mock(return_value=True))
     target.write_text(result.release_schedule(OLD))
     target.chmod(0o644)
     return result
@@ -139,3 +146,94 @@ def test_production_transaction_schedule_failure_rolls_back(schedule, tmp_path):
     restarted.restore_schedule(snapshot)
     assert restarted.rollback_check(snapshot)['scheduler_target'] == OLD
     assert schedule.read_schedule() == snapshot['schedule']
+
+
+def configured(schedule, jobs, configuration=()):
+    return ReleaseSchedule(schedule.target, schedule.environments, schedule.bundles,
+                           schedule.user, jobs, schedule.verify_release, configuration)
+
+
+def test_weekly_script_configuration_and_restart_rollback(schedule):
+    for sha in (OLD, NEW):
+        script = schedule.bundles / sha / 'source/tools/learning_weekly.sh'
+        script.parent.mkdir(exist_ok=True)
+        script.write_text('# fixture, never executed\n')
+    jobs = [*schedule.jobs, CronJob(0, 10, weekdays=(6,), script='tools/learning_weekly.sh'),
+            CronJob(5, 2, 'app.report', weekdays=(0, 2, 4),
+                    arguments=('--label', 'two words', '; touch /tmp/never'))]
+    config = (('EGX_STATE', '/host/state'), ('EGX_US_DATA', '/host/us-data'))
+    bound = configured(schedule, jobs, config)
+    old, new = bound.release_schedule(OLD), bound.release_schedule(NEW)
+    bound.target.write_text(old)
+    bound.install_schedule(new)
+    assert '0 10 * * 6 egx ' in new
+    assert '5 2 * * 0,2,4 egx ' in new
+    assert f'EGX_PYTHON={bound.environments}/{NEW}/venv/bin/python' in new
+    assert f'EGX_BUILD_REVISION={NEW}' in new
+    assert 'EGX_STATE=/host/state EGX_US_DATA=/host/us-data' in new
+    assert "--label 'two words' '; touch /tmp/never'" in new
+    fresh = configured(schedule, jobs, config)
+    fresh.install_schedule(old)
+    assert fresh.read_schedule() == old
+    assert not fresh.verify_schedule(NEW, old)
+    assert not configured(schedule, jobs).verify_schedule(OLD, old)
+
+
+@pytest.mark.parametrize('job', [
+    CronJob(0, 1, 'x', weekdays=(7,)), CronJob(0, 1, 'x', weekdays=(True,)),
+    CronJob(0, 1, 'x', weekdays=(2, 1)), CronJob(0, 1, 'x', weekdays=(1, 1)),
+    CronJob(0, 1, 'x', weekdays=[1]), CronJob(0, 1),
+    CronJob(0, 1, 'x', script='tools/a.sh'),
+    CronJob(0, 1, script='/tmp/a.sh'), CronJob(0, 1, script='tools/../a.sh'),
+    CronJob(0, 1, 'x', arguments=('a%command',)),
+    CronJob(0, 1, 'x', arguments=('a\ncommand',)),
+    CronJob(0, 1, 'x', arguments=('a\x00command',)),
+    CronJob(0, 1, 'x', arguments=['x']),
+])
+def test_invalid_extended_job_policy(schedule, job):
+    with pytest.raises(DeliveryError):
+        configured(schedule, [job])
+
+
+@pytest.mark.parametrize('config', [
+    (('LIVE_MONEY', 'true'),), (('EGX_PYTHON', '/dev/python'),),
+    (('PYTHONPATH', '/tmp'),), (('EGX_STATE', '/tmp/a%bad'),),
+    (('EGX_STATE', '/tmp/../state'),), (('EGX_STATE', 'relative'),),
+    (('EGX_STATE', '/state'), ('EGX_STATE', '/other')),
+])
+def test_invalid_configuration(schedule, config):
+    with pytest.raises(DeliveryError):
+        configured(schedule, schedule.jobs, config)
+
+
+def test_weekly_script_missing_or_symlink_rejected(schedule):
+    bound = configured(schedule, [CronJob(0, 10, script='tools/missing.sh', weekdays=(6,))])
+    old = bound.read_schedule()
+    with pytest.raises(DeliveryError, match='script'):
+        bound.release_schedule(NEW)
+    script = bound.bundles / NEW / 'source/tools/missing.sh'
+    script.parent.mkdir(exist_ok=True)
+    script.unlink(missing_ok=True)
+    script.symlink_to(schedule.target)
+    with pytest.raises(DeliveryError, match='script'):
+        bound.release_schedule(NEW)
+    assert bound.read_schedule() == old
+
+
+def test_generated_script_runs_with_pinned_environment_and_literal_arguments(schedule):
+    import os
+    import subprocess
+    script = schedule.bundles / NEW / 'source/tools/observe.sh'
+    script.parent.mkdir(exist_ok=True)
+    script.write_text('printf "%s\\n" "$EGX_PYTHON" "$EGX_BUILD_REVISION" '
+                      '"$LIVE_MONEY" "$EGX_STATE" "$1" "$2"\n')
+    job = CronJob(0, 10, weekdays=(6,), script='tools/observe.sh',
+                  arguments=('two words', '$(exit 99); false'))
+    bound = configured(schedule, [job], (('EGX_STATE', '/host/state'),))
+    command = bound.release_schedule(NEW).splitlines()[-1].split(maxsplit=6)[6]
+    result = subprocess.run(['/bin/sh', '-c', command], check=True, text=True,
+                            capture_output=True, env={**os.environ,
+                            'LIVE_MONEY': 'true', 'EGX_PYTHON': '/wrong/python'})
+    assert result.stdout.splitlines() == [
+        str(bound.environments / NEW / 'venv/bin/python'), NEW, 'false',
+        '/host/state', 'two words', '$(exit 99); false']

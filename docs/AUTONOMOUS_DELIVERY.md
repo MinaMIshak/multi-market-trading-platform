@@ -528,7 +528,7 @@ or deployed on the strength of these simulations.
 
 `tools/delivery_schedule.py:ReleaseSchedule` supplies the four schedule methods
 for the trusted production services driver. It generates an exact dedicated
-cron.d file from host-owned daily job times, module names, user and immutable
+cron.d file from host-owned daily or weekday job times, entrypoints, user and immutable
 bundle/environment roots. Every command changes to the SHA source and invokes
 that SHA's interpreter with a clean environment and LIVE_MONEY=false. No request
 can supply a shell command or an alternative schedule. The supplied release
@@ -548,8 +548,21 @@ The host must provision a root-owned cron.d target and protected parent, invoke
 this binding with the proper owner under the delivery lease, retain the prior
 release and policy for rollback, and independently verify cron daemon adoption
 and chain heartbeats. File readback proves installed text, not daemon execution
-or scheduler health. A separate host policy is needed for weekly/non-daily jobs;
-this binding intentionally accepts daily jobs only. No cron daemon was inspected
+or scheduler health. Host policy can now specify a sorted tuple of weekdays (Sunday=0 through
+Saturday=6; empty means daily), module arguments, or a release-local `tools/*.sh`
+entrypoint. Day-of-month/month remain wildcards, avoiding cron's day-field OR
+ambiguity. Times use the host cron daemon timezone; configuring `TZ` in a job
+would not establish its scheduling timezone. Host provisioning must verify it.
+Arguments are shell-quoted; cron percent expansion, control characters, unsafe
+script paths and duplicate jobs are rejected. Scripts must exist without symlink
+traversal in the independently verified source bundle. Every command pins
+`EGX_PYTHON` and `EGX_BUILD_REVISION` to the target release, including the existing
+weekly learning script. Optional host-owned absolute configuration paths are
+limited to `EGX_STATE`, `EGX_OPERATIONAL_DB`, `EGX_OPERATIONAL_DATA`, and
+`EGX_US_DATA`; interpreter, environment and live-money overrides are rejected.
+Exact verification includes configuration, weekdays and arguments. Host policy
+must select all actual daily/weekly chains and retain that policy for rollback;
+this component does not automatically infer or install it. No cron daemon was inspected
 or changed in Codex. Filesystem tests include production-backend rollback after
 an install succeeds and then raises. Routing consumer, persistent service and
 containment bindings, host policy wiring and actual acceptance remain pending.
