@@ -566,3 +566,31 @@ this component does not automatically infer or install it. No cron daemon was in
 or changed in Codex. Filesystem tests include production-backend rollback after
 an install succeeds and then raises. Routing consumer, persistent service and
 containment bindings, host policy wiring and actual acceptance remain pending.
+
+## Persistent service binding
+
+`tools/delivery_service.py:ReleaseService` implements `contained` and `stage`
+for host composition. The host provisions a separate full-SHA-named systemd
+unit per retained release, an exact unit-file digest and loaded property policy,
+a pinned systemctl executable, a release verifier, a direct-service API probe,
+and an independent isolation verifier. No units are generated or installed by
+this component. Invoke it only inside the supervisor's delivery lease.
+
+Before starting, it checks the fragment digest, exact loaded execution properties,
+absence of drop-ins/pending daemon reload, non-root service user, strict filesystem
+protection, no privilege escalation, control-group kill behavior, disabled delegation,
+and an exact SHA/disabled live-money environment. Start is idempotent and never
+restarts or stops the prior release. Running state, PID and cgroup are required
+before API acceptance and rechecked afterwards. The caller still requires SIG-v1
+for new releases; older rollback releases may lack it.
+
+The isolation callback must independently inspect actual host ownership, protected
+runtime files/mounts, cgroup restrictions and running PID membership. Unit properties
+alone do not establish containment. The callback must return boolean true, never
+infer success from this module's policy comparison. Protected policies and roots
+must remain immutable to candidate code and other writers throughout the lease.
+The separate production observer must probe the routing endpoint; the stage probe
+must not substitute for it. Routing consumer, temporary-resource cleanup, host
+isolation verification, service provisioning, supervisor wiring and real acceptance
+remain pending. Tests simulate systemd and API observations, with no host service
+or socket access; their passing results do not establish deployment health.
