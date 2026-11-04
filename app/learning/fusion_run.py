@@ -23,6 +23,8 @@ from app.learning.dataset import FEATURE_SCHEMA, VERSION as DATA_VERSION, build,
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--quant-challenger", action="store_true",
+                        help="Research DF-CFG-2; writes a separate cache, never the live cache")
     parser.add_argument("--state", required=True)
     parser.add_argument("--market", choices=("EGX", "US"), required=True)
     for name in ("--egx-db", "--egx-data", "--egx-evidence", "--us-data", "--us-report"):
@@ -40,7 +42,7 @@ def main(argv=None):
         closes = us_benchmarks.load(args.us_data)
         benchmarks = {name: us_benchmarks.forward_returns(ds.sessions, series_closes)
                       for name, series_closes in closes.items()} or None
-    evaluation = fusion_eval.run(ds, market=args.market, benchmarks=benchmarks)
+    evaluation = fusion_eval.run(ds, market=args.market, benchmarks=benchmarks, challenger=args.quant_challenger)
     research = fusion_eval.factor_research(ds)
     gaps = fusion_eval.gap_research(ds) if args.market == "US" else None
     document = {"schema": "fusion-walkforward-v1", "market": args.market, "generated_at": started.isoformat(),
@@ -51,7 +53,12 @@ def main(argv=None):
                 "champion": "DF0" if args.market == "EGX" else "US-DF0", "promotion": "NONE: no auto-promotion; requires ≥ 50 sessions of out-of-sample "
                                                 "superiority across regimes and an operator decision",
                 "rationale": fusion.RATIONALE, "effective_date": fusion.EFFECTIVE_DATE}
-    _write_atomic(Path(args.state) / args.market.lower() / "fusion_walkforward.json", document)
+    filename = "fusion_walkforward_cfg2.json" if args.quant_challenger else "fusion_walkforward.json"
+    if args.quant_challenger:
+        document["effective_date"] = "2026-11-04"
+        document["promotion"] = "NOT_AUTHORIZED: research challenger; multiplicity and independent OOS validation pending"
+        document["rationale"] = "DF-CFG-2: positive signed IC gate with monotonic train-fold quintile scores"
+    _write_atomic(Path(args.state) / args.market.lower() / filename, document)
     print(json.dumps({"market": args.market, "rows": evaluation["evaluated_rows"],
                       "arms": {a: r["all"].get("spearman_mean") for a, r in evaluation["results"].items()},
                       "live_money": False}))

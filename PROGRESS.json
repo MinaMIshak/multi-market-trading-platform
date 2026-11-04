@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SIG_V1_DEPENDENCY_VALIDATION_AND_PUBLISHED_EVIDENCE",
-  "current_capability": "SIG-v1 focused dependency-backed tests pass; reporting-only parity against pre-SIG code confirmed on synthetic fixtures for EGX/US fusion and walk-forward metrics. November 4 published snapshot observed and report hashes verified. EGX remains INCONCLUSIVE and US FLAT; no proven tradeable edge or promotion.",
-  "starting_head": "56ef53a56466fada3d025c769385df4dbc232b5b",
-  "head": "56ef53a56466fada3d025c769385df4dbc232b5b",
+  "phase": "DF_CFG_2_ISOLATED_QUANT_CHALLENGER",
+  "current_capability": "Opt-in DF-CFG-2 / US-DF-CFG-2 research configs enforce monotonic positive-gate quant tables fitted inside training folds; separate cache, unchanged legacy/live arms, no US fundamentals. Synthetic regression validation only; no market-edge or promotion claim.",
+  "starting_head": "f11c919fd68e22dadc5a720ec8e6e2cd659a13c6",
+  "head": "f11c919fd68e22dadc5a720ec8e6e2cd659a13c6",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "55 focused SIG-v1/learning/fusion tests passed; 35 checkpoint/offline/SYSTEM tests and 147 subtests passed. Full suite: 3708 passed, 693 subtests passed, 2 failed in 739.16s (exit 1): experimental-runtime launch tests denied socket creation by sandbox. Full suite is NOT green. Pre-SIG legacy-field fixture parity passed for EGX/US fusion and walk-forward; git diff --check passed. See docs/SIG_V1_RELEASE_CHECKPOINT.md.",
+  "tests": "75 affected tests and 85 subtests passed in 27.83s (challenger, fusion, learning, significance, checkpoint/SYSTEM); git diff --check passed. Synthetic correctness only. Prior full suite: 3708 passed, 2 sandbox socket failures; not retried. Full release acceptance remains pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "In a socket-enabled authorized release environment, validate the two experimental-runtime launch cases and SIG-v1 spare-port acceptance; measure full-scale nightly runtime/RSS before separate reporting-only cutover. Do not retry sandbox socket denial here. Next independent repository unit: versioned DF-CFG-2 / US-DF-CFG-2 quant-direction challengers with train-fold-only fitting and regression tests, preserving existing arms/frozen artifacts and excluding unvalidated US fundamentals. Pre-register primary comparison and address multiplicity before promotion evidence; no automatic promotion.",
+  "next_action": "Add two-market Holm-adjusted primary inference and component-level OOS diagnostics for DF-Q2/US-DF-Q2; evaluate authorized copied snapshots with provenance and empirical volatility loading, then independent forward retest. No promotion. Keep SIG-v1 release separate: socket-enabled acceptance and full-scale runtime/RSS remain pending; do not retry sandbox socket denial.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -132,7 +132,7 @@
     "runtime_evidence": "Dated published report counts and nightly completion observed; current process health, heartbeat, provider health and authoritative membership not verified.",
     "egx_universe": "224 baseline target; authoritative dated membership remains UNKNOWN.",
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
-    "quant_direction": "Supervisor diagnostic identifies inconsistent quant direction/high-volatility reward; versioned challenger correction and independent retest pending.",
+    "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
@@ -161,7 +161,7 @@
       "tradeable_edge_proven": false,
       "promotion": "NOT_AUTHORIZED"
     },
-    "quant_direction": "Correction pending as new versioned challenger; preserve historical frozen predictions.",
+    "quant_direction": "DF-CFG-2 / US-DF-CFG-2 opt-in research only; existing arms and frozen forecasts preserved. Primary h3 rank IC versus DF0 registered in docs/DF_CFG_2_CHALLENGER.md; no promotion.",
     "confidence": "LOW/non-informative per supervisor; no threshold loosening. EGX C2 shadow requires evidence gates; US confidence waits for quant correction."
   },
   "reconciliation": {
@@ -185,5 +185,19 @@
     ],
     "failure_cause": "Socket creation denied by sandbox, before launch assertions",
     "environment_packages_sha256": "6b374b9041e323ad54ce2d803dd0994a7528234af1daae7735bb69ea61834258"
+  },
+  "challenger": {
+    "configs": [
+      "DF-CFG-2",
+      "US-DF-CFG-2"
+    ],
+    "arms": [
+      "DF-Q2",
+      "US-DF-Q2"
+    ],
+    "registration": "docs/DF_CFG_2_CHALLENGER.md",
+    "runtime_enabled": false,
+    "market_data_evaluation": "NOT_RUN",
+    "promotion": "NOT_AUTHORIZED"
   }
 }

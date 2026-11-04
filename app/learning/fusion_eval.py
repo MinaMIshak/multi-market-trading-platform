@@ -181,9 +181,12 @@ def _excess(per):
     return out
 
 
-def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
+def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None, challenger=False):
     """benchmarks: {name: {session_index: forward 3-session return}} (US: SPY, QQQ), from that market only."""
-    config = fusion.MARKETS[market]
+    from app.learning.fusion_challenger import DirectionalQuantEdge, configuration
+    config = configuration(market) if challenger else fusion.MARKETS[market]
+    quant_class = DirectionalQuantEdge if challenger else fusion.QuantEdge
+    quant_folds = {}
     by_session = ds.by_session()
     regime, breadth = fusion.regime_series(ds, by_session)
     plan = folds(ds.sessions, min_train=min_train)
@@ -192,13 +195,17 @@ def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
     for fold in plan:
         cutoff = fold["start_index"]
         train_sessions = [k for k in by_session if k < cutoff]
-        quant = fusion.QuantEdge(config["quant_groups"]).fit(ds, by_session, train_sessions, cutoff)
+        quant = quant_class(config["quant_groups"]).fit(ds, by_session, train_sessions, cutoff)
+        if challenger:
+            quant_folds[fold["start"]] = {"cutoff_index": cutoff, "ic": quant.ic,
+                                          "edges": quant.edges, "bin_counts": quant.counts}
         train_rows = array("i", (i for i in range(ds.n) if ds.row_session[i] < cutoff))
         forecast_model = BucketModel().fit(ds, train_rows, cutoff) if len(train_rows) >= 500 else None
         del train_rows
         prior = [{"scores": store.score_dict(j), "ret3": store.r3[j]} for j in range(len(store.session))
                  if store.liquid[j] and not isnan(store.r3[j]) and store.end3[j] < cutoff]
-        learned_by_fold[fold["start"]] = fusion.learn_weights(prior, components=config["components"])
+        learned_by_fold[fold["start"]] = (None if challenger else
+                                            fusion.learn_weights(prior, components=config["components"]))
         del prior
         for day in fold["sessions"]:
             k = ds.session_index[day]
@@ -214,6 +221,8 @@ def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
                 store.add(ds, k, i, scores, (ds.value("turnover20", i) or 0) >= LIQUIDITY_FLOOR[market], tier)
 
     def weights_for(arm, k):
+        if challenger:
+            return {c: config["weights"][c] for c in config["arms"][arm]}
         return fusion.arm_weights(arm, learned_by_fold.get(fold_of_session.get(k)), market)
 
     values = [b for b in breadth.values() if b is not None]
@@ -251,7 +260,12 @@ def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
                                                                "recall_top10_in_top20", "top10_mean_r3", "top10_mean_r1",
                                                                "top10_mean_mae3", "max_drawdown_cum_r1")}
     learned = [w for w in learned_by_fold.values() if w]
-    return {"market": market, "strategy": config["strategy"], "config": config["config"],
+    return {**({"quant_training_folds": quant_folds, "promotion": "NOT_AUTHORIZED",
+                "primary_comparison": {"metric": "paired session h3 rank IC",
+                                       "challenger": names[1], "baseline": names[0],
+                                       "multiplicity": "PENDING: two-market family; no selection evidence"}}
+               if challenger else {}),
+            "market": market, "strategy": config["strategy"], "config": config["config"],
             "arms": {k: list(v) for k, v in config["arms"].items()}, "learned_arm": config["learned_arm"],
             "base_weights": config["weights"], "df5_cap": fusion.DF5_CAP,
             "segmentation": ("dollar-turnover tiers within session (cap proxy; research only, no segment model "
