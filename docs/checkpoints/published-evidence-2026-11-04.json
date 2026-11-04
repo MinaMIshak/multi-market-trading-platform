@@ -1,0 +1,127 @@
+{
+  "observed_at": "2026-11-04T11:08:34.247407+00:00",
+  "semantics": "Published snapshot observation, not current runtime readiness, provider health or authoritative membership verification. Candidate != fill.",
+  "pointer": {
+    "action": "publish",
+    "build_revision": "1124598ff424b1fe8d4befc5bf19be7156d0305c",
+    "bundle": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z",
+    "missing": [
+      "heartbeat"
+    ],
+    "published_at": "2026-11-04T06:42:19.551228+00:00"
+  },
+  "reports": {
+    "ranking": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/egx-ranking.json",
+      "sha256": "a1767d47e79b9b1a170253859b0271c77b319555a4168b5be560b9a68c036c6d",
+      "manifest_hash_verified": true,
+      "based_on_session": "2026-11-03",
+      "generated_at": "2026-11-04T06:39:32.427600+00:00",
+      "symbols_ranked": 229,
+      "counts": {
+        "CANDIDATE": 2,
+        "NO_TRADE": 219,
+        "WATCHLIST": 8
+      },
+      "rank_version": "EGX-RANK-v1"
+    },
+    "us_ranking": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/us-ranking.json",
+      "sha256": "02f11b963d845eb0ef4fc26dea5e9a9cfbaef9a1263e1f3afdd03f68b68b9633",
+      "manifest_hash_verified": true,
+      "based_on_session": "2026-11-03",
+      "generated_at": "2026-11-04T04:15:02.246476+00:00",
+      "symbols_ranked": 500,
+      "counts": {
+        "CANDIDATE": 161,
+        "NO_TRADE": 260,
+        "STRONG_CANDIDATE": 5,
+        "WATCHLIST": 74
+      },
+      "rank_version": "US-RANK-v1",
+      "universe": {
+        "eligible": 4910,
+        "excluded": {
+          "ETF_IN_MASTER": 0,
+          "NOT_IN_MASTER": 0
+        },
+        "floor_avg_dollar_volume_30d": "232607040",
+        "master_symbols": 13239,
+        "provenance": [
+          {
+            "date": "Wed, 04 Nov 2026 04:15:02 GMT",
+            "etag": "\"e39d8d9d46cdd1:0\"",
+            "last_modified": "Wed, 04 Nov 2026 02:31:36 GMT",
+            "raw_sha256": "65aa075126679c2d0dfc64ca883f170146fa887f684772cf8aafe4586ebc0b92",
+            "retrieved_at": "2026-11-04T04:15:03.295599+00:00",
+            "source_id": "nasdaqtrader",
+            "url": "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
+          },
+          {
+            "date": "Wed, 04 Nov 2026 04:15:02 GMT",
+            "etag": "\"efd8a29d46cdd1:0\"",
+            "last_modified": "Wed, 04 Nov 2026 02:31:37 GMT",
+            "raw_sha256": "aeaf17c31ce838506d2433f6d51738db4c4baa7953c8722a23b467e3998a0560",
+            "retrieved_at": "2026-11-04T04:15:04.110183+00:00",
+            "source_id": "nasdaqtrader",
+            "url": "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
+          },
+          {
+            "date": "Wed, 04 Nov 2026 04:15:04 GMT",
+            "raw_sha256": "b76b4808a99e8007caecba1252e20fd64246cc958a68f8e70dbe5a5135bb8b15",
+            "retrieved_at": "2026-11-04T04:15:05.347067+00:00",
+            "source_id": "tradingview_scanner",
+            "url": "https://scanner.tradingview.com/america/scan"
+          }
+        ],
+        "rule": "top 500 primary-listed common stocks by 30-day average dollar volume (TradingView scanner), present, non-test and non-ETF in the Nasdaq Trader directories; current liquidity, forward research only",
+        "scanner_rows": 4910,
+        "size": 500,
+        "version": "US-UNIVERSE-v1"
+      }
+    },
+    "scan_history": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/egx-scan-history.json",
+      "sha256": "e7b479991d2f6e5f93b61af9724dce87bab06d76e700b561f66ef74a5b255c02",
+      "manifest_hash_verified": true,
+      "requested": 312,
+      "scanned": 0,
+      "status_counts": {
+        "WATCH": 0,
+        "READY_NO_SIGNAL": 0,
+        "EVIDENCE_BLOCKED": 312,
+        "DATA_STALE": 0,
+        "NOT_READY": 0
+      },
+      "scope_kind": "EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE",
+      "scope_reference": "security-master-equity-universe",
+      "completed_at": "2026-11-04T06:39:35.705571+00:00"
+    },
+    "egx_experiment": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/egx-experiment.json",
+      "sha256": "4bfe94ad2d85d4b4fe6a33c5cbbf7acca4bd0c8c4cc9078989cbddef8f32bb1a",
+      "manifest_hash_verified": true,
+      "health": {
+        "candidates": 235,
+        "decisions": 235,
+        "new_decisions": 2,
+        "stale_decisions": 0,
+        "status": "HEALTHY",
+        "tickers_without_latest_artifact": [],
+        "v1_lifecycle_parity_mismatches": []
+      },
+      "session": "2026-11-03",
+      "generated_at": "2026-11-04T06:39:34.768614+00:00"
+    }
+  },
+  "scheduler": {
+    "egx_chain_done": "2026-11-04T06:42:19Z",
+    "us_chain_done": "2026-11-04T04:27:32Z",
+    "sources": [
+      "/home/egx-agent/er1-autopilot/state/nightly/20261104.log",
+      "/home/egx-agent/er1-autopilot/state/us-nightly/20261104.log"
+    ],
+    "installed_crontab": "UNKNOWN: crontab -l denied by sandbox",
+    "heartbeat": "MISSING in published bundle"
+  }
+}

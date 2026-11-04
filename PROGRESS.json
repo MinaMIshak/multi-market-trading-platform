@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "CHECKPOINT_RECONCILIATION_SIG_VALIDATION",
-  "current_capability": "Source includes V2E and SIG-v1 reporting. Supervisor reports EGX INCONCLUSIVE and US FLAT; neither has a proven tradeable edge. Quant direction requires a new versioned challenger. SYSTEM reads this reconciled checkpoint as reported history only. No runtime observations collected this cycle.",
-  "starting_head": "741f8b4f3566d43da4434f65a9c840566f2dbc6b",
-  "head": "741f8b4f3566d43da4434f65a9c840566f2dbc6b",
+  "phase": "SIG_V1_DEPENDENCY_VALIDATION_AND_PUBLISHED_EVIDENCE",
+  "current_capability": "SIG-v1 focused dependency-backed tests pass; reporting-only parity against pre-SIG code confirmed on synthetic fixtures for EGX/US fusion and walk-forward metrics. November 4 published snapshot observed and report hashes verified. EGX remains INCONCLUSIVE and US FLAT; no proven tradeable edge or promotion.",
+  "starting_head": "56ef53a56466fada3d025c769385df4dbc232b5b",
+  "head": "56ef53a56466fada3d025c769385df4dbc232b5b",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -16,11 +16,42 @@
     "not_ready": null,
     "data_stale": null,
     "evidence_blocked": null,
-    "counts_scope": "Current counts UNKNOWN; no fresh runtime observation. Historical counts preserved in archived checkpoint, not current coverage.",
+    "counts_scope": "224 baseline target retained. Published ranking scope: 229 classified series for 2026-11-03. Separate legacy launch scope: 312 requested, 0 scanned, 312 EVIDENCE_BLOCKED. Neither establishes authoritative current membership.",
     "observed_at": null,
     "valid_until": null,
     "last_verified_session": null,
-    "source": "No fresh runtime observation this cycle"
+    "source": "Published snapshot evidence: docs/checkpoints/published-evidence-2026-11-04.json. Top-level readiness/current scan fields remain unverified; nested ranking counts are dated observations, not fills.",
+    "published_snapshot_observation": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/egx-ranking.json",
+      "sha256": "a1767d47e79b9b1a170253859b0271c77b319555a4168b5be560b9a68c036c6d",
+      "manifest_hash_verified": true,
+      "based_on_session": "2026-11-03",
+      "generated_at": "2026-11-04T06:39:32.427600+00:00",
+      "symbols_ranked": 229,
+      "counts": {
+        "CANDIDATE": 2,
+        "NO_TRADE": 219,
+        "WATCHLIST": 8
+      },
+      "rank_version": "EGX-RANK-v1"
+    },
+    "legacy_launch_snapshot_observation": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/egx-scan-history.json",
+      "sha256": "e7b479991d2f6e5f93b61af9724dce87bab06d76e700b561f66ef74a5b255c02",
+      "manifest_hash_verified": true,
+      "requested": 312,
+      "scanned": 0,
+      "status_counts": {
+        "WATCH": 0,
+        "READY_NO_SIGNAL": 0,
+        "EVIDENCE_BLOCKED": 312,
+        "DATA_STALE": 0,
+        "NOT_READY": 0
+      },
+      "scope_kind": "EXPLICIT_SELECTION_NOT_AUTHORITATIVE_UNIVERSE",
+      "scope_reference": "security-master-equity-universe",
+      "completed_at": "2026-11-04T06:39:35.705571+00:00"
+    }
   },
   "us": {
     "configured_universe": null,
@@ -31,19 +62,74 @@
     "strong_candidates": null,
     "session": null,
     "session_verification": "UNKNOWN",
-    "source": "No fresh runtime observation this cycle; historical 500-name scope is not verified current membership."
+    "source": "Published snapshot evidence: docs/checkpoints/published-evidence-2026-11-04.json. Top-level readiness/current scan fields remain unverified; nested ranking counts are dated observations, not fills.",
+    "published_snapshot_observation": {
+      "source": "/home/egx-agent/er1-autopilot/state/snapshots/published-20261104T064219Z/us-ranking.json",
+      "sha256": "02f11b963d845eb0ef4fc26dea5e9a9cfbaef9a1263e1f3afdd03f68b68b9633",
+      "manifest_hash_verified": true,
+      "based_on_session": "2026-11-03",
+      "generated_at": "2026-11-04T04:15:02.246476+00:00",
+      "symbols_ranked": 500,
+      "counts": {
+        "CANDIDATE": 161,
+        "NO_TRADE": 260,
+        "STRONG_CANDIDATE": 5,
+        "WATCHLIST": 74
+      },
+      "rank_version": "US-RANK-v1",
+      "universe": {
+        "eligible": 4910,
+        "excluded": {
+          "ETF_IN_MASTER": 0,
+          "NOT_IN_MASTER": 0
+        },
+        "floor_avg_dollar_volume_30d": "232607040",
+        "master_symbols": 13239,
+        "provenance": [
+          {
+            "date": "Wed, 04 Nov 2026 04:15:02 GMT",
+            "etag": "\"e39d8d9d46cdd1:0\"",
+            "last_modified": "Wed, 04 Nov 2026 02:31:36 GMT",
+            "raw_sha256": "65aa075126679c2d0dfc64ca883f170146fa887f684772cf8aafe4586ebc0b92",
+            "retrieved_at": "2026-11-04T04:15:03.295599+00:00",
+            "source_id": "nasdaqtrader",
+            "url": "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
+          },
+          {
+            "date": "Wed, 04 Nov 2026 04:15:02 GMT",
+            "etag": "\"efd8a29d46cdd1:0\"",
+            "last_modified": "Wed, 04 Nov 2026 02:31:37 GMT",
+            "raw_sha256": "aeaf17c31ce838506d2433f6d51738db4c4baa7953c8722a23b467e3998a0560",
+            "retrieved_at": "2026-11-04T04:15:04.110183+00:00",
+            "source_id": "nasdaqtrader",
+            "url": "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
+          },
+          {
+            "date": "Wed, 04 Nov 2026 04:15:04 GMT",
+            "raw_sha256": "b76b4808a99e8007caecba1252e20fd64246cc958a68f8e70dbe5a5135bb8b15",
+            "retrieved_at": "2026-11-04T04:15:05.347067+00:00",
+            "source_id": "tradingview_scanner",
+            "url": "https://scanner.tradingview.com/america/scan"
+          }
+        ],
+        "rule": "top 500 primary-listed common stocks by 30-day average dollar volume (TradingView scanner), present, non-test and non-ETF in the Nasdaq Trader directories; current liquidity, forward research only",
+        "scanner_rows": 4910,
+        "size": 500,
+        "version": "US-UNIVERSE-v1"
+      }
+    }
   },
-  "tests": "6 stdlib unittest tests passed: checkpoint reconciliation (3), SIG-v1 offline reporting contracts (3). git diff --check passed. Dependency-backed SIG-v1/fusion/SYSTEM integration and full release suite pending; known package blockers not retried. See docs/SIG_V1_RELEASE_CHECKPOINT.md.",
-  "deployment": "Supervisor CYCLE_CONTEXT.md reports production 1124598; docs/PREVIEW_RUNTIME.md records its 2026-10-15 cutover. Not independently observed this cycle. SIG-v1 741f8b4 is not deployed; release validation and separately authorized safe cutover pending.",
-  "scheduler": "docs/PREVIEW_RUNTIME.md records four cron entries moved to 1124598 on 2026-10-15. Current heartbeat, execution and installed configuration UNKNOWN; no scheduler inspection this cycle.",
-  "next_action": "Finish dependency-backed SIG-v1 reporting-only integration/release validation in an equipped environment; retain deployment pending. Independently implement quant-direction correction as DF-CFG-2 / US-DF-CFG-2 challengers with regression tests, preserving existing arms and frozen artifacts. No automatic promotion.",
+  "tests": "55 focused SIG-v1/learning/fusion tests passed; 35 checkpoint/offline/SYSTEM tests and 147 subtests passed. Full suite: 3708 passed, 693 subtests passed, 2 failed in 739.16s (exit 1): experimental-runtime launch tests denied socket creation by sandbox. Full suite is NOT green. Pre-SIG legacy-field fixture parity passed for EGX/US fusion and walk-forward; git diff --check passed. See docs/SIG_V1_RELEASE_CHECKPOINT.md.",
+  "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
+  "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
+  "next_action": "In a socket-enabled authorized release environment, validate the two experimental-runtime launch cases and SIG-v1 spare-port acceptance; measure full-scale nightly runtime/RSS before separate reporting-only cutover. Do not retry sandbox socket denial here. Next independent repository unit: versioned DF-CFG-2 / US-DF-CFG-2 quant-direction challengers with train-fold-only fitting and regression tests, preserving existing arms/frozen artifacts and excluding unvalidated US fundamentals. Pre-register primary comparison and address multiplicity before promotion evidence; no automatic promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
   "capability_blockers": {
-    "test_execution": "Known pytest/pydantic/package blockers not retried; no changed environment evidence. Dependency-backed integration and full release validation pending.",
-    "deployment": "Production access prohibited in this cycle. Safe external release validation/cutover pending; this does not block repository development.",
-    "runtime_evidence": "No fresh scans, heartbeat, provider health, market membership or matured forward artifacts observed this cycle.",
+    "test_execution": "Package blocker cleared. Full suite completed: only two experimental-runtime tests failed at socket.socket with PermissionError [Errno 1]. Socket-enabled integration validation pending; do not retry this sandbox restriction without changed environment evidence.",
+    "deployment": "SIG-v1 safe cutover pending socket-enabled runtime acceptance, full-scale nightly runtime/RSS evidence and rollback checks. No deployment performed; independent repository work can continue.",
+    "runtime_evidence": "Dated published report counts and nightly completion observed; current process health, heartbeat, provider health and authoritative membership not verified.",
     "egx_universe": "224 baseline target; authoritative dated membership remains UNKNOWN.",
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Supervisor diagnostic identifies inconsistent quant direction/high-volatility reward; versioned challenger correction and independent retest pending.",
@@ -82,6 +168,22 @@
     "date": "2026-11-04",
     "source": "/home/egx-agent/er1-autopilot/state/CYCLE_CONTEXT.md",
     "previous_checkpoint": "docs/checkpoints/progress-before-2026-11-04.json",
-    "runtime_verified": false
+    "runtime_verified": false,
+    "published_evidence": "docs/checkpoints/published-evidence-2026-11-04.json",
+    "published_snapshot_observed": true
+  },
+  "validation_evidence": {
+    "directory": "/home/egx-agent/er1-autopilot/state/validation/sig-v1-20261104",
+    "full_suite_exit_code": 1,
+    "full_suite_passed": 3708,
+    "full_suite_failed": 2,
+    "full_suite_subtests_passed": 693,
+    "full_suite_seconds": 739.16,
+    "failed_tests": [
+      "tests/test_experimental_runtime.py::test_failed_candidate_preserves_previous",
+      "tests/test_experimental_runtime.py::test_success_records_identity_without_stopping_child"
+    ],
+    "failure_cause": "Socket creation denied by sandbox, before launch assertions",
+    "environment_packages_sha256": "6b374b9041e323ad54ce2d803dd0994a7528234af1daae7735bb69ea61834258"
   }
 }
