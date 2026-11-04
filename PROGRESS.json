@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_OFFLINE_ENVIRONMENT",
-  "current_capability": "Implemented offline release-local venv provisioning tied to verified source, trusted interpreter/wheel hashes and exact inventory; immutable manifest verification and real disposable offline integration passed. Production policy/runtime pinning and host adapter installation remain pending.",
-  "starting_head": "f1a7ce8dd3b38e3f410e7858cf566ed5639f6b75",
-  "head": "f1a7ce8dd3b38e3f410e7858cf566ed5639f6b75",
+  "phase": "AUTONOMOUS_DELIVERY_DURABLE_PREPARATION",
+  "current_capability": "Integrated exact-source bundle and offline environment preparation with durable host-owned manifest/policy receipts, restart verification and fail-closed interruption handling. Complete host validation/cutover adapter and installation remain pending.",
+  "starting_head": "a85cb8049835288338acd7505fb6f51d969cc221",
+  "head": "a85cb8049835288338acd7505fb6f51d969cc221",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "269 affected delivery/environment/process/supervisor/bundle/source/status, immutable-release, checkpoint, SYSTEM and SIG-v1 tests plus 88 subtests passed in 22.91s. Includes actual disposable venv installation from an artificial offline wheel. Earlier focused run: 38 passed, 1 process cleanup deadline failure; unchanged test passed in affected suite. No sandbox socket retry; host exact-release full/socket/spare-port acceptance pending.",
+  "tests": "266 affected delivery/preparation/environment/bundle/runner/supervisor/process/source/status and checkpoint/SYSTEM/SIG-v1 tests plus 88 subtests passed in 31.02s. Final preparation suite including two additional boundary tests: 19 passed in 8.77s. git diff --check passed. No sandbox socket retry; host exact-release full/socket/spare-port acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement trusted host prepare/validate adapter integrating exact-source bundle and offline environment with durable manifest-digest receipt. Provision independently reviewed reporting-only source approval, complete wheel/inventory policy and immutable base Python/OS runtime; do not auto-approve current HEAD. Wire supervisor/commit bridge with verified kill-on-stop cgroup. Run exact-release host full/socket tests and runtime/RSS/spare-port acceptance before cutover and scheduler adoption; publish host-owned SYSTEM receipt. No strategy promotion.",
+  "next_action": "Implement trusted exact-release test validation adapter using PreparedRelease.verify before and after execution, durable test evidence including both socket test IDs, isolated external writable test outputs and host runtime pinning. Complete independently reviewed reporting-only source/wheel policy; wire preparation and validation into host adapter/supervisor with verified cgroup containment. Runtime/RSS, spare-port, cutover and scheduler acceptance remain pending; do not auto-approve current HEAD or promote strategies.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "OFFLINE_ENVIRONMENT_TESTED_HOST_ADOPTION_PENDING",
+    "status": "DURABLE_PREPARATION_TESTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -215,6 +215,7 @@
     "supervisor_coordination": "Implemented run_cycle under both locks, process-group timeout/exit cleanup before bridge, and durable writer-active latch blocking supervisor/direct delivery after uncertain cleanup or interruption. Real local descendant termination tested; detached-child containment requires host kill-on-stop cgroup installation, not yet verified.",
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
     "source_bundle": "Implemented exact approved Git source bundle; environment binds to independently verified bundle manifest and file hashes. No actual reporting-only source approval or production environment provisioned.",
-    "environment": "Implemented offline hashed-wheel venv preparation, exact inventory and pip check, isolated supervised commands, read-only/fsynced manifest and independent digest verification. Real disposable artificial-wheel integration passed. Production wheel policy, immutable base stdlib/OS, manifest receipt integration and host provisioning remain pending."
+    "environment": "Implemented offline hashed-wheel venv preparation, exact inventory and pip check, isolated supervised commands, read-only/fsynced manifest and independent digest verification. Real disposable artificial-wheel integration passed. Production wheel policy, immutable base stdlib/OS, and host provisioning remain pending. Durable manifest receipt integration is implemented in PreparedRelease; host wiring remains pending.",
+    "preparation": "PreparedRelease persists PREPARING before artifact creation and PREPARED after verification/fsync with exact policy and manifest digests. Restart verification, interruption, receipt failure and tampering tests passed. Host-owned roots, enclosing delivery lock and containment required; no actual host installation or reporting-only approval."
   }
 }

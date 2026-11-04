@@ -291,3 +291,31 @@ host-protected throughout preparation. The inventory is environment evidence,
 remains explicit. Real local integration uses only an artificial offline wheel
 in a disposable environment; production pins, host wiring and acceptance remain
 pending. No strategy promotion is authorized.
+
+## Durable preparation boundary
+
+`tools/delivery_preparation.py` supplies `PreparedRelease`, a trusted host
+preparation component integrating the exact-source bundle and offline environment.
+The host constructs it from disjoint canonical repository, artifact, wheelhouse
+and private receipt directories plus independently reviewed policies. It must be
+called inside the existing delivery transaction lease and protected containment;
+it does not acquire a nested lock or supply production defaults.
+
+Preparation first durably records PREPARING, rejects existing artifacts/receipts,
+then creates and verifies the bundle/environment and fsyncs the bundle before
+publishing PREPARED with both manifest digests and a policy digest. Any failure,
+including uncertain child cleanup or receipt publication failure, leaves a
+blocking preparation marker. Host reconciliation is required; retries cannot
+adopt orphan artifacts or re-bless an interrupted environment. The enclosing
+host adapter must preserve that obligation during transaction recovery.
+
+`verify(sha)` reopens the private receipt after restart, requires the exact
+identity/policy and boolean false live-money setting, then verifies all source
+and environment content against the retained digest. Call it before tests,
+launch and cutover. Receipt directories and their parents must be host-owned
+and protected from concurrent modification; a receipt is not a signature or a
+substitute for that trust boundary. PREPARED means only preparation succeeded:
+validation remains NOT_RUN. This component is not yet wired into a complete
+HostOperations adapter. Exact-release full/socket tests, runtime image pinning,
+runtime/RSS measurement, candidate service, cutover/scheduler adapters and host
+installation remain pending. No production acceptance is claimed.
