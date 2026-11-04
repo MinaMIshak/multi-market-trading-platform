@@ -353,3 +353,43 @@ cannot pass the delivery transaction's complete validation gate alone. Runtime
 measurement, spare-port acceptance, production/scheduler adapters and installation
 remain pending. Local component tests simulate host execution; they do not rerun
 the sandbox-blocked socket cases or attest a deployed release.
+
+## Bound runtime and RSS evidence
+
+`ReleaseTests.verify` reopens exact-release test evidence, checks its command,
+preparation/runtime pins, report digest, passing socket cases and completion state.
+The test runner now uses the bundle's `source/` directory for imports and pytest
+collection; the bundle container itself is not the application source root.
+
+`tools/delivery_runtime.py` adds `ReleaseRuntime`, called under the same host
+lease and containment requirements. Trusted host policy must specify **both** EGX
+and US full-scale reporting workloads, source-relative Python scripts, arguments,
+immutable copied snapshot file hashes, time budgets and maximum RSS budgets. The
+host must independently establish that those scripts/inputs cover the required
+nightly workload and are reporting-only. Names or successful execution alone do
+not establish full-scale coverage. No production policy or input selection is
+provided or automatically approved here. Use a protected input tree and isolated
+writable output roots; the candidate cannot write receipts or policies.
+
+The pinned GNU time executable measures each release-local interpreter command.
+Only minimal environment variables are supplied, including LIVE_MONEY=false.
+Commands execute outside source in separate market output directories. Preparation,
+test evidence, runtime pins, timer and snapshot hashes are rechecked after each
+command even on failure. Zero exit, finite elapsed time and positive RSS within
+both budgets are mandatory. GNU time RSS is a process high-water measurement,
+**not total concurrent process-tree memory**; host cgroups must independently
+limit aggregate memory and contain all children. Immutable runtime/OS/filesystem
+protection remains a host installation requirement.
+
+MEASURING is persisted before launching anything and survives every failure or
+interruption. Successful measurements are fsynced and a MEASURED receipt binds
+the exact test receipt and workload policy. Restart verification rechecks the
+measurements and all dependencies before exposing `runtime_rss: true`. Neither
+this component nor supervisor recovery may erase or adopt an incomplete component
+receipt; host reconciliation is required. A successful gate still says candidate
+NOT_RUN and cannot establish spare-port or production acceptance.
+
+Local tests inject command execution and measurement output; they are not market
+runtime evidence. Production workload policies, actual exact-release host full/
+socket and runtime tests, spare-port adapter, cutover/scheduler wiring and host
+installation remain pending.

@@ -23,7 +23,8 @@ raise SystemExit(pytest.main(sys.argv[2:]))
 
 
 def report(path):
-    require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 64 * 1024 * 1024,
+    require(path.resolve() == path and path.is_file() and not path.is_symlink()
+            and path.stat().st_size <= 64 * 1024 * 1024,
             'missing or unsafe test report')
     try:
         root = ET.fromstring(path.read_bytes())
@@ -72,6 +73,38 @@ class ReleaseTests:
                     and environment.digest(path) == expected, 'host runtime mismatch')
         return hashlib.sha256(json.dumps(self.runtime_files, sort_keys=True).encode()).hexdigest()
 
+    def _command(self, sha, interpreter):
+        output = self.outputs / sha
+        return [str(interpreter), '-I', '-B', '-c', LAUNCH,
+                str(self.prepared.bundles / sha / 'source'), 'tests', '-o', 'addopts=',
+                '-p', 'no:cacheprovider', '--basetemp=' + str(output / 'tmp'),
+                '--junitxml=' + str(output / 'tests.xml')]
+
+    def verify(self, sha):
+        """Revalidate durable test evidence before downstream acceptance/restart."""
+        interpreter = self.prepared.verify(sha)
+        path = self.receipts / (sha + '.json')
+        require(path.is_file() and not path.is_symlink() and path.stat().st_size <= 65536,
+                'missing safe test receipt')
+        value = json.loads(path.read_text())
+        require(isinstance(value, dict), 'invalid test receipt')
+        expected = {'schema': 'delivery-tests-v1', 'commit': sha,
+                    'runtime_policy_sha256': self._runtime(), 'live_money': False,
+                    'preparation_receipt_sha256': environment.digest(
+                        self.prepared.receipts / (sha + '.json')),
+                    'runtime_rss': False, 'candidate_validation': 'NOT_RUN',
+                    **report(self.outputs / sha / 'tests.xml'),
+                    'status': 'TESTED', 'full_suite': True, 'reporting_only': True,
+                    'command': self._command(sha, interpreter)}
+        require(set(value) == set(expected) | {'started_at', 'completed_at'},
+                'test receipt fields mismatch')
+        require(all(json.dumps(value[k], sort_keys=True) == json.dumps(v, sort_keys=True)
+                    for k, v in expected.items()), 'test receipt mismatch')
+        start, end = (datetime.fromisoformat(value[k]) for k in ('started_at', 'completed_at'))
+        require(start.tzinfo is not None and end.tzinfo is not None and end >= start,
+                'invalid test receipt timestamps')
+        return value
+
     def validate(self, sha, *, timeout=1800):
         interpreter = self.prepared.verify(sha)
         runtime = self._runtime()
@@ -87,11 +120,9 @@ class ReleaseTests:
                     'runtime_rss': False, 'candidate_validation': 'NOT_RUN'}
         atomic_json(receipt, {**identity, 'status': 'TESTING'})
         output.mkdir(mode=0o700)
-        source = self.prepared.bundles / sha
+        source = self.prepared.bundles / sha / 'source'
         junit = output / 'tests.xml'
-        argv = [str(interpreter), '-I', '-B', '-c', LAUNCH, str(source),
-                'tests', '-o', 'addopts=', '-p', 'no:cacheprovider',
-                '--basetemp=' + str(output / 'tmp'), '--junitxml=' + str(junit)]
+        argv = self._command(sha, interpreter)
         env = {'PATH': str(interpreter.parent) + ':/usr/bin:/bin',
                'HOME': str(output), 'TMPDIR': str(output), 'LANG': 'C.UTF-8',
                'LIVE_MONEY': 'false', 'PYTHONDONTWRITEBYTECODE': '1'}

@@ -44,7 +44,9 @@ def test_exact_release_evidence_and_isolation(validator):
     argv, kw = calls[0]
     assert argv[0] == str(runner.prepared.environments / sha / 'venv/bin/python')
     assert '-I' in argv and '-B' in argv and 'addopts=' in argv
-    assert kw['cwd'] == runner.prepared.bundles / sha
+    assert kw['cwd'] == runner.prepared.bundles / sha / 'source'
+    assert (kw['cwd'] / 'tests').is_dir()
+    assert str(kw['cwd']) in argv
     assert kw['env']['LIVE_MONEY'] == 'false'
     assert not {'PYTHONPATH', 'PYTEST_ADDOPTS'} & kw['env'].keys()
     with pytest.raises(DeliveryError, match='already exists'):
@@ -104,3 +106,22 @@ def test_runtime_change_rejected_before_execution(validator):
     with pytest.raises(DeliveryError, match='runtime mismatch'):
         runner.validate(sha)
     assert calls == [] and not list(runner.receipts.iterdir())
+
+
+@pytest.mark.parametrize('fault', ['none', 'status', 'command', 'live', 'report', 'runtime', 'missing'])
+def test_reopen_test_evidence(validator, fault):
+    runner, sha, _, runtime = validator
+    result = runner.validate(sha)
+    path = runner.receipts / (sha + '.json')
+    if fault == 'none':
+        assert runner.verify(sha) == result
+        return
+    if fault == 'report': (runner.outputs / sha / 'tests.xml').write_text(xml('<testcase name="extra"/>'))
+    elif fault == 'runtime': runtime.write_text('changed')
+    elif fault == 'missing': path.unlink()
+    else:
+        result[{'status': 'status', 'command': 'command', 'live': 'live_money'}[fault]] = {
+            'status': 'TESTING', 'command': [], 'live': 0}[fault]
+        path.write_text(json.dumps(result))
+    with pytest.raises((DeliveryError, ValueError)):
+        runner.verify(sha)
