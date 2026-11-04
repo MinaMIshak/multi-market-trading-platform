@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "milestone": "M4",
+  "phase": "PLATFORM_REPORT",
+  "current_capability": "2026-10-02 pre-market chain processed Thursday 2026-10-01: TradingView 218 stored, cross-check 127 MATCH / 82 MINOR / 1 DISCREPANCY quarantined / 71 UNVERIFIED; ranking 1 STRONG_CANDIDATE, 19 CANDIDATE, 27 WATCHLIST, 174 NO_TRADE; 20 system Paper/Shadow candidates based on the Thursday close for the next expected session Sunday 2026-10-04; verified bundle published (8001 pointer).",
+  "starting_head": "6c920fe",
+  "head": "f618abb9aeea57b476764951081d9fbd7ecdff77",
+  "egx": {
+    "baseline_universe": 224,
+    "authoritative_universe": null,
+    "data_ready": 220,
+    "eligible": 20,
+    "scanned": 221,
+    "watch": null,
+    "ready_no_signal": null,
+    "not_ready": null,
+    "data_stale": null,
+    "evidence_blocked": 312,
+    "counts_scope": "Session 2026-10-01: 221 admitted symbols (TradingView, operator-accepted, no licence), 220 session-current, 221 ranked, 20 system candidates.",
+    "observed_at": null,
+    "valid_until": null,
+    "last_verified_session": null,
+    "source": "No fresh runtime observation this cycle",
+    "security_master_equities": 312,
+    "security_master_indices": 7,
+    "security_master_is_authoritative_universe": false,
+    "historical_observation": {
+      "data_ready": 1,
+      "eligible": 1,
+      "scanned": 1,
+      "watch": 0,
+      "ready_no_signal": 1,
+      "not_ready": 0,
+      "data_stale": 0,
+      "evidence_blocked": 0,
+      "counts_scope": "Previously observed distinct symbols in configured isolated runtime only; not refreshed in this cycle and not full-universe coverage",
+      "observed_at": "2026-09-26T19:55:52.768185+00:00",
+      "valid_until": "2026-09-27T07:00:00+00:00",
+      "last_verified_session": "2026-09-24",
+      "source": "existing PAPER_SIGNAL_VERIFIED receipt accepted by app.ui.operational.load_operational_state"
+    }
+  },
+  "us": {
+    "configured_universe": 500,
+    "data_ready": 500,
+    "eligible": 500,
+    "scanned": 500,
+    "candidates": 75,
+    "strong_candidates": 3,
+    "session": "2026-10-02",
+    "session_verification": "VERIFIED",
+    "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
+  },
+  "tests": "Full suite at 61b97f0 (Python 3.12, host): 3677 passed, 676 subtests passed.",
+  "deployment": "8001 serves 61b97f0 in SNAPSHOT_POINTER mode (agent cutover 2026-10-06; all checks incl. learning and fusion passed; public HTTPS 401). Rollback release 687eebf (VERIFIED).",
+  "scheduler": "egx-agent cron, release 61b97f0: Sun-Thu 16:45 capture, 08:30 EGX chain (with EGX learning); Tue-Sat 06:15 US chain (with US learning); Sat 10:00 weekly learning (sequential walk-forwards). Locks: publish.lock, learning.lock.",
+  "next_action": "Accumulate matured frozen forecasts/fusion snapshots (20/50/100-session checkpoints); US snapshot fields populate from the next US chain; no promotion without out-of-sample evidence.",
+  "hard_blocker": null,
+  "live_money": false,
+  "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
+  "capability_blockers": {
+    "test_execution": "System Python lacks pytest/fastapi; reproducible via `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt` (requires PyPI access). Full suite takes ~11-13 minutes.",
+    "deployment": "Agent performs authorised cutovers with spare-port validation and automatic rollback (docs/PREVIEW_RUNTIME.md).",
+    "egx_universe": "No dated authoritative membership source found; market-watch row set is supporting evidence only (rights-blocked, completeness unverified). authoritative_universe stays UNKNOWN.",
+    "us_universe": "No configured operational universe found",
+    "performance": "Authentic canonical lifecycle observation source not connected",
+    "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
+    "shared_database_ownership": "RESOLVED 2026-09-29 (host): the operational platform.db is owned by egx-agent; the uid-999 app containers mount its directory read-only; the uid-999 scheduler mounts no egx-agent path.",
+    "network_egx_sources": "Host egress reaches beta.egx.com.eg and ticker.egidegypt.com (2026-09-29). Official index acquisition works; this does not establish per-equity daily entitlement.",
+    "egx_daily_source_entitlement": "tradingview_tvdatafeed_egx ADMITTED by operator decision 2026-10-01 with NO contractual licence (label NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED). twelve_data optional (paid for EGX); market-watch verification only.",
+    "server_access": "RESOLVED: a host session as egx-agent has server access (no root). nginx/systemd/root Docker changes are ADMIN_REQUIRED.",
+    "sudo": "egx-agent has no sudo (password required); root-owned changes are ADMIN_REQUIRED.",
+    "us_sec": "BLOCKED: NO_OPERATOR_CONTACT_EMAIL. The operator has not provided an SEC contact; the platform uses explicit operator configuration only.",
+    "cbe": "cbe.org.eg rejects automated access (WAF); CBE current policy rate and official USD/EGP blocked."
+  },
+  "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION",
+  "experiment": {
+    "strategy": "EGX-EXP-v1",
+    "config": "EGX-EXP-CFG-1",
+    "champion": "V1 (EGX-RANK-v1)",
+    "decisions": 20,
+    "v2a_pass": 20,
+    "v2b_v2d_pass": 4,
+    "resistance_rr_fail": 16,
+    "closed_trades": 0,
+    "status": "INSUFFICIENT_SAMPLE"
+  },
+  "learning": {
+    "egx": {
+      "sessions": "2024-01-09..2026-10-05",
+      "forecast_champion": "FC-BASE-v1",
+      "fusion_reported_arm": "DF0 (no challenger beats technical)",
+      "status": "EXPERIMENTAL"
+    },
+    "us": {
+      "sessions": "2025-07..2026-10-05",
+      "fusion_reported_arm": "US-DF1",
+      "status": "EXPERIMENTAL"
+    },
+    "memory_peak_mb": {
+      "daily": 163,
+      "weekly": 183
+    }
+  }
+}

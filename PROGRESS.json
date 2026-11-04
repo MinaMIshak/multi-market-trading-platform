@@ -1,105 +1,87 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "PLATFORM_REPORT",
-  "current_capability": "2026-10-02 pre-market chain processed Thursday 2026-10-01: TradingView 218 stored, cross-check 127 MATCH / 82 MINOR / 1 DISCREPANCY quarantined / 71 UNVERIFIED; ranking 1 STRONG_CANDIDATE, 19 CANDIDATE, 27 WATCHLIST, 174 NO_TRADE; 20 system Paper/Shadow candidates based on the Thursday close for the next expected session Sunday 2026-10-04; verified bundle published (8001 pointer).",
-  "starting_head": "6c920fe",
-  "head": "f618abb9aeea57b476764951081d9fbd7ecdff77",
+  "phase": "CHECKPOINT_RECONCILIATION_SIG_VALIDATION",
+  "current_capability": "Source includes V2E and SIG-v1 reporting. Supervisor reports EGX INCONCLUSIVE and US FLAT; neither has a proven tradeable edge. Quant direction requires a new versioned challenger. SYSTEM reads this reconciled checkpoint as reported history only. No runtime observations collected this cycle.",
+  "starting_head": "741f8b4f3566d43da4434f65a9c840566f2dbc6b",
+  "head": "741f8b4f3566d43da4434f65a9c840566f2dbc6b",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
-    "data_ready": 220,
-    "eligible": 20,
-    "scanned": 221,
+    "data_ready": null,
+    "eligible": null,
+    "scanned": null,
     "watch": null,
     "ready_no_signal": null,
     "not_ready": null,
     "data_stale": null,
-    "evidence_blocked": 312,
-    "counts_scope": "Session 2026-10-01: 221 admitted symbols (TradingView, operator-accepted, no licence), 220 session-current, 221 ranked, 20 system candidates.",
+    "evidence_blocked": null,
+    "counts_scope": "Current counts UNKNOWN; no fresh runtime observation. Historical counts preserved in archived checkpoint, not current coverage.",
     "observed_at": null,
     "valid_until": null,
     "last_verified_session": null,
-    "source": "No fresh runtime observation this cycle",
-    "security_master_equities": 312,
-    "security_master_indices": 7,
-    "security_master_is_authoritative_universe": false,
-    "historical_observation": {
-      "data_ready": 1,
-      "eligible": 1,
-      "scanned": 1,
-      "watch": 0,
-      "ready_no_signal": 1,
-      "not_ready": 0,
-      "data_stale": 0,
-      "evidence_blocked": 0,
-      "counts_scope": "Previously observed distinct symbols in configured isolated runtime only; not refreshed in this cycle and not full-universe coverage",
-      "observed_at": "2026-09-26T19:55:52.768185+00:00",
-      "valid_until": "2026-09-27T07:00:00+00:00",
-      "last_verified_session": "2026-09-24",
-      "source": "existing PAPER_SIGNAL_VERIFIED receipt accepted by app.ui.operational.load_operational_state"
-    }
+    "source": "No fresh runtime observation this cycle"
   },
   "us": {
-    "configured_universe": 500,
-    "data_ready": 500,
-    "eligible": 500,
-    "scanned": 500,
-    "candidates": 75,
-    "strong_candidates": 3,
-    "session": "2026-10-02",
-    "session_verification": "VERIFIED",
-    "source": "tradingview_tvdatafeed_us (NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED); Yahoo cross-check 25/25"
+    "configured_universe": null,
+    "data_ready": null,
+    "eligible": null,
+    "scanned": null,
+    "candidates": null,
+    "strong_candidates": null,
+    "session": null,
+    "session_verification": "UNKNOWN",
+    "source": "No fresh runtime observation this cycle; historical 500-name scope is not verified current membership."
   },
-  "tests": "Full suite at 61b97f0 (Python 3.12, host): 3677 passed, 676 subtests passed.",
-  "deployment": "8001 serves 61b97f0 in SNAPSHOT_POINTER mode (agent cutover 2026-10-06; all checks incl. learning and fusion passed; public HTTPS 401). Rollback release 687eebf (VERIFIED).",
-  "scheduler": "egx-agent cron, release 61b97f0: Sun-Thu 16:45 capture, 08:30 EGX chain (with EGX learning); Tue-Sat 06:15 US chain (with US learning); Sat 10:00 weekly learning (sequential walk-forwards). Locks: publish.lock, learning.lock.",
-  "next_action": "Accumulate matured frozen forecasts/fusion snapshots (20/50/100-session checkpoints); US snapshot fields populate from the next US chain; no promotion without out-of-sample evidence.",
+  "tests": "6 stdlib unittest tests passed: checkpoint reconciliation (3), SIG-v1 offline reporting contracts (3). git diff --check passed. Dependency-backed SIG-v1/fusion/SYSTEM integration and full release suite pending; known package blockers not retried. See docs/SIG_V1_RELEASE_CHECKPOINT.md.",
+  "deployment": "Supervisor CYCLE_CONTEXT.md reports production 1124598; docs/PREVIEW_RUNTIME.md records its 2026-10-15 cutover. Not independently observed this cycle. SIG-v1 741f8b4 is not deployed; release validation and separately authorized safe cutover pending.",
+  "scheduler": "docs/PREVIEW_RUNTIME.md records four cron entries moved to 1124598 on 2026-10-15. Current heartbeat, execution and installed configuration UNKNOWN; no scheduler inspection this cycle.",
+  "next_action": "Finish dependency-backed SIG-v1 reporting-only integration/release validation in an equipped environment; retain deployment pending. Independently implement quant-direction correction as DF-CFG-2 / US-DF-CFG-2 challengers with regression tests, preserving existing arms and frozen artifacts. No automatic promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
   "capability_blockers": {
-    "test_execution": "System Python lacks pytest/fastapi; reproducible via `python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt` (requires PyPI access). Full suite takes ~11-13 minutes.",
-    "deployment": "Agent performs authorised cutovers with spare-port validation and automatic rollback (docs/PREVIEW_RUNTIME.md).",
-    "egx_universe": "No dated authoritative membership source found; market-watch row set is supporting evidence only (rights-blocked, completeness unverified). authoritative_universe stays UNKNOWN.",
-    "us_universe": "No configured operational universe found",
-    "performance": "Authentic canonical lifecycle observation source not connected",
-    "scheduled_free_acquisition": "Preserved acquisition manifest has no canonically admitted source package supporting a free daily transport; repository factory remains closed. Reviewed transport/source admission and real dated cost evidence are required. Do not repeat completed provider investigations absent new evidence.",
-    "shared_database_ownership": "RESOLVED 2026-09-29 (host): the operational platform.db is owned by egx-agent; the uid-999 app containers mount its directory read-only; the uid-999 scheduler mounts no egx-agent path.",
-    "network_egx_sources": "Host egress reaches beta.egx.com.eg and ticker.egidegypt.com (2026-09-29). Official index acquisition works; this does not establish per-equity daily entitlement.",
-    "egx_daily_source_entitlement": "tradingview_tvdatafeed_egx ADMITTED by operator decision 2026-10-01 with NO contractual licence (label NO_CONTRACTUAL_LICENCE_OPERATOR_ACCEPTED). twelve_data optional (paid for EGX); market-watch verification only.",
-    "server_access": "RESOLVED: a host session as egx-agent has server access (no root). nginx/systemd/root Docker changes are ADMIN_REQUIRED.",
-    "sudo": "egx-agent has no sudo (password required); root-owned changes are ADMIN_REQUIRED.",
-    "us_sec": "BLOCKED: NO_OPERATOR_CONTACT_EMAIL. The operator has not provided an SEC contact; the platform uses explicit operator configuration only.",
-    "cbe": "cbe.org.eg rejects automated access (WAF); CBE current policy rate and official USD/EGP blocked."
+    "test_execution": "Known pytest/pydantic/package blockers not retried; no changed environment evidence. Dependency-backed integration and full release validation pending.",
+    "deployment": "Production access prohibited in this cycle. Safe external release validation/cutover pending; this does not block repository development.",
+    "runtime_evidence": "No fresh scans, heartbeat, provider health, market membership or matured forward artifacts observed this cycle.",
+    "egx_universe": "224 baseline target; authoritative dated membership remains UNKNOWN.",
+    "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
+    "quant_direction": "Supervisor diagnostic identifies inconsistent quant direction/high-volatility reward; versioned challenger correction and independent retest pending.",
+    "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work."
   },
-  "commit_status": "COMMITTED_DIRECTLY_HOST_SESSION",
+  "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
-    "strategy": "EGX-EXP-v1",
-    "config": "EGX-EXP-CFG-1",
+    "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
-    "decisions": 20,
-    "v2a_pass": 20,
-    "v2b_v2d_pass": 4,
-    "resistance_rr_fail": 16,
-    "closed_trades": 0,
-    "status": "INSUFFICIENT_SAMPLE"
+    "registration": "2026-10-15T09:06:17Z (reported in docs/EGX_V2E_ONE_POSITION.md)",
+    "forward_sessions": null,
+    "closed_trades": null,
+    "status": "FORWARD_CHECKPOINT_PENDING",
+    "checkpoints": [
+      20,
+      50,
+      100
+    ]
   },
   "learning": {
+    "source": "Supervisor CYCLE_CONTEXT.md; audit artifacts not independently refreshed this cycle",
     "egx": {
-      "sessions": "2024-01-09..2026-10-05",
-      "forecast_champion": "FC-BASE-v1",
-      "fusion_reported_arm": "DF0 (no challenger beats technical)",
-      "status": "EXPERIMENTAL"
+      "classification": "INCONCLUSIVE",
+      "tradeable_edge_proven": false,
+      "promotion": "NOT_AUTHORIZED"
     },
     "us": {
-      "sessions": "2025-07..2026-10-05",
-      "fusion_reported_arm": "US-DF1",
-      "status": "EXPERIMENTAL"
+      "classification": "FLAT",
+      "tradeable_edge_proven": false,
+      "promotion": "NOT_AUTHORIZED"
     },
-    "memory_peak_mb": {
-      "daily": 163,
-      "weekly": 183
-    }
+    "quant_direction": "Correction pending as new versioned challenger; preserve historical frozen predictions.",
+    "confidence": "LOW/non-informative per supervisor; no threshold loosening. EGX C2 shadow requires evidence gates; US confidence waits for quant correction."
+  },
+  "reconciliation": {
+    "date": "2026-11-04",
+    "source": "/home/egx-agent/er1-autopilot/state/CYCLE_CONTEXT.md",
+    "previous_checkpoint": "docs/checkpoints/progress-before-2026-11-04.json",
+    "runtime_verified": false
   }
 }
