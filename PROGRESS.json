@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_SYSTEM_VISIBILITY",
-  "current_capability": "SYSTEM/API delivery journal projection implemented with bounded reads, strict identity and acceptance gates, and private-error/schedule redaction. Synchronous rollback now persists verified acceptance. Historical receipt visibility only; host adapter, supervisor integration and receipt publication pending.",
-  "starting_head": "20335a68b0492c790fb0d7efb6da75411dae626c",
-  "head": "20335a68b0492c790fb0d7efb6da75411dae626c",
+  "phase": "AUTONOMOUS_DELIVERY_SUPERVISOR_COORDINATION",
+  "current_capability": "Supervisor coordination API implemented: shared writer/commit-bridge/delivery exclusion, recovery before work, fail-closed interrupted delivery handling. Cross-process lock and recovery tests passed. Host adapter and actual supervisor installation remain pending.",
+  "starting_head": "b8195cf947944be2d9628a34e857b1c85640d178",
+  "head": "b8195cf947944be2d9628a34e857b1c85640d178",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "164 affected delivery/status, immutable-release, checkpoint, SYSTEM and SIG-v1 contract tests plus 88 subtests passed in 5.41s. git diff --check passed. Offline/fault-injection evidence only; sandbox socket tests not retried. Exact-release host full-suite/socket/spare-port acceptance pending.",
+  "tests": "187 affected delivery/supervisor/status, immutable-release, checkpoint, SYSTEM and SIG-v1 contract tests plus 88 subtests passed in 6.00s. git diff --check passed. Offline/fault-injection and local process-lock evidence only; socket tests not retried. Exact-release host full-suite/socket/spare-port acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement trusted host adapter and supervisor serialization/recovery wiring. Pin origin/deploy-key configuration and isolate reporting-only source; build release-local interpreter and run exact-source host full/socket tests, spare-port and runtime/RSS acceptance before cutover/schedule adoption. Publish host-owned receipt copy to SYSTEM; connect separate cycle/review/chain observations. No strategy promotion.",
+  "next_action": "Implement pinned origin/deploy-key trusted host adapter and isolated reporting-only release preparation with release-local interpreter. Wire DeliverySupervisor into actual host process-tree supervision and commit bridge; retain lease until all writer descendants exit. Run exact-source full/socket tests, runtime/RSS and spare-port acceptance before cutover/schedule adoption. Publish host-owned SYSTEM receipt; no strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "SYSTEM_PROJECTION_TESTED_HOST_INTEGRATION_PENDING",
+    "status": "SUPERVISOR_COORDINATION_TESTED_HOST_ADAPTER_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -211,6 +211,7 @@
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
-    "system_projection": "Implemented allowlisted historical delivery receipt view; EGX_DELIVERY_RECEIPT host publication not configured or operationally verified. Cycle/review/chain and live scheduler health remain unknown in this view."
+    "system_projection": "Implemented allowlisted historical delivery receipt view; EGX_DELIVERY_RECEIPT host publication not configured or operationally verified. Cycle/review/chain and live scheduler health remain unknown in this view.",
+    "supervisor_coordination": "Shared supervisor/delivery locks and recovery-before-writer/release API tested, including real child-process contention and death. Actual host invocation and process-tree timeout supervision not installed or verified."
   }
 }

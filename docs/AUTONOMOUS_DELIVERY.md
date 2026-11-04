@@ -1,7 +1,7 @@
 # Autonomous delivery contract
 
-Status: transaction core implemented; restart recovery implemented; host adapter and supervisor invocation
-pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
+Status: transaction core, restart recovery and supervisor coordination API implemented;
+host adapter and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -126,3 +126,35 @@ runtime verification are never inferred. Codex cycle, Claude review and EGX/US
 chain fields remain null until separate trusted observations are connected; no
 checkpoint prose or arbitrary journal metadata fills these fields. Existing
 SYSTEM runtime/chain sections retain their independent evidence semantics.
+
+## Supervisor coordination API
+
+`tools/delivery_supervisor.py` provides `DeliverySupervisor(state, source, host)`.
+This is tested coordination code, not an installed supervisor or production
+adapter. The trusted host must wire all entry points to the same private state
+folder; requests cannot choose an adapter, command, source repository or folder.
+
+- Call `startup()` before accepting work. An existing journal is recovered under
+  the delivery lock, including terminal receipt repair. Invalid journals and
+  failed recovery propagate; never delete them or continue the writer on error.
+- Hold `writer_session()` around the entire Codex process tree and subsequent
+  commit bridge. It takes the supervisor lock, recovers first, then holds the
+  delivery lock as well. This also excludes callers using the transaction API
+  directly. Commit failure must prevent creation of a release request.
+- After the writer/bridge session ends, construct a fresh identity-only request
+  from the exact bridge-committed HEAD and call `release(request)`. The source
+  gates still reject a changed HEAD or dirty tree; no stale request is refreshed
+  automatically. Recovery precedes delivery under the supervisor lock.
+- All locks are nonblocking; contention fails closed. Lock order is supervisor
+  then delivery. Do not call release/startup from within a writer session.
+- A process timeout must terminate and reap the writer **and all descendants**
+  before releasing its lease. The API does not launch or terminate processes.
+  The host service must use process-group/cgroup supervision to prevent orphan
+  writers after supervisor death; advisory locks alone cannot enforce this.
+
+Tests cover real cross-process exclusion and descriptor release on process death,
+interrupted cutover recovery before a new writer, independent release/schedule/
+acceptance/cleanup failures, malformed journals, dangling symlinks and exception
+cleanup. Actual supervisor installation, process-tree timeout integration, pinned
+origin/deploy-key adapter, isolated reporting release, receipt publication and
+host acceptance are still pending. No runtime health is inferred from these tests.
