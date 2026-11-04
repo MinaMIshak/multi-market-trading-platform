@@ -630,3 +630,37 @@ Tests use disposable filesystem pointers and simulated HTTP, including cutover,
 rollback, tampering, unknown identities, safety violations, response limits and
 request-time drift. Independent containment verification, composition/provisioning,
 public endpoint acceptance and exact-release socket tests remain required.
+
+## Independent persistent-service containment observations
+
+`tools/delivery_containment.py:ServiceContainment` supplies the independent
+`ReleaseService.verify_isolation` callback for protected host wiring. It performs
+read-only Linux procfs/cgroup-v2 observations; it neither provisions isolation nor
+starts services. Policies select exact release SHA, dedicated non-root UID/GID,
+leaf cgroup, protected artifact roots, pinned executable, and exact writable mount
+points. Protected roots and their ancestors must be host-owned and not group/other
+writable or symlinks; the existing release verifier must independently validate
+all source/runtime content. Policies must include the release, interpreter/stdlib,
+OS/runtime dependencies, and delivery control artifacts relevant to that service.
+
+Running acceptance checks every leaf-cgroup member for exact credentials, no
+supplementary groups beyond the dedicated group, zero capability sets (including
+bounding/ambient), no-new-privileges and seccomp-filter mode. It checks exact
+cgroup membership and executable, a mount namespace different from the observer,
+read-only protected paths, no nested mounts hiding protected content, matching
+host/process-visible protected inode identities, and an exact writable mount set
+with nosuid/nodev/noexec. Missing observations, nested cgroups, membership changes,
+and PID start-time changes reject acceptance. An inactive service gets only
+artifact preflight; `ReleaseService.stage` still requires running checks after
+start and after HTTP acceptance. No inactive result establishes runtime isolation.
+
+This deliberately restrictive policy may reject a normal systemd service layout;
+the host must provision a compatible dedicated sandbox, never relax the verifier
+to accept unreviewed mounts or child executables. Seccomp mode does not prove the
+filter contents: host provisioning must pin the filter/unit and enforce kill-on-stop,
+closed inherited descriptors, network/device restrictions, protected UID separation,
+and immutable OS/runtime dependencies throughout the lease. These observations
+are not an atomic kernel attestation or a replacement for that host boundary.
+Temporary validation jobs and supervisor containment still need their own binding.
+Tests use artificial procfs/cgroup files and simulated ownership policy; no real
+host containment, socket validation, service installation or cutover is claimed.
