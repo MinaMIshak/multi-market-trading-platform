@@ -225,8 +225,10 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
                     except Exception as rollback_error:
                         failures.append(type(rollback_error).__name__)
                 try:
-                    acceptance(host.rollback_check(snapshot), snapshot['commit'],
+                    rollback = host.rollback_check(snapshot)
+                    acceptance(rollback, snapshot['commit'],
                                scheduler=True, require_sig=False)
+                    record['rollback_validation'] = rollback
                 except Exception as rollback_error:
                     failures.append(type(rollback_error).__name__)
             try:

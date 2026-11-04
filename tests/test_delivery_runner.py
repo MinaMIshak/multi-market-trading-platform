@@ -387,3 +387,26 @@ def test_terminal_receipt_io_failure_does_not_start_unjournaled_rollback(setup, 
     setup[3].restore_schedule.assert_not_called()
     monkeypatch.setattr(runner, 'atomic_json', original)
     assert runner.recover(setup[1], setup[3])['status'] == 'SUCCEEDED'
+
+
+def test_success_receipt_projects_without_private_host_evidence(setup):
+    from app.delivery_status import project_delivery
+    result = project_delivery(run(setup))
+    assert result['deployed_release'] == HEAD
+    assert result['deployment_result'] == 'SUCCEEDED'
+    assert result['runtime_verified'] is False
+    assert 'exact prior cron bytes' not in json.dumps(result)
+
+
+def test_failed_cutover_persists_verified_rollback_for_system(setup):
+    from app.delivery_status import project_delivery
+    setup[3].cutover.side_effect = RuntimeError('private host failure')
+    with pytest.raises(DeliveryError, match='ROLLED_BACK'):
+        run(setup)
+    journal = status(setup)
+    assert journal['rollback_validation'] == setup[3].rollback_check.return_value
+    result = project_delivery(journal)
+    assert result['deployed_release'] == OLD
+    assert result['scheduler_target'] == OLD
+    assert result['deployment_result'] == 'ROLLED_BACK'
+    assert 'private host failure' not in json.dumps(result)

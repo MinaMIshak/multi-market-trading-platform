@@ -1,7 +1,7 @@
 # Autonomous delivery contract
 
-Status: transaction core implemented; restart recovery implemented; host adapter, supervisor invocation
-and SYSTEM receipt projection pending. No release was deployed by this work.
+Status: transaction core implemented; restart recovery implemented; host adapter and supervisor invocation
+pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -101,3 +101,28 @@ Fault-injection coverage includes every host boundary, crashes during recovery,
 independent restore/cleanup failures, invalid journals, unsafe rollback evidence,
 lock contention, journal/receipt interruption and repeated terminal recovery.
 The trusted adapter and supervisor integration remain necessary for real recovery.
+
+## SYSTEM delivery receipt projection
+
+`/api/system` and SYSTEM now include an allowlisted `delivery` view. The host
+can configure `EGX_DELIVERY_RECEIPT` to an absolute regular file containing a
+published journal copy; default is UNAVAILABLE. Publication/wiring is pending.
+Do not grant the API access to the private transaction directory. The copy must
+be host-owned, atomically replaced and accessible only to the API account;
+raw journals must never be served by a static-file endpoint. The reader rejects
+symlinks, nonregular files, malformed/oversized JSON, invalid identities, unknown
+phases, naive timestamps and any value other than boolean false for live money.
+
+Only enumerated statuses, full SHA identities, normalized timestamps and derived
+acceptance results are returned. Raw errors, schedule backups, paths, arbitrary
+metadata and nested host payloads are excluded. A success claim needs matching
+host tests (including both socket tests), candidate and production acceptance,
+origin verification and schedule identity. Rollback needs matching rollback
+acceptance; older receipts without that evidence remain unverified. Synchronous
+rollback now persists the same acceptance evidence as restart recovery.
+
+All results describe historical receipt observations. Scheduler health and live
+runtime verification are never inferred. Codex cycle, Claude review and EGX/US
+chain fields remain null until separate trusted observations are connected; no
+checkpoint prose or arbitrary journal metadata fills these fields. Existing
+SYSTEM runtime/chain sections retain their independent evidence semantics.

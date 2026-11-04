@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.ui.operational import load_operational_state
 from app.scheduler_heartbeat import load_heartbeat
+from app.delivery_status import load_delivery_status
 from app.egx_scan_history import load_scan_history
 from app.data.source_admission import daily_source_summary
 from app.ui.today import load_security_master_summary, load_validated_daily_observations
@@ -103,6 +104,7 @@ def load_system_state():
         'build': {'revision': os.getenv('EGX_BUILD_REVISION') or None,
                   'source': 'deployment-injected EGX_BUILD_REVISION; unverified if absent'},
         'checkpoint': checkpoint,
+        'delivery': load_delivery_status(),
         'checkpoint_status': 'AVAILABLE' if checkpoint is not None else 'UNAVAILABLE',
         'scheduler': heartbeat,
         # Official-index/calendar maintenance job: last recorded outcome only.
@@ -383,6 +385,20 @@ def render_runtime_observation(state):
                    'Revision is unverified and UNKNOWN when not injected at deployment.</p></section>')
 
 
+def render_delivery(state):
+    delivery = state.get('delivery') or {}
+    fields = ('status', 'source_head', 'origin_sync', 'deployed_release',
+              'latest_codex_cycle', 'latest_claude_review', 'tests',
+              'candidate_validation', 'deployment_result', 'scheduler_target',
+              'scheduler_health', 'egx_chain_status', 'us_chain_status', 'blocker', 'started_at')
+    return ('<section><h2>Autonomous delivery</h2><p>Historical receipt only; '
+            'not current deployment or scheduler health. Unconnected cycle, review and chain '
+            'observations remain UNKNOWN. LIVE_MONEY=DISABLED.</p><table><tbody>'
+            + ''.join('<tr><th scope="row">' + key.replace('_', ' ') + '</th><td>'
+                      + (escape(str(delivery[key])) if delivery.get(key) is not None else 'UNKNOWN')
+                      + '</td></tr>' for key in fields) + '</tbody></table></section>')
+
+
 def render_system(state):
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>System progress</title><style>body{font:16px sans-serif;max-width:1100px;margin:32px auto;padding:20px;'
@@ -395,6 +411,7 @@ def render_system(state):
             '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
+            + render_delivery(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
             + render_calendar_maintenance(state.get('calendar_maintenance'))
             + render_pipelines(state)

@@ -1,0 +1,104 @@
+"""Read-only, bounded delivery journal projection; never a live health probe.
+
+The host must publish a copy readable by the API via EGX_DELIVERY_RECEIPT.
+Never point the API at the private delivery state directory or expose raw journals.
+"""
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import re
+import stat
+
+SHA = re.compile(r'[0-9a-f]{40}')
+PHASES = {'STARTED', 'PREPARING', 'CUTOVER_PENDING', 'RECOVERING',
+          'RECOVERY_REQUIRED', 'SUCCEEDED', 'FAILED', 'ROLLED_BACK'}
+SOCKET_TESTS = {
+    'tests/test_experimental_runtime.py::test_failed_candidate_preserves_previous',
+    'tests/test_experimental_runtime.py::test_success_records_identity_without_stopping_child',
+}
+
+
+def sha(value):
+    return value if isinstance(value, str) and SHA.fullmatch(value) else None
+
+
+def accepted(value, commit, scheduler=False, sig=True):
+    return (isinstance(value, dict) and commit is not None
+            and value.get('commit') == commit and value.get('live_money') is False
+            and all(value.get(k) is True for k in
+                    ('http', 'api', 'runtime_compatible') + (('sig_v1',) if sig else ()))
+            and (not scheduler or (value.get('scheduler_target') == commit
+                                   and value.get('scheduler_verified') is True)))
+
+
+def project_delivery(raw):
+    result = dict.fromkeys(('source_head', 'origin_sync', 'deployed_release',
+                           'latest_codex_cycle', 'latest_claude_review', 'tests',
+                           'candidate_validation', 'deployment_result', 'scheduler_target',
+                           'scheduler_health', 'egx_chain_status', 'us_chain_status',
+                           'blocker', 'started_at', 'live_money'))
+    result.update(status='UNAVAILABLE', evidence_scope='HISTORICAL_RECEIPT_ONLY',
+                  runtime_verified=False)
+    if not isinstance(raw, dict) or raw.get('schema') != 'delivery-state-v1':
+        return result
+    head = sha(raw.get('source_head'))
+    phase = raw.get('status')
+    if not head or not isinstance(phase, str) or phase not in PHASES or raw.get('live_money') is not False:
+        return result
+    try:
+        started = datetime.fromisoformat(raw['started_at'])
+        if started.tzinfo is None:
+            return result
+    except (KeyError, ValueError, TypeError):
+        return result
+    result.update(status='AVAILABLE', source_head=head, started_at=started.isoformat(),
+                  deployment_result=phase, live_money=False)
+    if raw.get('origin_sync') == 'VERIFIED':
+        result['origin_sync'] = 'VERIFIED_AT_DELIVERY'
+    tests = raw.get('tests')
+    if (isinstance(tests, dict) and tests.get('commit') == head
+            and all(tests.get(k) is True for k in ('full_suite', 'reporting_only', 'runtime_rss'))
+            and isinstance(tests.get('socket_tests'), dict)
+            and set(tests['socket_tests']) == SOCKET_TESTS
+            and all(v is True for v in tests['socket_tests'].values())):
+        result['tests'] = 'PASSED_AT_DELIVERY'
+    candidate_ok = accepted(raw.get('candidate_validation'), head)
+    if candidate_ok:
+        result['candidate_validation'] = 'PASSED_AT_DELIVERY'
+    deployed = sha(raw.get('deployed_release'))
+    verified = False
+    if phase == 'SUCCEEDED':
+        verified = (deployed == head and result['tests'] is not None and candidate_ok
+                    and result['origin_sync'] is not None
+                    and accepted(raw.get('production_validation'), head, scheduler=True))
+    elif phase == 'ROLLED_BACK':
+        verified = accepted(raw.get('rollback_validation'), deployed, scheduler=True, sig=False)
+    if verified and raw.get('scheduler_target') == deployed:
+        result.update(deployed_release=deployed, scheduler_target=deployed)
+    elif phase in ('SUCCEEDED', 'ROLLED_BACK'):
+        result['deployment_result'] = 'UNVERIFIED_TERMINAL_RECEIPT'
+    if phase in ('FAILED', 'RECOVERY_REQUIRED', 'RECOVERING', 'ROLLED_BACK'):
+        result['blocker'] = 'RECOVERY_REQUIRED' if phase in ('RECOVERY_REQUIRED', 'RECOVERING') else 'DELIVERY_FAILED'
+    # Raw errors, rollback schedule, arbitrary metadata and paths never leave here.
+    return result
+
+
+def load_delivery_status():
+    configured = os.environ.get('EGX_DELIVERY_RECEIPT')
+    if not configured:
+        return project_delivery(None)
+    try:
+        path = Path(configured)
+        if not path.is_absolute():
+            return project_delivery(None)
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, 'rb') as source:
+            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+                return project_delivery(None)
+            payload = source.read(131073)
+        if len(payload) > 131072:
+            return project_delivery(None)
+        return project_delivery(json.loads(payload))
+    except (OSError, ValueError, RecursionError):
+        return project_delivery(None)
