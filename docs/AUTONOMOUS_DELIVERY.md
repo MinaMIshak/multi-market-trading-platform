@@ -474,3 +474,52 @@ and release/schedule rollback. Actual host production backend, atomic routing,
 cron snapshot/adoption/restoration, policy provisioning, containment installation
 and supervisor invocation remain pending. No host acceptance or deployment is
 claimed; the two socket tests must still pass on the exact approved host release.
+
+## Durable production backend
+
+`ProductionBackend` in `tools/delivery_production.py` implements the production
+transaction behind `ComposedHost`. It has no default paths, installation action,
+CLI, or request-supplied driver. The host must construct it under the existing
+exclusive supervisor lease with protected, disjoint state and routing directories.
+Its routing file is an atomic, fsynced JSON pointer containing full `commit` and
+strict `live_money: false`. A host routing consumer must actually apply that
+pointer; writing the file alone does not establish a successful cutover.
+
+Before mutation it observes the previous production release, validates its exact
+schedule and release-local interpreter through the driver, and persists the full
+schedule plus its digest in `previous.json`. Cutover stages the persistent new
+service while retaining the previous service, rejects route/schedule drift before
+and after staging, atomically switches the pointer, then observes production.
+Schedule adoption follows observed cutover, verifies the proposed release-local
+schedule, installs it and reads it back. Restoration reopens and compares the
+persisted backup, restores routing and schedule independently and is idempotent
+across a fresh backend instance. The enclosing delivery journal retains the same
+snapshot and latches failures for recovery. Backup state is protected by host
+permissions and the lease; a hash alone is not an authenticity control.
+
+The remaining trusted host services driver must implement:
+
+- `contained(sha)`: observe cgroup and filesystem containment; return strict true
+  only for verified isolation and immutable release/interpreter ownership.
+- `stage(sha)`: idempotently start/retain the persistent SHA service and return
+  actual HTTP/API identity, compatibility and applicable SIG-v1 acceptance. Never
+  stop the previous verified service. This is separate from temporary candidate
+  startup, whose process is already cleaned after acceptance.
+- `observe(sha)`: probe the actual production routing endpoint, not a direct
+  candidate port, with bounded responses and strict identity/LIVE_MONEY checks.
+- `read_schedule`, `release_schedule`, `verify_schedule`, `install_schedule`:
+  preserve exact prior schedule text, validate the full target and release-local
+  interpreter/configuration, install atomically, and observe installed state.
+  Missing/inaccessible schedule state must raise, not substitute an empty value.
+- `cleanup_validation`, `validation_quiescent`: idempotently reconcile only the
+  SHA-owned temporary validation resources, including when preparation never ran.
+  They must never terminate the serving or retained rollback service.
+
+Tests exercise real temporary filesystem pointers/receipts with simulated services
+and schedules, including transaction restart recovery, LIVE_MONEY and acceptance
+failures, schedule partial installation, snapshot corruption, concurrent state
+drift, disk-write failure and idempotent rollback. They do not validate a real
+routing consumer, service manager, cron installation or containment. Those host
+bindings, supervisor installation, reporting-only approval, exact-release socket
+and full-suite/runtime/spare-port acceptance remain pending. No release is green
+or deployed on the strength of these simulations.

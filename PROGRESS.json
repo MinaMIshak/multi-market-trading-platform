@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_HOST_COMPOSITION",
-  "current_capability": "ComposedHost connects preparation, exact-release tests, runtime and candidate components to the delivery transaction. Revalidates durable acceptance before mutation; recovery retains incomplete receipts and orphan artifacts behind RECOVERY_REQUIRED. Production backend and real host acceptance remain pending.",
-  "starting_head": "78a3a6e9e00230b22fcf8aa22660cb1b1e6fe4d3",
-  "head": "78a3a6e9e00230b22fcf8aa22660cb1b1e6fe4d3",
+  "phase": "AUTONOMOUS_DELIVERY_PRODUCTION_TRANSACTION",
+  "current_capability": "ProductionBackend persists verified rollback snapshots, atomically changes a durable routing pointer, guards schedule adoption and restores routing/schedule idempotently across restart. Filesystem and transaction fault tests pass with simulated host services. Actual routing consumer, service/cron/containment driver and host acceptance remain pending.",
+  "starting_head": "fa3dcaa55034cadf676f800dcfce07d3d373d707",
+  "head": "fa3dcaa55034cadf676f800dcfce07d3d373d707",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected delivery/checkpoint/SYSTEM/SIG-v1 suite: 372 passed and 88 subtests passed in 95.65s. Final expanded composition suite: 33 passed in 2.26s (six additional cases beyond affected-suite collection). git diff --check passed. Host operations simulated; no sandbox-blocked socket tests retried. Actual exact-release host full/socket/runtime/HTTP acceptance pending.",
+  "tests": "Affected delivery/checkpoint/SYSTEM/SIG-v1 suite: 402 passed and 88 subtests passed in 96.17s. Focused production/host/runner suite: 146 passed in 7.00s. git diff --check passed. Filesystem routing tests use simulated host services/schedules; exact-release host full/socket/runtime/HTTP acceptance remains pending. Sandbox-blocked socket tests not retried.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement trusted production backend for ComposedHost: verified containment, durable previous-release/schedule snapshots, atomic routing cutover, release-local scheduler adoption and idempotent restoration with fault-injection tests. Then provision reporting-only source/policies and wire supervisor; run exact-release host full/socket/runtime/spare-port gates before cutover. No strategy promotion.",
+  "next_action": "Implement and validate trusted host services binding for ProductionBackend (actual routing consumer, persistent service lifecycle, containment observations and release-local cron read/install/verification); wire protected policies and supervisor. Provision reporting-only source and run exact-release host full/socket/runtime/spare-port gates before any cutover. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,12 +202,12 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "HOST_COMPOSITION_TESTED_PRODUCTION_BACKEND_PENDING",
+    "status": "PRODUCTION_TRANSACTION_TESTED_HOST_SERVICES_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "rev 3/3a read as historical advisory. Current code confirms host production backend and installation are still absent; no historical socket-test result adopted as exact-current-release evidence. Strategy recommendations remain deferred.",
+    "claude_review": "rev 3/3a read as historical advisory. Confirmed host service bindings and installation are still absent; this cycle adds the production transaction backend only. Historical socket results are not exact-current-release evidence. Strategy recommendations remain deferred.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
@@ -220,6 +220,7 @@
     "test_validation": "Exact-source full-suite/socket component now uses bundle source/ for imports and collection. Restart verification binds command, preparation/runtime pins and report hash; incomplete or altered evidence rejected. Actual exact-release host tests remain pending.",
     "runtime_acceptance": "Both EGX/US trusted workloads measured with pinned GNU time, strict elapsed/RSS budgets, snapshot/test/preparation/runtime identity checks, durable MEASURING/MEASURED receipts and restart verification. Tests simulate measurements, not nightly evidence. RSS is process high-water, not aggregate cgroup memory. Actual workload policy, containment and host execution pending.",
     "candidate_acceptance": "ReleaseCandidate binds runtime receipt and policy pins, copies approved state, reserves a spare localhost port, passes its FD to release-local Python, validates exact identity/LIVE_MONEY and HTTP/API/compatibility/SIG-v1 fields, and publishes ACCEPTED only after cleanup and revalidation. Incomplete receipts remain latched. Socket/HTTP tests simulated; actual host acceptance not performed. Host-owned factory/policies and cgroup/filesystem containment remain required.",
-    "host_composition": "ComposedHost wired to existing component chain and delivery/recover protocol. Persistent component verification before mutation; cleanup reconciles host-owned resources then requires a complete verified receipt prefix. Incomplete/corrupt receipts and orphans remain RECOVERY_REQUIRED. Production backend is a required trusted dependency, not installed or provided by requests."
+    "host_composition": "ComposedHost connects all acceptance components and can use ProductionBackend. Host-owned service bindings and installation remain pending; no deployment claimed.",
+    "production_backend": "Implemented durable full schedule/digest backup, guarded atomic JSON routing pointer, staged-service acceptance, production observation, schedule readback and independent idempotent restoration. Real temporary filesystem plus simulated services tested through delivery/recovery. No actual routing consumer, cron or cgroup verification performed."
   }
 }
