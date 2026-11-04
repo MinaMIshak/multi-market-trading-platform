@@ -14,7 +14,11 @@ Metrics per model and horizon:
   predicted Top-K vs the equal-weight universe benchmark; the false-positive
   share;
 - calibration: Brier score vs the climatology Brier, calibration buckets, event
-  counts.
+  counts;
+- significance (app/learning/significance.py): Newey-West HAC and block
+  bootstrap tests on the per-session rank IC and Top-10 excess return (Top-10
+  mean minus the universe mean), their early-vs-recent change, and challenger
+  minus champion on common sessions.
 
 Only liquid symbols are ranked, so illiquid names cannot dominate.
 """
@@ -24,8 +28,9 @@ from array import array
 from math import isnan, nan
 from statistics import median
 
+from app.learning import significance
 from app.learning.dataset import THRESHOLD_KEYS
-from app.learning.models import FORECAST_HORIZONS, MODELS
+from app.learning.models import CHAMPION, FORECAST_HORIZONS, MODELS
 
 MIN_TRAIN_SESSIONS = 120
 K_VALUES = (5, 10, 20)
@@ -106,11 +111,13 @@ class Predictions:
         return len(self.session)
 
 
-def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
+def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None, series=None):
+    """``series`` (optional dict) receives {h: {"rank_ic": {session: rho}, "top10_excess": {session: excess}}}."""
     from app.learning.dataset import THRESHOLDS
     thresholds = dict(zip(THRESHOLD_KEYS, THRESHOLDS))
     report = {}
     for h in FORECAST_HORIZONS:
+        session_ic, session_excess = {}, {}
         scored = [i for i in range(len(preds)) if not isnan(preds.label[h][i]) and not isnan(preds.pred[h][i])]
         if not scored:
             report[h] = {"status": "INSUFFICIENT_SAMPLE", "n": 0}
@@ -122,7 +129,7 @@ def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
             by_session.setdefault(preds.session[i], []).append(i)
         spearmans, recall10, recall20, bench = [], [], [], []
         precision, top_returns, false_pos = ({k: [] for k in K_VALUES} for _ in range(3))
-        for members in by_session.values():
+        for session, members in by_session.items():
             liquid = [i for i in members if not isnan(preds.turnover20[i]) and preds.turnover20[i] >= liquidity_floor]
             if len(liquid) < 25:
                 continue
@@ -131,6 +138,7 @@ def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
             rho = spearman(p, a)
             if rho is not None:
                 spearmans.append(rho)
+                session_ic[session] = rho
             by_pred = sorted(range(len(liquid)), key=lambda j: (-p[j], preds.ticker[liquid[j]]))
             by_actual = sorted(range(len(liquid)), key=lambda j: (-a[j], preds.ticker[liquid[j]]))
             bench.append(sum(a) / len(a))
@@ -139,6 +147,7 @@ def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
                 precision[k].append(len(top_pred & top_act) / k)
                 top_returns[k].append(sum(a[j] for j in by_pred[:k]) / k)
                 false_pos[k].append(sum(1 for j in by_pred[:k] if a[j] < 0) / k)
+            session_excess[session] = top_returns[10][-1] - bench[-1]
             recall10.append(len(set(by_pred[:10]) & set(by_actual[:10])) / 10)
             recall20.append(len(set(by_pred[:20]) & set(by_actual[:20])) / 20)
         calibration = {}
@@ -167,23 +176,40 @@ def evaluate(preds: Predictions, *, liquidity_floor, thresholds=None):
             "topk_median_return": {k: round(median(v), 5) for k, v in top_returns.items() if v},
             "benchmark_mean_return": round(sum(bench) / len(bench), 5) if bench else None,
             "false_positive_share": {k: round(sum(v) / len(v), 4) for k, v in false_pos.items() if v},
-            "calibration": calibration}
+            "calibration": calibration,
+            "significance": {"rank_ic": significance.summary(session_ic, metric="rank_ic", horizon=h),
+                             "top10_excess": significance.summary(session_excess, metric="top10_excess", horizon=h)}}
+        if series is not None:
+            series[h] = {"rank_ic": session_ic, "top10_excess": session_excess}
     return report
 
 
-def evaluate_predictions(items, *, liquidity_floor):
+def compare_to_champion(series_by_model, champion=CHAMPION):
+    """Challenger minus champion per horizon and metric on common sessions (paired HAC + block bootstrap)."""
+    base = series_by_model.get(champion) or {}
+    out = {}
+    for name, by_h in series_by_model.items():
+        if name == champion:
+            continue
+        out[name] = {str(h): {metric: significance.paired(values, (base.get(h) or {}).get(metric) or {},
+                                                          metric=f"{metric}:{name}-minus-{champion}", horizon=h)
+                              for metric, values in metrics.items()} for h, metrics in by_h.items()}
+    return out
+
+
+def evaluate_predictions(items, *, liquidity_floor, series=None):
     """Dict-based entry point (live frozen-forecast scoring): items with session, ticker, features, labels, forecast."""
     preds = Predictions()
     for item in items:
         preds.add(item["session"], item["ticker"], (item.get("features") or {}).get("turnover20"), item["labels"],
                   item["forecast"])
-    return evaluate(preds, liquidity_floor=liquidity_floor)
+    return evaluate(preds, liquidity_floor=liquidity_floor, series=series)
 
 
 def run(ds, *, liquidity_floor, model_names=tuple(MODELS), min_train=MIN_TRAIN_SESSIONS):
     plan = folds(ds.sessions, min_train=min_train)
     by_session = ds.by_session()
-    results = {}
+    results, series = {}, {}
     for name in model_names:
         preds = Predictions()
         for fold in plan:
@@ -201,6 +227,9 @@ def run(ds, *, liquidity_floor, model_names=tuple(MODELS), min_train=MIN_TRAIN_S
                          "evaluation_start": plan[0]["start"] if plan else None,
                          "evaluation_end": plan[-1]["sessions"][-1] if plan else None,
                          "training_start": ds.sessions[0] if ds.sessions else None,
-                         "metrics": evaluate(preds, liquidity_floor=liquidity_floor)}
+                         "metrics": evaluate(preds, liquidity_floor=liquidity_floor,
+                                             series=series.setdefault(name, {}))}
         del preds
+    for name, comparison in compare_to_champion(series).items():
+        results[name]["vs_champion"] = comparison
     return results

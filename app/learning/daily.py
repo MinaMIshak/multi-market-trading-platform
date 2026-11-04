@@ -30,9 +30,10 @@ from pathlib import Path
 from statistics import median
 
 from app.learning import events as event_layer
+from app.learning import significance
 from app.learning.dataset import FEATURE_SCHEMA, VERSION as DATA_VERSION, build, label_counts
 from app.learning.models import CHAMPION, FORECAST_HORIZONS, MODELS
-from app.learning.walkforward import evaluate_predictions
+from app.learning.walkforward import compare_to_champion, evaluate_predictions, spearman
 
 SCHEMA = "learning-report-v1"
 LIQUIDITY_FLOOR = {"EGX": 1_000_000.0, "US": 20_000_000.0}
@@ -294,9 +295,11 @@ def live_scoring(state_dir, dataset, *, market):
                                      if v.get("status") == "OK" else {"status": v.get("status")}) for h, v in compact.items()}
                 per_model[name].append({"session": session, "ticker": ticker, "features": row["features"],
                                         "labels": row["labels"], "forecast": forecast})
-    return {"frozen_forecast_files": len(files),
-            "models": {name: evaluate_predictions(preds, liquidity_floor=LIQUIDITY_FLOOR[market])
-                       for name, preds in per_model.items()}}
+    series = {name: {} for name in per_model}
+    scored = {name: evaluate_predictions(preds, liquidity_floor=LIQUIDITY_FLOOR[market], series=series[name])
+              for name, preds in per_model.items()}
+    return {"frozen_forecast_files": len(files), "models": scored, "vs_champion": compare_to_champion(series),
+            "significance_method": significance.METHOD}
 
 
 def _load_json(path):
@@ -390,13 +393,20 @@ def _fusion_summary(cache):
 
 
 def fusion_scoring(state_dir, dataset, *, market):
-    """Live out-of-sample scoring of frozen fusion snapshots: mean realised r1 of each arm's top 10 (liquid)."""
+    """Live out-of-sample scoring of frozen fusion snapshots: mean realised r1 of each arm's top 10 (liquid).
+
+    ``significance`` adds, per arm and horizon (1, 3): the per-session rank IC and Top-10 excess return (Top-10 mean
+    minus the liquid-universe mean) with HAC and block-bootstrap tests, early vs recent, and arm minus the technical
+    arm (DF0 / US-DF0) on common sessions.
+    """
     by_key = {(r["session"], r["ticker"]): r for r in dataset["rows"]}
     per_arm = {}
+    series = {}
     files = sorted(glob.glob(str(Path(state_dir) / "fusion" / "*.json")))
     for path in files:
         document = _load_json(path) or {}
         session = document.get("session")
+        _fusion_session_series(document, by_key, series)
         arms = {}
         for ticker, item in (document.get("scores") or {}).items():
             row = by_key.get((session, ticker))
@@ -411,9 +421,48 @@ def fusion_scoring(state_dir, dataset, *, market):
                 continue
             top = sorted(pairs, key=lambda p: -p[0])[:10]
             per_arm.setdefault(arm, []).append(sum(r for _, r in top) / 10 - sum(r for _, r in pairs) / len(pairs))
+    from app.learning import fusion
+    base = list(fusion.MARKETS[market]["arms"])[0]
+    tests = {}
+    for arm, by_h in sorted(series.items()):
+        tests[arm] = {}
+        for h, metrics in sorted(by_h.items()):
+            cell = {metric: significance.summary(values, metric=f"{arm}:{metric}", horizon=h)
+                    for metric, values in metrics.items()}
+            if arm != base:
+                cell["vs_technical"] = {metric: significance.paired(values, ((series.get(base) or {}).get(h) or {})
+                                                                    .get(metric) or {},
+                                                                    metric=f"{metric}:{arm}-minus-{base}", horizon=h)
+                                        for metric, values in metrics.items()}
+            tests[arm][str(h)] = cell
     return {"frozen_fusion_files": len(files),
             "arms": {arm: {"matured_sessions": len(v), "mean_top10_excess_r1": round(sum(v) / len(v), 5),
-                           "status": "OK" if len(v) >= 20 else "INSUFFICIENT_SAMPLE"} for arm, v in per_arm.items()}}
+                           "status": "OK" if len(v) >= 20 else "INSUFFICIENT_SAMPLE"} for arm, v in per_arm.items()},
+            "significance": tests, "significance_method": significance.METHOD, "technical_arm": base}
+
+
+def _fusion_session_series(document, by_key, series, horizons=(1, 3), min_names=25):
+    """Per arm and horizon, {session: value} for rank IC and Top-10 excess (liquid names with a VALID label)."""
+    session = document.get("session")
+    for h in horizons:
+        arms = {}
+        for ticker, item in (document.get("scores") or {}).items():
+            label = ((by_key.get((session, ticker)) or {}).get("labels") or {}).get(h) or {}
+            if not item.get("liquid") or label.get("status") != "VALID":
+                continue
+            for arm, value in item["opportunity_by_arm"].items():
+                if value is not None:
+                    arms.setdefault(arm, []).append((value, ticker, label["ret"]))
+        for arm, triples in arms.items():
+            if len(triples) < min_names:
+                continue
+            ordered = sorted(triples, key=lambda t: (-t[0], t[1]))
+            universe = sum(t[2] for t in triples) / len(triples)
+            cell = series.setdefault(arm, {}).setdefault(h, {"rank_ic": {}, "top10_excess": {}})
+            rho = spearman([t[0] for t in triples], [t[2] for t in triples])
+            if rho is not None:
+                cell["rank_ic"][session] = rho
+            cell["top10_excess"][session] = sum(t[2] for t in ordered[:10]) / 10 - universe
 
 
 def outcome_classes(dataset, prior_frozen, state_dir, sessions):

@@ -209,7 +209,10 @@ def test_fusion_walk_forward_is_chronological_and_reports_incremental_value():
     all_metrics = result["results"]["US-DF0"]["all"]
     assert all_metrics["status"] in ("OK", "INSUFFICIENT_SAMPLE")
     assert "upper_turnover_tier" in result["results"]["US-DF0"]
-    egx = fusion_eval.run(dataset.build(universe(weekdays=(6, 0, 1, 2, 3))), market="EGX", min_train=120)
+    tests = all_metrics["significance"]                       # fixture yields an OK sample (deterministic)
+    assert tests["rank_ic"]["mean"]["n"] == all_metrics["sessions"] and tests["rank_ic"]["mean"]["horizon"] == 3
+    assert "vs_technical" not in tests and "vs_technical" in result["results"]["US-DF1"]["all"]["significance"]
+    egx =fusion_eval.run(dataset.build(universe(weekdays=(6, 0, 1, 2, 3))), market="EGX", min_train=120)
     assert set(egx["results"]) == set(fusion.ARMS) and "upper_turnover_tier" not in egx["results"]["DF0"]
 
 

@@ -95,7 +95,23 @@ A threshold probability with fewer than 30 training events is labelled
     realised return of the predicted Top-K vs the equal-weight universe
     benchmark; false-positive share;
   - calibration: Brier score vs the climatology (base-rate) Brier, buckets and
-    event counts for every threshold.
+    event counts for every threshold;
+  - significance (`app/learning/significance.py`, SIG-v1): every series is one
+    value per session (rank IC, or Top-10 minus universe mean return), and
+    each gets two tests.
+    - Newey-West HAC: the lag is `max(h − 1, floor(4(n/100)^(2/9)))`. The
+      p-value and CI come from Student t with n − 1 degrees of freedom.
+    - Circular moving-block bootstrap: the block length is
+      `max(h, ceil(n^(1/3)))`, with 2,000 seeded replications.
+
+    The same tests cover challenger minus champion on common sessions and
+    the recent half minus the early half. A result is `distinguishable` only
+    if both methods reject at 5%. Fewer than 8 values give
+    `INSUFFICIENT_SAMPLE`, and a zero-variance series gives
+    `DEGENERATE_ZERO_VARIANCE`. Live frozen forecasts
+    (`live_scoring.vs_champion`) and frozen fusion snapshots
+    (`fusion_live_scoring.significance`) get the same tests. Significance is
+    evidence for review, never a promotion rule by itself.
 - Run weekly: `tools/learning_weekly.sh`, Saturday 10:00 Cairo, a non-session
   day. The four heavy jobs run strictly in sequence under `learning.lock`.
   Results are cached in `walkforward.json` and `fusion_walkforward.json`, and

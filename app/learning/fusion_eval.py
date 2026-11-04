@@ -19,7 +19,10 @@ averaged:
 - after the liquidity gate (Top-10 by score, liquid only): expectancy and
   profit factor of the 3-session return, and the maximum drawdown of the
   cumulative mean next-session return;
-- splits by market regime (breadth above/below its median).
+- splits by market regime (breadth above/below its median);
+- significance (all sessions only): HAC and block-bootstrap tests of the
+  per-session rank IC and Top-10 excess 3-session return over the universe,
+  early vs recent, and each arm minus the technical arm on common sessions.
 
 The incremental view compares each arm with the previous one. Factor research
 covers conditional forward-return statistics with sample sizes and stability
@@ -31,7 +34,7 @@ from array import array
 from math import isnan, nan
 from statistics import median
 
-from app.learning import fusion
+from app.learning import fusion, significance
 from app.learning.models import BucketModel
 from app.learning.walkforward import MIN_TRAIN_SESSIONS, folds, spearman
 
@@ -106,7 +109,8 @@ def _session_metrics(scores, r1, r3, mae3):
     return out
 
 
-def arm_metrics(store, weights_by_session, arm, *, sessions_filter=None, tier=None, benchmarks=None):
+def arm_metrics(store, weights_by_session, arm, *, sessions_filter=None, tier=None, benchmarks=None, series=None):
+    """``series`` (optional dict) receives {"rank_ic": {session: rho}, "top10_excess": {session: top-10 r3 - universe r3}}."""
     sessions = {}
     for j in range(len(store.session)):
         if not store.liquid[j] or isnan(store.r1[j]) or isnan(store.r3[j]):
@@ -135,6 +139,10 @@ def arm_metrics(store, weights_by_session, arm, *, sessions_filter=None, tier=No
             if bench is not None:
                 metrics.setdefault("excess", {})[name] = sum(metrics["top10_r3"]) / 10 - bench
         per.append(metrics)
+        if series is not None:
+            if metrics["spearman_r3"] is not None:
+                series.setdefault("rank_ic", {})[k] = metrics["spearman_r3"]
+            series.setdefault("top10_excess", {})[k] = sum(metrics["top10_r3"]) / 10 - metrics["benchmark_r3"]
     if not per:
         return {"status": "INSUFFICIENT_SAMPLE", "sessions": 0}
     mean = lambda key: round(sum(p[key] for p in per if p[key] is not None) / max(1, sum(1 for p in per if p[key] is not None)), 4)
@@ -210,9 +218,10 @@ def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
 
     values = [b for b in breadth.values() if b is not None]
     mid = median(values) if values else None
-    results, incremental = {}, {}
+    results, incremental, series = {}, {}, {}
     for arm in config["arms"]:
-        results[arm] = {"all": arm_metrics(store, weights_for, arm, benchmarks=benchmarks)}
+        results[arm] = {"all": arm_metrics(store, weights_for, arm, benchmarks=benchmarks,
+                                           series=series.setdefault(arm, {}))}
         if mid is not None:
             results[arm]["broad_participation"] = arm_metrics(store, weights_for, arm,
                                                               sessions_filter=lambda k: (breadth.get(k) or 0) > mid)
@@ -222,6 +231,16 @@ def run(ds, *, market, min_train=MIN_TRAIN_SESSIONS, benchmarks=None):
             for tier, label in ((0, "lower_turnover_tier"), (1, "middle_turnover_tier"), (2, "upper_turnover_tier")):
                 results[arm][label] = arm_metrics(store, weights_for, arm, tier=tier)
     names = list(config["arms"])
+    for arm in names:
+        if results[arm]["all"].get("status") != "OK":
+            continue
+        tests = {metric: significance.summary(values, metric=f"{arm}:{metric}", horizon=3)
+                 for metric, values in series[arm].items()}
+        if arm != names[0]:
+            tests["vs_technical"] = {metric: significance.paired(values, series[names[0]].get(metric) or {},
+                                                                 metric=f"{metric}:{arm}-minus-{names[0]}", horizon=3)
+                                     for metric, values in series[arm].items()}
+        results[arm]["all"]["significance"] = tests
     for previous, current in zip(names, names[1:]):
         a, b = results[previous]["all"], results[current]["all"]
         if a.get("status") != "OK" or b.get("status") != "OK":
