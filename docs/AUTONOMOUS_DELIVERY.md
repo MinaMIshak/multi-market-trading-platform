@@ -523,3 +523,33 @@ routing consumer, service manager, cron installation or containment. Those host
 bindings, supervisor installation, reporting-only approval, exact-release socket
 and full-suite/runtime/spare-port acceptance remain pending. No release is green
 or deployed on the strength of these simulations.
+
+## Dedicated cron file binding
+
+`tools/delivery_schedule.py:ReleaseSchedule` supplies the four schedule methods
+for the trusted production services driver. It generates an exact dedicated
+cron.d file from host-owned daily job times, module names, user and immutable
+bundle/environment roots. Every command changes to the SHA source and invokes
+that SHA's interpreter with a clean environment and LIVE_MONEY=false. No request
+can supply a shell command or an alternative schedule. The supplied release
+verifier must independently verify the prepared release and immutable runtime;
+file existence alone is insufficient. Job policy must include every required
+chain and its release-local configuration before installation.
+
+Read refuses missing, symlink, nonregular, oversized or group/world-writable
+state. Install only accepts the exact approved generated text, writes a sibling
+temporary file, fsyncs it, atomically replaces the dedicated file, fsyncs the
+parent and checks exact readback. The existing production transaction retains
+the entire prior file and can restore it after partial installation and restart.
+Other cron files are untouched. Legacy schedules need explicit host migration
+before the production snapshot can pass exact schedule verification.
+
+The host must provision a root-owned cron.d target and protected parent, invoke
+this binding with the proper owner under the delivery lease, retain the prior
+release and policy for rollback, and independently verify cron daemon adoption
+and chain heartbeats. File readback proves installed text, not daemon execution
+or scheduler health. A separate host policy is needed for weekly/non-daily jobs;
+this binding intentionally accepts daily jobs only. No cron daemon was inspected
+or changed in Codex. Filesystem tests include production-backend rollback after
+an install succeeds and then raises. Routing consumer, persistent service and
+containment bindings, host policy wiring and actual acceptance remain pending.
