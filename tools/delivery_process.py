@@ -26,7 +26,7 @@ def _signal_group(pid, sig):
         pass
 
 
-def run_owned(argv, *, cwd: Path, timeout: float, grace: float = 1.0):
+def run_owned(argv, *, cwd: Path, timeout: float, grace: float = 1.0, env=None):
     """Run one trusted command; terminate its group on *every* exit path.
 
     Output inherits the supervisor's log handles (no unbounded pipe buffering).
@@ -42,7 +42,7 @@ def run_owned(argv, *, cwd: Path, timeout: float, grace: float = 1.0):
                 and math.isfinite(v) and v > 0 for v in (timeout, grace)),
             'invalid process deadline')
     process = subprocess.Popen(argv, cwd=cwd, start_new_session=True,
-                               stdin=subprocess.DEVNULL, close_fds=True)
+                               stdin=subprocess.DEVNULL, close_fds=True, env=env)
     try:
         try:
             returncode = process.wait(timeout=timeout)

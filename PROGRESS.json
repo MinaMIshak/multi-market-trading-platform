@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_WRITER_SUPERVISION",
-  "current_capability": "Implemented supervised writer/commit-bridge process groups, deadline cleanup and durable uncertain-writer latch across supervisor and direct delivery entry points. Host cgroup installation, release interpreter and adapter remain pending.",
-  "starting_head": "0d7b521c876aee7a1106ce4e72b76a9be7de565c",
-  "head": "0d7b521c876aee7a1106ce4e72b76a9be7de565c",
+  "phase": "AUTONOMOUS_DELIVERY_OFFLINE_ENVIRONMENT",
+  "current_capability": "Implemented offline release-local venv provisioning tied to verified source, trusted interpreter/wheel hashes and exact inventory; immutable manifest verification and real disposable offline integration passed. Production policy/runtime pinning and host adapter installation remain pending.",
+  "starting_head": "f1a7ce8dd3b38e3f410e7858cf566ed5639f6b75",
+  "head": "f1a7ce8dd3b38e3f410e7858cf566ed5639f6b75",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "246 affected delivery/process/supervisor/bundle/source/status, immutable-release, checkpoint, SYSTEM and SIG-v1 tests plus 88 subtests passed in 8.77s. No sandbox socket retry; host full/socket/spare-port acceptance remains pending.",
+  "tests": "269 affected delivery/environment/process/supervisor/bundle/source/status, immutable-release, checkpoint, SYSTEM and SIG-v1 tests plus 88 subtests passed in 22.91s. Includes actual disposable venv installation from an artificial offline wheel. Earlier focused run: 38 passed, 1 process cleanup deadline failure; unchanged test passed in affected suite. No sandbox socket retry; host exact-release full/socket/spare-port acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement pinned release-local interpreter/dependency provisioning for exact-source bundles and trusted host prepare/validate adapter. Wire supervisor run_cycle with verified kill-on-stop cgroup containment and existing commit bridge. Provision independently reviewed reporting-only baseline/change policy; do not auto-approve current HEAD. Run exact-release host full/socket tests, runtime/RSS and spare-port acceptance before cutover/schedule adoption; publish host-owned SYSTEM receipt. No strategy promotion.",
+  "next_action": "Implement trusted host prepare/validate adapter integrating exact-source bundle and offline environment with durable manifest-digest receipt. Provision independently reviewed reporting-only source approval, complete wheel/inventory policy and immutable base Python/OS runtime; do not auto-approve current HEAD. Wire supervisor/commit bridge with verified kill-on-stop cgroup. Run exact-release host full/socket tests and runtime/RSS/spare-port acceptance before cutover and scheduler adoption; publish host-owned SYSTEM receipt. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Core and restart recovery tested. Trusted host adapter, exact-source host validation, supervisor wiring and SYSTEM receipt projection pending; no production access attempted."
+    "delivery": "Core/recovery/source/environment components tested. Production dependency policy and base runtime pinning, trusted host adapter, exact-source host validation, supervisor wiring and SYSTEM receipt publication pending; no production access attempted."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "WRITER_PROCESS_SUPERVISION_TESTED_HOST_ADOPTION_PENDING",
+    "status": "OFFLINE_ENVIRONMENT_TESTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -214,6 +214,7 @@
     "system_projection": "Implemented allowlisted historical delivery receipt view; EGX_DELIVERY_RECEIPT host publication not configured or operationally verified. Cycle/review/chain and live scheduler health remain unknown in this view.",
     "supervisor_coordination": "Implemented run_cycle under both locks, process-group timeout/exit cleanup before bridge, and durable writer-active latch blocking supervisor/direct delivery after uncertain cleanup or interruption. Real local descendant termination tested; detached-child containment requires host kill-on-stop cgroup installation, not yet verified.",
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
-    "source_bundle": "Implemented trusted baseline and exact mode/content digest approval, complete Git-blob source/tests bundle, immutable publication and independent verification. 17 bundle regression tests passed; no actual release/source approval or interpreter provisioned."
+    "source_bundle": "Implemented exact approved Git source bundle; environment binds to independently verified bundle manifest and file hashes. No actual reporting-only source approval or production environment provisioned.",
+    "environment": "Implemented offline hashed-wheel venv preparation, exact inventory and pip check, isolated supervised commands, read-only/fsynced manifest and independent digest verification. Real disposable artificial-wheel integration passed. Production wheel policy, immutable base stdlib/OS, manifest receipt integration and host provisioning remain pending."
   }
 }

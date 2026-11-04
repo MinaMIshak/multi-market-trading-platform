@@ -134,3 +134,11 @@ def test_interruption_retains_marker(setup, tmp_path):
                                  writer_timeout=1, bridge_timeout=1)
     with pytest.raises(DeliveryError, match='host reconciliation'):
         supervisor.startup()
+
+
+def test_explicit_environment_excludes_inherited_configuration(tmp_path, monkeypatch):
+    monkeypatch.setenv('DELIVERY_TEST_UNTRUSTED', 'inherited')
+    script = ('import os; assert "DELIVERY_TEST_UNTRUSTED" not in os.environ; '
+              'assert os.environ["LIVE_MONEY"] == "false"')
+    assert run_owned(command(script), cwd=tmp_path, timeout=2,
+                     env={'LIVE_MONEY': 'false'}) == 0
