@@ -186,3 +186,32 @@ fault-injection tests and a local isolated `ssh -G` parser check do not establis
 that the real deploy key works or that origin is synchronized. The host adapter
 for immutable preparation, runtime validation/cutover and scheduler adoption is
 still required. No release or network operation occurred during this work.
+
+## Exact-source reporting validation bundle
+
+`tools/delivery_bundle.py` implements the source-preparation component, not a
+complete runnable release adapter. The trusted supervisor supplies a verified
+baseline full SHA and an exact mapping of reviewed changes to digests (deletions
+map to null). Each digest is SHA-256 of Git mode ASCII, a NUL byte, and blob bytes.
+This binds executable-mode changes as well as content, including tests. Approval
+must follow independent reporting-only review; the module cannot establish code
+semantics. Never generate approval automatically from the candidate diff.
+
+Preparation reads all tracked blobs from the exact SHA using ls-tree/cat-file,
+not checkout files or archive export attributes. Symlinks and submodules fail
+closed. No challenger is silently removed: any unapproved change rejects the
+whole candidate. Tests/configuration and application source stay together under
+`<full SHA>/source`; source files are read-only data and scripts must be invoked
+with their interpreter. All tracked files are included, so the trusted source
+must itself be appropriate for host validation; never expose this bundle through
+a static web root. Existing bundles are rejected, and partial failures clean up.
+Call preparation under the existing delivery lock and protect the bundle root.
+
+Verification rechecks both the trusted Git objects and external approval policy,
+all file bytes, read-only permissions, identity and manifest. Rewriting a local
+manifest cannot bless modified source. This is a read-only source bundle, **not**
+a release green signal: interpreter is null and validation is NOT_RUN. A pinned
+release-local interpreter, dependency lock/wheel provisioning, durable host
+publication, full/socket tests, runtime/RSS measurement, spare-port acceptance,
+cutover and schedule adoption remain to implement/integrate. No host operation
+or actual reporting-only source approval was performed in this cycle.
