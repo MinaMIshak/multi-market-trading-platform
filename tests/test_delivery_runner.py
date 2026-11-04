@@ -237,3 +237,153 @@ def test_rollback_accepts_verified_previous_release_without_sig_v1(setup):
     with pytest.raises(DeliveryError, match='ROLLED_BACK'):
         run(setup)
     assert status(setup)['deployed_release'] == OLD
+
+
+@pytest.mark.parametrize('operation', ['prepare', 'validate', 'candidate', 'snapshot',
+                                      'cutover', 'adopt_schedule', 'production', 'cleanup'])
+def test_crash_recovery_at_each_host_boundary(setup, operation):
+    from tools.delivery_runner import recover
+    host = setup[3]
+    getattr(host, operation).side_effect = KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
+        run(setup)
+    getattr(host, operation).side_effect = None
+    host.reset_mock()
+    result = recover(setup[1], host)
+    touched = operation in ('cutover', 'adopt_schedule', 'production', 'cleanup')
+    assert result['status'] == ('ROLLED_BACK' if touched else 'FAILED')
+    assert result['deployed_release'] == (OLD if touched else None)
+    assert host.restore_release.call_count == int(touched)
+    assert host.restore_schedule.call_count == int(touched)
+    host.cleanup.assert_called_once_with(HEAD)
+    host.prepare.assert_not_called()
+    host.cutover.assert_not_called()
+    before = list(host.method_calls)
+    assert recover(setup[1], host) == result
+    assert host.method_calls == before  # terminal recovery is a no-op
+    setup[0]['request_id'] = 'cycle-2'
+    assert run(setup)['status'] == 'SUCCEEDED'
+
+
+def interrupted_cutover(setup):
+    setup[3].cutover.side_effect = KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
+        run(setup)
+    setup[3].cutover.side_effect = None
+    setup[3].reset_mock()
+
+
+@pytest.mark.parametrize('operation', ['restore_release', 'restore_schedule', 'rollback_check', 'cleanup'])
+def test_recovery_failure_is_retryable_and_blocks_delivery(setup, operation):
+    from tools.delivery_runner import recover
+    interrupted_cutover(setup)
+    host = setup[3]
+    getattr(host, operation).side_effect = RuntimeError('private host detail')
+    with pytest.raises(DeliveryError, match='RECOVERY_REQUIRED'):
+        recover(setup[1], host)
+    host.restore_release.assert_called_once()
+    host.restore_schedule.assert_called_once()
+    host.cleanup.assert_called_once()
+    assert status(setup)['deployed_release'] is None
+    setup[0]['request_id'] = 'cycle-2'
+    with pytest.raises(DeliveryError, match='unresolved'):
+        run(setup)
+    getattr(host, operation).side_effect = None
+    assert recover(setup[1], host)['status'] == 'ROLLED_BACK'
+
+
+@pytest.mark.parametrize('operation', ['restore_release', 'restore_schedule', 'rollback_check', 'cleanup'])
+def test_recovery_survives_another_process_crash(setup, operation):
+    from tools.delivery_runner import recover
+    interrupted_cutover(setup)
+    getattr(setup[3], operation).side_effect = KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
+        recover(setup[1], setup[3])
+    assert status(setup)['status'] == 'RECOVERING'
+    getattr(setup[3], operation).side_effect = None
+    assert recover(setup[1], setup[3])['status'] == 'ROLLED_BACK'
+
+
+@pytest.mark.parametrize('field,value', [('http', False), ('api', False), ('live_money', True),
+    ('live_money', 0), ('commit', HEAD), ('scheduler_target', HEAD), ('scheduler_verified', False)])
+def test_recovery_requires_verified_safe_release_and_schedule(setup, field, value):
+    from tools.delivery_runner import recover
+    interrupted_cutover(setup)
+    setup[3].rollback_check.return_value[field] = value
+    with pytest.raises(DeliveryError, match='RECOVERY_REQUIRED'):
+        recover(setup[1], setup[3])
+    assert status(setup)['scheduler_target'] is None
+
+
+@pytest.mark.parametrize('field,value', [('request_id', '../escape'), ('request_id', 'delivery'),
+    ('source_head', 'short'), ('status', 'UNKNOWN'), ('live_money', True), ('rollback', None)])
+def test_invalid_recovery_journal_never_invokes_host(setup, field, value):
+    from tools.delivery_runner import recover
+    interrupted_cutover(setup)
+    record = status(setup)
+    record[field] = value
+    (setup[1] / 'delivery.json').write_text(json.dumps(record))
+    with pytest.raises(DeliveryError):
+        recover(setup[1], setup[3])
+    assert setup[3].method_calls == []
+
+
+def test_recovery_uses_same_nonblocking_lock(setup):
+    from tools.delivery_runner import recover
+    interrupted_cutover(setup)
+    with delivery_lock(setup[1]):
+        with pytest.raises(DeliveryError, match='concurrent'):
+            recover(setup[1], setup[3])
+    assert setup[3].method_calls == []
+
+
+def test_reserved_request_id_cannot_overwrite_journal(setup):
+    setup[0]['request_id'] = 'delivery'
+    with pytest.raises(DeliveryError, match='request id'):
+        run(setup)
+    assert not (setup[1] / 'delivery.json').exists()
+
+
+def test_crash_between_journal_and_receipt_writes_blocks_delivery(setup, monkeypatch):
+    from tools import delivery_runner as runner
+    original = runner.atomic_json
+    def crash(path, value):
+        if path.name == 'cycle-1.json' and value['status'] == 'CUTOVER_PENDING':
+            raise KeyboardInterrupt()
+        original(path, value)
+    monkeypatch.setattr(runner, 'atomic_json', crash)
+    with pytest.raises(KeyboardInterrupt):
+        run(setup)
+    assert status(setup)['status'] == 'CUTOVER_PENDING'
+    setup[0]['request_id'] = 'cycle-2'
+    with pytest.raises(DeliveryError, match='unresolved'):
+        run(setup)
+    monkeypatch.setattr(runner, 'atomic_json', original)
+    assert runner.recover(setup[1], setup[3])['status'] == 'ROLLED_BACK'
+
+
+def test_terminal_recovery_repairs_interrupted_receipt_write(setup):
+    from tools.delivery_runner import recover
+    result = run(setup)
+    (setup[1] / 'cycle-1.json').unlink()
+    setup[3].reset_mock()
+    assert recover(setup[1], setup[3]) == result
+    assert json.loads((setup[1] / 'cycle-1.json').read_text()) == result
+    assert setup[3].method_calls == []
+
+
+def test_terminal_receipt_io_failure_does_not_start_unjournaled_rollback(setup, monkeypatch):
+    from tools import delivery_runner as runner
+    original = runner.atomic_json
+    def fail(path, value):
+        if path.name == 'cycle-1.json' and value['status'] == 'SUCCEEDED':
+            raise OSError('receipt write failed')
+        original(path, value)
+    monkeypatch.setattr(runner, 'atomic_json', fail)
+    with pytest.raises(OSError):
+        run(setup)
+    assert status(setup)['status'] == 'SUCCEEDED'
+    setup[3].restore_release.assert_not_called()
+    setup[3].restore_schedule.assert_not_called()
+    monkeypatch.setattr(runner, 'atomic_json', original)
+    assert runner.recover(setup[1], setup[3])['status'] == 'SUCCEEDED'

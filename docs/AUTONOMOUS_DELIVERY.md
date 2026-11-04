@@ -1,7 +1,7 @@
 # Autonomous delivery contract
 
-Status: transaction core implemented; host adapter, supervisor invocation, recovery
-runner and SYSTEM receipt projection pending. No release was deployed by this work.
+Status: transaction core implemented; restart recovery implemented; host adapter, supervisor invocation
+and SYSTEM receipt projection pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -35,8 +35,11 @@ Claude reviews read-only. The supervisor owns commit/push/release operations.
   schedule restoration independently, then verifies rollback. Failed restoration
   or cleanup becomes `RECOVERY_REQUIRED`; no later delivery may proceed.
 - Interrupted transactions remain nonterminal and block subsequent delivery.
-  Recovery must be idempotent and preserve the previous verified release. This
-  cycle does not yet implement automatic restart recovery.
+  `recover(state_directory, adapter)` reconciles these under the same lock. It
+  never resumes forward delivery: before cutover it cleans up the candidate; if
+  cutover may have occurred it restores both the verified release and exact
+  schedule, verifies rollback, and cleans up. Failed recovery remains blocking.
+  Restore/cleanup methods must be idempotent across repeated process crashes.
 
 Receipts use atomic replacement and fsync for file/directory durability. They
 record historical observations, not ongoing process health. The supervisor must
@@ -65,8 +68,11 @@ an allowlisted SYSTEM view. Do not serve rollback backups or raw exception text.
 5. Persist a verified prior release/routing target and exact installed schedule,
    atomically switch production only after acceptance, then install/verify a
    schedule targeting the immutable release interpreter. Restore both on failure.
-6. Implement idempotent crash recovery under the delivery lock, supervisor timeout
-   handling and automatic reconciliation of nonterminal journals.
+6. Wire the implemented `recover` function into supervisor startup and timeout
+   handling before accepting another delivery or starting a Codex writer cycle.
+   Recovery is a host operation using the same trusted adapter, never request
+   commands. A missing journal means no transaction to recover; malformed journals
+   require host reconciliation and must not be deleted to bypass the gate.
 7. Connect allowlisted delivery receipts to SYSTEM: source HEAD, origin sync,
    deployed release, Codex cycle, Claude review, tests, candidate validation,
    deployment/rollback, schedule target/health, EGX/US chain status and blocker.
@@ -75,3 +81,23 @@ an allowlisted SYSTEM view. Do not serve rollback backups or raw exception text.
 No host path, socket, production process, cron or remote was accessed by the unit
 tests. Fault injection validates orchestration, not the missing adapter or a real
 release. LIVE_MONEY=DISABLED; automatic model/strategy/risk promotion is unauthorized.
+
+## Restart recovery durability
+
+The authoritative `delivery.json` journal is fsynced before the per-request
+receipt. A crash between those writes therefore leaves the recovery obligation
+visible. Terminal recovery repairs the receipt without host mutations. Request ID
+`delivery` is reserved to prevent collision with the journal filename.
+
+Recovery validates identity, phase, disabled live money and rollback metadata
+before invoking host operations. A durable `RECOVERING` phase precedes restores.
+Both release and schedule restoration are attempted independently, followed by
+HTTP/API, identity, compatibility, live-money and scheduler acceptance for the
+previous release (which need not have SIG-v1). Cleanup failure also blocks later
+delivery. Successful recovery records historical rollback observations, not current
+health. Recovery never pushes, launches a new release, or promotes a strategy.
+
+Fault-injection coverage includes every host boundary, crashes during recovery,
+independent restore/cleanup failures, invalid journals, unsafe rollback evidence,
+lock contention, journal/receipt interruption and repeated terminal recovery.
+The trusted adapter and supervisor integration remain necessary for real recovery.

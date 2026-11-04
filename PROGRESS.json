@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_TRANSACTION_CORE",
-  "current_capability": "Fail-closed delivery transaction core with exact-HEAD Git guards, durable receipts, lock/replay protection, host acceptance contracts and release/schedule rollback. Fault-injection tests only; production adapter and supervisor/SYSTEM integration pending. No deployment or strategy promotion.",
-  "starting_head": "484a984752b4f89cecfbc62546d197539fac295f",
-  "head": "484a984752b4f89cecfbc62546d197539fac295f",
+  "phase": "AUTONOMOUS_DELIVERY_RESTART_RECOVERY",
+  "current_capability": "Delivery transaction core now includes locked, idempotent restart recovery, durable journal-first receipts, conservative release/schedule rollback and fail-closed recovery acceptance. Fault-injection tested only; trusted host adapter, supervisor wiring and SYSTEM projection remain pending.",
+  "starting_head": "90f67551adb2c8d317f2f6c26bf4dd64136bd098",
+  "head": "90f67551adb2c8d317f2f6c26bf4dd64136bd098",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "89 affected delivery, immutable-release, checkpoint and SYSTEM tests plus 98 subtests passed in 2.67s. git diff --check passed. Fault injection only; prior sandbox socket failures not retried. Exact-release host full-suite/socket/spare-port acceptance pending.",
+  "tests": "124 affected delivery, immutable-release, checkpoint, SYSTEM and SIG-v1 contract tests plus 88 subtests passed in 5.14s. git diff --check passed. Fault injection only; known sandbox socket failures not retried. Exact-release host full-suite/socket/spare-port acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement trusted host adapter and supervisor integration: pinned remote/key configuration, isolated reporting-only SIG-v1 release source, immutable runtime/interpreter, exact-source full/socket tests, spare-port acceptance, atomic cutover and schedule restore; add crash recovery and allowlisted SYSTEM delivery projection. No discretionary model work until unattended delivery is restored.",
+  "next_action": "Implement trusted host adapter and supervisor wiring, invoking recover before new delivery/writer cycles. Pin intended origin/deploy-key configuration, isolate SIG-v1 reporting-only source, build immutable release-local interpreter, run exact-source host full/socket tests and spare-port acceptance, then atomic cutover/schedule adoption. Add allowlisted SYSTEM delivery projection. No model experimentation or promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Transaction core only. Trusted host adapter, host validation, crash recovery, supervisor wiring and SYSTEM receipt projection pending; no production access attempted."
+    "delivery": "Core and restart recovery tested. Trusted host adapter, exact-source host validation, supervisor wiring and SYSTEM receipt projection pending; no production access attempted."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
@@ -202,13 +202,14 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "CORE_TESTED_HOST_INTEGRATION_PENDING",
+    "status": "RECOVERY_TESTED_HOST_INTEGRATION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
     "claude_review": "rev 3/3a read as advisory; reported host socket passes not independently verified this cycle",
     "scope": "SIG-v1-reporting-only",
-    "promotion": "NOT_AUTHORIZED"
+    "promotion": "NOT_AUTHORIZED",
+    "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed."
   }
 }

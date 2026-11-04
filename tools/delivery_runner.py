@@ -147,7 +147,8 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
         require(isinstance(sha, str) and SHA.fullmatch(sha), 'full SHA required')
         identifier = request['request_id']
         require(isinstance(identifier, str) and
-                re.fullmatch(r'[A-Za-z0-9_-]{1,100}', identifier), 'invalid request id')
+                re.fullmatch(r'[A-Za-z0-9_-]{1,100}', identifier) and identifier != 'delivery',
+                'invalid request id')
         try:
             created = datetime.fromisoformat(request['created_at'])
             age = (now - created).total_seconds()
@@ -169,8 +170,8 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
 
         def save(status):
             record['status'] = status
-            atomic_json(receipt, record)
             atomic_json(journal, record)
+            atomic_json(receipt, record)
 
         save('STARTED')
         touched = False
@@ -211,7 +212,6 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
             record['scheduler_target'] = sha
             record['production_validation'] = production
             host.cleanup(sha)
-            save('SUCCEEDED')
         except Exception as error:
             record['blocker'] = type(error).__name__ + ': ' + str(error)
             record['deployed_release'] = None
@@ -239,4 +239,85 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
                 record['scheduler_target'] = snapshot['commit']
             save('RECOVERY_REQUIRED' if failures else 'ROLLED_BACK' if touched else 'FAILED')
             raise DeliveryError(record['status'] + ': ' + record['blocker']) from error
+        # All host mutations are complete. A receipt write failure after the
+        # terminal journal must not start an unjournaled rollback.
+        save('SUCCEEDED')
+        return record
+
+
+def recover(state: Path, host: HostOperations):
+    """Reconcile an interrupted delivery before the supervisor starts more work.
+
+    Never resume forward delivery: conservatively restore the journaled release
+    and schedule when cutover might have happened. Host restore/cleanup operations
+    must be idempotent and identify resources by the persisted transaction SHA.
+    No source checkout, push, release preparation or strategy promotion occurs.
+    """
+    with delivery_lock(state):
+        journal = state / 'delivery.json'
+        require(journal.is_file() and not journal.is_symlink(), 'missing or unsafe recovery journal')
+        record = json.loads(journal.read_text())
+        require(isinstance(record, dict) and record.get('schema') == 'delivery-state-v1'
+                and record.get('live_money') is False, 'invalid recovery journal')
+        identifier = record.get('request_id')
+        sha = record.get('source_head')
+        require(isinstance(identifier, str) and
+                re.fullmatch(r'[A-Za-z0-9_-]{1,100}', identifier) and identifier != 'delivery',
+                'invalid recovery request id')
+        require(isinstance(sha, str) and SHA.fullmatch(sha), 'invalid recovery SHA')
+        receipt = state / (identifier + '.json')
+        require(not receipt.is_symlink(), 'unsafe recovery receipt')
+        phase = record.get('status')
+        require(phase in ('STARTED', 'PREPARING', 'CUTOVER_PENDING', 'RECOVERING',
+                          'RECOVERY_REQUIRED', 'SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
+                'unknown recovery phase')
+        if phase in ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'):
+            # Journal is authoritative; repair a receipt left behind by a crash.
+            atomic_json(receipt, record)
+            return record
+        snapshot = record.get('rollback')
+        # A persisted backup is sufficient to assume mutation, even if the
+        # process died just before cutover. Re-restoration is intentionally safe.
+        touched = snapshot is not None or phase == 'CUTOVER_PENDING'
+        if touched:
+            require(isinstance(snapshot, dict) and
+                    isinstance(snapshot.get('commit'), str) and SHA.fullmatch(snapshot['commit'])
+                    and snapshot.get('verified') is True and
+                    isinstance(snapshot.get('schedule'), str), 'invalid recovery rollback state')
+
+        def save(status):
+            record['status'] = status
+            # Authoritative journal first: a crash between writes must never
+            # leave a terminal journal hiding a new recovery obligation.
+            atomic_json(journal, record)
+            atomic_json(receipt, record)
+
+        record['deployed_release'] = None
+        record['scheduler_target'] = None
+        record['blocker'] = 'interrupted delivery; conservative recovery'
+        save('RECOVERING')
+        failures = []
+        if touched:
+            for operation in (host.restore_release, host.restore_schedule):
+                try:
+                    operation(snapshot)
+                except Exception as error:
+                    failures.append(type(error).__name__)
+            try:
+                result = host.rollback_check(snapshot)
+                acceptance(result, snapshot['commit'], scheduler=True, require_sig=False)
+                record['rollback_validation'] = result
+            except Exception as error:
+                failures.append(type(error).__name__)
+        try:
+            host.cleanup(sha)
+        except Exception as error:
+            failures.append(type(error).__name__)
+        record['recovery_errors'] = failures
+        if touched and not failures:
+            record['deployed_release'] = snapshot['commit']
+            record['scheduler_target'] = snapshot['commit']
+        save('RECOVERY_REQUIRED' if failures else 'ROLLED_BACK' if touched else 'FAILED')
+        if failures:
+            raise DeliveryError('RECOVERY_REQUIRED: interrupted delivery recovery failed')
         return record
