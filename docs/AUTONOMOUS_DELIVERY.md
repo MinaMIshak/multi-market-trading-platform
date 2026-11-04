@@ -1,7 +1,7 @@
 # Autonomous delivery contract
 
-Status: transaction core, restart recovery and supervisor coordination API implemented;
-host adapter and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
+Status: transaction core, restart recovery, supervisor coordination and component
+composition implemented; production backend and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -437,3 +437,40 @@ Tests use simulated sockets/HTTP/lifecycle and real local process-group cleanup.
 No sandbox socket test was retried. Host factory and policy provisioning, actual
 exact-release full/socket/runtime/candidate acceptance, atomic cutover, scheduler
 rollback and supervisor installation remain pending.
+
+## Host composition and component recovery
+
+`tools/delivery_host.py` now supplies `ComposedHost(candidate, production)` for
+`deliver` and `DeliverySupervisor`. The candidate's existing dependency chain
+provides preparation, full/socket tests and both-market runtime validation.
+Each completed gate is reopened from its durable receipt; candidate acceptance
+and its entire dependency chain are reverified immediately before cutover,
+schedule adoption and production observation. No in-memory success flag substitutes
+for durable evidence. Existing receipts or orphan artifacts reject preparation.
+
+The host must supply a trusted production backend, never loaded from requests:
+`snapshot`, `cutover`, `adopt_schedule`, `production`, `restore_release`,
+`restore_schedule` and `rollback_check` retain the HostOperations contract.
+`assert_contained(sha)` must raise unless protected host cgroup/filesystem/runtime
+containment is installed and verified. `cleanup(sha)` must idempotently reconcile
+only transaction-owned validation resources, without stopping the serving release.
+`quiescent(sha)` must return strict boolean true only after observing those
+resources empty; it must also work when preparation never started.
+
+Cleanup always calls the backend before inspecting component receipts. A complete
+contiguous prefix of verified components is safe to retain; missing receipts with
+artifacts, downstream receipts without predecessors, incomplete receipts, altered
+policies/evidence and uncertain containment all leave RECOVERY_REQUIRED in the
+transaction journal. Restart recovery cannot erase or upgrade those receipts,
+and both production and schedule restoration remain callable independently of
+candidate evidence. Host reconciliation must preserve evidence and resolve the
+specific resource/artifact obligation before reuse; this adapter supplies no
+blind reset or automatic receipt deletion.
+
+Composition tests simulate host operations and exercise transaction and restart
+recovery, interruptions at all four component stages, orphan artifacts, evidence
+tampering before cutover, strict containment truth, production/LIVE_MONEY failure
+and release/schedule rollback. Actual host production backend, atomic routing,
+cron snapshot/adoption/restoration, policy provisioning, containment installation
+and supervisor invocation remain pending. No host acceptance or deployment is
+claimed; the two socket tests must still pass on the exact approved host release.
