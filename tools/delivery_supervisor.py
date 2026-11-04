@@ -1,4 +1,4 @@
-"""Host supervisor coordination; no CLI, production adapter or process launcher.
+"""Host supervisor coordination; no CLI or production adapter.
 
 All Codex writers, commit bridges and delivery invocations must use this API with
 one host-owned state directory. Hold writer_session until the writer and all its
@@ -45,6 +45,8 @@ class DeliverySupervisor:
         self.host = host
 
     def _recover(self):
+        require(not os.path.lexists(self.state / 'writer-active.json'),
+                'writer containment requires host reconciliation')
         journal = self.state / 'delivery.json'
         # lexists includes dangling symlinks: unsafe evidence cannot mean absent.
         if os.path.lexists(journal):
@@ -73,6 +75,31 @@ class DeliverySupervisor:
                             ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
                             'unresolved delivery requires recovery')
                 yield
+
+    def run_cycle(self, writer, bridge, *, cwd, writer_timeout, bridge_timeout,
+                  grace=1.0):
+        """Trusted commands in a host kill-on-stop cgroup; never request commands.
+
+        A durable marker blocks all subsequent operations if this supervisor
+        dies or cannot prove cleanup. Host reconciliation must verify cgroup
+        emptiness before removing it; startup never clears it automatically.
+        """
+        from tools.delivery_process import CleanupError, run_owned
+        from tools.delivery_runner import atomic_json
+
+        with self.writer_session():
+            marker = self.state / 'writer-active.json'
+            atomic_json(marker, {'schema': 'writer-active-v1'})
+            try:
+                run_owned(writer, cwd=cwd, timeout=writer_timeout, grace=grace)
+                run_owned(bridge, cwd=cwd, timeout=bridge_timeout, grace=grace)
+            except CleanupError:
+                raise
+            except Exception:
+                marker.unlink()
+                raise
+            else:
+                marker.unlink()
 
     def release(self, request, now=None):
         """Recover then deliver; requests never bypass source or acceptance gates."""

@@ -149,7 +149,7 @@ folder; requests cannot choose an adapter, command, source repository or folder.
 - All locks are nonblocking; contention fails closed. Lock order is supervisor
   then delivery. Do not call release/startup from within a writer session.
 - A process timeout must terminate and reap the writer **and all descendants**
-  before releasing its lease. The API does not launch or terminate processes.
+  before releasing its lease. The optional run_cycle API now supervises ordinary process groups as described below.
   The host service must use process-group/cgroup supervision to prevent orphan
   writers after supervisor death; advisory locks alone cannot enforce this.
 
@@ -215,3 +215,30 @@ release-local interpreter, dependency lock/wheel provisioning, durable host
 publication, full/socket tests, runtime/RSS measurement, spare-port acceptance,
 cutover and schedule adoption remain to implement/integrate. No host operation
 or actual reporting-only source approval was performed in this cycle.
+
+
+## Writer process lifetime and commit bridge
+
+`DeliverySupervisor.run_cycle` now holds both leases across a trusted writer
+command, complete process-group cleanup, and the trusted commit bridge command.
+Commands and deadlines come from host configuration, never a delivery request.
+`tools/delivery_process.py` launches a new POSIX session, closes inherited lock
+file descriptors, inherits log handles, enforces deadlines, sends TERM then KILL
+and checks Linux process membership until no live group member remains. This
+cleanup also runs after a successful leader exit, so a leftover writer child
+cannot overlap the bridge. Failed writers never invoke the bridge; failed bridges
+never return success. No release request is constructed by this helper.
+
+Before launch a durable writer-active.json marker is written. Supervisor death
+or unconfirmed cleanup leaves the marker blocking startup, writers and releases.
+Only host reconciliation after confirming containment is empty may remove it.
+A known-clean command failure clears the marker but propagates the error.
+
+This is not a complete containment boundary: detached descendants can escape a
+POSIX group. Host installation MUST use a dedicated kill-on-stop cgroup covering
+the supervisor and every child, prohibit daemonizing commands, and prevent
+uncoordinated invocation. SIGKILL of the supervisor cannot run Python cleanup.
+The marker prevents subsequent cooperating cycles from treating that death as
+success; it does not itself terminate an orphan. Host cgroup wiring/verification
+and real supervisor adoption remain pending. Tests use disposable local process
+groups (including TERM-resistant children), not production processes or sockets.

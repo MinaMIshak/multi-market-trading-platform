@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_EXACT_SOURCE_BUNDLE",
-  "current_capability": "Implemented immutable exact-source validation bundle with trusted reporting-only baseline/change-digest policy, direct Git blob extraction and independent verification. Runnable release interpreter and host adapter remain pending.",
-  "starting_head": "dd4537b62704281badf294a9697175d7ed0a5da3",
-  "head": "dd4537b62704281badf294a9697175d7ed0a5da3",
+  "phase": "AUTONOMOUS_DELIVERY_WRITER_SUPERVISION",
+  "current_capability": "Implemented supervised writer/commit-bridge process groups, deadline cleanup and durable uncertain-writer latch across supervisor and direct delivery entry points. Host cgroup installation, release interpreter and adapter remain pending.",
+  "starting_head": "0d7b521c876aee7a1106ce4e72b76a9be7de565c",
+  "head": "0d7b521c876aee7a1106ce4e72b76a9be7de565c",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "229 affected delivery/bundle/source/supervisor/status, immutable-release, checkpoint, SYSTEM and SIG-v1 tests plus 88 subtests passed in 9.21s. No sandbox socket retry; host full/socket/spare-port acceptance remains pending.",
+  "tests": "246 affected delivery/process/supervisor/bundle/source/status, immutable-release, checkpoint, SYSTEM and SIG-v1 tests plus 88 subtests passed in 8.77s. No sandbox socket retry; host full/socket/spare-port acceptance remains pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement pinned release-local interpreter/dependency provisioning for exact-source validation bundles; integrate trusted host prepare/validate adapter and supervisor process-tree supervision. Provision independently reviewed reporting-only baseline/change policy (do not auto-approve current HEAD). Run exact-release host full/socket tests, runtime/RSS and spare-port acceptance before cutover/schedule adoption; publish host-owned SYSTEM receipt. No strategy promotion.",
+  "next_action": "Implement pinned release-local interpreter/dependency provisioning for exact-source bundles and trusted host prepare/validate adapter. Wire supervisor run_cycle with verified kill-on-stop cgroup containment and existing commit bridge. Provision independently reviewed reporting-only baseline/change policy; do not auto-approve current HEAD. Run exact-release host full/socket tests, runtime/RSS and spare-port acceptance before cutover/schedule adoption; publish host-owned SYSTEM receipt. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "EXACT_SOURCE_BUNDLE_TESTED_HOST_INTERPRETER_PENDING",
+    "status": "WRITER_PROCESS_SUPERVISION_TESTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -212,7 +212,7 @@
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
     "system_projection": "Implemented allowlisted historical delivery receipt view; EGX_DELIVERY_RECEIPT host publication not configured or operationally verified. Cycle/review/chain and live scheduler health remain unknown in this view.",
-    "supervisor_coordination": "Shared supervisor/delivery locks and recovery-before-writer/release API tested, including real child-process contention and death. Actual host invocation and process-tree timeout supervision not installed or verified.",
+    "supervisor_coordination": "Implemented run_cycle under both locks, process-group timeout/exit cleanup before bridge, and durable writer-active latch blocking supervisor/direct delivery after uncertain cleanup or interruption. Real local descendant termination tested; detached-child containment requires host kill-on-stop cgroup installation, not yet verified.",
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
     "source_bundle": "Implemented trusted baseline and exact mode/content digest approval, complete Git-blob source/tests bundle, immutable publication and independent verification. 17 bundle regression tests passed; no actual release/source approval or interpreter provisioned."
   }

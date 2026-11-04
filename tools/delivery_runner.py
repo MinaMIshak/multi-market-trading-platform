@@ -61,6 +61,8 @@ def delivery_lock(directory):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise DeliveryError('concurrent release rejected') from None
+        require(not os.path.lexists(directory / 'writer-active.json'),
+                'writer containment requires host reconciliation')
         yield
     finally:
         os.close(fd)
