@@ -6,7 +6,7 @@ host adapter and actual supervisor invocation pending; SYSTEM receipt projection
 adapter. Importing it cannot start, push or deploy anything.
 
 The supervisor, outside the Codex sandbox, will supply a trusted adapter and call
-`deliver(request, state_directory, GitSource(repository), adapter)`. The adapter
+`deliver(request, state_directory, pinned_source, adapter)`. The adapter
 must not come from request text. The state directory must be supervisor-owned,
 private and outside the source checkout. Codex remains the sole repository writer;
 Claude reviews read-only. The supervisor owns commit/push/release operations.
@@ -48,9 +48,10 @@ an allowlisted SYSTEM view. Do not serve rollback backups or raw exception text.
 
 ## Host adapter acceptance requirements still to implement
 
-1. Verify the existing SSH alias resolves to the intended deploy-key configuration
-   without exposing key material. Pin the intended repository, not merely the
-   alias-shaped URL. Serialize with the commit bridge and Codex cycle.
+1. Provision trusted host policy for the implemented `PinnedGitSource` adapter
+   described below and wire it into the supervisor. Verify the real existing
+   deploy-key configuration outside this sandbox. Serialize with the commit
+   bridge and Codex cycle.
 2. Reuse the immutable SHA archive approach in `tools/preview_release.py`, with
    exact-source tests available in a separate validation bundle and a release-local
    pinned interpreter. Never install into the development virtualenv. Verify hashes
@@ -156,5 +157,32 @@ Tests cover real cross-process exclusion and descriptor release on process death
 interrupted cutover recovery before a new writer, independent release/schedule/
 acceptance/cleanup failures, malformed journals, dangling symlinks and exception
 cleanup. Actual supervisor installation, process-tree timeout integration, pinned
-origin/deploy-key adapter, isolated reporting release, receipt publication and
+origin/deploy-key policy provisioning, isolated reporting release, receipt publication and
 host acceptance are still pending. No runtime health is inferred from these tests.
+
+## Pinned source transport
+
+`tools/delivery_source.py` supplies `PinnedGitSource`, the host transport adapter.
+The supervisor must construct it with the intended exact origin URL, absolute
+SSH configuration path, SHA-256 of its approved bytes, and exact deploy-key
+identity path. These are trusted host policy, never release-request fields.
+Use this adapter rather than the generic `GitSource` transaction test seam.
+Actual host policy provisioning and supervisor installation remain pending.
+
+Before push and again afterwards it verifies branch, clean tree, exact HEAD,
+fetch/push URL equality to the pinned repository, and `ssh -G` metadata for the
+existing github-multimarket alias (github.com, git user, one expected identity,
+IdentitiesOnly, strict host checking and batch mode). No private key is read by
+this inspection. Changed config bytes, symlinks, Include/Match directives and
+proxy/local commands fail closed. SSH is invoked with the pinned config, no
+agent or multiplexed connection reuse, and cleared forwarding. Git hooks and
+non-SSH protocols are disabled; inherited Git/SSH configuration overrides are
+excluded. Push retains the explicit non-force SHA refspec and exact origin check.
+
+The host must protect policy/configuration, SSH trust files and key files from
+concurrent modification for the whole transaction. This adapter neither provisions
+keys nor accepts host keys; absent existing trust makes the push fail. Offline
+fault-injection tests and a local isolated `ssh -G` parser check do not establish
+that the real deploy key works or that origin is synchronized. The host adapter
+for immutable preparation, runtime validation/cutover and scheduler adoption is
+still required. No release or network operation occurred during this work.
