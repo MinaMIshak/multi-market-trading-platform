@@ -393,3 +393,47 @@ Local tests inject command execution and measurement output; they are not market
 runtime evidence. Production workload policies, actual exact-release host full/
 socket and runtime tests, spare-port adapter, cutover/scheduler wiring and host
 installation remain pending.
+
+## Spare-port acceptance component
+
+`tools/delivery_candidate.py` supplies `ReleaseCandidate` under the enclosing
+host delivery lease. It revalidates PreparedRelease, ReleaseTests and
+ReleaseRuntime through the runtime verifier, then binds the runtime receipt and
+all candidate policy pins into a durable CHECKING receipt before creating state
+or opening a socket. Incomplete receipts and output directories are never erased,
+retried or adopted by this component. Recovery must retain these artifacts until
+host containment/resource reconciliation is complete.
+
+The trusted host must provision a hash-pinned factory with
+`create_app(source, state, commit)`, approved snapshot files and HTTP field checks.
+The factory must load the exact release application's real configuration and
+copied state, expose observed `commit` and strict boolean `live_money` fields on
+the health/API routes, and exercise actual compatibility and SIG-v1 reports.
+It must not manufacture success wrappers. The host independently reviews these
+policies; no production factory or approved route mapping is supplied here.
+Every gate requires nonempty expected field paths/values. Policy pins cover the
+factory, inputs, route checks, launcher and deadline. Candidate code cannot write
+the protected policy or receipt directories under the required host containment.
+
+The component copies only explicitly pinned files to its isolated state root,
+reserves an OS-selected localhost port before spawn, passes the listening FD to
+the release-local isolated Python, and rejects ports 8000/8001. HTTP requests use
+no proxy or redirects and enforce status, response size, exact release identity,
+LIVE_MONEY=false and type-sensitive policy assertions. Bounded body reads check
+the shared acceptance deadline between reads, including slow-stream responses.
+Host containment must still bound the entire supervisor lifetime (including HTTP
+header parsing and unresponsive OS calls). Receipts include response
+hashes and observation routes. No production pointer or schedule is changed.
+
+The shared process-group owner now also supports temporary servers. Every normal,
+exception and interruption exit terminates the owned group; uncertain cleanup
+prevents ACCEPTED publication. Host kill-on-stop cgroup containment remains
+mandatory for supervisor death or detached descendants. ACCEPTED is recorded only
+after cleanup and dependency revalidation. Reopening verifies the historical
+receipt and its dependency/policy binding; it does not claim a process is serving.
+Cutover must start/manage the production instance separately and revalidate it.
+
+Tests use simulated sockets/HTTP/lifecycle and real local process-group cleanup.
+No sandbox socket test was retried. Host factory and policy provisioning, actual
+exact-release full/socket/runtime/candidate acceptance, atomic cutover, scheduler
+rollback and supervisor installation remain pending.

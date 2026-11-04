@@ -5,6 +5,7 @@ kill-on-stop cgroup. Process groups cannot contain children that call setsid(),
 nor survive supervisor SIGKILL safely. No request-supplied commands are accepted
 by the delivery API; this helper is only for trusted supervisor wiring.
 """
+from contextlib import contextmanager
 import math
 import os
 from pathlib import Path
@@ -33,23 +34,33 @@ def run_owned(argv, *, cwd: Path, timeout: float, grace: float = 1.0, env=None):
     Returning zero means the leader succeeded and group cleanup completed, not
     that application validation succeeded. Descendants must not daemonize.
     """
-    require(isinstance(argv, (list, tuple)) and argv
-            and all(isinstance(v, str) and v and '\0' not in v for v in argv)
-            and Path(argv[0]).is_absolute(), 'invalid trusted command')
-    require(cwd.is_absolute() and cwd.resolve() == cwd and cwd.is_dir(),
-            'invalid command directory')
-    require(all(isinstance(v, (int, float)) and not isinstance(v, bool)
-                and math.isfinite(v) and v > 0 for v in (timeout, grace)),
+    require(type(timeout) in (int, float) and math.isfinite(timeout) and timeout > 0,
             'invalid process deadline')
-    process = subprocess.Popen(argv, cwd=cwd, start_new_session=True,
-                               stdin=subprocess.DEVNULL, close_fds=True, env=env)
-    try:
+    with owned_process(argv, cwd=cwd, grace=grace, env=env) as process:
         try:
             returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             raise DeliveryError('supervised command timed out') from None
         require(returncode == 0, 'supervised command failed')
         return returncode
+
+
+@contextmanager
+def owned_process(argv, *, cwd: Path, grace=1.0, env=None, pass_fds=()):
+    """Own a temporary server and clean its process group before returning."""
+    require(isinstance(argv, (list, tuple)) and argv
+            and all(isinstance(v, str) and v and '\0' not in v for v in argv)
+            and Path(argv[0]).is_absolute(), 'invalid trusted command')
+    require(cwd.is_absolute() and cwd.resolve() == cwd and cwd.is_dir(),
+            'invalid command directory')
+    require(all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                and math.isfinite(v) and v > 0 for v in (grace,)),
+            'invalid process deadline')
+    process = subprocess.Popen(argv, cwd=cwd, start_new_session=True,
+                               stdin=subprocess.DEVNULL, close_fds=True, env=env,
+                               pass_fds=pass_fds)
+    try:
+        yield process
     finally:
         try:
             # A successful/exited leader can still leave a writer grandchild alive.

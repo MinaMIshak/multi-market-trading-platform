@@ -142,3 +142,27 @@ def test_explicit_environment_excludes_inherited_configuration(tmp_path, monkeyp
               'assert os.environ["LIVE_MONEY"] == "false"')
     assert run_owned(command(script), cwd=tmp_path, timeout=2,
                      env={'LIVE_MONEY': 'false'}) == 0
+
+
+def test_owned_server_cleanup_on_caller_interruption(tmp_path):
+    from tools.delivery_process import owned_process
+    with pytest.raises(KeyboardInterrupt):
+        with owned_process(command('import time; time.sleep(30)'), cwd=tmp_path, grace=0.1) as process:
+            group = process.pid
+            raise KeyboardInterrupt()
+    assert process.poll() is not None and not _live_members(group)
+
+
+def test_owned_server_passes_explicit_descriptor_and_cleans_up(tmp_path):
+    from tools.delivery_process import owned_process
+    read_fd, write_fd = os.pipe()
+    try:
+        script = f'import os; os.write({write_fd}, b"ready")'
+        with owned_process(command(script), cwd=tmp_path, grace=0.1,
+                           pass_fds=(write_fd,)) as process:
+            assert process.wait(timeout=2) == 0
+            assert os.read(read_fd, 5) == b'ready'
+        assert not _live_members(process.pid)
+    finally:
+        os.close(read_fd)
+        os.close(write_fd)

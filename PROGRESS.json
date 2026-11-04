@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_RUNTIME_ACCEPTANCE",
-  "current_capability": "Implemented both-market host runtime/RSS gate bound to exact-release test evidence, pinned workload inputs and budgets, durable interruption markers and restart verification. Corrected host test collection/import root to bundle source/. Host adoption and spare-port adapter remain pending.",
-  "starting_head": "516709c2c263b693fb0b3a71d458c47c6db87863",
-  "head": "516709c2c263b693fb0b3a71d458c47c6db87863",
+  "phase": "AUTONOMOUS_DELIVERY_CANDIDATE_ACCEPTANCE",
+  "current_capability": "Completed preserved spare-port candidate adapter bound to prepared release, full/socket tests and both-market runtime evidence. Pinned factory/snapshot/HTTP policies, strict identity/LIVE_MONEY gates, durable interruption receipts and owned process cleanup implemented. Host provisioning and actual acceptance remain pending.",
+  "starting_head": "d4529b41b012aca9c5ff25e57e123d3330a08dc6",
+  "head": "d4529b41b012aca9c5ff25e57e123d3330a08dc6",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "308 affected delivery/preparation/environment/bundle/runner/supervisor/process/source/status and checkpoint/SYSTEM/SIG-v1 tests plus 88 subtests passed in 64.17s. Final runtime/test-evidence focused suite: 47 passed in 40.09s. git diff --check passed. Host execution/measurements simulated; no sandbox socket retry or actual release acceptance.",
+  "tests": "344 affected delivery and checkpoint/SYSTEM/SIG-v1 tests plus 88 subtests passed in 98.89s. Process suite including additional real FD handoff regression: 20 passed in 1.69s. git diff --check passed. Candidate socket/HTTP and runtime measurements simulated; actual exact-release host full/socket and release acceptance remain pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement spare-port candidate host adapter bound to PreparedRelease, ReleaseTests and ReleaseRuntime evidence; preserve incomplete component receipts during recovery. Independently provision approved reporting-only source, full-scale EGX/US workload/snapshot policies, immutable runtime and verified cgroup/filesystem containment before host wiring. Run exact-release full/socket and runtime tests on host, then spare-port/cutover/scheduler gates; no automatic strategy promotion.",
+  "next_action": "Implement trusted HostOperations composition connecting prepared/test/runtime/candidate components to the delivery runner, with recovery preserving incomplete component receipts and refusing reuse until containment reconciliation. Continue atomic cutover/scheduler rollback adapter work. Host must provision approved reporting-only source, pinned policies/runtime and verified containment; execute exact-release full/socket/runtime/spare-port gates before any cutover. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,12 +202,12 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "RUNTIME_ACCEPTANCE_COMPONENT_TESTED_HOST_ADOPTION_PENDING",
+    "status": "CANDIDATE_ACCEPTANCE_COMPONENT_TESTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "rev 3/3a read as advisory; reported host socket passes not independently verified this cycle",
+    "claude_review": "rev 3/3a reread as advisory; historical review predates current HEAD. No host socket/deployment claim adopted as current-release evidence; strategy recommendations deferred behind unattended delivery.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
@@ -218,6 +218,7 @@
     "environment": "Implemented offline hashed-wheel venv preparation, exact inventory and pip check, isolated supervised commands, read-only/fsynced manifest and independent digest verification. Real disposable artificial-wheel integration passed. Production wheel policy, immutable base stdlib/OS, and host provisioning remain pending. Durable manifest receipt integration is implemented in PreparedRelease; host wiring remains pending.",
     "preparation": "PreparedRelease persists PREPARING before artifact creation and PREPARED after verification/fsync with exact policy and manifest digests. Restart verification, interruption, receipt failure and tampering tests passed. Host-owned roots, enclosing delivery lock and containment required; no actual host installation or reporting-only approval.",
     "test_validation": "Exact-source full-suite/socket component now uses bundle source/ for imports and collection. Restart verification binds command, preparation/runtime pins and report hash; incomplete or altered evidence rejected. Actual exact-release host tests remain pending.",
-    "runtime_acceptance": "Both EGX/US trusted workloads measured with pinned GNU time, strict elapsed/RSS budgets, snapshot/test/preparation/runtime identity checks, durable MEASURING/MEASURED receipts and restart verification. Tests simulate measurements, not nightly evidence. RSS is process high-water, not aggregate cgroup memory. Actual workload policy, containment and host execution pending."
+    "runtime_acceptance": "Both EGX/US trusted workloads measured with pinned GNU time, strict elapsed/RSS budgets, snapshot/test/preparation/runtime identity checks, durable MEASURING/MEASURED receipts and restart verification. Tests simulate measurements, not nightly evidence. RSS is process high-water, not aggregate cgroup memory. Actual workload policy, containment and host execution pending.",
+    "candidate_acceptance": "ReleaseCandidate binds runtime receipt and policy pins, copies approved state, reserves a spare localhost port, passes its FD to release-local Python, validates exact identity/LIVE_MONEY and HTTP/API/compatibility/SIG-v1 fields, and publishes ACCEPTED only after cleanup and revalidation. Incomplete receipts remain latched. Socket/HTTP tests simulated; actual host acceptance not performed. Host-owned factory/policies and cgroup/filesystem containment remain required."
   }
 }
