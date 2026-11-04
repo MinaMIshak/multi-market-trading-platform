@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_DURABLE_PREPARATION",
-  "current_capability": "Integrated exact-source bundle and offline environment preparation with durable host-owned manifest/policy receipts, restart verification and fail-closed interruption handling. Complete host validation/cutover adapter and installation remain pending.",
-  "starting_head": "a85cb8049835288338acd7505fb6f51d969cc221",
-  "head": "a85cb8049835288338acd7505fb6f51d969cc221",
+  "phase": "AUTONOMOUS_DELIVERY_EXACT_RELEASE_TESTS",
+  "current_capability": "Implemented trusted exact-release host test component with preparation/runtime checks before and after execution, isolated external outputs, durable interruption marker and mandatory passing socket-test evidence. Complete host adapter and installation remain pending.",
+  "starting_head": "b6aa1b9093146a19ac79db68f77f6ee2748a8799",
+  "head": "b6aa1b9093146a19ac79db68f77f6ee2748a8799",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "266 affected delivery/preparation/environment/bundle/runner/supervisor/process/source/status and checkpoint/SYSTEM/SIG-v1 tests plus 88 subtests passed in 31.02s. Final preparation suite including two additional boundary tests: 19 passed in 8.77s. git diff --check passed. No sandbox socket retry; host exact-release full/socket/spare-port acceptance pending.",
+  "tests": "283 affected delivery/preparation/environment/bundle/runner/supervisor/process/source/status and checkpoint/SYSTEM/SIG-v1 tests plus 88 subtests passed in 35.83s. Final validation component suite: 16 passed in 5.78s. git diff --check passed. Execution simulated for new host validation tests; no sandbox socket retry or actual release acceptance.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement trusted exact-release test validation adapter using PreparedRelease.verify before and after execution, durable test evidence including both socket test IDs, isolated external writable test outputs and host runtime pinning. Complete independently reviewed reporting-only source/wheel policy; wire preparation and validation into host adapter/supervisor with verified cgroup containment. Runtime/RSS, spare-port, cutover and scheduler acceptance remain pending; do not auto-approve current HEAD or promote strategies.",
+  "next_action": "Implement runtime/RSS acceptance and spare-port host adapter bound to PreparedRelease and ReleaseTests evidence; preserve failed/interrupted markers during supervisor recovery. Independently review reporting-only source/wheel/runtime policy and install verified cgroup/filesystem containment before host wiring. Exact-release host full/socket tests, cutover and scheduler acceptance remain pending; do not auto-approve HEAD or promote strategies.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "DURABLE_PREPARATION_TESTED_HOST_ADOPTION_PENDING",
+    "status": "EXACT_RELEASE_TEST_COMPONENT_TESTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -216,6 +216,7 @@
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
     "source_bundle": "Implemented exact approved Git source bundle; environment binds to independently verified bundle manifest and file hashes. No actual reporting-only source approval or production environment provisioned.",
     "environment": "Implemented offline hashed-wheel venv preparation, exact inventory and pip check, isolated supervised commands, read-only/fsynced manifest and independent digest verification. Real disposable artificial-wheel integration passed. Production wheel policy, immutable base stdlib/OS, and host provisioning remain pending. Durable manifest receipt integration is implemented in PreparedRelease; host wiring remains pending.",
-    "preparation": "PreparedRelease persists PREPARING before artifact creation and PREPARED after verification/fsync with exact policy and manifest digests. Restart verification, interruption, receipt failure and tampering tests passed. Host-owned roots, enclosing delivery lock and containment required; no actual host installation or reporting-only approval."
+    "preparation": "PreparedRelease persists PREPARING before artifact creation and PREPARED after verification/fsync with exact policy and manifest digests. Restart verification, interruption, receipt failure and tampering tests passed. Host-owned roots, enclosing delivery lock and containment required; no actual host installation or reporting-only approval.",
+    "test_validation": "ReleaseTests verifies preparation and runtime file pins before/after execution; external outputs, durable TESTING/TESTED receipt, command and report/preparation/runtime digests, exact passing socket IDs. Local simulated execution tests passed. Full runtime image protection, actual host execution, runtime/RSS and candidate validation remain pending."
   }
 }

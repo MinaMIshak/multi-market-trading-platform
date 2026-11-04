@@ -319,3 +319,37 @@ validation remains NOT_RUN. This component is not yet wired into a complete
 HostOperations adapter. Exact-release full/socket tests, runtime image pinning,
 runtime/RSS measurement, candidate service, cutover/scheduler adapters and host
 installation remain pending. No production acceptance is claimed.
+
+## Exact-release host test evidence
+
+`tools/delivery_validation.py` provides `ReleaseTests` for trusted host adapter
+wiring under the existing delivery lease and verified cgroup containment. It
+requires a prepared release, disjoint external test-output/private-receipt roots,
+and independently pinned host runtime files. The host must choose pins covering
+its immutable runtime image and keep that image and all roots protected; this
+component checks pin bytes, not container mounts or OS immutability.
+
+It verifies preparation and runtime pins before execution and again after every
+command exit, runs the release-local interpreter in isolated/no-bytecode mode,
+and runs the entire `tests` directory with inherited pytest arguments cleared.
+Temporary files, HOME and JUnit output live outside the immutable source and
+venv. Only a minimal environment is inherited, with LIVE_MONEY=false. Required
+plugins must be in the reviewed environment inventory. Tests that require writes
+inside immutable source fail closed and need explicit test-output remediation.
+
+The durable TESTING marker precedes execution. Any command error, timeout,
+interruption, changed artifact, invalid report or receipt failure retains that
+blocking marker; automatic retry cannot bless it. Successful evidence requires
+zero command exit, no reported failures/errors, and exactly one passing JUnit
+case for each required socket ID (no skip or duplicate). Evidence includes
+report hash, exact command, preparation receipt hash, runtime pin digest and
+start/completion times. Host-owned receipt storage is required; test process
+output alone is not trusted evidence. The host must protect receipts from the
+candidate test user and enforce filesystem isolation independently.
+
+TESTED establishes only full-suite/socket evidence at this exact source. The
+result deliberately retains `runtime_rss: false` and candidate NOT_RUN, so it
+cannot pass the delivery transaction's complete validation gate alone. Runtime
+measurement, spare-port acceptance, production/scheduler adapters and installation
+remain pending. Local component tests simulate host execution; they do not rerun
+the sandbox-blocked socket cases or attest a deployed release.
