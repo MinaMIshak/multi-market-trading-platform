@@ -101,6 +101,10 @@ class ReleaseService:
     def stage(self, sha):
         unit = self._observe(sha)
         self._command('start', unit)  # idempotent; never restart or stop retained releases
+        return self.observe(sha)
+
+    def observe(self, sha):
+        """Read-only running-service acceptance, safe for request-time routing."""
         self._observe(sha, running=True)
         result = self.probe(sha)
         # Previous rollback releases may predate SIG-v1; caller gates SIG-v1 for new releases.

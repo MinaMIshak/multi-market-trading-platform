@@ -664,3 +664,35 @@ are not an atomic kernel attestation or a replacement for that host boundary.
 Temporary validation jobs and supervisor containment still need their own binding.
 Tests use artificial procfs/cgroup files and simulated ownership policy; no real
 host containment, socket validation, service installation or cutover is claimed.
+
+## Protected production component composition
+
+`tools/delivery_bindings.py:ProductionServices` connects `ReleaseService` (whose
+isolation callback is `ServiceContainment`), `ReleaseSchedule`, a public HTTP/API
+probe, and independent temporary-job cleanup/quiescence callbacks to
+`ProductionBackend`. Construct these objects only from protected host policy.
+The adapter has no production paths, installation defaults or request-driven
+factory. Host provisioning must bind every component to the same approved source
+and environment identities, and protect the policies and installed runner code.
+
+Use `ProductionServices.router(...)` to construct the reporting WSGI application.
+Its observer is `ReleaseService.observe`, which verifies running state,
+containment and direct HTTP/API acceptance before and after probing without
+starting a service. Inactive services return unavailable. Router requests never
+call `stage`, change the schedule, or recurse into the public production probe.
+The public probe supplied to `ProductionServices` must traverse the installed
+router/listener/authentication boundary. Direct upstream success alone cannot
+establish public production health. The adapter rechecks direct-service
+acceptance after public probing; `ProductionBackend` additionally gates SIG-v1
+for new cutovers and verifies the exact installed schedule. Previous verified
+releases may lack SIG-v1 and remain eligible for rollback.
+
+Integration tests exercise real temporary routing/schedule files, the service
+policy parser, simulated manager/HTTP evidence, new-release schedule adoption,
+restart rollback, public acceptance failures, isolation drift, and uncertain
+temporary cleanup. These are composition tests, not host deployment evidence.
+Protected provisioning, actual public probes, temporary-job/supervisor cgroup
+bindings, listener installation, cron daemon adoption and exact-release
+full/socket/runtime/spare-port validation remain pending. Cleanup callbacks must
+only reconcile temporary validation resources; they must never stop persistent
+serving or rollback services. A false or non-boolean quiescence result fails closed.

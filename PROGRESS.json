@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_SERVICE_CONTAINMENT",
-  "current_capability": "Implemented independent persistent-service containment verifier for protected host composition: procfs privileges/runtime identity, cgroup membership, protected ownership and mount boundaries. Fixture tests only; host installation and acceptance pending.",
-  "starting_head": "7e59b0182983249e1c71521e08c00835db2419cd",
-  "head": "7e59b0182983249e1c71521e08c00835db2419cd",
+  "phase": "AUTONOMOUS_DELIVERY_PRODUCTION_COMPOSITION",
+  "current_capability": "Composed persistent service, read-only reporting router, release schedule and public production observation into ProductionBackend. Temporary filesystem and simulated service integration passed; host provisioning and acceptance pending.",
+  "starting_head": "525842d3d238fc64d7ec1cfd51cf62fe3e542c8a",
+  "head": "525842d3d238fc64d7ec1cfd51cf62fe3e542c8a",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected containment/service/routing/production/host/runner/schedule/supervisor/status suite: 407 passed in 9.39s. Artificial procfs/cgroup and simulated HTTP/service evidence only. git diff --check passed.",
+  "tests": "Affected bindings/containment/service/routing/production/host/runner/schedule/supervisor/status suite: 420 passed in 11.71s. Simulated service/HTTP evidence and temporary files only; git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Compose containment verifier, reporting router, persistent service, schedule and production observer using protected host policy; add temporary-job/supervisor containment binding. Wire supervisor and approve isolated SIG-v1 reporting-only source, then run exact-release host full/socket/runtime/spare-port gates before any cutover. No strategy promotion.",
+  "next_action": "Implement temporary-job and supervisor containment bindings, then provision protected host composition/public probes and supervisor wiring. Approve isolated SIG-v1 reporting-only source and run exact-release host full/socket/runtime/spare-port gates before cutover; no strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Persistent-service containment observation component implemented; protected host composition/provisioning, temporary-job and supervisor containment bindings, installation and exact-release acceptance remain pending."
+    "delivery": "Production component composition implemented and fixture-tested. Temporary-job/supervisor containment bindings, protected host provisioning, isolated source approval and exact-release host acceptance remain pending."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "SERVICE_CONTAINMENT_TESTED_HOST_INSTALLATION_PENDING",
+    "status": "PRODUCTION_COMPOSITION_TESTED_HOST_INSTALLATION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -225,6 +225,7 @@
     "schedule_binding": "Daily or sorted weekday cron policy supports release-local modules/scripts, literal quoted arguments and allowlisted absolute state/data configuration. Scripts receive exact release-local EGX_PYTHON and build SHA. Missing/symlink scripts, cron percent/control injection and safety overrides rejected. Disposable shell execution and daily/weekly restart/production rollback tested. Host job selection, timezone, daemon adoption and heartbeats remain pending.",
     "persistent_service": "ReleaseService checks pinned manager/fragment, exact loaded policy and safety environment, running PID/cgroup and API evidence. Independent host isolation callback mandatory; no stop/restart operations. Simulated service tests only; actual host installation pending.",
     "routing_consumer": "ReportingRouter consumes atomic SHA pointer per GET/HEAD request, validates protected ancestors/file and exact approved ports/paths, rejects query/body/mutations, buffers bounded proxy-free nonredirecting responses and rechecks pointer/service acceptance. Disposable pointer and simulated HTTP tests only; host authentication, route policy, containment, listener and production observation pending.",
-    "service_containment": "ServiceContainment validates protected ownership/runtime pin, every dedicated leaf-cgroup member, UID/GID/groups, zero capabilities, no-new-privileges, seccomp mode, mount namespace separation, exact restricted writable mounts and process-visible protected identities. PID/membership drift rejected. Artificial fixtures only; host policy must enforce filter contents, descriptors/network/devices and immutable dependencies. Inactive result is preflight only."
+    "service_containment": "ServiceContainment validates protected ownership/runtime pin, every dedicated leaf-cgroup member, UID/GID/groups, zero capabilities, no-new-privileges, seccomp mode, mount namespace separation, exact restricted writable mounts and process-visible protected identities. PID/membership drift rejected. Artificial fixtures only; host policy must enforce filter contents, descriptors/network/devices and immutable dependencies. Inactive result is preflight only.",
+    "production_composition": "ProductionServices connects ReleaseService/ServiceContainment, ReleaseSchedule, public production probe and separate temporary cleanup callbacks. Router uses read-only running-service observer; public probe is independently gated and followed by service revalidation. Temporary-file cutover/adoption/restart rollback and simulated failures tested. Host configuration, listener/authentication, real probes and containment installation pending."
   }
 }

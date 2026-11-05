@@ -142,3 +142,14 @@ def test_unsafe_policy_environment_rejected(service, environment):
     with pytest.raises(DeliveryError):
         service.stage(SHA)
     service._command.assert_not_called()
+
+
+def test_read_only_observation_never_activates(service):
+    assert service.observe(SHA)['commit'] == SHA
+    assert all(c.args[0] == 'show' for c in service._command.call_args_list)
+    service.observed['ActiveState'] = 'inactive'
+    service.probe.reset_mock()
+    with pytest.raises(DeliveryError):
+        service.observe(SHA)
+    service.probe.assert_not_called()
+    assert all(c.args[0] == 'show' for c in service._command.call_args_list)
