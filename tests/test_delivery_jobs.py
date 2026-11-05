@@ -125,3 +125,134 @@ def test_production_cleanup_binding(job):
     (group / 'cgroup.events').write_text('populated 1\nfrozen 0\n')
     with pytest.raises(CleanupError):
         services.cleanup_validation('release')
+
+
+@pytest.fixture
+def launcher(job):
+    import sys
+    from pathlib import Path
+    from tools.delivery_jobs import JobLauncher
+    binding, group, proc = job
+    return JobLauncher(binding, python=Path(sys.executable).resolve()), group
+
+
+def test_launch_admission_precedes_target(launcher, tmp_path):
+    import sys
+    launch, group = launcher
+    marker = tmp_path / 'executed'
+    script = (f'from pathlib import Path; '
+              f'assert Path({str(group / "cgroup.procs")!r}).read_text() == "0"; '
+              f'Path({str(marker)!r}).write_text("executed")')
+    # Artificial control accepts writes but cannot implement kernel membership.
+    def cleanup(key):
+        assert marker.read_text() == 'executed'
+        (group / 'cgroup.procs').write_text('')
+    with patch.object(launch.containment, 'cleanup', side_effect=cleanup) as clean:
+        assert launch.run('release', [sys.executable, '-c', script], cwd=tmp_path,
+                          timeout=2, grace=0.05) == 0
+    clean.assert_called_once_with('release')
+
+
+@pytest.mark.parametrize('kind', ['populated', 'missing', 'symlink'])
+def test_admission_uncertainty_never_executes(launcher, tmp_path, kind):
+    import sys
+    launch, group = launcher
+    if kind == 'populated':
+        (group / 'cgroup.events').write_text('populated 1\nfrozen 0\n')
+    elif kind == 'missing':
+        (group / 'cgroup.procs').unlink()
+    else:
+        (group / 'cgroup.procs').unlink()
+        (group / 'cgroup.procs').symlink_to(group / 'cgroup.kill')
+    with patch('tools.delivery_process.subprocess.Popen') as popen:
+        with pytest.raises((CleanupError, OSError)):
+            launch.run('release', [sys.executable, '-c', 'pass'], cwd=tmp_path, timeout=1)
+        popen.assert_not_called()
+
+
+def test_exec_failure_still_cleans_cgroup(launcher, tmp_path):
+    launch, _ = launcher
+    with patch.object(launch.containment, 'cleanup') as clean:
+        with pytest.raises(DeliveryError, match='command failed'):
+            launch.run('release', ['/nonexistent-delivery-command'], cwd=tmp_path,
+                       timeout=2, grace=0.05)
+    clean.assert_called_once_with('release')
+
+
+def test_cleanup_failure_overrides_success(launcher, tmp_path):
+    import sys
+    launch, _ = launcher
+    with patch.object(launch.containment, 'cleanup', side_effect=RuntimeError):
+        with pytest.raises(CleanupError):
+            launch.run('release', [sys.executable, '-c', 'pass'], cwd=tmp_path,
+                       timeout=2, grace=0.05)
+
+
+def test_launch_timeout_cleans_cgroup(launcher, tmp_path):
+    import sys
+    launch, _ = launcher
+    with patch.object(launch.containment, 'cleanup') as clean:
+        with pytest.raises(DeliveryError, match='timed out'):
+            launch.run('release', [sys.executable, '-c', 'import time; time.sleep(30)'],
+                       cwd=tmp_path, timeout=0.1, grace=0.05)
+    clean.assert_called_once_with('release')
+
+
+def test_kernel_admission_error_prevents_target(launcher, tmp_path):
+    import sys
+    launch, group = launcher
+    marker = tmp_path / 'must-not-exist'
+    original_open = os.open
+    def readonly(path, flags, *args, **kwargs):
+        if path == group / 'cgroup.procs':
+            flags = os.O_RDONLY
+        return original_open(path, flags, *args, **kwargs)
+    with patch('tools.delivery_jobs.os.open', side_effect=readonly), \
+            patch.object(launch.containment, 'cleanup') as clean:
+        with pytest.raises(DeliveryError, match='command failed'):
+            launch.run('release', [sys.executable, '-c',
+                       f'from pathlib import Path; Path({str(marker)!r}).touch()'],
+                       cwd=tmp_path, timeout=2, grace=0.05)
+    assert not marker.exists()
+    clean.assert_called_once_with('release')
+
+
+def test_interrupted_server_and_replaced_group_latch(launcher, tmp_path):
+    import sys
+    launch, group = launcher
+    with pytest.raises(CleanupError, match='cleanup unconfirmed'):
+        with launch.process('release', [sys.executable, '-c', 'import time; time.sleep(30)'],
+                            cwd=tmp_path, grace=0.05):
+            group.rename(group.with_name('old'))
+            group.mkdir()
+            raise KeyboardInterrupt
+
+
+def test_supervisor_uses_separate_groups_and_cleans_before_bridge(launcher, tmp_path):
+    import sys
+    from tools.delivery_supervisor import DeliverySupervisor
+    launch, group = launcher
+    bridge_group = group.with_name('bridge')
+    bridge_group.mkdir()
+    for name in ('cgroup.procs', 'cgroup.events', 'cgroup.kill'):
+        (bridge_group / name).write_text((group / name).read_text())
+        (bridge_group / name).chmod(0o600)
+    launch.containment.policies = {'writer': '/temporary', 'bridge': '/bridge'}
+    state = tmp_path / 'state'
+    state.mkdir()
+    supervisor = DeliverySupervisor(state, None, None, launcher=launch)
+    writer = [sys.executable, '-c', 'pass']
+    bridge = [sys.executable, '-c',
+              f'from pathlib import Path; assert Path({str(group / "cgroup.procs")!r}).read_text() == ""']
+    cleaned = []
+    def cleanup(key):
+        assert (state / 'writer-active.json').exists()
+        target = group if key == 'writer' else bridge_group
+        assert (target / 'cgroup.procs').read_text() == '0'
+        (target / 'cgroup.procs').write_text('')
+        cleaned.append(key)
+    with patch.object(launch.containment, 'cleanup', side_effect=cleanup):
+        supervisor.run_cycle(writer, bridge, cwd=tmp_path,
+                             writer_timeout=2, bridge_timeout=2, grace=0.05)
+    assert cleaned == ['writer', 'bridge']
+    assert not (state / 'writer-active.json').exists()

@@ -713,10 +713,28 @@ unsafe controls or replacement. Callers retain their unresolved-work latch on
 failure. An empty observation is valid only under the delivery lease with the
 host launcher excluded from admitting new jobs.
 
-This is cleanup plumbing, not a launcher or containment installation. Host wiring
-must place every job in its group **before execution**, deny migration/delegation,
-verify filesystem/privilege isolation, and enforce supervisor-death cleanup.
-`DeliverySupervisor.run_cycle` still requires that host launch binding; its current
-process-group cleanup alone cannot prove detached-child containment. Tests use
-artificial cgroup files and simulated population changes, including composition
-with `ProductionServices`; they do not establish real kernel kill behavior.
+`JobLauncher` now supplies `run(key, argv, ...)` and `process(key, argv, ...)`.
+A protected, resolved host Python interpreter starts an isolated stdlib bootstrap,
+writes zero (the calling process) to an already opened `cgroup.procs` descriptor,
+closes that descriptor, and execs the target. Failed admission prevents target
+execution. This avoids thread-unsafe `preexec_fn` and shell interpolation. Explicit
+candidate descriptors can be passed through; the admission descriptor is closed
+before target execution. Every exit path after attempted launch performs process
+group cleanup followed by cgroup cleanup, with group identity checks. A busy,
+missing or unsafe admission group raises `CleanupError` before launch.
+
+`DeliverySupervisor(..., launcher=...)` now requires an explicit protected launcher
+for `run_cycle`. It uses separate `writer` and `bridge` keys and retains its durable
+writer latch on uncertain cleanup; bridge execution follows writer cleanup under
+both locks. Missing launcher configuration rejects the cycle before execution.
+Only protected host composition may inject this dependency; there is no launcher
+selection in a release request.
+
+The launcher is admission/cleanup plumbing, not containment installation. Host
+wiring must deny migration/delegation, exclude other admissions during the lease,
+verify filesystem/privilege isolation, pin the interpreter and its stdlib/OS, and
+enforce supervisor-death cleanup. Release environment/test/runtime/candidate
+components still require binding their command invocations to this launcher.
+Tests use artificial cgroup files, actual disposable subprocesses, and simulated
+population cleanup. They prove bootstrap ordering and latch behavior, not kernel
+cgroup placement, detached-child kill behavior, sockets or deployment acceptance.

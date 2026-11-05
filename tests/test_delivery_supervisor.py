@@ -150,3 +150,26 @@ with context:
         child.communicate(timeout=5)
     with coordinator(setup).writer_session():
         pass
+
+
+def test_unconfigured_writer_launcher_fails_closed(setup, tmp_path):
+    with pytest.raises(DeliveryError, match='protected writer launcher required'):
+        coordinator(setup).run_cycle(['/writer'], ['/bridge'], cwd=tmp_path,
+                                     writer_timeout=1, bridge_timeout=1)
+    assert not (setup[1] / 'writer-active.json').exists()
+
+
+def test_contained_writer_cleanup_failure_latches_before_bridge(setup, tmp_path):
+    from unittest.mock import Mock
+    from tools.delivery_process import CleanupError
+    launcher = Mock()
+    launcher.run.side_effect = CleanupError('cgroup still populated')
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=launcher)
+    with pytest.raises(CleanupError):
+        supervisor.run_cycle(['/writer'], ['/bridge'], cwd=tmp_path,
+                             writer_timeout=1, bridge_timeout=1)
+    assert launcher.run.call_count == 1
+    assert launcher.run.call_args.args[0] == 'writer'
+    assert (setup[1] / 'writer-active.json').exists()
+    with pytest.raises(DeliveryError, match='host reconciliation'):
+        supervisor.startup()

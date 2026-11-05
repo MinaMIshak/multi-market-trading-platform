@@ -12,6 +12,13 @@ from tools.delivery_supervisor import DeliverySupervisor, supervisor_lock
 from tests.test_delivery_runner import setup
 
 
+class FixtureLauncher:
+    """Process-only fixture, never host containment evidence."""
+    def run(self, key, argv, **kwargs):
+        from tools import delivery_process
+        return delivery_process.run_owned(argv, **kwargs)
+
+
 def command(script):
     return [sys.executable, '-c', script]
 
@@ -46,7 +53,7 @@ def test_invalid_deadlines_do_not_launch(tmp_path, value):
 
 
 def test_cycle_orders_cleanup_and_bridge_under_locks(setup, tmp_path):
-    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3])
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher())
     calls = []
     def owned(argv, **kwargs):
         calls.append(argv)
@@ -63,7 +70,7 @@ def test_cycle_orders_cleanup_and_bridge_under_locks(setup, tmp_path):
 
 @pytest.mark.parametrize('error', [DeliveryError('timeout'), CleanupError('cleanup')])
 def test_writer_failure_never_runs_bridge(setup, tmp_path, error):
-    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3])
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher())
     with patch('tools.delivery_process.run_owned', side_effect=error) as run:
         with pytest.raises(DeliveryError):
             supervisor.run_cycle(['writer'], ['bridge'], cwd=tmp_path,
@@ -82,7 +89,7 @@ def test_writer_failure_never_runs_bridge(setup, tmp_path, error):
 
 
 def test_actual_cycle_bridge_runs_after_descendant_cleanup(setup, tmp_path):
-    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3])
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher())
     record = tmp_path / 'pid'
     writer = command(f'import os, time; from pathlib import Path; '
                      f'Path({str(record)!r}).write_text(str(os.getpgrp())); '
@@ -101,7 +108,7 @@ def test_cleanup_inspection_failure_is_distinct(tmp_path):
 
 
 def test_bridge_failure_prevents_success_and_clears_clean_lease(setup, tmp_path):
-    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3])
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher())
     with patch('tools.delivery_process.run_owned',
                side_effect=[0, DeliveryError('bridge failed')]) as run:
         with pytest.raises(DeliveryError, match='bridge failed'):
@@ -115,7 +122,7 @@ def test_bridge_failure_prevents_success_and_clears_clean_lease(setup, tmp_path)
 def test_dangling_active_marker_also_blocks_recovery(setup):
     (setup[1] / 'writer-active.json').symlink_to(setup[1] / 'absent')
     with pytest.raises(DeliveryError, match='host reconciliation'):
-        DeliverySupervisor(setup[1], setup[2], setup[3]).startup()
+        DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher()).startup()
     assert not setup[3].method_calls
 
 
@@ -127,7 +134,7 @@ def test_uncertain_writer_blocks_direct_delivery_lock(setup):
 
 
 def test_interruption_retains_marker(setup, tmp_path):
-    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3])
+    supervisor = DeliverySupervisor(setup[1], setup[2], setup[3], launcher=FixtureLauncher())
     with patch('tools.delivery_process.run_owned', side_effect=KeyboardInterrupt):
         with pytest.raises(KeyboardInterrupt):
             supervisor.run_cycle(['writer'], ['bridge'], cwd=tmp_path,

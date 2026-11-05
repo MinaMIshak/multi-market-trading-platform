@@ -1,9 +1,9 @@
 """Cleanup for protected, host-provisioned cgroup-v2 temporary jobs.
 
 The host launcher must place jobs inside these groups before executing code,
-exclude other writers, and deny job migration/delegation. This module does not
-launch jobs or establish filesystem isolation. Never map a persistent service or
-the supervisor's own cgroup here. Policies are trusted wiring, not requests.
+exclude other writers, and deny job migration/delegation. JobLauncher admits
+commands before exec; neither component establishes filesystem isolation. Never
+map a persistent service or the supervisor's own cgroup here. Policies are trusted wiring, not requests.
 """
 import math
 import os
@@ -101,3 +101,90 @@ class JobContainment:
                     'temporary cgroup replaced')
         except BaseException as exc:
             raise CleanupError('temporary cgroup cleanup unconfirmed') from exc
+
+
+# The bootstrap runs only trusted stdlib code before joining the group. The target
+# cannot run unless the kernel accepts admission. No preexec_fn (unsafe in a
+# threaded supervisor), shell, or request-selected Python code is involved.
+_ADMIT = '''import os, sys
+fd = int(sys.argv[1])
+if os.write(fd, b"0") != 1:
+    raise RuntimeError("incomplete cgroup admission")
+os.close(fd)
+os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
+'''
+
+
+class JobLauncher:
+    """Host-only launch binding; caller holds the exclusive delivery lease.
+
+    The bootstrap interpreter, its stdlib and host isolation policy must be
+    immutable. Jobs must lack cgroup migration rights. This is admission and
+    cleanup, not privilege dropping or filesystem/network sandbox installation.
+    """
+    def __init__(self, containment, *, python):
+        self.containment = containment
+        self.python = Path(python)
+
+    def process(self, key, argv, *, cwd, grace=1.0, env=None, pass_fds=()):
+        from contextlib import contextmanager
+        from tools.delivery_process import owned_process
+
+        @contextmanager
+        def session():
+            require(isinstance(argv, (list, tuple)) and argv
+                    and all(isinstance(v, str) and v and '\0' not in v for v in argv)
+                    and Path(argv[0]).is_absolute(), 'invalid trusted command')
+            require(self.python.is_absolute() and self.python.resolve() == self.python
+                    and self.python.is_file(), 'invalid bootstrap interpreter')
+            _protected(self.python, self.containment.owner)
+            try:
+                group = self.containment._group(key)
+                identity = group.stat()
+                require(self.containment.quiescent(key), 'temporary job already active')
+                control = group / 'cgroup.procs'
+                _protected(control, self.containment.owner)
+                fd = os.open(control, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            except BaseException as exc:
+                raise CleanupError('job admission state unconfirmed') from exc
+            try:
+                try:
+                    info = os.fstat(fd)
+                    require(stat.S_ISREG(info.st_mode) and info.st_uid == self.containment.owner
+                            and not info.st_mode & 0o022, 'unsafe admission control')
+                    require((info.st_dev, info.st_ino) ==
+                            (control.stat().st_dev, control.stat().st_ino),
+                            'admission control replaced')
+                except BaseException as exc:
+                    raise CleanupError('job admission control unconfirmed') from exc
+                try:
+                    with owned_process([str(self.python), '-I', '-c', _ADMIT, str(fd), *argv],
+                                       cwd=cwd, grace=grace, env=env,
+                                       pass_fds=(*pass_fds, fd)) as process:
+                        yield process
+                finally:
+                    # Even a failed bootstrap/exec or detached child requires
+                    # whole-cgroup cleanup before the durable latch can clear.
+                    try:
+                        after = self.containment._group(key).stat()
+                        require((identity.st_dev, identity.st_ino) ==
+                                (after.st_dev, after.st_ino), 'admission group replaced')
+                        self.containment.cleanup(key)
+                    except BaseException as exc:
+                        raise CleanupError('launched job cleanup unconfirmed') from exc
+            finally:
+                os.close(fd)
+        return session()
+
+    def run(self, key, argv, *, cwd, timeout, grace=1.0, env=None):
+        import subprocess
+        from tools.delivery_runner import DeliveryError
+        require(type(timeout) in (int, float) and math.isfinite(timeout) and timeout > 0,
+                'invalid process deadline')
+        with self.process(key, argv, cwd=cwd, grace=grace, env=env) as process:
+            try:
+                code = process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                raise DeliveryError('supervised command timed out') from None
+            require(code == 0, 'supervised command failed')
+            return code

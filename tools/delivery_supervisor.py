@@ -39,10 +39,11 @@ class DeliverySupervisor:
     protected by the delivery lock, which a writer session also holds. The host
     must exclude uncoordinated writers and must keep these locks out of the repo.
     """
-    def __init__(self, state: Path, source, host):
+    def __init__(self, state: Path, source, host, *, launcher=None):
         self.state = state
         self.source = source
         self.host = host
+        self.launcher = launcher
 
     def _recover(self):
         require(not os.path.lexists(self.state / 'writer-active.json'),
@@ -84,15 +85,16 @@ class DeliverySupervisor:
         dies or cannot prove cleanup. Host reconciliation must verify cgroup
         emptiness before removing it; startup never clears it automatically.
         """
-        from tools.delivery_process import CleanupError, run_owned
+        from tools.delivery_process import CleanupError
         from tools.delivery_runner import atomic_json
 
+        require(self.launcher is not None, 'protected writer launcher required')
         with self.writer_session():
             marker = self.state / 'writer-active.json'
             atomic_json(marker, {'schema': 'writer-active-v1'})
             try:
-                run_owned(writer, cwd=cwd, timeout=writer_timeout, grace=grace)
-                run_owned(bridge, cwd=cwd, timeout=bridge_timeout, grace=grace)
+                self.launcher.run('writer', writer, cwd=cwd, timeout=writer_timeout, grace=grace)
+                self.launcher.run('bridge', bridge, cwd=cwd, timeout=bridge_timeout, grace=grace)
             except CleanupError:
                 raise
             except Exception:
