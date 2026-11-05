@@ -893,3 +893,37 @@ locks and failed atomic replacement. Temporary-directory ancestor protection is
 mocked; these are not installed-host ownership, mount or runtime tests. Installed
 bootstrap must pin this module and `app/delivery_status.py` plus dependencies.
 Host invocation wiring and real read-only API mount acceptance remain pending.
+
+## Publication at the host invocation boundary
+
+`HostEntrypoint` now supports `delivery-host-v2`: the existing strict host policy
+plus a mandatory `publication` canonical absolute file path. The destination's
+parent must be disjoint from both repository and private state; ownership and
+ancestor protection use the existing publication checks. The installed bootstrap
+must pin the updated configuration, publication module, `app/delivery_status.py`
+and its dependencies. This is repository wiring, not an installed-host claim.
+Legacy `delivery-host-v1` remains compatible but has no automatic publication;
+unattended delivery installations must adopt v2 and the read-only API mount.
+
+After startup, cycle or release, including recovery or operation failure and
+Python interruption, the entrypoint publishes after operation leases unwind.
+Successful publication preserves the original return value or exception. A
+publication failure raises `PublicationFailure`, retaining `operation_error`
+(or None) and `publication_error` for trusted supervisor diagnostics. Its public
+message contains no raw exception detail. The supervisor must record this as a
+failed invocation; it must not retry cutover just to retry publication. A completed
+release remains governed by its durable journal and startup recovery. Abrupt
+process death cannot execute this finalizer; subsequent startup republishes.
+
+Configuration, invocation and binding rejection happen before publication or
+recovery. Publication identity/destination mutation is rejected. Missing journals
+clear public success to UNKNOWN and fail the invocation, including a first startup
+with no delivery evidence. Contention and write failures propagate; an older
+receipt may remain and is historical evidence, not current health. No observation
+of cycle/review/chain freshness is inferred from publication time.
+
+Regression tests exercise all operations with success, startup failure and
+operation failure, reacquisition of real temporary-file leases, dual failures,
+interruption, strict v2 policy, disjoint roots and binding drift. Services are
+simulated and ancestor checks mocked. Real host installation, publication mount,
+exact-release socket tests and spare-port acceptance remain pending.

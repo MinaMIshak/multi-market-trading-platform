@@ -47,6 +47,14 @@ def _unique(pairs):
     return result
 
 
+class PublicationFailure(DeliveryError):
+    """Retain both errors for trusted supervisor reporting; no public error text."""
+    def __init__(self, operation_error, publication_error):
+        super().__init__('delivery publication failed after host operation')
+        self.operation_error = operation_error
+        self.publication_error = publication_error
+
+
 class HostEntrypoint:
     def __init__(self, config, digest, factory, *, owner=0):
         require(type(owner) is int and owner >= 0 and os.getuid() == owner
@@ -59,10 +67,13 @@ class HostEntrypoint:
             policy = json.loads(raw, object_pairs_hook=_unique)
         except (ValueError, RecursionError):
             raise DeliveryError('malformed host configuration') from None
-        require(type(policy) is dict and set(policy) == {
-            'schema', 'state', 'repository', 'writer', 'bridge', 'live_money'},
+        require(type(policy) is dict, 'invalid host configuration')
+        fields = {'schema', 'state', 'repository', 'writer', 'bridge', 'live_money'}
+        if policy.get('schema') == 'delivery-host-v2':
+            fields.add('publication')
+        require(set(policy) == fields,
             'invalid host configuration fields')
-        require(policy['schema'] == 'delivery-host-v1' and policy['live_money'] is False,
+        require(policy['schema'] in ('delivery-host-v1', 'delivery-host-v2') and policy['live_money'] is False,
                 'unsafe host configuration')
         self.state = Path(_absolute(policy['state']))
         self.repository = Path(_absolute(policy['repository']))
@@ -71,6 +82,17 @@ class HostEntrypoint:
                 and self.repository.resolve() == self.repository
                 and not self.state.is_relative_to(self.repository)
                 and not self.repository.is_relative_to(self.state), 'unsafe host roots')
+        self.publication = None
+        if policy['schema'] == 'delivery-host-v2':
+            from tools.delivery_publication import DeliveryPublication
+            destination = Path(_absolute(policy['publication']))
+            require(not destination.parent.is_relative_to(self.repository)
+                    and not self.repository.is_relative_to(destination.parent),
+                    'publication must be separate from repository')
+            self.publication = DeliveryPublication(self.state, destination, owner=owner)
+        self._publication = self.publication
+        self._publication_binding = (None if self.publication is None else
+                                     (self.state, self.publication.destination, owner))
         self.commands = {}
         for name in ('writer', 'bridge'):
             command = policy[name]
@@ -111,6 +133,12 @@ class HostEntrypoint:
         require(self.supervisor.state == self.state
                 and Path(self.supervisor.source.repository) == self.repository,
                 'host binding changed')
+        require(self.publication is self._publication, 'publication binding changed')
+        if self.publication is not None:
+            require((self.publication.state, self.publication.destination,
+                     self.publication.owner) == self._publication_binding,
+                    'publication binding changed')
+            self.publication._check()
         for argv, _ in self.commands.values():
             _protected(Path(argv[0]), self.owner)
 
@@ -119,6 +147,22 @@ class HostEntrypoint:
         require(operation in ('startup', 'cycle', 'release'), 'unknown host operation')
         require((operation == 'release' and type(request) is dict)
                 or (operation != 'release' and request is None), 'invalid host invocation')
+        operation_error = None
+        try:
+            return self._invoke(operation, request)
+        except BaseException as exc:
+            operation_error = exc
+            raise
+        finally:
+            # Both operation leases are released before publication reacquires them.
+            # Rejected policy/request checks above never trigger publication.
+            if self.publication is not None:
+                try:
+                    self.publication.publish()
+                except Exception as exc:
+                    raise PublicationFailure(operation_error, exc) from exc
+
+    def _invoke(self, operation, request):
         # Every entry, including a fresh process after restart, reconciles first.
         # Each operation reacquires the supervisor lease and rechecks recovery.
         self.supervisor.startup()

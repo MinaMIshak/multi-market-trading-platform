@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_PUBLICATION",
-  "current_capability": "Implemented protected host-side delivery publication: locked bounded journal reads, reconstructed public receipt, atomic durable publication, private-data exclusion and UNKNOWN on invalid source. SYSTEM/API projection parity verified offline; installed host wiring remains pending.",
-  "starting_head": "4fbd332a1b6eb0e009374895ac945215f97d85cf",
-  "head": "4fbd332a1b6eb0e009374895ac945215f97d85cf",
+  "phase": "AUTONOMOUS_DELIVERY_PUBLICATION_WIRING",
+  "current_capability": "HostEntrypoint v2 binds protected publication destination and publishes after startup/cycle/release leases unwind, including failures and interruption. Dual operation/publication failures remain explicit. Legacy v1 compatible; installed host adoption pending.",
+  "starting_head": "ec4dc2d2130b8a9d5a309fc5e21a4e4455d40bec",
+  "head": "ec4dc2d2130b8a9d5a309fc5e21a4e4455d40bec",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected publication/status/runner/supervisor/entrypoint/bootstrap/composition/host/production/checkpoint suites: 378 passed, 85 subtests passed in 9.90s. Temporary filesystem and simulated host evidence only. git diff --check passed. Known socket restriction not retried.",
+  "tests": "Affected publication/status/runner/supervisor/entrypoint/bootstrap/composition/host/production/checkpoint suites: 387 passed, 14 subtests passed in 9.86s. Temporary filesystem and simulated host evidence only. git diff --check passed. Known socket restriction not retried.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Wire protected DeliveryPublication into installed supervisor invocation with explicit failure reporting; add trusted cycle/review/chain observation contracts. Provision host bootstrap/isolation and read-only API publication mount through authorized host mechanism, then run exact SIG-v1 full/socket/runtime/spare-port acceptance before cutover.",
+  "next_action": "Add trusted cycle/review/chain observation contracts and freshness projection. Through an authorized host mechanism adopt delivery-host-v2 with pinned publication dependencies and read-only API mount, provision isolation, then run exact SIG-v1 full/socket/runtime/spare-port acceptance before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,12 +202,12 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "PUBLICATION_COMPONENT_IMPLEMENTED_HOST_WIRING_PENDING",
+    "status": "PUBLICATION_INVOCATION_IMPLEMENTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "Historical rev 3/3a read as advisory. Current delivery code independently confirms host wiring/acceptance remain outstanding. Historical external socket test claims do not establish exact-current-release acceptance; no strategy recommendations applied this cycle.",
+    "claude_review": "Historical rev 3/3a read as advisory; current delivery entrypoint independently confirmed missing automatic publication and this cycle adds repository wiring. External historical socket claims do not establish exact-current-release acceptance. No strategy recommendations applied.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
@@ -232,6 +232,6 @@
     "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
     "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified.",
     "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed.",
-    "publication": "DeliveryPublication implemented and offline-tested. Invalid source clears old success; unsafe destination, contention or write failure propagates without claiming fresh publication. No actual host publication or deployment performed."
+    "publication": "HostEntrypoint delivery-host-v2 requires fixed protected publication destination disjoint from repository/private state. Publishes after operation leases unwind on success, failure and Python interruption; PublicationFailure retains both errors for trusted diagnostics. Invalid configuration/request/binding blocks admission. Legacy v1 does not publish. Temporary-file lock and simulated supervisor tests passed; actual installed host wiring/mount/deployment remain pending."
   }
 }

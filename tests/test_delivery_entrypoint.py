@@ -186,3 +186,111 @@ def test_current_identity_required_before_config_read(setup):
     with pytest.raises(DeliveryError, match='identity'):
         HostEntrypoint(path, '0' * 64, factory, owner=os.getuid() + 1)
     factory.assert_not_called()
+
+
+@pytest.fixture
+def published_setup(setup):
+    from tests.test_delivery_status import receipt
+    policy, path, supervisor, factory, build = setup
+    public = path.parent / 'public'
+    public.mkdir()
+    destination = public / 'delivery.json'
+    policy.update(schema='delivery-host-v2', publication=str(destination))
+    journal = supervisor.state / 'delivery.json'
+    journal.write_text(json.dumps(receipt()))
+    journal.chmod(0o600)
+    with patch('tools.delivery_publication._protected'):
+        yield policy, supervisor, build, journal, destination
+
+
+@pytest.mark.parametrize('operation', ['startup', 'cycle', 'release'])
+@pytest.mark.parametrize('failure', [None, 'startup', 'operation'])
+def test_v2_publishes_success_and_failure_after_leases(published_setup, operation, failure):
+    from tools.delivery_runner import delivery_lock
+    from tools.delivery_supervisor import supervisor_lock
+    from tests.test_delivery_status import receipt, SECRET
+    from app.delivery_status import project_delivery
+    _, supervisor, build, journal, destination = published_setup
+    error = DeliveryError('private operation failure')
+    def action(fail):
+        with supervisor_lock(supervisor.state), delivery_lock(supervisor.state):
+            if fail:
+                journal.write_text(json.dumps(receipt() | {'status': 'FAILED'}))
+                raise error
+    supervisor.startup.side_effect = lambda: action(failure == 'startup')
+    method = supervisor.release if operation == 'release' else supervisor.run_cycle
+    method.side_effect = lambda *a, **kw: action(failure == 'operation')
+    entry = build()
+    if failure == 'startup' or (failure == 'operation' and operation != 'startup'):
+        with pytest.raises(DeliveryError) as caught:
+            entry.invoke(operation, {} if operation == 'release' else None)
+        assert caught.value is error
+    else:
+        entry.invoke(operation, {} if operation == 'release' else None)
+    assert project_delivery(json.loads(destination.read_text())) == project_delivery(json.loads(journal.read_text()))
+    assert SECRET not in destination.read_text()
+
+
+@pytest.mark.parametrize('operation_fails', [False, True])
+def test_v2_publication_failure_retains_both_results(published_setup, operation_fails):
+    from tools.delivery_entrypoint import PublicationFailure
+    _, supervisor, build, journal, destination = published_setup
+    entry = build()
+    error = DeliveryError('private failure')
+    if operation_fails:
+        supervisor.run_cycle.side_effect = error
+    journal.unlink()
+    with pytest.raises(PublicationFailure) as caught:
+        entry.invoke('cycle')
+    assert caught.value.operation_error is (error if operation_fails else None)
+    assert isinstance(caught.value.publication_error, DeliveryError)
+    assert json.loads(destination.read_text()) == {}
+    assert 'private failure' not in str(caught.value)
+
+
+@pytest.mark.parametrize('drift', ['publisher', 'destination', 'state', 'owner'])
+def test_v2_binding_drift_blocks_admission(published_setup, drift):
+    _, supervisor, build, _, destination = published_setup
+    entry = build()
+    if drift == 'publisher':
+        entry.publication = Mock()
+    elif drift == 'owner':
+        entry.publication.owner += 1
+    else:
+        setattr(entry.publication, drift, destination.parent / 'changed')
+    with pytest.raises(DeliveryError, match='binding changed'):
+        entry.invoke('cycle')
+    supervisor.startup.assert_not_called()
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize('root', ['repository', 'state'])
+def test_v2_publication_root_cannot_overlap(published_setup, root):
+    policy, _, build, _, _ = published_setup
+    policy['publication'] = str(Path(policy[root]) / 'receipt.json')
+    with pytest.raises(DeliveryError, match='separate'):
+        build()
+
+
+def test_v2_missing_publication_rejected(setup):
+    policy, _, _, factory, build = setup
+    policy['schema'] = 'delivery-host-v2'
+    with pytest.raises(DeliveryError, match='fields'):
+        build()
+    factory.assert_not_called()
+
+
+def test_v2_invalid_invocation_does_not_publish(published_setup):
+    _, supervisor, build, _, destination = published_setup
+    with pytest.raises(DeliveryError):
+        build().invoke('cycle', {})
+    supervisor.startup.assert_not_called()
+    assert not destination.exists()
+
+
+def test_v2_interruption_still_publishes(published_setup):
+    _, supervisor, build, _, destination = published_setup
+    supervisor.run_cycle.side_effect = KeyboardInterrupt()
+    with pytest.raises(KeyboardInterrupt):
+        build().invoke('cycle')
+    assert destination.exists()
