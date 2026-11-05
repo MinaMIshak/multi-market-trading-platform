@@ -1,6 +1,7 @@
 # Scanner v2 — first contract and card slice
 
-Status: offline contract and read-only card implemented; runtime scanner/API wiring pending.
+Status: offline contract, read-only card and bounded EGX verification coverage
+adapter implemented; confirmed-setup adapters and runtime/API wiring pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -46,8 +47,23 @@ artifacts before runtime use. Candidate itself has no market field; the new
 explicit source binding must be made by that trusted adapter, never guessed from
 symbol text. Synthetic tests do not establish market coverage or provider health.
 
-Next implement a bounded adapter with explicit requested/usable/rejected coverage,
-reason codes and deterministic ordering, using existing admitted candidate sources.
+`app.scanner_v2.scan_egx` now delegates to `scan_egx_scope` with a bounded,
+unique explicit selection (maximum 1,000), preserving its admission and coverage
+semantics. It returns deterministic lexical ordering, requested/usable/scanned
+counts, per-symbol exclusions and an unknown authoritative universe size.
+Usable means verification passed at the verifier's decision timestamp, not current
+provider health. Extra out-of-scope source/error keys and inconsistent coordinator
+reports are rejected. Only fixed exclusion codes enter the projection.
+
+The current legacy SWING verifier emits WATCH or READY_NO_SIGNAL only. Both are
+excluded from the confirmed trade-decision contract; this adapter therefore emits
+zero candidates and no cards. It does not accept caller-supplied trade decisions
+as verified output. No WATCH-to-READY conversion is authorized. The coordinator's
+existing audit-event write remains; no scan history or signal is published by this
+wrapper. Synthetic mixed-status and 224-symbol fixtures are not live scan evidence.
+
+Next bind an existing confirmed research setup to market-specific admitted inputs,
+explicit decimal terms and the contract, with inspected artifact provenance.
 Do not invent missing targets, triggers or risk decisions. Keep missing required
 inputs visibly excluded. Then connect the read-only API/UI with coverage evidence.
 No new breakout/ORB/RSI generators are part of this slice. The complete Scanner v2

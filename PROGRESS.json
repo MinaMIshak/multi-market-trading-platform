@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_CONTRACT_AND_CARD",
-  "current_capability": "Scanner v2 immutable trade-decision-v1 contract and read-only JSON/HTML Trade Card reuse existing research candidates and canonical trade-plan geometry. Explicit market/provenance, completed-bar/freshness checks and paper-only invariants tested. Runtime scanner adapters, coverage accounting and HTTP wiring pending; no activation or deployment.",
-  "starting_head": "02ced6aa5a96380e1cdcff836f08f79dd9674652",
-  "head": "02ced6aa5a96380e1cdcff836f08f79dd9674652",
+  "phase": "SCANNER_V2_EGX_COVERAGE_ADAPTER",
+  "current_capability": "Scanner v2 bounded EGX coverage adapter reuses existing scan verification with explicit selection counts and fixed per-symbol exclusions. Legacy SWING WATCH/READY_NO_SIGNAL never promoted to confirmed TradeDecision. Immutable contract/card preserved. No runtime invocation, API wiring, activation or deployment.",
+  "starting_head": "d36cb1bd776707835ed1d7a42d5be934b97f935e",
+  "head": "d36cb1bd776707835ed1d7a42d5be934b97f935e",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "76 passed, 85 subtests in 0.88s: trade decision/card, domain, risk engine, shadow candidate admission, checkpoint and SYSTEM. Synthetic fixtures only. Full/socket release gates not rerun; exact-release host acceptance remains pending.",
+  "tests": "88 passed, 112 subtests in 0.90s: Scanner v2, EGX scan, trade decision/card, checkpoint, SYSTEM and shadow candidate admission. Synthetic fixtures only. Full/socket host release gates not rerun.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Commit bridge and exact origin sync first. Host delivery provisioning and exact SIG-v1 full/socket/runtime/spare-port/rollback acceptance remain pending. At the safe delivery checkpoint, continue Scanner v2 with a bounded market-specific adapter reusing admitted artifacts/candidates and existing scan coverage accounting; report missing terms and stale evidence as exclusions, then wire the read-only API/card.",
+  "next_action": "Commit bridge and exact origin sync first. Authorized-host delivery provisioning and exact SIG-v1 full/socket/spare-port/rollback acceptance remain pending. At the safe delivery checkpoint, inspect one existing confirmed research setup and its market-specific admitted inputs for a provenance-bound TradeDecision adapter with explicit terms; do not promote legacy SWING WATCH. HTTP/card integration remains pending.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -250,18 +250,20 @@
     "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
   },
   "scanner_v2": {
-    "status": "CONTRACT_AND_CARD_VALIDATED_OFFLINE",
+    "status": "EGX_COVERAGE_ADAPTER_VALIDATED_OFFLINE",
     "integration_points": {
       "candidate": "app.strategies.contracts.Candidate: immutable versioned research input",
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
       "paper": "app.paper.shadow_candidate_admission: separate explicit admission remains required",
-      "coverage": "app.egx_universe_scan: existing coverage model; runtime adapter deferred",
-      "card": "read-only typed projection; API route and runtime data wiring deferred"
+      "coverage": "app.scanner_v2.scan_egx reuses app.egx_scan.scan_egx_scope without parallel admission or history publication; retains explicit-selection semantics and validates projected totals.",
+      "card": "read-only typed projection; API route and runtime data wiring deferred",
+      "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion."
     },
-    "scope": "Explicit market-bound candidate plus immutable decimal plan; no setup generation, risk approval or execution",
+    "scope": "Bounded EGX explicit-selection verification coverage; legacy WATCH/READY_NO_SIGNAL excluded from confirmed decisions. Existing immutable contract/card unchanged.",
     "promotion": "NOT_AUTHORIZED",
-    "limitations": "No runtime market adapter, scan counts, HTTP route, durable emission store or provider verification. Source authority/calendar/identity admission must be established by market-specific adapters. No risk approval or execution.",
-    "tests": "23 contract/card tests passed; 76 total affected tests plus 85 subtests.",
-    "documentation": "docs/SCANNER_V2.md"
+    "limitations": "EGX wrapper is coverage-only and emits zero candidates because legacy SWING has no confirmed state. No US adapter, confirmed-setup adapter, runtime invocation, HTTP route or durable emission store. Existing verifier may append audit events. Synthetic scope counts do not establish market coverage, current freshness or provider health.",
+    "tests": "88 passed, 112 subtests in 0.90s: Scanner v2, EGX scan, trade decision/card, checkpoint, SYSTEM and shadow candidate admission. Synthetic fixtures only. Full/socket host release gates not rerun.",
+    "documentation": "docs/SCANNER_V2.md",
+    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches source HEAD d36cb1bd776707835ed1d7a42d5be934b97f935e at 2026-11-05T19:45:07Z; new cycle changes await bridge/sync. No remote query performed."
   }
 }
