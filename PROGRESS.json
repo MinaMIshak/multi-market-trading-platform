@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_REPAIR_PLANNING",
-  "current_capability": "Protected digest-bound read-only completion repair planning. Captures bounded pending inventory, sidecar presence, explicit archive/receipt references and independently located originating-job records under existing leases. Rechecks pins, preserves damaged bytes and remains unresolved; no mutation executor or host deployment.",
-  "starting_head": "b6f713a1dee1ac695219cb508732bd51894fc63a",
-  "head": "b6f713a1dee1ac695219cb508732bd51894fc63a",
+  "phase": "SCANNER_V2_CONTRACT_AND_CARD",
+  "current_capability": "Scanner v2 immutable trade-decision-v1 contract and read-only JSON/HTML Trade Card reuse existing research candidates and canonical trade-plan geometry. Explicit market/provenance, completed-bar/freshness checks and paper-only invariants tested. Runtime scanner adapters, coverage accounting and HTTP wiring pending; no activation or deployment.",
+  "starting_head": "02ced6aa5a96380e1cdcff836f08f79dd9674652",
+  "head": "02ced6aa5a96380e1cdcff836f08f79dd9674652",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "202 passed in 14.71s: delivery repair, backlog, completion, observations and publication suites. Initial fixture failures corrected (read-only mutation setup, protected modes and expected OSError for symlink rejection). git diff --check passed. Full/socket suite not rerun; exact-release host acceptance pending. Checkpoint/SYSTEM validation: 14 passed, 85 subtests in 0.81s.",
+  "tests": "76 passed, 85 subtests in 0.88s: trade decision/card, domain, risk engine, shadow candidate admission, checkpoint and SYSTEM. Synthetic fixtures only. Full/socket release gates not rerun; exact-release host acceptance remains pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Commit bridge and exact origin sync first. Delivery is at a read-only repair-planning checkpoint: authorized host must provision pinned callers/retry scheduling, supervisor v2 publication and explicit PublicationFailure handling, then run exact SIG-v1 full/socket/runtime/spare-port/rollback gates. Do not execute repair without independent semantic reconciliation and durable restart-safe mutation protocol. If no immediately executable authorized host recovery action exists after sync, begin queued Scanner v2 vertical slice by inspecting existing contract/scanner/card abstractions and recording integration points before coding.",
+  "next_action": "Commit bridge and exact origin sync first. Host delivery provisioning and exact SIG-v1 full/socket/runtime/spare-port/rollback acceptance remain pending. At the safe delivery checkpoint, continue Scanner v2 with a bounded market-specific adapter reusing admitted artifacts/candidates and existing scan coverage accounting; report missing terms and stale evidence as exclusions, then wire the read-only API/card.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -136,7 +136,7 @@
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
     "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending."
   },
-  "commit_status": "Clean origin-synced b6f713a at cycle start; validated repair-planning unit submitted via exact COMMIT_REQUEST.json. No direct stage/commit. No handoff or origin-pending markers observed.",
+  "commit_status": "Clean HEAD and matching ORIGIN_SYNCED marker/local origin ref at cycle start; no handoff or origin-pending markers. Contract/card unit validated and exact commit request prepared for supervisor; no direct stage/commit.",
   "experiment": {
     "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
@@ -205,7 +205,7 @@
     "status": "HANDOFF_HARDENING_VALIDATED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
-    "origin_sync": "UNKNOWN",
+    "origin_sync": "Supervisor ORIGIN_SYNCED marker and local remote ref matched cycle-start HEAD 02ced6aa5a96380e1cdcff836f08f79dd9674652; no network query this cycle.",
     "deployed_release": null,
     "claude_review": "Read historical rev 3/3a and current executor/barrier handoffs as advisory. Independently exercised receipt corruption, release result retention, source pin omission and caller archive/time-conflict stall. No review claim accepted as host execution evidence. Handoff markers remain supervisor-owned.",
     "scope": "SIG-v1-reporting-only",
@@ -248,5 +248,20 @@
     "archive_timestamp_integrity": "Shared protected canonical archive validation under spool lease plus caller batch preflight. Temporary-file tests cover equivalent timestamps, restart, exact retries, later-event progress, newer receiver observations, kind separation, malformed/symlink/filename/unsafe-root rejection, and preserved legacy conflicts. No deletion, timestamp rewriting or host execution.",
     "settlement_visibility": "Bounded protected receiver pending inventory with timestamp, count and bytes; UNAVAILABLE omits counters. SYSTEM projection excludes private text and journal-forged counters. Artificial tests only. Inventory does not validate envelopes or inspect caller/archive state; publication precedes archive movement. Host repair policy documented; executor and installation pending.",
     "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
+  },
+  "scanner_v2": {
+    "status": "CONTRACT_AND_CARD_VALIDATED_OFFLINE",
+    "integration_points": {
+      "candidate": "app.strategies.contracts.Candidate: immutable versioned research input",
+      "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
+      "paper": "app.paper.shadow_candidate_admission: separate explicit admission remains required",
+      "coverage": "app.egx_universe_scan: existing coverage model; runtime adapter deferred",
+      "card": "read-only typed projection; API route and runtime data wiring deferred"
+    },
+    "scope": "Explicit market-bound candidate plus immutable decimal plan; no setup generation, risk approval or execution",
+    "promotion": "NOT_AUTHORIZED",
+    "limitations": "No runtime market adapter, scan counts, HTTP route, durable emission store or provider verification. Source authority/calendar/identity admission must be established by market-specific adapters. No risk approval or execution.",
+    "tests": "23 contract/card tests passed; 76 total affected tests plus 85 subtests.",
+    "documentation": "docs/SCANNER_V2.md"
   }
 }
