@@ -348,3 +348,14 @@ def test_recovery_checks_pins_before_dispatch(setup):
     with pytest.raises(DeliveryError):
         bootstrap.recover_completions()
     assert entry.return_value.recover_completions.call_count == 1
+
+
+def test_retention_only_checks_pins_before_dispatch(setup):
+    _, _, dependency, entry, build = setup
+    bootstrap = build()
+    bootstrap.retain_completion(event_id='host-event')
+    entry.return_value.retain_completion.assert_called_once_with(event_id='host-event')
+    dependency.write_text('drift')
+    with pytest.raises(DeliveryError):
+        bootstrap.retain_completion(event_id='other-event')
+    assert entry.return_value.retain_completion.call_count == 1

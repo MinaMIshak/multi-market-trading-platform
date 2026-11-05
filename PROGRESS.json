@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_STORAGE_HEADROOM",
-  "current_capability": "Completion admission now checks available filesystem bytes and inodes under the spool lock, budgeting the whole pending batch plus recovery headroom. Identical retries and settlement remain available at low space. No evidence pruning, host adoption or deployment performed.",
-  "starting_head": "3c058ace6ecb564036f79245c42ba336bf6590db",
-  "head": "3c058ace6ecb564036f79245c42ba336bf6590db",
+  "phase": "AUTONOMOUS_DELIVERY_CALLER_OUTBOX",
+  "current_capability": "Trusted caller outbox durably retains completion events before receiver queue/storage admission, validates bounded batches and exact-byte acknowledgements, and preserves identities through partial handoff and restart. Retention-only pinned bootstrap API separates handoff from publication. No host installation or deployment performed.",
+  "starting_head": "1ae16e869591c6bfcfe0bef1aeebec11d9b2a564",
+  "head": "1ae16e869591c6bfcfe0bef1aeebec11d9b2a564",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Delivery and checkpoint suites: 1001 passed, 14 subtests in 117.48s. Focused completion suite: 78 passed; related callback/publication/checkpoint suites: 222 passed, 14 subtests. git diff --check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
+  "tests": "Delivery and checkpoint suites: 1020 passed, 14 subtests in 116.84s. Initial broad run found one new fixture timestamp-ordering error; corrected before the passing rerun. git diff --check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Provision pinned trusted host callers with durable event retry handling for queue/storage rejection, supervisor v2 invocation and read-only API receipt mount through the authorized host mechanism. Provision and monitor protected state/archive and publication storage; admission is not a reservation. Run exact reporting-only SIG-v1 full/socket/runtime/spare-port acceptance and rollback gates before cutover. No strategy promotion.",
+  "next_action": "Provision pinned host callers using CompletionOutbox and retention-only bootstrap handoff, scheduled retries/settlement, supervisor v2 and read-only API receipt mount through the authorized host mechanism. Preserve originating job records if local admission fails; provision and monitor both archives. Run exact reporting-only SIG-v1 full/socket/runtime/spare-port acceptance and rollback gates before cutover. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "STORAGE_HEADROOM_ADMISSION_IMPLEMENTED_HOST_ADOPTION_PENDING",
+    "status": "CALLER_OUTBOX_IMPLEMENTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -239,6 +239,7 @@
     "completion_recovery": "v2 invocation settles bounded retained batches after operation leases unwind. Published envelopes move to protected completion-archive without deletion; failures retain pending work. Receipt/sidecar/publication retries tested; host capacity and retention provisioning pending.",
     "journal_safety": "Reserved receipt IDs reject collisions with delivery, writer-active, observations, previous, completion-* and observation-* state. Malformed or dangling journals fail closed without replacement or host operations.",
     "completion_capacity": "Retention shares recovery limits (128 pending envelopes / 8 MiB exact envelope bytes). Locked admission rejects overflow before writes; identical pending/archived retries bypass new admission. Unsafe/unreadable siblings fail closed. Archive/receipt disk provisioning remains a host obligation; no evidence pruning or host acceptance.",
-    "storage_headroom": "Pinned admission requires 64 MiB plus three times pending envelope bytes plus per-event allocation overhead; 256 inodes plus two per pending event. Unknown/exhausted accounting rejects before new retention. Existing retries and recovery bypass admission. Temporary-file fault tests only; no space reservation, quota guarantee or host capacity evidence."
+    "storage_headroom": "Pinned admission requires 64 MiB plus three times pending envelope bytes plus per-event allocation overhead; 256 inodes plus two per pending event. Unknown/exhausted accounting rejects before new retention. Existing retries and recovery bypass admission. Temporary-file fault tests only; no space reservation, quota guarantee or host capacity evidence.",
+    "caller_outbox": "Protected disjoint caller/receiver roots, bounded validated batch, locked exact-byte handoff, retained-only acknowledgement and permanent caller archive implemented. Temporary-file tests cover queue/storage rejection, crash after acceptance, newer receiver observations, partial handoff, concurrent rejection, malformed/symlink evidence and local capacity failure. Host callers, durable originating job records and periodic retries remain unprovisioned; no publication or runtime acceptance inferred."
   }
 }

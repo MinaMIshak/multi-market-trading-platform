@@ -1179,3 +1179,35 @@ publication storage, retain rejected producer events, and handle write failures.
 No automatic pruning, host installation or production capacity claim is implied.
 Tests inject byte/inode exhaustion, accounting failure, batch and block boundaries,
 and recovery followed by restored admission on temporary filesystems.
+
+### Trusted caller retry outbox
+
+`delivery_caller.CompletionOutbox` preserves a caller's original completion before
+receiver queue/storage admission. Installed code supplies a protected caller root,
+a disjoint receiver state root, and the pinned
+`InstalledBootstrap.retain_completion` callback. The new retention-only bootstrap
+method verifies dependency pins and host-v2 configuration, then returns the durable
+receiver envelope path and digest without publication or delivery operations.
+
+Call `outbox.retain(**event)` before `outbox.handoff()`. On startup and periodic
+retry, call `handoff()` again, then separately schedule receiver
+`recover_completions()` (or the usual v2 invocation). A bounded batch is validated
+before any transfer; the caller spool lock serializes concurrent handoffs. Each
+acknowledgement must point to the exact pending or archived receiver identity and
+match the original bytes. Only then is the caller copy moved to its permanent
+archive and both directories fsynced. A failure leaves remaining events pending;
+partial transfer is possible. A crash after receiver retention repeats the same
+identity, including when the receiver has already archived it or published a newer
+event. The result means **retained by receiver**, never published or release-green.
+
+Both roots use existing capacity/headroom admission. Local admission can also
+fail: the host must preserve its originating durable job record until retention
+succeeds, monitor both stores, and provision archive capacity. No finite outbox
+can guarantee acceptance on an exhausted filesystem. Nothing prunes evidence or
+reruns a delivery/cutover to retry a completion. The trusted callback must only
+retain into the configured receiver root; it must never recursively call the
+caller or take its spool lock. Pin this module and its loaded dependencies in the
+installed manifest. Host authors still attest event semantics and configure
+protected roots, retry scheduling, process isolation and the read-only API mount.
+Temporary-file failure tests establish protocol behavior only; no installation,
+scheduler adoption, runtime acceptance or deployment was performed.

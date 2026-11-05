@@ -286,16 +286,9 @@ def record_completion(publication, path, digest):
     return result
 
 
-def retain_completion(publication, *, kind, event_id, source_head, status,
-                      observed_at, live_money, evidence):
-    """Retain a trusted caller's event before dispatch; identical retries only.
-
-    Callers preserve original event IDs/timestamps across restart. No inference,
-    automatic discovery, deletion or delivery operation is performed here. A retry
-    of a settled event returns its archived path, so its identity cannot be reused.
-    Takes only the spool lock, so an event survives a concurrent writer session.
-    """
-    publication._check()
+def completion_payload(*, kind, event_id, source_head, status, observed_at,
+                       live_money, evidence):
+    """Shared strict validation and canonical bytes for durable caller handoff."""
     require(type(kind) is str and kind in OBSERVATIONS and type(event_id) is str
             and re.fullmatch('[A-Za-z0-9_-]{1,128}', event_id), 'invalid event identity')
     require(type(evidence) is str and bool(evidence.strip()), 'invalid completion evidence')
@@ -311,6 +304,22 @@ def retain_completion(publication, *, kind, event_id, source_head, status,
     # Match atomic_json and bound the later hex-encoded archive too.
     raw = (json.dumps(event, sort_keys=True, indent=2) + '\n').encode()
     require(len(raw) * 2 + 4096 < 1000000, 'event evidence too large')
+    return event, raw, moment
+
+
+def retain_completion(publication, *, kind, event_id, source_head, status,
+                      observed_at, live_money, evidence):
+    """Retain a trusted caller's event before dispatch; identical retries only.
+
+    Callers preserve original event IDs/timestamps across restart. No inference,
+    automatic discovery, deletion or delivery operation is performed here. A retry
+    of a settled event returns its archived path, so its identity cannot be reused.
+    Takes only the spool lock, so an event survives a concurrent writer session.
+    """
+    publication._check()
+    event, raw, moment = completion_payload(kind=kind, event_id=event_id,
+        source_head=source_head, status=status, observed_at=observed_at,
+        live_money=live_money, evidence=evidence)
     path = publication.state / ('completion-' + kind + '-' + event_id + '.json')
     digest = hashlib.sha256(raw).hexdigest()
     with _spool_lock(publication.state):

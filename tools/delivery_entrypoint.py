@@ -159,12 +159,16 @@ class HostEntrypoint:
         require(self.publication is not None, 'completion requires delivery-host-v2')
         return recover_completions(self.publication)
 
-    def report_completion(self, **event):
-        """Retain a host-attested event before observation dispatch."""
+    def retain_completion(self, **event):
+        """Durable handoff only; does not claim publication or run operations."""
         from tools.delivery_observations import retain_completion
         self._check()
         require(self.publication is not None, 'completion requires delivery-host-v2')
-        path, digest = retain_completion(self.publication, **event)
+        return retain_completion(self.publication, **event)
+
+    def report_completion(self, **event):
+        """Retain a host-attested event before observation dispatch."""
+        path, digest = self.retain_completion(**event)
         try:
             return self.completion(path, digest)
         except LeaseContention as exc:
