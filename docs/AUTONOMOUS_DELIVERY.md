@@ -860,3 +860,36 @@ to verify recovery-before-cycle ordering and recovery-failure rejection. They
 do not establish an installed bootstrap, real file ownership or host acceptance. The
 real manifest, delivery-evidence publication, isolation provisioning and exact-release
 acceptance remain pending.
+
+## Protected public delivery receipt
+
+`delivery_publication.DeliveryPublication(state, destination, owner=0)` is a
+host-side publication component. Trusted installed wiring must call `publish()`
+after supervisor operations, including failed operations, **outside** their lock
+contexts. It acquires supervisor then delivery leases and reads the journal with
+the protected, bounded reader. Concurrent operations reject publication. State and
+public directories must be disjoint, canonical, host-owned and protected through
+all ancestors; the destination is fixed by installed wiring, never a request.
+
+Only a reconstructed allowlisted receipt is written. It preserves the existing
+SYSTEM projection, including incomplete gates and rollback validation, without
+copying raw errors, paths, schedule backups or arbitrary nested metadata. The
+atomic write fsyncs the file and directory; public files are 0644, while private
+journal writes retain 0600. Mount only the public directory read-only into the API
+and set `EGX_DELIVERY_RECEIPT` to its published file. Do not mount private state.
+The reader rejects duplicate JSON keys as ambiguous evidence.
+
+Missing, malformed, oversized or unsafe source journals replace the published
+view with UNKNOWN before reporting failure. Unsafe destination, lock contention
+or filesystem write failure cannot guarantee a replacement; callers must record
+publication failure and must not describe an older receipt as current health.
+Publication is historical evidence only: cycle/review/market-chain observations
+and current scheduler health remain UNKNOWN until separate trusted evidence
+contracts exist. This component neither approves a release nor triggers cutover.
+
+Tests cover sanitized projection parity, API reads, all transaction phases,
+incomplete gates, invalid sources, unsafe permissions, symlink source, concurrent
+locks and failed atomic replacement. Temporary-directory ancestor protection is
+mocked; these are not installed-host ownership, mount or runtime tests. Installed
+bootstrap must pin this module and `app/delivery_status.py` plus dependencies.
+Host invocation wiring and real read-only API mount acceptance remain pending.

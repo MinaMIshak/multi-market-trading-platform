@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_BOOTSTRAP_MANIFEST",
-  "current_capability": "Completed preserved bootstrap WIP: strict protected manifest pins configuration, factory source and loaded delivery modules; drift and malformed input reject admission. Real entrypoint integration verifies recovery precedes cycle admission. Offline tests pass; installed-host delivery remains pending.",
-  "starting_head": "857ff7d67420a4748fd1bb5002578d0b0c5c496e",
-  "head": "857ff7d67420a4748fd1bb5002578d0b0c5c496e",
+  "phase": "AUTONOMOUS_DELIVERY_PUBLICATION",
+  "current_capability": "Implemented protected host-side delivery publication: locked bounded journal reads, reconstructed public receipt, atomic durable publication, private-data exclusion and UNKNOWN on invalid source. SYSTEM/API projection parity verified offline; installed host wiring remains pending.",
+  "starting_head": "4fbd332a1b6eb0e009374895ac945215f97d85cf",
+  "head": "4fbd332a1b6eb0e009374895ac945215f97d85cf",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected bootstrap/entrypoint/composition/supervisor/runner/host/production/jobs/bindings suite: 341 passed in 10.41s, including 40 bootstrap tests. Temporary filesystem and simulated host evidence only. git diff --check passed; known sandbox socket failures not retried.",
+  "tests": "Affected publication/status/runner/supervisor/entrypoint/bootstrap/composition/host/production/checkpoint suites: 378 passed, 85 subtests passed in 9.90s. Temporary filesystem and simulated host evidence only. git diff --check passed. Known socket restriction not retried.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement protected delivery-evidence publication into SYSTEM/UI, then provision installed supervisor/bootstrap policies and host isolation through the authorized host mechanism. Verify actual death/restart cleanup and run exact SIG-v1 release full/socket/runtime/spare-port acceptance before cutover.",
+  "next_action": "Wire protected DeliveryPublication into installed supervisor invocation with explicit failure reporting; add trusted cycle/review/chain observation contracts. Provision host bootstrap/isolation and read-only API publication mount through authorized host mechanism, then run exact SIG-v1 full/socket/runtime/spare-port acceptance before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Installed manifest/factory provisioning, supervisor-only service invocation, isolation provisioning, delivery-evidence publication, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending. Bootstrap and invocation components implemented and offline-tested."
+    "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending."
   },
   "commit_status": "Commit bridge requested; no direct staging or commit.",
   "experiment": {
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "BOOTSTRAP_MANIFEST_IMPLEMENTED_HOST_ACCEPTANCE_PENDING",
+    "status": "PUBLICATION_COMPONENT_IMPLEMENTED_HOST_WIRING_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -211,7 +211,7 @@
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
-    "system_projection": "Implemented allowlisted historical delivery receipt view; EGX_DELIVERY_RECEIPT host publication not configured or operationally verified. Cycle/review/chain and live scheduler health remain unknown in this view.",
+    "system_projection": "Host publication reconstructs minimal delivery receipts preserving existing SYSTEM/API gates without private journal errors/schedules. Atomic 0644 public output, protected roots, supervisor/delivery leases and duplicate-key rejection tested. Current cycle/review/chain and live scheduler health remain UNKNOWN; installed publication invocation and read-only API mount unverified.",
     "supervisor_coordination": "run_cycle now requires an explicit host launcher, uses separate writer/bridge groups under both locks, and retains writer-active on CleanupError or interruption. Fixture composition verifies writer cleanup precedes bridge. Host isolation and supervisor-death containment remain unverified.",
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
     "source_bundle": "Implemented exact approved Git source bundle; environment binds to independently verified bundle manifest and file hashes. No actual reporting-only source approval or production environment provisioned.",
@@ -231,6 +231,7 @@
     "job_launch": "All release component commands now require explicit launcher bindings: environment, tests, runtime and candidate. PreparedRelease passes its launcher to environment creation; candidate forwards its spare listener FD. No process-group-only fallback. Incomplete receipts and partial environments remain on uncertain admission/cleanup. Simulated component tests and artificial-control JobLauncher tests only; kernel containment and production host wiring remain unverified.",
     "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
     "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified.",
-    "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed."
+    "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed.",
+    "publication": "DeliveryPublication implemented and offline-tested. Invalid source clears old success; unsafe destination, contention or write failure propagates without claiming fresh publication. No actual host publication or deployment performed."
   }
 }

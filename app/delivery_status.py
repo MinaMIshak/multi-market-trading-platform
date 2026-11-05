@@ -84,6 +84,46 @@ def project_delivery(raw):
     return result
 
 
+def public_receipt(raw):
+    """Reconstruct a minimal receipt without copying private strings or mappings."""
+    view = project_delivery(raw)
+    if view['status'] != 'AVAILABLE':
+        return {}
+    result = dict(schema='delivery-state-v1', source_head=view['source_head'],
+                  started_at=view['started_at'], live_money=False, status=raw['status'])
+    if view['origin_sync']:
+        result['origin_sync'] = 'VERIFIED'
+    if view['tests']:
+        result['tests'] = dict(commit=view['source_head'], full_suite=True,
+            reporting_only=True, runtime_rss=True,
+            socket_tests={key: True for key in sorted(SOCKET_TESTS)})
+    def gate(commit, scheduler=False):
+        value = dict(commit=commit, live_money=False, http=True, api=True,
+                     runtime_compatible=True, sig_v1=True)
+        if scheduler:
+            value.update(scheduler_target=commit, scheduler_verified=True)
+        return value
+    if view['candidate_validation']:
+        result['candidate_validation'] = gate(view['source_head'])
+    if view['deployed_release']:
+        commit = view['deployed_release']
+        result.update(deployed_release=commit, scheduler_target=commit)
+        key = 'rollback_validation' if raw['status'] == 'ROLLED_BACK' else 'production_validation'
+        result[key] = gate(commit, scheduler=True)
+        if key == 'rollback_validation':
+            result[key].pop('sig_v1')
+    return result
+
+
+def _unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate receipt key')
+        result[key] = value
+    return result
+
+
 def load_delivery_status():
     configured = os.environ.get('EGX_DELIVERY_RECEIPT')
     if not configured:
@@ -99,6 +139,6 @@ def load_delivery_status():
             payload = source.read(131073)
         if len(payload) > 131072:
             return project_delivery(None)
-        return project_delivery(json.loads(payload))
+        return project_delivery(json.loads(payload, object_pairs_hook=_unique))
     except (OSError, ValueError, RecursionError):
         return project_delivery(None)

@@ -31,11 +31,12 @@ def require(condition, reason):
         raise DeliveryError(reason)
 
 
-def atomic_json(path, value):
+def atomic_json(path, value, *, mode=0o600):
     """Persist receipts before external mutation, including directory durability."""
     fd, temporary = tempfile.mkstemp(prefix='.delivery-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w') as out:
+            os.fchmod(out.fileno(), mode)
             json.dump(value, out, sort_keys=True, indent=2)
             out.write('\n')
             out.flush()
