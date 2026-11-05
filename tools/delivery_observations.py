@@ -28,6 +28,8 @@ from tools.delivery_supervisor import supervisor_lock
 ARCHIVE = 'completion-archive'
 # Bounded wait: holders only do short file work, unlike the operation leases.
 SPOOL_WAIT = 30.0
+MAX_PENDING_EVENTS = 128
+MAX_PENDING_BYTES = 8 * 1024 * 1024
 
 
 @contextmanager
@@ -56,6 +58,34 @@ def _spool_lock(state):
         yield
     finally:
         os.close(fd)
+
+
+def _pending_paths(state):
+    """Bound the scan before reading envelopes; caller holds the spool lock."""
+    paths = []
+    with os.scandir(state) as entries:
+        for entry in entries:
+            if entry.name.startswith('completion-') and entry.name.endswith('.json'):
+                paths.append(state / entry.name)
+                require(len(paths) <= MAX_PENDING_EVENTS,
+                        'completion recovery capacity exceeded')
+    return paths
+
+
+def _admit_completion(publication, size):
+    """Reject overflow before retaining it, so accepted work can still settle.
+
+    Identical retries bypass admission. Never prune evidence or interpret an
+    unreadable sibling as free space. This bounds pending work, not disk usage
+    of the permanent archive; the host must still provision archive capacity.
+    """
+    paths = _pending_paths(publication.state)
+    require(len(paths) < MAX_PENDING_EVENTS, 'completion retention capacity exceeded')
+    total = size
+    for path in paths:
+        total += len(protected_bytes(path, publication.owner))
+        require(total <= MAX_PENDING_BYTES, 'completion retention capacity exceeded')
+    require(total <= MAX_PENDING_BYTES, 'completion retention capacity exceeded')
 
 
 def _existing_observations(publication):
@@ -269,6 +299,7 @@ def retain_completion(publication, *, kind, event_id, source_head, status,
         if os.path.lexists(path):
             require(protected_bytes(path, publication.owner) == raw, 'completion identity conflict')
         else:
+            _admit_completion(publication, len(raw))
             _reject_time_conflict(publication, kind, moment, digest)
             atomic_json(path, event, mode=0o400)
         require(protected_bytes(path, publication.owner) == raw, 'completion retention mismatch')
@@ -281,12 +312,7 @@ def recover_completions(publication):
     with supervisor_lock(publication.state), _delivery_lease(publication.state), \
             _spool_lock(publication.state):
         publication._check()
-        paths = []
-        with os.scandir(publication.state) as entries:
-            for entry in entries:
-                if entry.name.startswith('completion-') and entry.name.endswith('.json'):
-                    paths.append(publication.state / entry.name)
-                    require(len(paths) <= 128, 'completion recovery capacity exceeded')
+        paths = _pending_paths(publication.state)
         sidecar = publication.state / 'observations.json'
         # With nothing to merge, a damaged sidecar is publication's to clear, not a failure.
         current = _existing_observations(publication) if paths else {}
@@ -297,7 +323,7 @@ def recover_completions(publication):
         for path in sorted(paths):
             evidence = protected_bytes(path, publication.owner)
             total += len(evidence)
-            require(total <= 8 * 1024 * 1024, 'completion recovery capacity exceeded')
+            require(total <= MAX_PENDING_BYTES, 'completion recovery capacity exceeded')
             digest = hashlib.sha256(evidence).hexdigest()
             event = _completion_event(publication, path, digest)
             kind, event_id = event['kind'], event['event_id']

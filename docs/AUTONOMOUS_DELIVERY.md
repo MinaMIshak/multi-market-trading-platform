@@ -1071,7 +1071,9 @@ not successful publication. The v2 invocation settlement and explicit
 A new event whose instant matches another event of its kind (in the sidecar or still
 retained) is rejected before retention with `observation time conflict`, so it cannot
 block recovery for every kind. The caller keeps that event and must resolve it.
-Damaged sidecar or sibling files do not stop retention; recording and recovery reject them.
+A damaged sidecar does not stop retention; recording and recovery reject it.
+Readable malformed sibling envelopes count toward capacity; unsafe or unreadable
+siblings stop admission as described below.
 
 After successful publication, an envelope whose exact bytes are in its receipt, and
 whose event time the sidecar has reached, moves to the private `completion-archive/`
@@ -1132,3 +1134,26 @@ historical evidence only.
 This means uncertain writer cleanup now raises its original error instead of
 `PublicationFailure`, and an INTERRUPTED cycle can be reported while the latch is
 held. Temporary-file tests cover this; no installed host has been observed.
+
+### Pending completion capacity admission
+
+Retention and recovery share the same 128-envelope and 8 MiB bounds. Under the
+spool lock, a new identity counts existing direct `completion-*.json` files and
+reads their protected bytes before writing. The proposed envelope's exact serialized
+byte length is included. An event that would exceed either bound is rejected with
+`completion retention capacity exceeded`; it is **not retained or published**.
+The trusted caller must preserve that event and retry after settlement frees space.
+This prevents ordinary callback traffic during a long writer session from making
+an otherwise valid queue impossible to recover. Concurrent callers cannot both
+claim the last slot. Existing identical pending or archived retries do not consume
+a slot and remain available at capacity.
+
+Unreadable, unsafe or oversized pending files fail admission closed instead of
+being counted as empty. Malformed but readable siblings still count toward capacity;
+recovery remains responsible for semantic validation. External files can still
+exceed the queue bounds and require explicit host reconciliation. No evidence is
+pruned. These limits cover pending envelope bytes only, not permanent receipts,
+archives, filesystem overhead or free disk space. Host archive retention and disk
+capacity provisioning remain required before adoption. Temporary-file tests exercise
+count and exact-byte boundaries, concurrent admission, retry and resumed settlement;
+they provide no deployed-host evidence.

@@ -459,3 +459,90 @@ def test_damaged_sidecar_cannot_stop_retention_and_reports_typed_error(setup, pa
         with pytest.raises(DeliveryError, match='existing observations'):
             attempt()
     assert path.exists()
+
+
+def test_pending_count_limit_preserves_retries_and_recovers_capacity(setup):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    events = [event(event_id=f'bounded-{i}',
+                    observed_at=(NOW - timedelta(seconds=200 - i)).isoformat())
+              for i in range(129)]
+    retained = [retain_completion(publisher, **item) for item in events[:128]]
+    before = {p: p.read_bytes() for p, _ in retained}
+    with pytest.raises(DeliveryError, match='retention capacity'):
+        retain_completion(publisher, **events[128])
+    assert {p: p.read_bytes() for p in before} == before
+    assert retain_completion(publisher, **events[0]) == retained[0]
+    assert not list(publisher.state.glob('observation-*.json'))
+    recover_completions(publisher)
+    assert not list(publisher.state.glob('completion-*.json'))
+    assert len(list((publisher.state / 'completion-archive').iterdir())) == 128
+    assert retain_completion(publisher, **events[128])[0].exists()
+    assert retain_completion(publisher, **events[0])[0].parent.name == 'completion-archive'
+
+
+def test_pending_byte_limit_includes_exact_serialized_bytes(setup):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    first = event(evidence='unicode \u2603 ' * 10)
+    path, digest = retain_completion(publisher, **first)
+    second = event(event_id='bounded-2', observed_at=(NOW - timedelta(seconds=1)).isoformat())
+    raw = (json.dumps(dict(schema='delivery-completion-v1', **second),
+                      sort_keys=True, indent=2) + '\n').encode()
+    limit = len(path.read_bytes()) + len(raw)
+    with patch('tools.delivery_observations.MAX_PENDING_BYTES', limit - 1):
+        with pytest.raises(DeliveryError, match='retention capacity'):
+            retain_completion(publisher, **second)
+        assert retain_completion(publisher, **first) == (path, digest)
+        assert len(list(publisher.state.glob('completion-*.json'))) == 1
+    with patch('tools.delivery_observations.MAX_PENDING_BYTES', limit):
+        other, _ = retain_completion(publisher, **second)
+        assert other.read_bytes() == raw
+        recover_completions(publisher)
+    assert not path.exists() and not other.exists()
+
+
+def test_concurrent_retention_cannot_overbook_last_slot(setup):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    barrier = Barrier(2)
+    def submit(i):
+        barrier.wait(timeout=10)
+        try:
+            return retain_completion(publisher, **event(event_id=f'race-{i}',
+                observed_at=(NOW - timedelta(seconds=i)).isoformat()))
+        except DeliveryError as exc:
+            return exc
+    with patch('tools.delivery_observations.MAX_PENDING_EVENTS', 1):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(submit, (1, 2)))
+        assert sum(isinstance(result, tuple) for result in results) == 1
+        errors = [result for result in results if isinstance(result, DeliveryError)]
+        assert len(errors) == 1 and 'retention capacity' in str(errors[0])
+        assert len(list(publisher.state.glob('completion-*.json'))) == 1
+        recover_completions(publisher)
+    assert not list(publisher.state.glob('completion-*.json'))
+
+
+@pytest.mark.parametrize('damage', ['symlink', 'unsafe', 'oversize'])
+def test_capacity_admission_cannot_ignore_unreadable_pending_bytes(setup, damage):
+    from tools.delivery_observations import retain_completion
+    publisher = setup[0]
+    path, _ = retain_completion(publisher, **event())
+    if damage == 'symlink':
+        target = path.with_suffix('.saved')
+        path.rename(target)
+        path.symlink_to(target)
+    elif damage == 'unsafe':
+        path.chmod(0o666)
+    else:
+        path.chmod(0o600)
+        from tools.delivery_entrypoint import LIMIT
+        path.write_bytes(b'x' * (LIMIT + 1))
+    with pytest.raises((DeliveryError, OSError)):
+        retain_completion(publisher, **event(event_id='new-event',
+            observed_at=(NOW - timedelta(seconds=1)).isoformat()))
+    assert len(list(publisher.state.glob('completion-*.json'))) == 1
+    assert not list(publisher.state.glob('observation-*.json'))
