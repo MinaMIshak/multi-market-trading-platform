@@ -20,15 +20,17 @@ class ObservationProducer:
         self.publication = publication
 
     def record(self, kind, *, event_id, source_head, status, observed_at,
-               evidence_path, live_money, now=None):
+               evidence_path, live_money, now=None, expected_evidence_sha256=None):
         publisher = self.publication
         publisher._check()
-        require(kind in OBSERVATIONS and isinstance(event_id, str)
+        require(isinstance(kind, str) and kind in OBSERVATIONS and isinstance(event_id, str)
                 and re.fullmatch('[A-Za-z0-9_-]{1,128}', event_id), 'invalid event identity')
         with supervisor_lock(publisher.state), delivery_lock(publisher.state):
             publisher._check()
             evidence = protected_bytes(evidence_path, publisher.owner)
             digest = hashlib.sha256(evidence).hexdigest()
+            require(expected_evidence_sha256 is None or digest == expected_evidence_sha256,
+                    'completion evidence pin mismatch')
             record = dict(status=status, source_head=source_head, observed_at=observed_at,
                           evidence_sha256=digest, live_money=live_money)
             records = observation_records(dict(schema='delivery-observations-v1', **{kind: record}))
@@ -63,3 +65,27 @@ class ObservationProducer:
             current[kind] = record
             atomic_json(sidecar, dict(schema='delivery-observations-v1', **current))
         return publisher.publish()
+
+
+def record_completion(publication, path, digest):
+    """Consume a host-authored envelope; recheck parsed bytes under both leases."""
+    require(isinstance(digest, str) and re.fullmatch('[0-9a-f]{64}', digest),
+            'invalid completion pin')
+    raw = protected_bytes(path, publication.owner)
+    require(hashlib.sha256(raw).hexdigest() == digest, 'completion evidence pin mismatch')
+    try:
+        event = json.loads(raw, object_pairs_hook=_unique)
+    except (ValueError, RecursionError):
+        from tools.delivery_runner import DeliveryError
+        raise DeliveryError('malformed completion envelope') from None
+    require(type(event) is dict and set(event) == {
+        'schema', 'kind', 'event_id', 'source_head', 'status', 'observed_at',
+        'live_money', 'evidence'}, 'invalid completion fields')
+    require(event['schema'] == 'delivery-completion-v1'
+            and type(event['evidence']) is str and bool(event['evidence'].strip()),
+            'invalid completion evidence')
+    return ObservationProducer(publication).record(event['kind'],
+        event_id=event['event_id'], source_head=event['source_head'],
+        status=event['status'], observed_at=event['observed_at'],
+        live_money=event['live_money'], evidence_path=path,
+        expected_evidence_sha256=digest)

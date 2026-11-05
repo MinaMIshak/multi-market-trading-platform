@@ -173,3 +173,14 @@ def test_owned_server_passes_explicit_descriptor_and_cleans_up(tmp_path):
     finally:
         os.close(read_fd)
         os.close(write_fd)
+
+
+@pytest.mark.parametrize('error', [FileNotFoundError(), ProcessLookupError(), PermissionError()])
+def test_procfs_exit_race_only_ignores_disappeared_process(error):
+    with patch.object(Path, 'iterdir', return_value=iter([Path('/proc/123')])), \
+            patch.object(Path, 'read_text', side_effect=error):
+        if isinstance(error, PermissionError):
+            with pytest.raises(PermissionError):
+                _live_members(123)
+        else:
+            assert _live_members(123) is False

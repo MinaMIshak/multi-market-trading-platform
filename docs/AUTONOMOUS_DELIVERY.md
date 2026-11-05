@@ -993,3 +993,30 @@ fails; it is not treated as an initial installation.
 Installed completion callbacks, retention policy for private evidence, bootstrap
 pins and read-only publication mount acceptance remain host integration work.
 Temporary-file regression tests establish producer behavior only.
+
+### Pinned host completion callback
+
+`InstalledBootstrap.completion(path, digest)` now connects trusted host completion
+notifications to the observation producer through `HostEntrypoint.completion`.
+It loads callback dependencies before checking installed-module pins, rechecks the
+entrypoint identity and requires delivery-host-v2. The envelope must be a protected
+file beneath private host state; repository files cannot be supplied directly.
+The callback does not invoke recovery, writers, bridges or releases, so interrupted
+operations can be reported without clearing their recovery latches.
+
+The host constructs `delivery-completion-v1` JSON with exactly `schema`, `kind`,
+`event_id`, `source_head`, `status`, `observed_at`, `live_money` and `evidence`.
+`evidence` is a nonempty string containing the retained completion evidence.
+The other fields follow the observation contract above. The host supplies SHA256
+of the entire envelope as `digest`. Parsing checks this pin, and the producer
+rechecks it after reacquiring both leases before archiving the exact envelope.
+Duplicate/extra fields, malformed JSON, invalid observations, changed bytes and
+concurrent operations fail closed. Identical retry repairs interrupted publication
+without authorizing delivery. Public output contains only the sanitized observation
+and envelope digest, never its private evidence text.
+
+Trusted installed supervisor/reviewer/chain callers must independently establish
+completion semantics and preserve the envelope for retries. A protected file and
+hash alone do not prove those semantics. This repository implements the callback
+boundary; installed callers, protected storage retention, manifest provisioning,
+API mount and actual host acceptance remain pending. No sandbox privileges change.

@@ -142,6 +142,15 @@ class HostEntrypoint:
         for argv, _ in self.commands.values():
             _protected(Path(argv[0]), self.owner)
 
+    def completion(self, path, digest):
+        """Trusted historical callback outside leases; never executes operations."""
+        from tools.delivery_observations import record_completion
+        self._check()
+        require(self.publication is not None, 'completion requires delivery-host-v2')
+        path = Path(_absolute(str(path)))
+        require(path.is_relative_to(self.state), 'completion must be in private host state')
+        return record_completion(self.publication, path, digest)
+
     def invoke(self, operation, request=None):
         self._check()
         require(operation in ('startup', 'cycle', 'release'), 'unknown host operation')

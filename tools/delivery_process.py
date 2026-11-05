@@ -94,7 +94,8 @@ def _live_members(group):
             continue
         try:
             fields = (entry / 'stat').read_text().rsplit(')', 1)[1].split()
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
+            # A process can exit after procfs open but before read (ESRCH).
             continue
         if int(fields[2]) == group and fields[0] not in ('Z', 'X'):
             return True

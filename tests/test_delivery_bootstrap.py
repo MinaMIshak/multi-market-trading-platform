@@ -287,3 +287,14 @@ def test_bootstrap_integrates_with_entrypoint_recovery_before_cycle(setup):
     with pytest.raises(DeliveryError, match='recovery incomplete'):
         bootstrap.invoke('cycle')
     calls.cycle.assert_not_called()
+
+
+def test_completion_dispatch_checks_pins_and_entrypoint(setup):
+    _, _, dependency, entry, build = setup
+    bootstrap = build()
+    assert bootstrap.completion('/host/event.json', 'a' * 64) is entry.return_value.completion.return_value
+    entry.return_value.completion.assert_called_once_with('/host/event.json', 'a' * 64)
+    dependency.write_text('changed')
+    with pytest.raises(DeliveryError):
+        bootstrap.completion('/host/event.json', 'a' * 64)
+    assert entry.return_value.completion.call_count == 1

@@ -90,3 +90,10 @@ class InstalledBootstrap:
         self._check()
         require(self.entrypoint is self._entrypoint, 'bootstrap entrypoint changed')
         return self.entrypoint.invoke(operation, request)
+
+    def completion(self, path, digest):
+        # Load callback dependencies before verifying complete installed-code pins.
+        from tools import delivery_observations  # noqa: F401
+        self._check()
+        require(self.entrypoint is self._entrypoint, 'bootstrap entrypoint changed')
+        return self.entrypoint.completion(path, digest)

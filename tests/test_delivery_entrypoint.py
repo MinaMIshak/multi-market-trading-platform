@@ -294,3 +294,24 @@ def test_v2_interruption_still_publishes(published_setup):
     with pytest.raises(KeyboardInterrupt):
         build().invoke('cycle')
     assert destination.exists()
+
+
+def test_completion_requires_v2_and_private_state(setup):
+    policy, _, supervisor, _, build = setup
+    entry = build()
+    with pytest.raises(DeliveryError, match='v2'):
+        entry.completion(entry.state / 'event.json', 'a' * 64)
+    public = entry.state.parent / 'public'
+    public.mkdir()
+    policy.update(schema='delivery-host-v2', publication=str(public / 'delivery.json'))
+    with patch('tools.delivery_publication._protected'):
+        entry = build()
+        with pytest.raises(DeliveryError, match='private host state'):
+            entry.completion(entry.repository / 'event.json', 'a' * 64)
+        with patch('tools.delivery_observations.record_completion') as record:
+            path = entry.state / 'event.json'
+            assert entry.completion(path, 'a' * 64) is record.return_value
+            record.assert_called_once_with(entry.publication, path, 'a' * 64)
+    supervisor.startup.assert_not_called()
+    supervisor.run_cycle.assert_not_called()
+    supervisor.release.assert_not_called()
