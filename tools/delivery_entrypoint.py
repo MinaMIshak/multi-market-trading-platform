@@ -142,6 +142,12 @@ class HostEntrypoint:
         for argv, _ in self.commands.values():
             _protected(Path(argv[0]), self.owner)
 
+    def recover_completions(self):
+        from tools.delivery_observations import recover_completions
+        self._check()
+        require(self.publication is not None, 'completion requires delivery-host-v2')
+        return recover_completions(self.publication)
+
     def report_completion(self, **event):
         """Retain a host-attested event before observation dispatch."""
         from tools.delivery_observations import retain_completion

@@ -309,3 +309,14 @@ def test_report_completion_checks_pins_before_retention(setup):
     with pytest.raises(DeliveryError):
         bootstrap.report_completion(event_id='other-event')
     assert entry.return_value.report_completion.call_count == 1
+
+
+def test_recovery_checks_pins_before_dispatch(setup):
+    _, _, path, entry, build = setup
+    bootstrap = build()
+    bootstrap.recover_completions()
+    entry.return_value.recover_completions.assert_called_once_with()
+    path.write_text('{}')
+    with pytest.raises(DeliveryError):
+        bootstrap.recover_completions()
+    assert entry.return_value.recover_completions.call_count == 1

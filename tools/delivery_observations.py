@@ -67,8 +67,8 @@ class ObservationProducer:
         return publisher.publish()
 
 
-def record_completion(publication, path, digest):
-    """Consume a host-authored envelope; recheck parsed bytes under both leases."""
+def _completion_event(publication, path, digest):
+    """Read a protected envelope and verify its exact byte digest."""
     require(isinstance(digest, str) and re.fullmatch('[0-9a-f]{64}', digest),
             'invalid completion pin')
     raw = protected_bytes(path, publication.owner)
@@ -84,6 +84,11 @@ def record_completion(publication, path, digest):
     require(event['schema'] == 'delivery-completion-v1'
             and type(event['evidence']) is str and bool(event['evidence'].strip()),
             'invalid completion evidence')
+    return event
+
+
+def record_completion(publication, path, digest):
+    event = _completion_event(publication, path, digest)
     return ObservationProducer(publication).record(event['kind'],
         event_id=event['event_id'], source_head=event['source_head'],
         status=event['status'], observed_at=event['observed_at'],
@@ -123,3 +128,68 @@ def retain_completion(publication, *, kind, event_id, source_head, status,
             atomic_json(path, event, mode=0o400)
         require(protected_bytes(path, publication.owner) == raw, 'completion retention mismatch')
     return path, hashlib.sha256(raw).hexdigest()
+
+
+def recover_completions(publication):
+    """Validate a bounded retained batch before advancing historical observations."""
+    publication._check()
+    with supervisor_lock(publication.state), delivery_lock(publication.state):
+        publication._check()
+        paths = []
+        with os.scandir(publication.state) as entries:
+            for entry in entries:
+                if entry.name.startswith('completion-') and entry.name.endswith('.json'):
+                    paths.append(publication.state / entry.name)
+                    require(len(paths) <= 128, 'completion recovery capacity exceeded')
+        current = {}
+        sidecar = publication.state / 'observations.json'
+        if os.path.lexists(sidecar):
+            raw = json.loads(protected_bytes(sidecar, publication.owner), object_pairs_hook=_unique)
+            current = observation_records(raw)
+            require(type(raw) is dict and raw.get('schema') == 'delivery-observations-v1'
+                    and set(raw) == {'schema', *current}, 'invalid existing observations')
+        receipts, total = [], 0
+        moments = {(kind, datetime.fromisoformat(record['observed_at'])): record
+                   for kind, record in current.items()}
+        now = datetime.now(timezone.utc)
+        for path in sorted(paths):
+            evidence = protected_bytes(path, publication.owner)
+            total += len(evidence)
+            require(total <= 8 * 1024 * 1024, 'completion recovery capacity exceeded')
+            digest = hashlib.sha256(evidence).hexdigest()
+            event = _completion_event(publication, path, digest)
+            kind, event_id = event['kind'], event['event_id']
+            require(type(kind) is str and kind in OBSERVATIONS and type(event_id) is str
+                    and re.fullmatch('[A-Za-z0-9_-]{1,128}', event_id), 'invalid event identity')
+            require(path.name == 'completion-' + kind + '-' + event_id + '.json',
+                    'completion filename identity mismatch')
+            record = {key: event[key] for key in
+                      ('status', 'source_head', 'observed_at', 'live_money')}
+            record['evidence_sha256'] = digest
+            records = observation_records(dict(schema='delivery-observations-v1', **{kind: record}))
+            require(kind in records, 'invalid observation')
+            record = records[kind]
+            moment = datetime.fromisoformat(record['observed_at'])
+            require(moment <= now, 'future observation')
+            key = (kind, moment)
+            require(key not in moments or moments[key] == record, 'observation time conflict')
+            moments[key] = record
+            receipt = dict(schema='delivery-observation-event-v1', kind=kind,
+                           event_id=event_id, record=record, evidence_hex=evidence.hex())
+            require(len(json.dumps(receipt).encode()) < 1000000, 'event evidence too large')
+            archive = publication.state / ('observation-' + kind + '-' + event_id + '.json')
+            if os.path.lexists(archive):
+                existing = json.loads(protected_bytes(archive, publication.owner), object_pairs_hook=_unique)
+                require(existing == receipt, 'event identity conflict')
+            else:
+                receipts.append((archive, receipt))
+            prior = current.get(kind)
+            previous = datetime.fromisoformat(prior['observed_at']) if prior else None
+            require(previous != moment or prior == record, 'observation time conflict')
+            if previous is None or moment > previous:
+                current[kind] = record
+        for archive, receipt in receipts:
+            atomic_json(archive, receipt, mode=0o400)
+        if paths:
+            atomic_json(sidecar, dict(schema='delivery-observations-v1', **current))
+    return publication.publish()

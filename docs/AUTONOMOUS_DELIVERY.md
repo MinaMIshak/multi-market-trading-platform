@@ -1042,3 +1042,28 @@ Envelopes and receipts remain private indefinitely; no automatic pruning is
 introduced. Host capacity/retention policy, installed callers and manifest pins
 still require provisioning. Temporary-file restart/failure tests are not evidence
 of host adoption or deployment.
+
+### Restart recovery of retained completion events
+
+A trusted installed caller can invoke `InstalledBootstrap.recover_completions()`
+after restart, outside operation leases. Bootstrap pins and the v2 publication
+binding are checked first. Recovery holds both leases while reading only direct
+`completion-*.json` entries in private host state. It validates every envelope,
+filename identity, observation, existing receipt and timestamp conflict before
+writing any receipts or advancing the sidecar. Unsafe, malformed, conflicting,
+future-dated or LIVE_MONEY events fail closed for the whole batch.
+
+Recovery retains receipts for historical events and selects the newest observation
+per kind without regressing an existing newer sidecar. Original timestamps and
+hashes survive retries; recovery does not refresh evidence or infer health.
+Receipt writes precede sidecar replacement. Interrupted writes and publication
+failure can be retried; existing receipts must match exactly. Publication occurs
+only after the leases unwind. No delivery operation or evidence deletion occurs.
+
+The batch is limited to 128 envelopes and 8 MiB of envelope bytes, in addition to
+per-file limits. Exceeding either limit fails closed. Host provisioning must supply
+a protected archival/retention policy before those bounds are reached; this code
+does not authorize pruning evidence. Artificial filesystem and mocked host tests
+cover restart, invalid batches, conflicts and pin checks. Installed invocation,
+retention policy, read-only publication mount and actual host acceptance are still
+pending. This API is not an installer and does not satisfy release validation.

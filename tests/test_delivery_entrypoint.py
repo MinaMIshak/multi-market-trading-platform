@@ -344,3 +344,22 @@ def test_report_completion_rejects_legacy_host(setup):
     with pytest.raises(DeliveryError, match='v2'):
         entry.report_completion(**event())
     assert not list(entry.state.glob('completion-*.json'))
+
+
+def test_recovery_after_restart_never_runs_delivery(published_setup):
+    from tests.test_delivery_completion import event
+    from tools.delivery_observations import retain_completion
+    _, supervisor, build, journal, _ = published_setup
+    before = journal.read_bytes()
+    retain_completion(build().publication, **event())
+    result = build().recover_completions()
+    assert result['observations']['latest_codex_cycle']['status'] == 'SUCCEEDED'
+    assert journal.read_bytes() == before
+    supervisor.startup.assert_not_called()
+    supervisor.run_cycle.assert_not_called()
+    supervisor.release.assert_not_called()
+
+
+def test_recovery_rejects_legacy_host(setup):
+    with pytest.raises(DeliveryError, match='v2'):
+        setup[-1]().recover_completions()

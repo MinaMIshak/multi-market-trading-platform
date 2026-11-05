@@ -127,3 +127,89 @@ def test_retention_lock_and_symlink_rejection(setup):
     path.symlink_to(target)
     with pytest.raises((DeliveryError, OSError)):
         retain_completion(setup[0], **event())
+
+
+def test_recovery_retains_history_selects_latest_and_retries_publication(setup):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    old = event(event_id='z-old', observed_at='2026-11-04T00:00:00+00:00')
+    new = event(event_id='a-new')
+    for item in (old, new, event(kind='us_chain_status', status='COMPLETED')):
+        retain_completion(publisher, **item)
+    with patch.object(publisher, 'publish', side_effect=OSError('unavailable')):
+        with pytest.raises(OSError):
+            recover_completions(publisher)
+    assert len(list(publisher.state.glob('observation-*.json'))) == 3
+    result = recover_completions(publisher)
+    assert result['observations']['latest_codex_cycle']['observed_at'] == new['observed_at']
+    assert recover_completions(publisher) == result
+    assert 'artificial host completion' not in setup[2].read_text()
+
+
+@pytest.mark.parametrize('damage', ['malformed', 'symlink', 'unsafe', 'filename', 'live', 'future', 'conflict'])
+def test_recovery_validates_whole_batch_before_writing(setup, damage):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    retain_completion(publisher, **event(event_id='a-valid'))
+    path, _ = retain_completion(publisher, **event(event_id='z-other', kind='us_chain_status', status='COMPLETED'))
+    path.chmod(0o600)
+    if damage == 'malformed':
+        path.write_text('{')
+    elif damage == 'symlink':
+        target = path.with_suffix('.saved')
+        path.rename(target)
+        path.symlink_to(target)
+    elif damage == 'unsafe':
+        path.chmod(0o666)
+    elif damage == 'filename':
+        path.rename(path.with_name('completion-wrong.json'))
+    else:
+        raw = json.loads(path.read_bytes())
+        if damage == 'live':
+            raw['live_money'] = True
+        elif damage == 'future':
+            raw['observed_at'] = '2999-01-01T00:00:00+00:00'
+        else:
+            raw['kind'] = 'latest_codex_cycle'
+            path.unlink()
+            path = publisher.state / 'completion-latest_codex_cycle-z-other.json'
+        path.write_text(json.dumps(raw))
+    with pytest.raises((DeliveryError, ValueError, OSError)):
+        recover_completions(publisher)
+    assert not list(publisher.state.glob('observation-*.json'))
+    assert not (publisher.state / 'observations.json').exists()
+
+
+def test_recovery_rejects_receipt_conflict_and_concurrency(setup):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    retain_completion(publisher, **event())
+    with delivery_lock(publisher.state), pytest.raises(DeliveryError):
+        recover_completions(publisher)
+    recover_completions(publisher)
+    archive = next(publisher.state.glob('observation-*.json'))
+    archive.chmod(0o600)
+    archive.write_text('{}')
+    before = (publisher.state / 'observations.json').read_bytes()
+    with pytest.raises(DeliveryError, match='identity conflict'):
+        recover_completions(publisher)
+    assert (publisher.state / 'observations.json').read_bytes() == before
+
+
+def test_recovery_capacity_and_partial_archive_restart(setup):
+    from tools.delivery_observations import retain_completion, recover_completions, atomic_json
+    publisher = setup[0]
+    retain_completion(publisher, **event())
+    def fail_sidecar(path, *args, **kwargs):
+        if path.name == 'observations.json':
+            raise OSError('interrupted')
+        return atomic_json(path, *args, **kwargs)
+    with patch('tools.delivery_observations.atomic_json', side_effect=fail_sidecar):
+        with pytest.raises(OSError):
+            recover_completions(publisher)
+    assert len(list(publisher.state.glob('observation-*.json'))) == 1
+    recover_completions(publisher)
+    for i in range(128):
+        (publisher.state / f'completion-extra-{i}.json').write_text('{}')
+    with pytest.raises(DeliveryError, match='capacity'):
+        recover_completions(publisher)
