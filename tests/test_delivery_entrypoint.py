@@ -79,6 +79,17 @@ def test_invalid_policy_never_constructs_host(setup, field, value):
     factory.assert_not_called()
 
 
+@pytest.mark.parametrize('raw', [b'{', b'\xff', b'[]', b'{"schema": 1, "schema": 2}',
+                                 b'[' * 100000], ids=['open', 'bytes', 'list', 'dup', 'deep'])
+def test_malformed_configuration_is_delivery_error(setup, raw):
+    _, path, _, factory, _ = setup
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(DeliveryError):
+        HostEntrypoint(path, hashlib.sha256(raw).hexdigest(), factory, owner=os.getuid())
+    factory.assert_not_called()
+
+
 @pytest.mark.parametrize('timeout', [0, -1, True, float('inf'), float('nan'), 86401, '60'])
 def test_invalid_deadline(setup, timeout):
     policy, _, _, factory, build = setup

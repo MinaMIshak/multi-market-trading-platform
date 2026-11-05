@@ -11,7 +11,7 @@ from pathlib import Path
 import stat
 
 from tools.delivery_containment import _absolute, _protected
-from tools.delivery_runner import require
+from tools.delivery_runner import DeliveryError, require
 from tools.delivery_supervisor import DeliverySupervisor
 
 LIMIT = 1024 * 1024
@@ -55,7 +55,10 @@ class HostEntrypoint:
         self.config, self.digest = Path(config), digest
         raw = protected_bytes(self.config, owner)
         require(hashlib.sha256(raw).hexdigest() == digest, 'host configuration pin mismatch')
-        policy = json.loads(raw, object_pairs_hook=_unique)
+        try:
+            policy = json.loads(raw, object_pairs_hook=_unique)
+        except (ValueError, RecursionError):
+            raise DeliveryError('malformed host configuration') from None
         require(type(policy) is dict and set(policy) == {
             'schema', 'state', 'repository', 'writer', 'bridge', 'live_money'},
             'invalid host configuration fields')

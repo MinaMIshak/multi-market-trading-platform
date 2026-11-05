@@ -1,7 +1,8 @@
 # Autonomous delivery contract
 
-Status: transaction core, restart recovery, supervisor coordination and component
-composition implemented; production backend and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
+Status: transaction core, restart recovery, supervisor coordination, component
+composition, production backend and host invocation components implemented as offline
+code; host provisioning and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -819,4 +820,43 @@ Tests use protected-read fixtures with ancestor checks mocked for temporary
 paths and simulated supervisor methods. They establish parser, pinning, dispatch
 and failure-ordering behavior only. Actual installed bootstrap/factory policy,
 isolation attestation, delivery-evidence publication and exact-release host
+acceptance remain pending.
+
+## Installed bootstrap manifest gate
+
+`delivery_bootstrap.InstalledBootstrap` wraps `HostEntrypoint` for installed code.
+It is not an installer, CLI or dynamic loader. The host passes a manifest path, its
+independently held SHA-256, the factory function object and the owner. The strict
+`delivery-bootstrap-v1` manifest contains `schema`, `configuration`, `files` (at most
+1024 canonical absolute paths mapped to lowercase SHA-256) and boolean
+`live_money: false`. It names no factory, so neither it nor a request selects code.
+
+Before the factory runs, the gate requires:
+
+- the manifest digest and every pinned file, read through `protected_bytes`;
+- the host configuration among the pinned files;
+- a module-level factory whose loaded module `__file__` matches its code path, with
+  that source pinned;
+- a pin for the source of every loaded `tools.*` module, so a manifest cannot omit
+  delivery code that the process has already imported.
+
+The same checks repeat after construction and at every invocation, before dispatch.
+Factory module binding and entrypoint identity drift also block dispatch.
+A module imported after the last check is only detected at the next invocation.
+
+These checks compare files on disk. They do not attest code already in memory, so
+the host must verify the manifest before trusting the process and must protect
+bytecode caches, for example by running with `-I -B`. Because `-I` removes the script
+directory from the import path, the protected launcher must set that path itself.
+Malformed or excessively nested manifest and host configuration JSON raises
+`DeliveryError` before the factory runs. Files above the 1 MiB read limit
+(such as interpreter binaries) cannot be pinned here and fail closed if listed. The
+interpreter, stdlib, third-party packages and OS stay host obligations, and anything
+outside `tools.*` is only covered if the manifest lists it.
+
+Tests use temporary files with ancestor checks mocked. Manifest tests stub the
+entrypoint; one integration test uses the real entrypoint with a simulated supervisor
+to verify recovery-before-cycle ordering and recovery-failure rejection. They
+do not establish an installed bootstrap, real file ownership or host acceptance. The
+real manifest, delivery-evidence publication, isolation provisioning and exact-release
 acceptance remain pending.
