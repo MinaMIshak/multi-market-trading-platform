@@ -37,3 +37,32 @@ The next implementation must require a protected, digest-bound repair manifest,
 independent originating-job evidence, exclusive leases, durable before/after
 records and restart-safe recovery before any mutation. Ambiguous evidence remains
 fail-closed. Archive retention and disk provisioning remain host responsibilities.
+
+## Read-only repair planning
+
+`tools.delivery_repair.plan_repair(publication, request_path, request_sha256)`
+provides a host-private planning API, with no CLI, host dispatch or mutation
+executor. A protected `delivery-repair-request-v1` JSON document must contain
+exactly `schema`, `live_money: false`, `references` (receiver-relative filenames
+mapped to SHA256 pins), and `originating_records` (absolute protected paths outside
+the receiver state mapped to SHA256 pins). Both maps must contain 1–128 entries.
+References permit completion envelopes, archived envelopes and observation
+receipts only; traversal and symlinks are rejected by the protected readers.
+
+Under supervisor, delivery and spool leases, planning binds every current pending
+filename, exact bytes/digest of each referenced file, the sidecar or its absence,
+and independent job records. The initial evidence inventory budget is 8 MiB; overlapping
+references count each capture. Pin rechecks reread this bounded scope. Files are rechecked before returning a deterministic
+plan and its SHA256. Malformed evidence can be hashed without being interpreted.
+Errors return no plan and preserve original evidence. Existing lease files may be
+created as part of locking; evidence files are never written.
+
+The plan explicitly remains UNRESOLVED and does not authorize mutation. It covers
+pending state, the sidecar and explicit references, **not all archive history or
+caller outboxes**. Physical separation of job records does not prove their semantic
+authority. A trusted host must supply and reconcile all relevant originating
+records and preserve the returned plan in protected storage. This API is not yet
+wired into the installed supervisor. A future executor still requires independent
+semantic reconciliation, full affected-scope validation, pin rechecks under leases,
+durable before/after evidence and restart recovery. No deletion, timestamp editing,
+event replacement, settlement or delivery replay is supplied here.

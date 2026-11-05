@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_SETTLEMENT_VISIBILITY",
-  "current_capability": "Bounded receiver settlement backlog inventory published through sanitized delivery receipts and SYSTEM. Protected count/byte snapshots distinguish unreadable inventory; no settlement, host health or release acceptance inferred. Existing exact evidence and retry semantics preserved.",
-  "starting_head": "f6afe548baa40c45430ff0ae1d9433d7346b2fd0",
-  "head": "f6afe548baa40c45430ff0ae1d9433d7346b2fd0",
+  "phase": "AUTONOMOUS_DELIVERY_REPAIR_PLANNING",
+  "current_capability": "Protected digest-bound read-only completion repair planning. Captures bounded pending inventory, sidecar presence, explicit archive/receipt references and independently located originating-job records under existing leases. Rechecks pins, preserves damaged bytes and remains unresolved; no mutation executor or host deployment.",
+  "starting_head": "b6f713a1dee1ac695219cb508732bd51894fc63a",
+  "head": "b6f713a1dee1ac695219cb508732bd51894fc63a",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected publication/completion/status/observations/caller/entrypoint/bootstrap/producer/checkpoint/SYSTEM suites: 415 passed, 85 subtests in 18.51s. Extended backlog suite: 14 passed. Initial runs exposed snapshot-versus-durable-evidence equality assertions; updated comparisons preserve all evidence fields and explicitly test backlog transitions. git diff --check passed. Full/socket suite not rerun; exact-release host acceptance pending.",
+  "tests": "202 passed in 14.71s: delivery repair, backlog, completion, observations and publication suites. Initial fixture failures corrected (read-only mutation setup, protected modes and expected OSError for symlink rejection). git diff --check passed. Full/socket suite not rerun; exact-release host acceptance pending. Checkpoint/SYSTEM validation: 14 passed, 85 subtests in 0.81s.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "After commit bridge and exact origin sync, implement protected digest-bound provenance-preserving repair planning for legacy damaged/conflicting completion evidence; no automatic deletion or timestamp changes. Provision pinned callers/retry scheduling, supervisor v2 publication mount and explicit PublicationFailure handling without replay through authorized host mechanism. Measure archive admission cost. Run exact SIG-v1 full/socket/runtime/spare-port/rollback gates before cutover. Scanner v2 remains queued behind delivery prerequisites.",
+  "next_action": "Commit bridge and exact origin sync first. Delivery is at a read-only repair-planning checkpoint: authorized host must provision pinned callers/retry scheduling, supervisor v2 publication and explicit PublicationFailure handling, then run exact SIG-v1 full/socket/runtime/spare-port/rollback gates. Do not execute repair without independent semantic reconciliation and durable restart-safe mutation protocol. If no immediately executable authorized host recovery action exists after sync, begin queued Scanner v2 vertical slice by inspecting existing contract/scanner/card abstractions and recording integration points before coding.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -136,7 +136,7 @@
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
     "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending."
   },
-  "commit_status": "Validated preserved handoff; exact commit bridge request written. No direct staging/commit; supervisor retains ownership of handoff markers and origin sync.",
+  "commit_status": "Clean origin-synced b6f713a at cycle start; validated repair-planning unit submitted via exact COMMIT_REQUEST.json. No direct stage/commit. No handoff or origin-pending markers observed.",
   "experiment": {
     "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
@@ -246,6 +246,7 @@
     "open_recovery_findings": "New archived same-time conflicts are rejected before retention; caller preflight rejects legacy batch/archive conflicts before receiver callbacks. Historical receiver conflicts remain rejected after newer observations. Existing conflicting or damaged evidence stays preserved and fail-closed; host repair, backlog visibility and installed failure handling remain pending. Archive scan streams history but cost grows with history and pending batch size.",
     "handoff_validation_evidence": "/home/egx-agent/er1-autopilot/state/validation/delivery-handoff-64c6a93",
     "archive_timestamp_integrity": "Shared protected canonical archive validation under spool lease plus caller batch preflight. Temporary-file tests cover equivalent timestamps, restart, exact retries, later-event progress, newer receiver observations, kind separation, malformed/symlink/filename/unsafe-root rejection, and preserved legacy conflicts. No deletion, timestamp rewriting or host execution.",
-    "settlement_visibility": "Bounded protected receiver pending inventory with timestamp, count and bytes; UNAVAILABLE omits counters. SYSTEM projection excludes private text and journal-forged counters. Artificial tests only. Inventory does not validate envelopes or inspect caller/archive state; publication precedes archive movement. Host repair policy documented; executor and installation pending."
+    "settlement_visibility": "Bounded protected receiver pending inventory with timestamp, count and bytes; UNAVAILABLE omits counters. SYSTEM projection excludes private text and journal-forged counters. Artificial tests only. Inventory does not validate envelopes or inspect caller/archive state; publication precedes archive movement. Host repair policy documented; executor and installation pending.",
+    "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
   }
 }
