@@ -781,3 +781,42 @@ preflight does not kill unexplained jobs or clear writer latches.
 These are offline composition guarantees. Host provisioning, real cgroup and
 isolation enforcement, exact-release full/socket tests, workload measurements,
 spare-port acceptance and production adoption remain pending.
+
+## Protected host invocation boundary
+
+`delivery_entrypoint.HostEntrypoint` is an installed-supervisor API, not a
+privileged CLI. Protected bootstrap code supplies a configuration path, its
+SHA-256, the host owner (root by default), and a zero-argument composition factory.
+Neither a release request nor the writer may supply those inputs. The factory
+must construct the existing composed supervisor with its isolation preflight,
+launcher and pinned source transport. Host installation must protect the bootstrap,
+Python dependencies, factory and command scripts against writer/release mutation.
+The entrypoint does not establish those installation facts itself.
+
+The strict `delivery-host-v1` JSON contains `schema`, `state`, `repository`,
+`writer`, `bridge`, and boolean `live_money: false`. Each command contains only
+`argv` (an argument array beginning with a protected absolute executable) and
+`timeout` (finite positive seconds, at most 86400). State and repository must be
+disjoint canonical directories. State and configuration ancestors must have the
+configured owner and no group/world write permission or symlinks. The configuration
+reader uses a bounded regular-file read, no-follow open, file identity checks,
+duplicate-key rejection and an independently supplied digest. No shell or dynamic
+import path is selected by a request. Command script/dependency immutability is a
+host installation obligation; configuration hashing alone does not prove it.
+
+`invoke('startup')` reconciles recovery only; it does not declare readiness.
+`invoke('cycle')` recovers before running the configured writer then bridge under
+the existing leases and isolation preflight. `invoke('release', request)` recovers
+before handing the unchanged identity-only request to the gated runner. Every
+invocation rechecks the configuration digest, process identity and composition
+bindings. A restart does not clear writer latches or manufacture acceptance;
+unresolved recovery prevents admission. Existing supervisor/delivery locks reject
+concurrent work. This API adds no remote endpoint, setuid program, sudo path or
+sandbox privilege. Restricting service invocation and excluding uncoordinated
+writers remains a host enforcement requirement.
+
+Tests use protected-read fixtures with ancestor checks mocked for temporary
+paths and simulated supervisor methods. They establish parser, pinning, dispatch
+and failure-ordering behavior only. Actual installed bootstrap/factory policy,
+isolation attestation, delivery-evidence publication and exact-release host
+acceptance remain pending.
