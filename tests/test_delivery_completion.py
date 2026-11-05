@@ -546,3 +546,67 @@ def test_capacity_admission_cannot_ignore_unreadable_pending_bytes(setup, damage
             observed_at=(NOW - timedelta(seconds=1)).isoformat()))
     assert len(list(publisher.state.glob('completion-*.json'))) == 1
     assert not list(publisher.state.glob('observation-*.json'))
+
+
+def storage_usage(**changes):
+    from types import SimpleNamespace
+    return SimpleNamespace(**(dict(f_frsize=4096, f_bavail=1000000,
+                                  f_favail=1000000) | changes))
+
+
+@pytest.mark.parametrize('usage,reason', [
+    (storage_usage(f_bavail=0), 'byte headroom'),
+    (storage_usage(f_favail=0), 'inode headroom'),
+    (storage_usage(f_frsize=0), 'accounting unavailable'),
+    (storage_usage(f_bavail=-1), 'accounting unavailable'),
+    (storage_usage(f_favail=-1), 'accounting unavailable'),
+])
+def test_storage_rejection_preserves_queue_and_allows_settlement(setup, usage, reason):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    first = retain_completion(publisher, **event())
+    raw = first[0].read_bytes()
+    with patch('tools.delivery_observations.os.statvfs', return_value=usage):
+        with pytest.raises(DeliveryError, match=reason):
+            retain_completion(publisher, **event(event_id='disk-rejected',
+                observed_at=(NOW - timedelta(seconds=1)).isoformat()))
+        assert first[0].read_bytes() == raw
+        assert retain_completion(publisher, **event()) == first
+        assert len(list(publisher.state.glob('completion-*.json'))) == 1
+        recover_completions(publisher)
+        assert not first[0].exists()
+        assert retain_completion(publisher, **event())[0] == archived(publisher, first[0])
+    # Provisioning space restores admission without deleting any evidence.
+    assert retain_completion(publisher, **event(event_id='disk-rejected',
+        observed_at=(NOW - timedelta(seconds=1)).isoformat()))[0].exists()
+
+
+def test_storage_query_failure_cannot_retain_event(setup):
+    from tools.delivery_observations import retain_completion
+    with patch('tools.delivery_observations.os.statvfs', side_effect=OSError('unavailable')):
+        with pytest.raises(OSError):
+            retain_completion(setup[0], **event())
+    assert not list(setup[0].state.glob('completion-*.json'))
+
+
+@pytest.mark.parametrize('block_size', [1, 4096, 65536])
+def test_storage_budget_includes_pending_batch_and_block_rounding(setup, block_size):
+    from tools.delivery_observations import retain_completion, MIN_FREE_BYTES, MIN_FREE_INODES
+    publisher = setup[0]
+    path, _ = retain_completion(publisher, **event())
+    second = event(event_id='disk-second', observed_at=(NOW - timedelta(seconds=1)).isoformat())
+    raw = (json.dumps(dict(schema='delivery-completion-v1', **second),
+                      sort_keys=True, indent=2) + '\n').encode()
+    required = MIN_FREE_BYTES + 3 * (len(path.read_bytes()) + len(raw)) + max(16384, 4 * block_size) * 2
+    blocks = (required + block_size - 1) // block_size
+    usage = storage_usage(f_frsize=block_size, f_bavail=blocks - 1,
+                          f_favail=MIN_FREE_INODES + 4)
+    with patch('tools.delivery_observations.os.statvfs', return_value=usage):
+        with pytest.raises(DeliveryError, match='byte headroom'):
+            retain_completion(publisher, **second)
+        usage.f_bavail += 1
+        usage.f_favail -= 1
+        with pytest.raises(DeliveryError, match='inode headroom'):
+            retain_completion(publisher, **second)
+        usage.f_favail += 1
+        assert retain_completion(publisher, **second)[0].read_bytes() == raw

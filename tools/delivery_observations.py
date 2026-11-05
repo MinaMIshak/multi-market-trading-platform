@@ -30,6 +30,27 @@ ARCHIVE = 'completion-archive'
 SPOOL_WAIT = 30.0
 MAX_PENDING_EVENTS = 128
 MAX_PENDING_BYTES = 8 * 1024 * 1024
+# Pinned code policy: leave recovery headroom as permanent evidence accumulates.
+MIN_FREE_BYTES = 64 * 1024 * 1024
+MIN_FREE_INODES = 256
+
+
+def _disk_admission(state, pending_bytes, pending_count):
+    """Advisory free-space gate, not a filesystem reservation or quota guarantee.
+
+    Budget the envelope plus hex receipt, block rounding and atomic replacements
+    for the whole pending batch. Existing retries and settlement bypass this gate.
+    Unknown inode accounting fails closed; host provisioning must support it.
+    """
+    usage = os.statvfs(state)
+    require(usage.f_frsize > 0 and usage.f_bavail >= 0 and usage.f_favail >= 0,
+            'completion storage accounting unavailable')
+    overhead = max(16384, 4 * usage.f_frsize) * pending_count
+    require(usage.f_bavail * usage.f_frsize >=
+            MIN_FREE_BYTES + 3 * pending_bytes + overhead,
+            'completion storage byte headroom exhausted')
+    require(usage.f_favail >= MIN_FREE_INODES + 2 * pending_count,
+            'completion storage inode headroom exhausted')
 
 
 @contextmanager
@@ -86,6 +107,7 @@ def _admit_completion(publication, size):
         total += len(protected_bytes(path, publication.owner))
         require(total <= MAX_PENDING_BYTES, 'completion retention capacity exceeded')
     require(total <= MAX_PENDING_BYTES, 'completion retention capacity exceeded')
+    _disk_admission(publication.state, total, len(paths) + 1)
 
 
 def _existing_observations(publication):

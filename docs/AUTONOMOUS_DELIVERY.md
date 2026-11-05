@@ -1152,8 +1152,30 @@ Unreadable, unsafe or oversized pending files fail admission closed instead of
 being counted as empty. Malformed but readable siblings still count toward capacity;
 recovery remains responsible for semantic validation. External files can still
 exceed the queue bounds and require explicit host reconciliation. No evidence is
-pruned. These limits cover pending envelope bytes only, not permanent receipts,
-archives, filesystem overhead or free disk space. Host archive retention and disk
+pruned. The queue limits cover pending envelope bytes only. The storage headroom
+gate below additionally checks filesystem capacity; host archive retention and disk
 capacity provisioning remain required before adoption. Temporary-file tests exercise
 count and exact-byte boundaries, concurrent admission, retry and resumed settlement;
 they provide no deployed-host evidence.
+
+### Completion storage headroom
+
+New retention also checks `statvfs` under the spool lock before writing an envelope.
+The pinned code policy requires at least 64 MiB plus three times the complete
+proposed pending batch's serialized bytes, plus the larger of 16 KiB or four
+filesystem allocation units per event. Available inodes must cover 256 plus two
+per pending event. This budgets envelopes, hex-expanded receipts, block rounding
+and atomic replacement headroom while permanent receipts and archives accumulate.
+It uses caller-available blocks/inodes, not privileged reserved filesystem space.
+Missing accounting, exhausted headroom and filesystem errors reject new admission;
+the caller must durably retain and retry the original event identity and timestamp.
+
+Identical retained/archived retries and settlement bypass this admission gate so a
+low-space condition does not itself prevent recovery. No evidence is deleted.
+This is a conservative admission estimate, **not reserved space**: other processes,
+quotas, separate publication filesystems and metadata overhead can still cause
+writes to fail. The host must provision and monitor protected state/archive and
+publication storage, retain rejected producer events, and handle write failures.
+No automatic pruning, host installation or production capacity claim is implied.
+Tests inject byte/inode exhaustion, accounting failure, batch and block boundaries,
+and recovery followed by restored admission on temporary filesystems.
