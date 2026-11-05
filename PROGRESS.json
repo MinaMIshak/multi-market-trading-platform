@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_JOB_ADMISSION",
-  "current_capability": "Implemented pre-exec cgroup admission bootstrap and mandatory supervisor writer/bridge launcher binding with cleanup uncertainty latches. Artificial-control subprocess integration passed; real host containment and release-component launch wiring remain pending.",
-  "starting_head": "8e414cb080d09491300101c6b60401debf3502d3",
-  "head": "8e414cb080d09491300101c6b60401debf3502d3",
+  "phase": "AUTONOMOUS_DELIVERY_RELEASE_JOB_BINDING",
+  "current_capability": "Release environment preparation, exact-release tests, runtime measurement and candidate startup require explicit host launcher bindings with separate job keys. Missing bindings fail closed and uncertain admission/cleanup preserves active receipts. Host provisioning and exact-release acceptance remain pending.",
+  "starting_head": "f6ba28fb317558570ec544480c7b8f5c508b35e3",
+  "head": "f6ba28fb317558570ec544480c7b8f5c508b35e3",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Focused jobs/bindings/process/supervisor/runner/production/containment suite: 242 passed in 9.06s. Final admission guard focused rerun: 34 passed in 1.49s. Artificial cgroup controls and disposable subprocesses only; no kernel cgroup or deployment evidence. git diff --check passed.",
+  "tests": "Affected environment/preparation/tests/runtime/candidate/jobs/host/supervisor/runner/production/bindings/process suite: 361 passed in 136.44s. Includes eight new missing-launcher and uncertain-admission/cleanup regressions. Disposable environments, simulated HTTP/measurements and artificial cgroup controls only; no exact-release host/socket/deployment evidence. git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Bind environment preparation, exact-release tests, runtime measurement and candidate server invocations to JobLauncher, preserving their durable active receipts on uncertain admission/cleanup. Then provision protected host isolation/supervisor/public probes and run isolated SIG-v1 exact-release full/socket/runtime/spare-port gates.",
+  "next_action": "Build protected host composition/preflight that binds the same disjoint JobContainment policy to supervisor, all four release components and aggregate temporary cleanup; validate recovery when any stage has uncertain admission or descendants. Then provision authorized host isolation/public probes and run SIG-v1 exact-release full/socket/runtime/spare-port gates before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "JOB_ADMISSION_AND_SUPERVISOR_BINDING_TESTED_HOST_PROVISIONING_PENDING",
+    "status": "RELEASE_JOB_BINDINGS_IMPLEMENTED_HOST_ACCEPTANCE_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -228,6 +228,6 @@
     "service_containment": "ServiceContainment validates protected ownership/runtime pin, every dedicated leaf-cgroup member, UID/GID/groups, zero capabilities, no-new-privileges, seccomp mode, mount namespace separation, exact restricted writable mounts and process-visible protected identities. PID/membership drift rejected. Artificial fixtures only; host policy must enforce filter contents, descriptors/network/devices and immutable dependencies. Inactive result is preflight only.",
     "production_composition": "ProductionServices connects ReleaseService/ServiceContainment, ReleaseSchedule, public production probe and separate temporary cleanup callbacks. Router uses read-only running-service observer; public probe is independently gated and followed by service revalidation. Temporary-file cutover/adoption/restart rollback and simulated failures tested. Host configuration, listener/authentication, real probes and containment installation pending.",
     "temporary_cleanup": "JobContainment validates disjoint protected cgroup leaves, rejects supervisor self-targeting, writes cgroup.kill and requires empty membership plus populated=0 with bounded timeout and identity checks. CleanupError preserves uncertainty. Artificial filesystem and ProductionServices composition tests passed; no actual cgroup installation/kill verified.",
-    "job_launch": "JobLauncher uses protected resolved Python isolated bootstrap to write self to an opened cgroup.procs before target exec and closes admission descriptor. Busy/unsafe groups reject launch; cleanup/replacement uncertainty raises CleanupError. Actual subprocesses with artificial controls tested; no kernel admission/kill evidence. Release component command injection still pending."
+    "job_launch": "All release component commands now require explicit launcher bindings: environment, tests, runtime and candidate. PreparedRelease passes its launcher to environment creation; candidate forwards its spare listener FD. No process-group-only fallback. Incomplete receipts and partial environments remain on uncertain admission/cleanup. Simulated component tests and artificial-control JobLauncher tests only; kernel containment and production host wiring remain unverified."
   }
 }

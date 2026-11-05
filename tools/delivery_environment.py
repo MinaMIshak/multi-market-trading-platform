@@ -11,7 +11,7 @@ import re
 import shutil
 
 from tools import delivery_bundle, preview_release
-from tools.delivery_process import CleanupError, run_owned
+from tools.delivery_process import CleanupError
 from tools.delivery_runner import require
 
 MANIFEST = 'ENVIRONMENT.json'
@@ -68,12 +68,13 @@ Path(sys.argv[1]).write_text(json.dumps(dict(zip(names, [d.version for d in rows
 
 
 def prepare(bundle, repository, root, wheelhouse, *, sha, baseline,
-            approved_changes, policy, timeout=600):
+            approved_changes, policy, timeout=600, launcher=None):
     """Create once at final path (venv launchers are not relocatable).
 
     The manifest is the last completion marker. A crash leaves a rejected partial
     directory, never a reusable environment. No package index or source builds.
     """
+    require(launcher is not None, 'protected environment launcher required')
     source = delivery_bundle.verify(bundle, repository, sha=sha, baseline=baseline,
                                     approved_changes=approved_changes)
     python = _policy(policy)
@@ -100,7 +101,7 @@ def prepare(bundle, repository, root, wheelhouse, *, sha, baseline,
                'LIVE_MONEY': 'false', 'PIP_CONFIG_FILE': os.devnull,
                'PYTHONDONTWRITEBYTECODE': '1'}
         def run(args):
-            run_owned([str(x) for x in args], cwd=target, timeout=timeout, env=env)
+            launcher.run('environment', [str(x) for x in args], cwd=target, timeout=timeout, env=env)
         venv = target / 'venv'
         run([python, '-I', '-m', 'venv', '--copies', venv])
         # CPython creates this internal convenience symlink even with --copies.

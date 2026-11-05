@@ -1,5 +1,6 @@
 """Simulated host metrics only; no nightly or socket acceptance claims."""
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -21,14 +22,17 @@ def measurement(validator, tmp_path, monkeypatch):
     policy = {'script': 'app/ui/system.py', 'args': [],
               'inputs': {str(pin): runtime.environment.digest(pin)},
               'max_seconds': 10, 'max_rss_kib': 10000}
+    def launch(key, argv, **kwargs):
+        assert key == 'runtime'
+        return runtime.run_owned(argv, **kwargs)
     runner = runtime.ReleaseRuntime(tests, outputs, receipts, timer=pin,
                                    timer_sha256=runtime.environment.digest(pin),
-                                   workloads={'EGX': policy, 'US': policy})
+                                   workloads={'EGX': policy, 'US': policy}, launcher=SimpleNamespace(run=launch))
     calls = []
     def run(argv, **kw):
         calls.append((argv, kw))
         Path(argv[argv.index('-o') + 1]).write_text('1.25 1000 0\n')
-    monkeypatch.setattr(runtime, 'run_owned', run)
+    monkeypatch.setattr(runtime, 'run_owned', run, raising=False)
     return runner, sha, calls, pin
 
 
@@ -65,7 +69,7 @@ def test_failure_retains_measurement_latch(measurement, monkeypatch, fault):
         if fault in ('report', 'rss', 'wall', 'nan', 'exit'):
             path.write_text({'report': 'bad', 'rss': '1 10001 0', 'wall': '11 1 0',
                              'nan': 'nan 1 0', 'exit': '1 1 2'}[fault])
-    monkeypatch.setattr(runtime, 'run_owned', run)
+    monkeypatch.setattr(runtime, 'run_owned', run, raising=False)
     write = runtime.atomic_json
     def publish(path, value):
         if fault == 'publish' and value['status'] == 'MEASURED': raise OSError('disk failure')
@@ -121,3 +125,20 @@ def test_incomplete_tests_block_runtime_before_marker(measurement):
     with pytest.raises(DeliveryError):
         runner.validate(sha)
     assert calls == [] and not list(runner.receipts.iterdir())
+
+
+@pytest.mark.parametrize('uncertain', [False, True])
+def test_launcher_failure_cannot_publish_measurement(measurement, uncertain):
+    from tools.delivery_process import CleanupError
+    runner, sha, calls, _ = measurement
+    def reject(*args, **kwargs):
+        raise CleanupError('cleanup uncertain')
+    runner.launcher = SimpleNamespace(run=reject) if uncertain else None
+    with pytest.raises(CleanupError if uncertain else DeliveryError):
+        runner.validate(sha)
+    assert not calls
+    receipt = runner.receipts / (sha + '.json')
+    if uncertain:
+        assert json.loads(receipt.read_text())['status'] == 'MEASURING'
+    else:
+        assert not receipt.exists()

@@ -12,7 +12,6 @@ import os
 from pathlib import Path
 
 from tools import delivery_environment as environment, preview_release
-from tools.delivery_process import run_owned
 from tools.delivery_runner import atomic_json, require
 
 LAUNCH = '''import runpy, sys
@@ -28,7 +27,8 @@ def digest(value):
 
 
 class ReleaseRuntime:
-    def __init__(self, tests, outputs, receipts, *, timer, timer_sha256, workloads):
+    def __init__(self, tests, outputs, receipts, *, timer, timer_sha256, workloads, launcher=None):
+        self.launcher = launcher
         self.tests, self.outputs, self.receipts = tests, outputs, receipts
         self.timer, self.timer_sha256 = timer, timer_sha256
         self.workloads = copy.deepcopy(workloads)
@@ -87,6 +87,7 @@ class ReleaseRuntime:
                 'measurement_sha256': environment.digest(path)}
 
     def validate(self, sha):
+        require(self.launcher is not None, 'protected runtime launcher required')
         identity = self._identity(sha)
         receipt, output = self.receipts / (sha + '.json'), self.outputs / sha
         require(not os.path.lexists(receipt) and not os.path.lexists(output),
@@ -109,7 +110,7 @@ class ReleaseRuntime:
                    'TMPDIR': str(target), 'LANG': 'C.UTF-8', 'LIVE_MONEY': 'false',
                    'PYTHONDONTWRITEBYTECODE': '1'}
             try:
-                run_owned(argv, cwd=target, timeout=policy['max_seconds'], env=env)
+                self.launcher.run('runtime', argv, cwd=target, timeout=policy['max_seconds'], env=env)
             finally:
                 require(self._identity(sha) == identity, 'runtime evidence changed during measurement')
             results[market] = self._metrics(metrics, policy)

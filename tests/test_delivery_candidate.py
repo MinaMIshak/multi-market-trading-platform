@@ -22,10 +22,13 @@ def gate(measurement, tmp_path, monkeypatch):
     receipts.mkdir()
     routes = {name: {'route': '/' + name, 'checks': [{'path': ['status'], 'value': 'ok'}]}
               for name in ('http', 'api', 'runtime_compatible', 'sig_v1')}
+    def launch(key, argv, **kwargs):
+        assert key == 'candidate'
+        return candidate.owned_process(argv, **kwargs)
     runner = candidate.ReleaseCandidate(runtime, outputs, receipts, factory=pin,
         factory_sha256=candidate.environment.digest(pin),
         inputs={'snapshot.json': {'path': str(pin), 'sha256': candidate.environment.digest(pin)}},
-        routes=routes)
+        routes=routes, launcher=SimpleNamespace(process=launch))
     events = []
     class Listener:
         def __enter__(self): return self
@@ -44,7 +47,7 @@ def gate(measurement, tmp_path, monkeypatch):
             yield SimpleNamespace(poll=lambda: None)
         finally:
             events.append('cleanup')
-    monkeypatch.setattr(candidate, 'owned_process', owned)
+    monkeypatch.setattr(candidate, 'owned_process', owned, raising=False)
     def probe(port, commit, routes, **kwargs):
         assert port == 43210 and commit == sha
         events.append('probe')
@@ -188,3 +191,22 @@ def test_http_trickling_response_cannot_extend_total_deadline(monkeypatch):
     with pytest.raises(DeliveryError, match='deadline exceeded'):
         candidate.probe(43210, 'a' * 40,
             {'http': {'route': '/health', 'checks': []}}, deadline=2)
+
+
+@pytest.mark.parametrize('uncertain', [False, True])
+def test_launcher_failure_cannot_accept_candidate(gate, uncertain):
+    from tools.delivery_process import CleanupError
+    runner, sha, events, _ = gate
+    @contextmanager
+    def reject(*args, **kwargs):
+        raise CleanupError('admission uncertain')
+        yield
+    runner.launcher = SimpleNamespace(process=reject) if uncertain else None
+    with pytest.raises(CleanupError if uncertain else DeliveryError):
+        runner.validate(sha)
+    assert 'probe' not in events
+    receipt = runner.receipts / (sha + '.json')
+    if uncertain:
+        assert json.loads(receipt.read_text())['status'] == 'CHECKING'
+    else:
+        assert not receipt.exists()

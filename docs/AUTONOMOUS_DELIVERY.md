@@ -734,7 +734,20 @@ The launcher is admission/cleanup plumbing, not containment installation. Host
 wiring must deny migration/delegation, exclude other admissions during the lease,
 verify filesystem/privilege isolation, pin the interpreter and its stdlib/OS, and
 enforce supervisor-death cleanup. Release environment/test/runtime/candidate
-components still require binding their command invocations to this launcher.
+components now require explicit `launcher=` bindings for execution. Host wiring
+passes the protected JobLauncher to PreparedRelease, ReleaseTests, ReleaseRuntime
+and ReleaseCandidate, with disjoint `environment`, `tests`, `runtime`, and
+`candidate` leaf policies (also disjoint from `writer` and `bridge`). Environment
+commands and both sequential market workloads finish cgroup cleanup before the
+next command starts. Candidate startup forwards only its spare listener descriptor.
+There is no fallback to process-group-only execution. Read-only receipt verification
+does not require a launcher and does not establish current containment.
+
+PREPARING, TESTING, MEASURING and CHECKING receipts survive uncertain admission
+or cleanup; no completion receipt is published. Partial environments are retained
+on CleanupError so a possibly live child cannot race deletion. These bindings
+remain host-owned Python dependencies, never release-request parameters.
+Host provisioning and kernel-level admission/cleanup acceptance remain pending.
 Tests use artificial cgroup files, actual disposable subprocesses, and simulated
 population cleanup. They prove bootstrap ordering and latch behavior, not kernel
 cgroup placement, detached-child kill behavior, sockets or deployment acceptance.

@@ -12,7 +12,6 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from tools import delivery_environment as environment, preview_release
-from tools.delivery_process import run_owned
 from tools.delivery_runner import SOCKET_TESTS, atomic_json, require
 
 LAUNCH = '''import sys
@@ -50,7 +49,8 @@ def report(path):
 
 
 class ReleaseTests:
-    def __init__(self, prepared, outputs, receipts, *, runtime_files):
+    def __init__(self, prepared, outputs, receipts, *, runtime_files, launcher=None):
+        self.launcher = launcher
         self.prepared = prepared
         self.outputs = outputs
         self.receipts = receipts
@@ -106,6 +106,7 @@ class ReleaseTests:
         return value
 
     def validate(self, sha, *, timeout=1800):
+        require(self.launcher is not None, 'protected tests launcher required')
         interpreter = self.prepared.verify(sha)
         runtime = self._runtime()
         receipt = self.receipts / (sha + '.json')
@@ -128,7 +129,7 @@ class ReleaseTests:
                'LIVE_MONEY': 'false', 'PYTHONDONTWRITEBYTECODE': '1'}
         # On any error/interruption retain TESTING. Never adopt interrupted evidence.
         try:
-            run_owned(argv, cwd=source, timeout=timeout, env=env)
+            self.launcher.run('tests', argv, cwd=source, timeout=timeout, env=env)
         finally:
             self.prepared.verify(sha)
             require(self._runtime() == runtime, 'host runtime changed')

@@ -16,7 +16,6 @@ import time
 from urllib.request import build_opener, ProxyHandler
 
 from tools import delivery_environment as environment, preview_release
-from tools.delivery_process import owned_process
 from tools.delivery_runtime import digest
 from tools.delivery_runner import atomic_json, require, acceptance
 from tools.experimental_runtime import NoRedirect
@@ -71,7 +70,8 @@ def probe(port, sha, routes, *, deadline=None):
 
 class ReleaseCandidate:
     def __init__(self, runtime, outputs, receipts, *, factory, factory_sha256, inputs,
-                 routes, timeout=30):
+                 routes, timeout=30, launcher=None):
+        self.launcher = launcher
         self.runtime, self.outputs, self.receipts = runtime, outputs, receipts
         self.factory, self.factory_sha256 = factory, factory_sha256
         self.inputs, self.routes = copy.deepcopy(inputs), copy.deepcopy(routes)
@@ -123,6 +123,7 @@ class ReleaseCandidate:
                     self.runtime.receipts / (sha + '.json'))}
 
     def validate(self, sha):
+        require(self.launcher is not None, 'protected candidate launcher required')
         identity = self._identity(sha)
         receipt, output = self.receipts / (sha + '.json'), self.outputs / sha
         require(not os.path.lexists(receipt) and not os.path.lexists(output),
@@ -152,7 +153,7 @@ class ReleaseCandidate:
             listener.listen(128)
             argv = [str(interpreter), '-I', '-B', '-c', BOOT, str(source), str(self.factory),
                     str(state), sha, str(listener.fileno())]
-            with owned_process(argv, cwd=output, env=env, pass_fds=(listener.fileno(),)) as process:
+            with self.launcher.process('candidate', argv, cwd=output, env=env, pass_fds=(listener.fileno(),)) as process:
                 deadline = time.monotonic() + self.timeout
                 while True:
                     require(process.poll() is None, 'candidate exited before acceptance')

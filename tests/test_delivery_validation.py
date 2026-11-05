@@ -1,5 +1,6 @@
 """Validation contract with simulated host execution, never socket acceptance."""
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -25,13 +26,16 @@ def validator(host, tmp_path, monkeypatch):
     receipts.mkdir()
     runtime = tmp_path / 'runtime-pin'
     runtime.write_text('immutable host runtime fixture')
+    def launch(key, argv, **kwargs):
+        assert key == 'tests'
+        return validation.run_owned(argv, **kwargs)
     runner = validation.ReleaseTests(adapter, output, receipts,
-                                    runtime_files={str(runtime): validation.environment.digest(runtime)})
+                                    runtime_files={str(runtime): validation.environment.digest(runtime)}, launcher=SimpleNamespace(run=launch))
     calls = []
     def run(argv, **kw):
         calls.append((argv, kw))
         Path(next(a.split('=', 1)[1] for a in argv if a.startswith('--junitxml='))).write_text(xml())
-    monkeypatch.setattr(validation, 'run_owned', run)
+    monkeypatch.setattr(validation, 'run_owned', run, raising=False)
     return runner, sha, calls, runtime
 
 
@@ -89,7 +93,7 @@ def test_failure_retains_blocking_receipt(validator, monkeypatch, fault):
             root.chmod(0o755)
             (root / 'unexpected').write_text('mutation')
         if fault == 'report': (runner.outputs / sha / 'tests.xml').unlink()
-    monkeypatch.setattr(validation, 'run_owned', run)
+    monkeypatch.setattr(validation, 'run_owned', run, raising=False)
     original_write = validation.atomic_json
     def write(path, value):
         if fault == 'publish' and value['status'] == 'TESTED': raise OSError('disk failure')
@@ -125,3 +129,24 @@ def test_reopen_test_evidence(validator, fault):
         path.write_text(json.dumps(result))
     with pytest.raises((DeliveryError, ValueError)):
         runner.verify(sha)
+
+
+def test_missing_launcher_cannot_start_tests(validator):
+    runner, sha, calls, _ = validator
+    runner.launcher = None
+    with pytest.raises(DeliveryError, match='launcher required'):
+        runner.validate(sha)
+    assert not calls
+    assert not (runner.receipts / (sha + '.json')).exists()
+
+
+def test_uncertain_admission_retains_testing(validator):
+    from tools.delivery_process import CleanupError
+    runner, sha, calls, _ = validator
+    def reject(*args, **kwargs):
+        raise CleanupError('admission uncertain')
+    runner.launcher = SimpleNamespace(run=reject)
+    with pytest.raises(CleanupError):
+        runner.validate(sha)
+    assert not calls
+    assert json.loads((runner.receipts / (sha + '.json')).read_text())['status'] == 'TESTING'

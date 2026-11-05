@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -39,14 +40,17 @@ def prepared(tmp_path, monkeypatch):
             (venv / 'lib64').symlink_to('lib')
         if env.INVENTORY in argv:
             Path(argv[-1]).write_text(json.dumps(policy['inventory']))
-    monkeypatch.setattr(env, 'run_owned', run)
+    monkeypatch.setattr(env, 'run_owned', run, raising=False)
     args = (bundle, repo, environments, wheels)
-    kw = dict(sha=sha, baseline=baseline, approved_changes=changes, policy=policy)
+    def launch(key, argv, **kwargs):
+        assert key == 'environment'
+        return env.run_owned(argv, **kwargs)
+    kw = dict(launcher=SimpleNamespace(run=launch), sha=sha, baseline=baseline, approved_changes=changes, policy=policy)
     return args, kw, calls
 
 
 def verify(out, args, kw, digest=None):
-    return env.verify(out, args[0], args[1], **kw,
+    return env.verify(out, args[0], args[1], **{k: v for k, v in kw.items() if k != 'launcher'},
                       expected_manifest_sha256=digest or env.digest(out / env.MANIFEST))
 
 
@@ -195,3 +199,12 @@ def test_real_offline_disposable_environment(prepared, monkeypatch):
     run_owned([str(python), '-I', '-B', '-c', 'import example; assert example.VALUE == 1'],
               cwd=out, timeout=5, env={'LIVE_MONEY': 'false'})
     verify(out, args, kw)
+
+
+def test_missing_launcher_creates_no_environment(prepared):
+    args, kw, calls = prepared
+    kw['launcher'] = None
+    with pytest.raises(DeliveryError, match='launcher required'):
+        env.prepare(*args, **kw)
+    assert not calls
+    assert not (args[2] / kw['sha']).exists()

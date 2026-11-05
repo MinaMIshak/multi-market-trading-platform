@@ -20,7 +20,7 @@ def host(prepared, tmp_path):
     adapter = preparation.PreparedRelease(args[1], args[0].parent, args[2], args[3],
                                          receipts, baseline=kw['baseline'],
                                          approved_changes=kw['approved_changes'],
-                                         policy=kw['policy'])
+                                         policy=kw['policy'], launcher=kw['launcher'])
     return adapter, kw['sha'], calls
 
 
@@ -139,3 +139,16 @@ def test_unsafe_identity_rejected_before_writes(host):
     with pytest.raises(DeliveryError, match='full commit'):
         adapter.prepare('../escape')
     assert not calls and not list(adapter.receipts.iterdir())
+
+
+def test_uncertain_launcher_preserves_preparation(host):
+    from types import SimpleNamespace
+    adapter, sha, calls = host
+    def reject(*args, **kwargs):
+        raise CleanupError('admission uncertain')
+    adapter.launcher = SimpleNamespace(run=reject)
+    with pytest.raises(CleanupError):
+        adapter.prepare(sha)
+    assert not calls
+    assert (adapter.environments / sha).is_dir()
+    assert json.loads((adapter.receipts / (sha + '.json')).read_text())['status'] == 'PREPARING'

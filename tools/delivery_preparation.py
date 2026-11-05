@@ -18,7 +18,8 @@ SCHEMA = 'delivery-preparation-v1'
 
 class PreparedRelease:
     def __init__(self, repository, bundles, environments, wheelhouse, receipts, *,
-                 baseline, approved_changes, policy):
+                 baseline, approved_changes, policy, launcher=None):
+        self.launcher = launcher
         self.repository = repository
         self.bundles = bundles
         self.environments = environments
@@ -60,7 +61,8 @@ class PreparedRelease:
                                 baseline=self.baseline, approved_changes=self.changes)
         target = environment.prepare(source, self.repository, self.environments,
                                      self.wheelhouse, sha=sha, baseline=self.baseline,
-                                     approved_changes=self.changes, policy=self.policy)
+                                     approved_changes=self.changes, policy=self.policy,
+                                     launcher=self.launcher)
         digest = environment.digest(target / environment.MANIFEST)
         environment.verify(target, source, self.repository, sha=sha,
                            baseline=self.baseline, approved_changes=self.changes,
