@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_PROTECTED_INVOCATION",
-  "current_capability": "Protected host invocation API validates pinned bounded configuration, host identity, fixed writer/bridge commands and stable supervisor bindings; every invocation reconciles restart state before admission. Offline regression gates pass. Installed bootstrap, isolation and exact-release acceptance remain pending.",
-  "starting_head": "2bf95104bae9280b88c30f4ffc5dac001856888b",
-  "head": "2bf95104bae9280b88c30f4ffc5dac001856888b",
+  "phase": "AUTONOMOUS_DELIVERY_WRITER_RESTART_RECOVERY",
+  "current_capability": "Protected host composition can reconcile an interrupted writer/bridge under both leases, verify whole-cgroup cleanup and marker integrity, and durably clear the latch before release recovery or new admission. Offline regression gates pass; installed host containment and SIG-v1 acceptance remain pending.",
+  "starting_head": "7958172adec38df825853d054aa48beb1ee5a4bf",
+  "head": "7958172adec38df825853d054aa48beb1ee5a4bf",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected entrypoint/composition/supervisor/host/runner/production/jobs/bindings suite: 286 passed in 10.10s, including 38 new entrypoint regressions. Temporary files and simulated supervisor/containment only; no host/socket/deployment evidence. git diff --check passed.",
+  "tests": "Affected composition/entrypoint/supervisor/runner/host/production/jobs/bindings suite: 296 passed in 10.04s. Temporary filesystem and mocked containment evidence only; no socket or installed-host acceptance. git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Implement protected installed bootstrap/factory policy binding and delivery-evidence publication using the host invocation API; validate supervisor service restart/death enforcement. Then provision authorized host isolation/public probes and execute SIG-v1 exact-release full/socket/runtime/spare-port gates before cutover.",
+  "next_action": "Implement protected installed bootstrap/factory policy binding and delivery-evidence publication; provision authorized host isolation and verify actual supervisor death/restart cleanup. Then run SIG-v1 exact-release full/socket/runtime/spare-port gates before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -136,7 +136,7 @@
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
     "delivery": "Installed protected bootstrap/factory policy, supervisor-only service invocation, isolation provisioning, delivery-evidence publication, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending. Protected invocation API implemented and offline-tested."
   },
-  "commit_status": "COMMIT_BRIDGE_REQUESTED",
+  "commit_status": "Commit bridge requested; no direct staging or commit.",
   "experiment": {
     "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
@@ -229,6 +229,7 @@
     "production_composition": "ProductionServices connects ReleaseService/ServiceContainment, ReleaseSchedule, public production probe and separate temporary cleanup callbacks. Router uses read-only running-service observer; public probe is independently gated and followed by service revalidation. Temporary-file cutover/adoption/restart rollback and simulated failures tested. Host configuration, listener/authentication, real probes and containment installation pending.",
     "temporary_cleanup": "JobContainment validates disjoint protected cgroup leaves, rejects supervisor self-targeting, writes cgroup.kill and requires empty membership plus populated=0 with bounded timeout and identity checks. CleanupError preserves uncertainty. Artificial filesystem and ProductionServices composition tests passed; no actual cgroup installation/kill verified.",
     "job_launch": "All release component commands now require explicit launcher bindings: environment, tests, runtime and candidate. PreparedRelease passes its launcher to environment creation; candidate forwards its spare listener FD. No process-group-only fallback. Incomplete receipts and partial environments remain on uncertain admission/cleanup. Simulated component tests and artificial-control JobLauncher tests only; kernel containment and production host wiring remain unverified.",
-    "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations."
+    "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
+    "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified."
   }
 }

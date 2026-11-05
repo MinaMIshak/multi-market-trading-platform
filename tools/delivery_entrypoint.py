@@ -92,7 +92,7 @@ class HostEntrypoint:
                 'host source binding mismatch')
         self.supervisor = supervisor
         self._bindings = (supervisor, supervisor.source, supervisor.host,
-                          supervisor.launcher, supervisor.preflight)
+                          supervisor.launcher, supervisor.preflight, supervisor.reconcile_writer)
 
     def _check(self):
         require(os.getuid() == self.owner and os.geteuid() == self.owner
@@ -102,7 +102,8 @@ class HostEntrypoint:
         _protected(self.state, self.owner)
         require(all(current is pinned for current, pinned in zip(
                     (self.supervisor, self.supervisor.source, self.supervisor.host,
-                     self.supervisor.launcher, self.supervisor.preflight), self._bindings)),
+                     self.supervisor.launcher, self.supervisor.preflight,
+                     self.supervisor.reconcile_writer), self._bindings)),
                 'host composition changed')
         require(self.supervisor.state == self.state
                 and Path(self.supervisor.source.repository) == self.repository,

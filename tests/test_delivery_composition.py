@@ -123,7 +123,7 @@ def test_writer_latch_remains_when_recovery_uncertain(composition):
     marker = supervisor.state / 'writer-active.json'
     marker.write_text('{}')
     with patch.object(supervisor, 'preflight') as preflight:
-        with pytest.raises(DeliveryError, match='reconciliation'):
+        with pytest.raises(DeliveryError):
             supervisor.release({})
         preflight.assert_not_called()
     assert marker.exists()
@@ -148,3 +148,62 @@ def test_supervisor_launcher_drift_rejected(composition):
         with pytest.raises(DeliveryError, match='composition changed'):
             with supervisor.writer_session():
                 pytest.fail('writer admitted')
+
+
+@pytest.mark.parametrize('failure', [None, 'writer', 'bridge', 'busy', 'isolation', 'marker'])
+def test_restart_writer_reconciliation(composition, jobs, failure):
+    supervisor, _, _ = composition
+    marker = supervisor.state / 'writer-active.json'
+    marker.write_text('{"schema": "writer-active-v1"}')
+    marker.chmod(0o600)
+    if failure == 'isolation':
+        jobs.isolation = lambda: False
+    if failure == 'marker':
+        marker.write_text('{}')
+    def cleanup(key):
+        # Reconciliation holds both leases even while killing descendants.
+        from tools.delivery_runner import delivery_lock
+        from tools.delivery_supervisor import supervisor_lock
+        for lock in (delivery_lock, supervisor_lock):
+            with pytest.raises(DeliveryError, match='concurrent'):
+                with lock(supervisor.state):
+                    pytest.fail('recovery lease missing')
+        if key == failure:
+            raise CleanupError('uncertain cleanup')
+    with patch('tools.delivery_composition._protected'), \
+            patch('tools.delivery_entrypoint._protected'), \
+            patch.object(jobs.containment, 'cleanup', side_effect=cleanup) as clean, \
+            patch.object(jobs.containment, 'quiescent', return_value=failure != 'busy'):
+        if failure:
+            with pytest.raises((DeliveryError, CleanupError)):
+                supervisor.startup()
+            assert marker.exists()
+        else:
+            supervisor.startup()
+            assert not marker.exists()
+            supervisor.startup()  # restart is idempotent
+        assert [c.args[0] for c in clean.call_args_list] == (
+            [] if failure in ('isolation', 'marker') else ['writer', 'bridge'])
+
+
+@pytest.mark.parametrize('kind', ['symlink', 'writable', 'drift'])
+def test_restart_marker_uncertainty_retains_latch(composition, jobs, kind):
+    supervisor, _, _ = composition
+    marker = supervisor.state / 'writer-active.json'
+    marker.write_text('{"schema": "writer-active-v1"}')
+    marker.chmod(0o600)
+    if kind == 'symlink':
+        marker.unlink()
+        marker.symlink_to(supervisor.state / 'missing')
+    elif kind == 'writable':
+        marker.chmod(0o666)
+    def cleanup(key):
+        if kind == 'drift':
+            marker.write_text('{}')
+    with patch('tools.delivery_composition._protected'), \
+            patch('tools.delivery_entrypoint._protected'), \
+            patch.object(jobs.containment, 'cleanup', side_effect=cleanup), \
+            patch.object(jobs.containment, 'quiescent', return_value=True):
+        with pytest.raises((DeliveryError, OSError)):
+            supervisor.startup()
+    assert os.path.lexists(marker)

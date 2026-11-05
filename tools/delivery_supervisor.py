@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 import stat
 
-from tools.delivery_runner import DeliveryError, deliver, delivery_lock, recover, require
+from tools.delivery_runner import DeliveryError, deliver, delivery_lock, recover, require, _delivery_lease
 
 
 @contextmanager
@@ -39,16 +39,30 @@ class DeliverySupervisor:
     protected by the delivery lock, which a writer session also holds. The host
     must exclude uncoordinated writers and must keep these locks out of the repo.
     """
-    def __init__(self, state: Path, source, host, *, launcher=None, preflight=None):
+    def __init__(self, state: Path, source, host, *, launcher=None, preflight=None, reconcile_writer=None):
         self.state = state
         self.source = source
         self.host = host
         self.launcher = launcher
         self.preflight = preflight
+        self.reconcile_writer = reconcile_writer
 
     def _recover(self):
-        require(not os.path.lexists(self.state / 'writer-active.json'),
-                'writer containment requires host reconciliation')
+        marker = self.state / 'writer-active.json'
+        if os.path.lexists(marker):
+            require(self.reconcile_writer is not None,
+                    'writer containment requires host reconciliation')
+            with _delivery_lease(self.state):
+                # Callback verifies the protected latch and whole-cgroup cleanup.
+                # No admission or bridge replay is allowed during reconciliation.
+                require(self.reconcile_writer(marker) is True,
+                        'writer reconciliation unconfirmed')
+                marker.unlink()
+                fd = os.open(self.state, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
         journal = self.state / 'delivery.json'
         # lexists includes dangling symlinks: unsafe evidence cannot mean absent.
         if os.path.lexists(journal):
@@ -85,8 +99,8 @@ class DeliverySupervisor:
         """Trusted commands in a host kill-on-stop cgroup; never request commands.
 
         A durable marker blocks all subsequent operations if this supervisor
-        dies or cannot prove cleanup. Host reconciliation must verify cgroup
-        emptiness before removing it; startup never clears it automatically.
+        dies or cannot prove cleanup. Protected host reconciliation must verify cgroup
+        emptiness before startup can clear it.
         """
         from tools.delivery_process import CleanupError
         from tools.delivery_runner import atomic_json

@@ -160,7 +160,7 @@ def test_unsafe_file_rejected(tmp_path, kind):
             protected_bytes(path, os.getuid())
 
 
-@pytest.mark.parametrize('field', ['source', 'host', 'launcher', 'preflight'])
+@pytest.mark.parametrize('field', ['source', 'host', 'launcher', 'preflight', 'reconcile_writer'])
 def test_composition_replacement_rejected(setup, field):
     _, _, supervisor, _, build = setup
     entry = build()

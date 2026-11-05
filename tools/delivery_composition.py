@@ -3,6 +3,7 @@
 The host must install isolation and exclude uncoordinated admission. Preflight
 observes those bindings under the supervisor lease; it does not install them.
 """
+import json
 from pathlib import Path
 
 from tools.delivery_containment import _absolute, _protected
@@ -51,6 +52,27 @@ class HostJobs:
         for key in ALL_JOBS:
             require(self.containment.quiescent(key) is True, 'host job still active')
 
+    def reconcile_writer(self, marker):
+        from tools.delivery_entrypoint import protected_bytes, _unique
+        self.validate_policy()
+        raw = protected_bytes(marker, self.containment.owner)
+        require(json.loads(raw, object_pairs_hook=_unique) == {'schema': 'writer-active-v1'},
+                'invalid writer recovery marker')
+        require(self.isolation() is True, 'host job isolation unverified')
+        failures = []
+        for key in ('writer', 'bridge'):
+            try:
+                self.containment.cleanup(key)
+            except BaseException as exc:
+                failures.append(exc)
+        if failures:
+            raise CleanupError('writer recovery cleanup unconfirmed') from failures[0]
+        require(all(self.containment.quiescent(key) is True for key in ('writer', 'bridge')),
+                'writer recovery still active')
+        require(protected_bytes(marker, self.containment.owner) == raw,
+                'writer recovery marker changed')
+        return True
+
     def cleanup(self, sha):
         require(isinstance(sha, str) and SHA.fullmatch(sha), 'full SHA required')
         self.validate_policy()
@@ -85,15 +107,24 @@ def compose_supervisor(state, source, candidate, production, jobs):
     services._cleanup = jobs.cleanup
     services._quiescent = jobs.quiescent
 
-    def preflight():
+    def bindings():
         _protected(state, jobs.containment.owner)
         require(supervisor.launcher is jobs.launcher
                 and all(c.launcher is jobs.launcher for c in components)
                 and services._cleanup == jobs.cleanup
                 and services._quiescent == jobs.quiescent,
                 'host composition changed')
+        require(supervisor.reconcile_writer is reconcile_writer,
+                'writer recovery binding changed')
+
+    def preflight():
+        bindings()
         jobs.preflight()
 
+    def reconcile_writer(marker):
+        bindings()
+        return jobs.reconcile_writer(marker)
+
     supervisor = DeliverySupervisor(state, source, host, launcher=jobs.launcher,
-                                    preflight=preflight)
+                                    preflight=preflight, reconcile_writer=reconcile_writer)
     return supervisor

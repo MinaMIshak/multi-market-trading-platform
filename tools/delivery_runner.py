@@ -52,7 +52,7 @@ def atomic_json(path, value):
 
 
 @contextmanager
-def delivery_lock(directory):
+def _delivery_lease(directory):
     require(directory.is_absolute() and directory.resolve() == directory
             and directory.is_dir(), 'invalid delivery state directory')
     fd = os.open(directory / 'delivery.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -61,11 +61,17 @@ def delivery_lock(directory):
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise DeliveryError('concurrent release rejected') from None
-        require(not os.path.lexists(directory / 'writer-active.json'),
-                'writer containment requires host reconciliation')
         yield
     finally:
         os.close(fd)
+
+
+@contextmanager
+def delivery_lock(directory):
+    with _delivery_lease(directory):
+        require(not os.path.lexists(directory / 'writer-active.json'),
+                'writer containment requires host reconciliation')
+        yield
 
 
 class GitSource:
