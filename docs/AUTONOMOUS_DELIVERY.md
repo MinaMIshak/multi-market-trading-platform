@@ -961,3 +961,35 @@ observations through escaped text. Scheduler health still remains UNKNOWN.
 Host producer integration, immutable evidence storage, installed bootstrap pins
 and actual publication mount acceptance remain pending. Tests use temporary
 files and artificial attestations only.
+
+### Protected event producer and first-publication behavior
+
+`tools.delivery_observations.ObservationProducer(publication).record(...)` is the
+host integration boundary for trusted cycle/review/chain completion callbacks.
+Invoke outside both leases, supplying an event ID, full source SHA, bounded
+status, actual event timestamp, strict `live_money=False` and a protected evidence
+file. The caller must independently establish those semantics; arbitrary logs,
+Codex checkpoint statements and Claude opinions are not completion attestations.
+No CLI or repository-controlled callback is granted host authority here.
+
+The producer takes both leases and reads bounded, protected regular-file evidence.
+It hashes the exact bytes and durably stores a write-once, mode-0400 event receipt
+in private state before atomically advancing the sidecar. Receipts contain the
+exact evidence bytes encoded as hex; they must never be mounted into the API.
+Event IDs are scoped by observation kind. Reusing an identity with changed content,
+future timestamps, older events, equal-time conflicting observations, malformed
+existing sidecars and unsafe evidence fail closed. Retry of an identical event is
+idempotent. A failure after archive persistence can leave an unreferenced receipt;
+it does not imply successful publication. Host-owned storage must remain protected;
+these permissions are not an adversarial root immutability guarantee.
+
+Publication runs after producer leases unwind. When no delivery journal exists,
+valid sidecar records use `delivery-observation-publication-v1`; the API shows the
+observations while delivery remains UNAVAILABLE with no tests, deployed identity
+or scheduler claims. Missing journal plus missing observations still clears old
+publication and fails. An unsafe or malformed journal also clears publication and
+fails; it is not treated as an initial installation.
+
+Installed completion callbacks, retention policy for private evidence, bootstrap
+pins and read-only publication mount acceptance remain host integration work.
+Temporary-file regression tests establish producer behavior only.

@@ -43,7 +43,10 @@ class DeliveryPublication:
             self._check()
             journal = self.state / 'delivery.json'
             try:
-                raw = json.loads(protected_bytes(journal, self.owner), object_pairs_hook=_unique)
+                if not os.path.lexists(journal):
+                    raw = dict(schema='delivery-observation-publication-v1')
+                else:
+                    raw = json.loads(protected_bytes(journal, self.owner), object_pairs_hook=_unique)
                 # Journal metadata is not an observation authority.
                 if isinstance(raw, dict):
                     raw.pop('observations', None)
@@ -56,6 +59,8 @@ class DeliveryPublication:
                     if records:
                         raw['observations'] = dict(schema='delivery-observations-v1', **records)
                 result = public_receipt(raw)
+                require(os.path.lexists(journal) or bool(result),
+                        'delivery publication source unavailable')
             except (OSError, ValueError, RecursionError, DeliveryError):
                 # Replace historical success with UNKNOWN when source is unreadable.
                 atomic_json(self.destination, {}, mode=0o644)

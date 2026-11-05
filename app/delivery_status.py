@@ -86,6 +86,9 @@ def project_delivery(raw, *, now=None):
                            'blocker', 'started_at', 'live_money'))
     result.update(status='UNAVAILABLE', evidence_scope='HISTORICAL_RECEIPT_ONLY',
                   runtime_verified=False)
+    if isinstance(raw, dict) and raw.get('schema') == 'delivery-observation-publication-v1':
+        result.update(project_observations(raw.get('observations'), now))
+        return result
     if not isinstance(raw, dict) or raw.get('schema') != 'delivery-state-v1':
         return result
     head = sha(raw.get('source_head'))
@@ -135,7 +138,12 @@ def public_receipt(raw):
     """Reconstruct a minimal receipt without copying private strings or mappings."""
     view = project_delivery(raw)
     if view['status'] != 'AVAILABLE':
-        return {}
+        observations = (observation_records(raw.get('observations'))
+                        if isinstance(raw, dict) and raw.get('schema') ==
+                        'delivery-observation-publication-v1' else {})
+        return (dict(schema='delivery-observation-publication-v1',
+                     observations=dict(schema='delivery-observations-v1', **observations))
+                if observations else {})
     result = dict(schema='delivery-state-v1', source_head=view['source_head'],
                   started_at=view['started_at'], live_money=False, status=raw['status'])
     if view['origin_sync']:
