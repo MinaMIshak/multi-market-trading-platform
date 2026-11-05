@@ -927,3 +927,37 @@ operation failure, reacquisition of real temporary-file leases, dual failures,
 interruption, strict v2 policy, disjoint roots and binding drift. Services are
 simulated and ancestor checks mocked. Real host installation, publication mount,
 exact-release socket tests and spare-port acceptance remain pending.
+
+## Cycle, review and chain observation contract
+
+The optional fixed `observations.json` sidecar in protected private host state
+uses schema `delivery-observations-v1`. Publication reads it under both leases
+using the same protected bounded reader as the journal. Journal-supplied
+observations are discarded. Missing, unsafe or malformed sidecars clear optional
+observations on the next successful publication without invalidating independent
+release receipts. No repository checkpoint or advisory review is automatically
+converted into host evidence.
+
+Supported record keys are `latest_codex_cycle`, `latest_claude_review`,
+`egx_chain_status` and `us_chain_status`. Each requires `source_head` (full SHA),
+`evidence_sha256` (64 lowercase hex characters), timezone-aware `observed_at`,
+`live_money: false` and a bounded status. Cycle statuses are SUCCEEDED, FAILED or
+INTERRUPTED; review is COMPLETED; chains are COMPLETED or FAILED. All other fields
+are discarded. The trusted host producer must hash the actual evidence and bind
+its source identity and event time before atomically writing the sidecar under
+the supervisor/delivery leases. The digest is an attestation reference, not proof
+that the API has independently read or validated the evidence. Review completion
+is not endorsement, and chain completion establishes neither coverage nor fills.
+
+API reads compute freshness from event time, never publication time: cycle 24h,
+review 7d, each chain 4d (a coarse observation-age budget, not an exchange-calendar
+or scheduled-session check). Exact budget boundaries are RECENT; older records
+are STALE; any future timestamp is FUTURE. Status is historical and remains
+visible beside freshness, source SHA and digest. None establishes live health,
+satisfies a release gate, or authorizes strategy promotion. Invalid records remain
+UNKNOWN independently. The existing SYSTEM table displays these structured
+observations through escaped text. Scheduler health still remains UNKNOWN.
+
+Host producer integration, immutable evidence storage, installed bootstrap pins
+and actual publication mount acceptance remain pending. Tests use temporary
+files and artificial attestations only.

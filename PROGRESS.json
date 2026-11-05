@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_PUBLICATION_WIRING",
-  "current_capability": "HostEntrypoint v2 binds protected publication destination and publishes after startup/cycle/release leases unwind, including failures and interruption. Dual operation/publication failures remain explicit. Legacy v1 compatible; installed host adoption pending.",
-  "starting_head": "ec4dc2d2130b8a9d5a309fc5e21a4e4455d40bec",
-  "head": "ec4dc2d2130b8a9d5a309fc5e21a4e4455d40bec",
+  "phase": "AUTONOMOUS_DELIVERY_OBSERVATION_CONTRACTS",
+  "current_capability": "Protected host observation sidecar supplies sanitized cycle/review/EGX/US chain attestations with event-time freshness to delivery API/SYSTEM. Missing or invalid records remain UNKNOWN; observations never satisfy deployment gates. Host producers and installation pending.",
+  "starting_head": "73379a4d620a14d691daf2e6af0b888ab5ea982b",
+  "head": "73379a4d620a14d691daf2e6af0b888ab5ea982b",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected publication/status/runner/supervisor/entrypoint/bootstrap/composition/host/production/checkpoint suites: 387 passed, 14 subtests passed in 9.86s. Temporary filesystem and simulated host evidence only. git diff --check passed. Known socket restriction not retried.",
+  "tests": "Observation/publication/status: 99 passed in 1.00s. Affected entrypoint/bootstrap/runner/supervisor/composition/host/production/checkpoint suites: 329 passed, 85 subtests passed in 9.57s. Synthetic host fixtures only; known socket restriction not retried. git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Add trusted cycle/review/chain observation contracts and freshness projection. Through an authorized host mechanism adopt delivery-host-v2 with pinned publication dependencies and read-only API mount, provision isolation, then run exact SIG-v1 full/socket/runtime/spare-port acceptance before cutover.",
+  "next_action": "Implement protected host observation producer integration with durable evidence hashes and event identity; handle observation publication before any delivery journal exists. Then adopt pinned delivery-host-v2 through authorized host mechanism and run exact SIG-v1 full/socket/runtime/spare-port acceptance before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,16 +202,16 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "PUBLICATION_INVOCATION_IMPLEMENTED_HOST_ADOPTION_PENDING",
+    "status": "OBSERVATION_CONTRACTS_IMPLEMENTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "Historical rev 3/3a read as advisory; current delivery entrypoint independently confirmed missing automatic publication and this cycle adds repository wiring. External historical socket claims do not establish exact-current-release acceptance. No strategy recommendations applied.",
+    "claude_review": "Historical rev 3/3a read as advisory. Current code independently confirms observation fields were unconnected; added protected sidecar and freshness projection. Historical socket claims do not establish exact-current-release acceptance; no strategy recommendations applied.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
-    "system_projection": "Host publication reconstructs minimal delivery receipts preserving existing SYSTEM/API gates without private journal errors/schedules. Atomic 0644 public output, protected roots, supervisor/delivery leases and duplicate-key rejection tested. Current cycle/review/chain and live scheduler health remain UNKNOWN; installed publication invocation and read-only API mount unverified.",
+    "system_projection": "Protected optional observations.json supplies bounded cycle/review/chain status, full source SHA, evidence SHA256 and event timestamp. API recomputes RECENT/STALE/FUTURE on reads. Missing/unsafe sidecars clear observations on publication; no live health or release gate inference. Actual host producers/mount pending; scheduler health UNKNOWN.",
     "supervisor_coordination": "run_cycle now requires an explicit host launcher, uses separate writer/bridge groups under both locks, and retains writer-active on CleanupError or interruption. Fixture composition verifies writer cleanup precedes bridge. Host isolation and supervisor-death containment remain unverified.",
     "source_transport": "PinnedGitSource requires trusted exact origin, SSH config digest/path and identity path; offline guards and local fixture ssh -G parser verified. Actual deploy-key configuration, network push and origin synchronization not verified.",
     "source_bundle": "Implemented exact approved Git source bundle; environment binds to independently verified bundle manifest and file hashes. No actual reporting-only source approval or production environment provisioned.",
@@ -232,6 +232,7 @@
     "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
     "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified.",
     "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed.",
-    "publication": "HostEntrypoint delivery-host-v2 requires fixed protected publication destination disjoint from repository/private state. Publishes after operation leases unwind on success, failure and Python interruption; PublicationFailure retains both errors for trusted diagnostics. Invalid configuration/request/binding blocks admission. Legacy v1 does not publish. Temporary-file lock and simulated supervisor tests passed; actual installed host wiring/mount/deployment remain pending."
+    "publication": "HostEntrypoint delivery-host-v2 requires fixed protected publication destination disjoint from repository/private state. Publishes after operation leases unwind on success, failure and Python interruption; PublicationFailure retains both errors for trusted diagnostics. Invalid configuration/request/binding blocks admission. Legacy v1 does not publish. Temporary-file lock and simulated supervisor tests passed; actual installed host wiring/mount/deployment remain pending.",
+    "observations": "Contract and publication/API integration tested using artificial evidence. Fixed age budgets: cycle 24h, review 7d, chains 4d; not calendar-aware health. Host must hash actual immutable evidence and atomically write protected sidecar under leases. No producer or runtime observation installed this cycle."
   }
 }

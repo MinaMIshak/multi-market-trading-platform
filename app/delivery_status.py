@@ -3,7 +3,7 @@
 The host must publish a copy readable by the API via EGX_DELIVERY_RECEIPT.
 Never point the API at the private delivery state directory or expose raw journals.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -32,7 +32,53 @@ def accepted(value, commit, scheduler=False, sig=True):
                                    and value.get('scheduler_verified') is True)))
 
 
-def project_delivery(raw):
+# Fixed host evidence contracts; freshness never authorizes a release.
+OBSERVATIONS = {
+    'latest_codex_cycle': ({'SUCCEEDED', 'FAILED', 'INTERRUPTED'}, 86400),
+    'latest_claude_review': ({'COMPLETED'}, 604800),
+    'egx_chain_status': ({'COMPLETED', 'FAILED'}, 345600),
+    'us_chain_status': ({'COMPLETED', 'FAILED'}, 345600),
+}
+
+
+def observation_records(raw):
+    """Sanitize host attestations without copying free text or market counts."""
+    if not isinstance(raw, dict) or raw.get('schema') != 'delivery-observations-v1':
+        return {}
+    result = {}
+    for key, (statuses, _) in OBSERVATIONS.items():
+        value = raw.get(key)
+        if not isinstance(value, dict):
+            continue
+        status = value.get('status')
+        digest = value.get('evidence_sha256')
+        if (not isinstance(status, str) or status not in statuses
+                or not sha(value.get('source_head'))
+                or not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest)
+                or value.get('live_money') is not False):
+            continue
+        try:
+            observed = datetime.fromisoformat(value['observed_at'])
+            if observed.tzinfo is None:
+                continue
+        except (KeyError, ValueError, TypeError):
+            continue
+        result[key] = dict(status=status, source_head=value['source_head'],
+            evidence_sha256=digest, observed_at=observed.isoformat(), live_money=False)
+    return result
+
+
+def project_observations(raw, now=None):
+    now = now if now is not None else datetime.now(timezone.utc)
+    result = {}
+    for key, value in observation_records(raw).items():
+        age = (now - datetime.fromisoformat(value['observed_at'])).total_seconds()
+        freshness = 'FUTURE' if age < 0 else ('STALE' if age > OBSERVATIONS[key][1] else 'RECENT')
+        result[key] = dict(value, freshness=freshness, evidence_scope='HOST_ATTESTATION_ONLY')
+    return result
+
+
+def project_delivery(raw, *, now=None):
     result = dict.fromkeys(('source_head', 'origin_sync', 'deployed_release',
                            'latest_codex_cycle', 'latest_claude_review', 'tests',
                            'candidate_validation', 'deployment_result', 'scheduler_target',
@@ -80,6 +126,7 @@ def project_delivery(raw):
         result['deployment_result'] = 'UNVERIFIED_TERMINAL_RECEIPT'
     if phase in ('FAILED', 'RECOVERY_REQUIRED', 'RECOVERING', 'ROLLED_BACK'):
         result['blocker'] = 'RECOVERY_REQUIRED' if phase in ('RECOVERY_REQUIRED', 'RECOVERING') else 'DELIVERY_FAILED'
+    result.update(project_observations(raw.get("observations"), now))
     # Raw errors, rollback schedule, arbitrary metadata and paths never leave here.
     return result
 
@@ -112,6 +159,9 @@ def public_receipt(raw):
         result[key] = gate(commit, scheduler=True)
         if key == 'rollback_validation':
             result[key].pop('sig_v1')
+    observations = observation_records(raw.get('observations'))
+    if observations:
+        result['observations'] = dict(schema='delivery-observations-v1', **observations)
     return result
 
 

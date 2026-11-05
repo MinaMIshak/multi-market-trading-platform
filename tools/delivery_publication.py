@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from app.delivery_status import public_receipt
+from app.delivery_status import public_receipt, observation_records
 from tools.delivery_containment import _absolute, _protected
 from tools.delivery_entrypoint import protected_bytes, _unique
 from tools.delivery_runner import atomic_json, delivery_lock, require, DeliveryError
@@ -44,6 +44,17 @@ class DeliveryPublication:
             journal = self.state / 'delivery.json'
             try:
                 raw = json.loads(protected_bytes(journal, self.owner), object_pairs_hook=_unique)
+                # Journal metadata is not an observation authority.
+                if isinstance(raw, dict):
+                    raw.pop('observations', None)
+                    try:
+                        observations = json.loads(protected_bytes(
+                            self.state / 'observations.json', self.owner), object_pairs_hook=_unique)
+                        records = observation_records(observations)
+                    except (OSError, ValueError, RecursionError, DeliveryError):
+                        records = {}
+                    if records:
+                        raw['observations'] = dict(schema='delivery-observations-v1', **records)
                 result = public_receipt(raw)
             except (OSError, ValueError, RecursionError, DeliveryError):
                 # Replace historical success with UNKNOWN when source is unreadable.
