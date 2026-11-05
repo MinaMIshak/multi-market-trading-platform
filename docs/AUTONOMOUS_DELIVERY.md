@@ -751,3 +751,33 @@ Host provisioning and kernel-level admission/cleanup acceptance remain pending.
 Tests use artificial cgroup files, actual disposable subprocesses, and simulated
 population cleanup. They prove bootstrap ordering and latch behavior, not kernel
 cgroup placement, detached-child kill behavior, sockets or deployment acceptance.
+
+## Unified host job composition
+
+`delivery_composition.HostJobs` requires exactly six disjoint temporary leaves:
+writer, bridge, environment, tests, runtime and candidate. Explicit persistent
+service/rollback group exclusions are mandatory. `compose_supervisor` binds one
+launcher to the supervisor and all four acceptance components, and binds aggregate
+release cleanup to ProductionServices. Conflicting component launchers are
+rejected. Policy or component-binding drift blocks new work.
+
+The supervisor recovers unresolved delivery state before preflight. Preflight
+checks protected state/interpreter paths, an explicit host isolation attestation,
+and empty membership for all six leaves before writer or release admission.
+Writer preflight holds both locks; release preflight holds the supervisor lock
+before the runner acquires its delivery lock. Host installation must route every
+writer/release through this supervisor and prohibit direct concurrent runner
+invocation. The host isolation callback must verify provisioned migration,
+filesystem, privilege, interpreter-dependency and supervisor-death controls;
+a constant callback is suitable only for test fixtures.
+
+Recovery cleanup attempts all four release groups even if an earlier group fails,
+then raises CleanupError if any cleanup was uncertain. It never kills the writer,
+bridge, serving service or rollback service. Receipts and writer-active latches
+retain existing fail-closed recovery semantics. Successful cleanup does not bless
+incomplete acceptance receipts. Missing or populated groups block admission;
+preflight does not kill unexplained jobs or clear writer latches.
+
+These are offline composition guarantees. Host provisioning, real cgroup and
+isolation enforcement, exact-release full/socket tests, workload measurements,
+spare-port acceptance and production adoption remain pending.

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_RELEASE_JOB_BINDING",
-  "current_capability": "Release environment preparation, exact-release tests, runtime measurement and candidate startup require explicit host launcher bindings with separate job keys. Missing bindings fail closed and uncertain admission/cleanup preserves active receipts. Host provisioning and exact-release acceptance remain pending.",
-  "starting_head": "f6ba28fb317558570ec544480c7b8f5c508b35e3",
-  "head": "f6ba28fb317558570ec544480c7b8f5c508b35e3",
+  "phase": "AUTONOMOUS_DELIVERY_HOST_JOB_COMPOSITION",
+  "current_capability": "Host composition binds one JobLauncher and disjoint six-job containment policy to the supervisor and all release components. Preflight rejects busy groups, unverified isolation and binding drift; aggregate recovery attempts every release group while retaining uncertain receipts. Host installation and exact-release acceptance remain pending.",
+  "starting_head": "8e8af3ef185c23b433a798b8f52dfeba465d66c8",
+  "head": "8e8af3ef185c23b433a798b8f52dfeba465d66c8",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected environment/preparation/tests/runtime/candidate/jobs/host/supervisor/runner/production/bindings/process suite: 361 passed in 136.44s. Includes eight new missing-launcher and uncertain-admission/cleanup regressions. Disposable environments, simulated HTTP/measurements and artificial cgroup controls only; no exact-release host/socket/deployment evidence. git diff --check passed.",
+  "tests": "Affected host/bindings/runner/production/composition/supervisor/jobs suite: 248 passed in 12.56s. Includes 34 new composition and all-stage recovery regressions. Artificial containment and simulated services only; no exact-release host/socket/deployment evidence. git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Build protected host composition/preflight that binds the same disjoint JobContainment policy to supervisor, all four release components and aggregate temporary cleanup; validate recovery when any stage has uncertain admission or descendants. Then provision authorized host isolation/public probes and run SIG-v1 exact-release full/socket/runtime/spare-port gates before cutover.",
+  "next_action": "Implement protected host configuration/entrypoint with pinned composition, isolation attestation and supervisor-only invocation; validate host startup/restart policy and publication of delivery evidence. Then provision authorized host isolation/public probes and run SIG-v1 exact-release full/socket/runtime/spare-port gates before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,7 +134,7 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Host admission and supervisor binding fixture-tested. Release environment/test/runtime/candidate command wiring, protected host isolation/provisioning, source approval and exact-release host acceptance remain pending."
+    "delivery": "Protected host configuration/entrypoint, actual isolation provisioning, public probes, source approval and exact-release full/socket/runtime/spare-port acceptance remain pending. Unified job composition implemented and offline-tested."
   },
   "commit_status": "COMMIT_BRIDGE_REQUESTED",
   "experiment": {
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "RELEASE_JOB_BINDINGS_IMPLEMENTED_HOST_ACCEPTANCE_PENDING",
+    "status": "HOST_JOB_COMPOSITION_IMPLEMENTED_HOST_ACCEPTANCE_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -220,7 +220,7 @@
     "test_validation": "Exact-source full-suite/socket component now uses bundle source/ for imports and collection. Restart verification binds command, preparation/runtime pins and report hash; incomplete or altered evidence rejected. Actual exact-release host tests remain pending.",
     "runtime_acceptance": "Both EGX/US trusted workloads measured with pinned GNU time, strict elapsed/RSS budgets, snapshot/test/preparation/runtime identity checks, durable MEASURING/MEASURED receipts and restart verification. Tests simulate measurements, not nightly evidence. RSS is process high-water, not aggregate cgroup memory. Actual workload policy, containment and host execution pending.",
     "candidate_acceptance": "ReleaseCandidate binds runtime receipt and policy pins, copies approved state, reserves a spare localhost port, passes its FD to release-local Python, validates exact identity/LIVE_MONEY and HTTP/API/compatibility/SIG-v1 fields, and publishes ACCEPTED only after cleanup and revalidation. Incomplete receipts remain latched. Socket/HTTP tests simulated; actual host acceptance not performed. Host-owned factory/policies and cgroup/filesystem containment remain required.",
-    "host_composition": "ComposedHost connects all acceptance components and can use ProductionBackend. Host-owned service bindings and installation remain pending; no deployment claimed.",
+    "host_composition": "HostJobs and compose_supervisor unify writer/bridge/environment/tests/runtime/candidate launchers and release-only aggregate cleanup. Protected preflight requires exact stable disjoint policy, persistent service exclusions, explicit isolation attestation and quiescence; launcher drift rejected. Offline fixtures verify all-stage cleanup and retained incomplete receipts through repeated recovery. No host installation or kernel isolation evidence.",
     "production_backend": "Implemented durable full schedule/digest backup, guarded atomic JSON routing pointer, staged-service acceptance, production observation, schedule readback and independent idempotent restoration. Real temporary filesystem plus simulated services tested through delivery/recovery. No actual routing consumer, cron or cgroup verification performed.",
     "schedule_binding": "Daily or sorted weekday cron policy supports release-local modules/scripts, literal quoted arguments and allowlisted absolute state/data configuration. Scripts receive exact release-local EGX_PYTHON and build SHA. Missing/symlink scripts, cron percent/control injection and safety overrides rejected. Disposable shell execution and daily/weekly restart/production rollback tested. Host job selection, timezone, daemon adoption and heartbeats remain pending.",
     "persistent_service": "ReleaseService checks pinned manager/fragment, exact loaded policy and safety environment, running PID/cgroup and API evidence. Independent host isolation callback mandatory; no stop/restart operations. Simulated service tests only; actual host installation pending.",

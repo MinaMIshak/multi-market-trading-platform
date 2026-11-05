@@ -39,11 +39,12 @@ class DeliverySupervisor:
     protected by the delivery lock, which a writer session also holds. The host
     must exclude uncoordinated writers and must keep these locks out of the repo.
     """
-    def __init__(self, state: Path, source, host, *, launcher=None):
+    def __init__(self, state: Path, source, host, *, launcher=None, preflight=None):
         self.state = state
         self.source = source
         self.host = host
         self.launcher = launcher
+        self.preflight = preflight
 
     def _recover(self):
         require(not os.path.lexists(self.state / 'writer-active.json'),
@@ -75,6 +76,8 @@ class DeliverySupervisor:
                     require(isinstance(record, dict) and record.get('status') in
                             ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
                             'unresolved delivery requires recovery')
+                if self.preflight is not None:
+                    self.preflight()
                 yield
 
     def run_cycle(self, writer, bridge, *, cwd, writer_timeout, bridge_timeout,
@@ -107,4 +110,6 @@ class DeliverySupervisor:
         """Recover then deliver; requests never bypass source or acceptance gates."""
         with supervisor_lock(self.state):
             self._recover()
+            if self.preflight is not None:
+                self.preflight()
             return deliver(request, self.state, self.source, self.host, now=now)

@@ -201,3 +201,48 @@ def test_dangling_artifact_link_is_not_absence(wiring):
     with pytest.raises(DeliveryError, match='RECOVERY_REQUIRED'):
         run(w)
     assert w.events == []
+
+
+@pytest.mark.parametrize('index', range(4))
+def test_composed_job_recovery_keeps_uncertain_stage_receipt(wiring, index):
+    """Shared cleanup cannot turn incomplete admission evidence into acceptance."""
+    import os
+    import sys
+    from pathlib import Path
+    from unittest.mock import patch
+    from tools.delivery_composition import ALL_JOBS, RELEASE_JOBS, HostJobs, compose_supervisor
+    from tools.delivery_jobs import JobContainment
+    from tools.delivery_process import CleanupError
+
+    w = wiring
+    containment = JobContainment({k: '/temporary/' + k for k in ALL_JOBS}, owner=os.getuid())
+    jobs = HostJobs(containment, python=Path(sys.executable).resolve(),
+                   persistent_groups=['/serving'], isolation=lambda: True)
+    for component in w.components:
+        component.launcher = None
+    supervisor = compose_supervisor(w.state, Mock(), w.components[-1], w.backend, jobs)
+    w.backend.cleanup.side_effect = w.backend.services._cleanup
+    w.backend.quiescent.side_effect = w.backend.services._quiescent
+    component = w.components[index]
+    def fail(sha):
+        atomic_json(component.receipts / (sha + '.json'), {'complete': False})
+        raise CleanupError('admission or descendants uncertain')
+    (component.prepare if index == 0 else component.validate).side_effect = fail
+    def cleanup(key):
+        if key == RELEASE_JOBS[index]:
+            raise CleanupError('descendant unresolved')
+    with patch('tools.delivery_composition._protected'), \
+            patch.object(containment, 'quiescent', return_value=True), \
+            patch.object(containment, 'cleanup', side_effect=cleanup) as clean:
+        with pytest.raises(DeliveryError):
+            supervisor.release(w.request, now=NOW)
+        assert {c.args[0] for c in clean.call_args_list} == set(RELEASE_JOBS)
+        before = (component.receipts / (SHA + '.json')).read_bytes()
+        with pytest.raises(DeliveryError, match='RECOVERY_REQUIRED'):
+            supervisor.startup()
+        # Even eventual kernel cleanup cannot bless the incomplete receipt.
+        clean.side_effect = None
+        with pytest.raises(DeliveryError, match='RECOVERY_REQUIRED'):
+            supervisor.startup()
+        assert (component.receipts / (SHA + '.json')).read_bytes() == before
+    w.backend.cutover.assert_not_called()
