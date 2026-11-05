@@ -845,8 +845,9 @@ Before the factory runs, the gate requires:
 - the host configuration among the pinned files;
 - a module-level factory whose loaded module `__file__` matches its code path, with
   that source pinned;
-- a pin for the source of every loaded `tools.*` module and of `app.delivery_status`,
-  so a manifest cannot omit delivery code that the process has already imported.
+- a pin for the source of every loaded `tools.*` module, of `app.delivery_status` and
+  of its parent `app` package (`app/__init__.py`), so a manifest cannot omit delivery
+  code that the process has already imported.
 
 The same checks repeat after construction and at every invocation, before dispatch.
 Factory module binding and entrypoint identity drift also block dispatch.
@@ -917,10 +918,15 @@ After startup, cycle or release, including recovery or operation failure and
 Python interruption, the entrypoint publishes after operation leases unwind.
 Successful publication preserves the original return value or exception. A
 publication failure raises `PublicationFailure`, retaining `operation_error`
-(or None) and `publication_error` for trusted supervisor diagnostics. Its public
+(or None) and `publication_error` for trusted supervisor diagnostics. When
+`operation_error` is None the operation completed and `result` holds its return
+value, since a completed release cannot be replayed. Its public
 message contains no raw exception detail. The supervisor must record this as a
 failed invocation; it must not retry cutover just to retry publication. A completed
-release remains governed by its durable journal and startup recovery. Abrupt
+release remains governed by its durable journal and startup recovery. The retained
+result is host-private and must not be copied unfiltered into logs or public output.
+Termination during settlement can bypass this exception wrapper; the durable
+journal remains authoritative. Abrupt
 process death cannot execute this finalizer; subsequent startup republishes.
 
 Configuration, invocation and binding rejection happen before publication or
@@ -1100,7 +1106,8 @@ Recovery retains receipts for historical events and selects the newest observati
 per kind without regressing an existing newer sidecar. Original timestamps and
 hashes survive retries; recovery does not refresh evidence or infer health.
 Receipt writes precede sidecar replacement. Interrupted writes and publication
-failure can be retried; existing receipts must match exactly. Publication occurs
+failure can be retried; existing receipts must match exactly, and an unparsable one
+is the same typed `event identity conflict`. Publication occurs
 only after the leases unwind. No delivery operation or evidence deletion occurs.
 
 The batch is limited to 128 unsettled envelopes and 8 MiB of envelope bytes, in

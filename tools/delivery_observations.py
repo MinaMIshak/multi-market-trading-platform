@@ -208,6 +208,15 @@ def _reject_time_conflict(publication, kind, moment, digest):
         require(observed != moment, 'observation time conflict')
 
 
+def _existing_receipt(path, owner):
+    """A damaged receipt conflicts like a changed one; callers only handle typed errors."""
+    raw = protected_bytes(path, owner)
+    try:
+        return json.loads(raw, object_pairs_hook=_unique)
+    except (ValueError, RecursionError, DeliveryError):
+        raise DeliveryError('event identity conflict') from None
+
+
 class ObservationProducer:
     def __init__(self, publication):
         self.publication = publication
@@ -238,8 +247,8 @@ class ObservationProducer:
             receipt = dict(schema='delivery-observation-event-v1', kind=kind,
                            event_id=event_id, record=record, evidence_hex=evidence.hex())
             if os.path.lexists(archive):
-                existing = json.loads(protected_bytes(archive, publisher.owner), object_pairs_hook=_unique)
-                require(existing == receipt, 'event identity conflict')
+                require(_existing_receipt(archive, publisher.owner) == receipt,
+                        'event identity conflict')
             else:
                 # Hex expansion must remain readable by the protected reader.
                 require(len(json.dumps(receipt).encode()) < 1000000, 'event evidence too large')
@@ -378,8 +387,8 @@ def recover_completions(publication):
             require(len(json.dumps(receipt).encode()) < 1000000, 'event evidence too large')
             archive = publication.state / ('observation-' + kind + '-' + event_id + '.json')
             if os.path.lexists(archive):
-                existing = json.loads(protected_bytes(archive, publication.owner), object_pairs_hook=_unique)
-                require(existing == receipt, 'event identity conflict')
+                require(_existing_receipt(archive, publication.owner) == receipt,
+                        'event identity conflict')
             else:
                 receipts.append((archive, receipt))
             prior = current.get(kind)

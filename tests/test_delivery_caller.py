@@ -189,6 +189,22 @@ def test_retry_pre_settlement_failure_keeps_local_event(caller):
     assert caught.value.failures[0][0] == 'before_handoff'
 
 
+def test_retry_reports_damaged_receipt_as_phase_failure(caller, setup):
+    receiver = setup[0]
+    retain_completion(receiver, **event())
+    receipt = receiver.state / 'observation-latest_codex_cycle-retained-1.json'
+    receipt.write_bytes(b'{')
+    receipt.chmod(0o600)
+    path, _ = caller.retain(**event(event_id='local'))
+    with patch.object(caller, 'handoff') as handoff, pytest.raises(CompletionRetryError) as caught:
+        CompletionRetry(caller, lambda: recover_completions(receiver)).run()
+    handoff.assert_not_called()
+    assert path.exists()
+    assert [phase for phase, _ in caught.value.failures] == ['before_handoff']
+    assert isinstance(caught.value.failures[0][1], DeliveryError)
+    assert str(caught.value.failures[0][1]) == 'event identity conflict'
+
+
 def test_retry_preserves_both_phase_failures(caller):
     calls = []
     def settle():

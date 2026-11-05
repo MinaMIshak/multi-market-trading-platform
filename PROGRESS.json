@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_COMPLETION_RETRY",
-  "current_capability": "Bounded host-scheduled completion retry settles receiver capacity before handoff and settles partial transfers after handoff failure. Phase errors remain inspectable, termination propagates, and restart preserves exact retained identities. No host installation or deployment performed.",
-  "starting_head": "984822f0428b51eb135082b4d00dc8f8361ed35f",
-  "head": "984822f0428b51eb135082b4d00dc8f8361ed35f",
+  "phase": "AUTONOMOUS_DELIVERY_HANDOFF_VALIDATION",
+  "current_capability": "Validated preserved delivery hardening: damaged receipts fail with typed conflicts, completed operation results survive publication failure, and the app package source is manifest-pinned. Expanded offline regression coverage; no host installation or deployment.",
+  "starting_head": "64c6a930fe8a39868f2f562949e8d10372d99447",
+  "head": "64c6a930fe8a39868f2f562949e8d10372d99447",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Delivery and checkpoint suites: 1041 passed, 85 subtests in 150.98s. New busy-lock test initially used the wrong import; corrected and the full affected suite rerun passed. git diff --check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
+  "tests": "Affected delivery/checkpoint suites: umask 022 final 1055 passed, 85 subtests (189.79s); umask 002 1054 passed, 85 subtests (200.13s), plus subsequently added real-package omission test passed separately under 002. Checkpoint/SYSTEM plus real-package test: 15 passed, 85 subtests. Four disposable mutation checks detected regressions. Initial corruption fixture failed due to read-only receipt and was corrected; an added package test incorrectly expected unprotected worktree code to satisfy host permissions, corrected to test omission rejection only. Final diff check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Provision pinned host callers with CompletionOutbox and CompletionRetry startup/periodic invocation through the authorized host mechanism; preserve originating job records and monitor archives. Install supervisor v2 and read-only API receipt mount. Run exact reporting-only SIG-v1 full/socket/runtime/spare-port acceptance and rollback gates before cutover. No strategy promotion.",
+  "next_action": "After commit bridge and exact origin sync, resolve the reproduced caller archive/time-conflict stall without deleting evidence or relaxing identity checks; add settlement backlog visibility and define host supervisor handling of PublicationFailure without cutover replay. Then provision pinned callers/retry scheduling, supervisor v2 and read-only publication mount through the authorized host mechanism; run exact SIG-v1 full/socket/runtime/spare-port and rollback gates. Scanner v2 remains queued behind handoff/origin/delivery prerequisites.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -136,7 +136,7 @@
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
     "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending."
   },
-  "commit_status": "Commit bridge requested; no direct staging or commit.",
+  "commit_status": "Validated preserved handoff; exact commit bridge request written. No direct staging/commit; supervisor retains ownership of handoff markers and origin sync.",
   "experiment": {
     "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
@@ -202,12 +202,12 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "COMPLETION_RETRY_IMPLEMENTED_HOST_ADOPTION_PENDING",
+    "status": "HANDOFF_HARDENING_VALIDATED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
     "deployed_release": null,
-    "claude_review": "Historical rev 3/3a read as advisory. No new independent current-release host acceptance verified; delivery-only callback work does not change strategies or promotion gates.",
+    "claude_review": "Read historical rev 3/3a and current executor/barrier handoffs as advisory. Independently exercised receipt corruption, release result retention, source pin omission and caller archive/time-conflict stall. No review claim accepted as host execution evidence. Handoff markers remain supervisor-owned.",
     "scope": "SIG-v1-reporting-only",
     "promotion": "NOT_AUTHORIZED",
     "recovery": "Implemented conservative locked restart recovery; crash/failure injection passed. No real host recovery performed.",
@@ -231,7 +231,7 @@
     "job_launch": "All release component commands now require explicit launcher bindings: environment, tests, runtime and candidate. PreparedRelease passes its launcher to environment creation; candidate forwards its spare listener FD. No process-group-only fallback. Incomplete receipts and partial environments remain on uncertain admission/cleanup. Simulated component tests and artificial-control JobLauncher tests only; kernel containment and production host wiring remain unverified.",
     "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
     "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified.",
-    "bootstrap": "Pins include loaded tools modules and app.delivery_status; v2 settlement dependencies load before invocation pin verification. Installed manifests/interpreter/import isolation still require host provisioning.",
+    "bootstrap": "Pins include loaded tools modules, app.delivery_status and app/__init__.py; real package omission regression rejects before factory invocation. Installed manifests/interpreter/import isolation require host provisioning.",
     "publication": "Publication and observation paths acquire both operation leases without clearing writer-active. SYSTEM exposes WRITER_RECONCILIATION_REQUIRED even for missing/damaged journals. Live lease contention still rejects publication. Host mount and invocation pending.",
     "observations": "Implemented locked protected evidence ingestion, SHA256 and exact-byte durable event receipts, conflict/stale/future rejection, crash retry, and pre-journal publication. Synthetic tests only. Trusted caller must attest event semantics; installed callbacks, retention and mount acceptance pending.",
     "completion_callback": "Implemented strict host-private delivery-completion-v1 envelopes through bootstrap/entrypoint, dependency pin checks before dispatch, digest recheck under both leases, exact-envelope retention and idempotent publication. Artificial fixtures only; installed event authors and host acceptance pending. Broad validation also exposed and corrected procfs ESRCH disappearance during cleanup observation; permission errors remain fail-closed.",
@@ -241,6 +241,9 @@
     "completion_capacity": "Retention shares recovery limits (128 pending envelopes / 8 MiB exact envelope bytes). Locked admission rejects overflow before writes; identical pending/archived retries bypass new admission. Unsafe/unreadable siblings fail closed. Archive/receipt disk provisioning remains a host obligation; no evidence pruning or host acceptance.",
     "storage_headroom": "Pinned admission requires 64 MiB plus three times pending envelope bytes plus per-event allocation overhead; 256 inodes plus two per pending event. Unknown/exhausted accounting rejects before new retention. Existing retries and recovery bypass admission. Temporary-file fault tests only; no space reservation, quota guarantee or host capacity evidence.",
     "caller_outbox": "Protected disjoint caller/receiver roots, bounded validated batch, locked exact-byte handoff, retained-only acknowledgement and permanent caller archive implemented. Temporary-file tests cover queue/storage rejection, crash after acceptance, newer receiver observations, partial handoff, concurrent rejection, malformed/symlink evidence and local capacity failure. Host callers, durable originating job records and periodic retries remain unprovisioned; no publication or runtime acceptance inferred.",
-    "completion_retry": "CompletionRetry binds trusted outbox and settlement callback, performs receiver settlement/handoff/settlement without overlapping caller and receiver leases, preserves both phase failures and supports restart. Temporary-file full-queue, partial-transfer, publication-failure, busy-lease, binding-drift and termination tests only. Host retry scheduling and deployment remain unverified."
+    "completion_retry": "CompletionRetry binds trusted outbox and settlement callback, performs receiver settlement/handoff/settlement without overlapping caller and receiver leases, preserves both phase failures and supports restart. Temporary-file full-queue, partial-transfer, publication-failure, busy-lease, binding-drift and termination tests only. Host retry scheduling and deployment remain unverified.",
+    "publication_failure": "Completed operation result retained privately alongside typed publication/settlement error. Unsettleable batch regression confirms journal publication and evidence preservation; no automatic delivery replay. Termination still relies on durable journal.",
+    "open_recovery_findings": "Disposable reproduction confirms archived caller event permits same-time conflicting local event, whose receiver rejection stalls later events. Corrupt receipts intentionally block settlement; explicit repair procedure, backlog visibility and installed supervisor failure handling remain required before caller adoption.",
+    "handoff_validation_evidence": "/home/egx-agent/er1-autopilot/state/validation/delivery-handoff-64c6a93"
   }
 }

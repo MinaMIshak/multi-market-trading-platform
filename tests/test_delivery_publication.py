@@ -151,16 +151,18 @@ def test_writer_latch_published_without_journal(setup):
     assert project_delivery(json.loads(destination.read_text())) == view
 
 
-@pytest.mark.parametrize('payload', [b'{', b'[]', b'x' * 1048577], ids=['malformed', 'array', 'oversized'])
-def test_writer_latch_survives_invalid_journal(setup, payload):
+@pytest.mark.parametrize('payload,unreadable', [(b'{', True), (b'[]', False), (b'x' * 1048577, True)],
+                         ids=['malformed', 'array', 'oversized'])
+def test_writer_latch_survives_invalid_journal(setup, payload, unreadable):
     publisher, journal, destination = setup
     publisher.publish()
     journal.write_bytes(payload)
     (publisher.state / 'writer-active.json').write_text('{}')
-    try:
+    if unreadable:
+        with pytest.raises(DeliveryError, match='source unavailable'):
+            publisher.publish()
+    else:
         publisher.publish()
-    except DeliveryError:
-        pass
     view = project_delivery(json.loads(destination.read_text()))
     assert view['blocker'] == LATCHED and view['status'] == 'UNAVAILABLE'
     assert view['deployed_release'] is None

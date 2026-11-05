@@ -14,11 +14,12 @@ from tools.delivery_runner import DeliveryError, require
 def _gate_sources():
     """Source of every loaded delivery module, so a manifest cannot omit code it trusts.
 
-    app.delivery_status builds the published receipt, so it is delivery code too.
+    app.delivery_status builds the published receipt, so it is delivery code too, and
+    importing it first runs its parent package.
     """
     return {Path(_absolute(getattr(module, '__file__', None)))
             for name, module in tuple(sys.modules.items())
-            if name.startswith('tools.') or name == 'app.delivery_status'}
+            if name.startswith('tools.') or name in ('app', 'app.delivery_status')}
 
 
 def _factory_source(factory):

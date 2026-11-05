@@ -201,10 +201,13 @@ def test_gate_sources_cover_loaded_tools_modules():
 
 
 def test_gate_sources_cover_receipt_projection_only_from_app():
+    package = SimpleNamespace(__file__='/installed/app/__init__.py')
     status = SimpleNamespace(__file__='/installed/app/delivery_status.py')
     other = SimpleNamespace(__file__='/installed/app/unrelated.py')
-    with patch.dict(sys.modules, {'app.delivery_status': status, 'app.unrelated': other}):
+    with patch.dict(sys.modules, {'app': package, 'app.delivery_status': status,
+                                  'app.unrelated': other}):
         sources = _gate_sources()
+    assert Path('/installed/app/__init__.py') in sources
     assert Path('/installed/app/delivery_status.py') in sources
     assert Path('/installed/app/unrelated.py') not in sources
 
@@ -359,3 +362,18 @@ def test_retention_only_checks_pins_before_dispatch(setup):
     with pytest.raises(DeliveryError):
         bootstrap.retain_completion(event_id='other-event')
     assert entry.return_value.retain_completion.call_count == 1
+
+
+def test_real_app_package_source_required_by_manifest(setup):
+    import app
+    policy, _, _, entry, build = setup
+    sources = _gate_sources()
+    package = Path(app.__file__)
+    assert package in sources
+    policy['files'].update({str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+                            for path in sources})
+    del policy['files'][str(package)]
+    with patch('tools.delivery_bootstrap._gate_sources', side_effect=_gate_sources):
+        with pytest.raises(DeliveryError, match='loaded delivery module not pinned'):
+            build()
+        entry.assert_not_called()

@@ -48,11 +48,16 @@ def _unique(pairs):
 
 
 class PublicationFailure(DeliveryError):
-    """Retain both errors for trusted supervisor reporting; no public error text."""
-    def __init__(self, operation_error, publication_error):
+    """Retain both errors for trusted supervisor reporting; no public error text.
+
+    operation_error None means the operation completed and result is its return value.
+    A completed release cannot be replayed, so its outcome must survive this failure.
+    """
+    def __init__(self, operation_error, publication_error, result=None):
         super().__init__('delivery publication failed after host operation')
         self.operation_error = operation_error
         self.publication_error = publication_error
+        self.result = result
 
 
 class CompletionDeferred(DeliveryError):
@@ -188,9 +193,10 @@ class HostEntrypoint:
         require(operation in ('startup', 'cycle', 'release'), 'unknown host operation')
         require((operation == 'release' and type(request) is dict)
                 or (operation != 'release' and request is None), 'invalid host invocation')
-        operation_error = None
+        operation_error = result = None
         try:
-            return self._invoke(operation, request)
+            result = self._invoke(operation, request)
+            return result
         except BaseException as exc:
             operation_error = exc
             raise
@@ -201,7 +207,7 @@ class HostEntrypoint:
                 try:
                     self._settle_and_publish()
                 except Exception as exc:
-                    raise PublicationFailure(operation_error, exc) from exc
+                    raise PublicationFailure(operation_error, exc, result) from exc
 
     def _settle_and_publish(self):
         """Settle events deferred by this operation, then publish its outcome.

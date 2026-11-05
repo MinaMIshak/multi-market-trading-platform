@@ -256,6 +256,22 @@ def test_recovery_rejects_receipt_conflict_and_concurrency(setup):
     assert len(list(publisher.state.glob('completion-*.json'))) == 2
 
 
+@pytest.mark.parametrize('damaged', [b'{', b'\xff', b'[' * 10000, b'{"a":1,"a":2}', b'[]'],
+                         ids=['truncated', 'undecodable', 'deep', 'duplicate', 'shape'])
+def test_damaged_receipt_is_a_typed_conflict(setup, damaged):
+    from tools.delivery_observations import retain_completion, recover_completions
+    publisher = setup[0]
+    path, _ = retain_completion(publisher, **event())
+    receipt = publisher.state / 'observation-latest_codex_cycle-retained-1.json'
+    receipt.write_bytes(damaged)
+    receipt.chmod(0o600)
+    with pytest.raises(DeliveryError, match='identity conflict'):
+        recover_completions(publisher)
+    assert receipt.read_bytes() == damaged
+    assert path.exists()
+    assert not (publisher.state / 'observations.json').exists()
+
+
 def test_interrupted_cycle_reportable_while_writer_latched(setup):
     from app.delivery_status import project_delivery
     from tools.delivery_observations import retain_completion
@@ -610,3 +626,21 @@ def test_storage_budget_includes_pending_batch_and_block_rounding(setup, block_s
             retain_completion(publisher, **second)
         usage.f_favail += 1
         assert retain_completion(publisher, **second)[0].read_bytes() == raw
+
+
+@pytest.mark.parametrize('damaged', [b'{', b'\xff', b'[' * 10000, b'{"a":1,"a":2}', b'[]'],
+                         ids=['truncated', 'undecodable', 'deep', 'duplicate', 'shape'])
+def test_record_completion_rejects_damaged_receipt_without_changes(setup, damaged):
+    publisher = setup[0]
+    path, digest = envelope(setup)
+    record_completion(publisher, path, digest)
+    sidecar = publisher.state / 'observations.json'
+    before = sidecar.read_bytes()
+    receipt = publisher.state / 'observation-latest_codex_cycle-cycle-1.json'
+    receipt.chmod(0o600)  # Inject corruption into the normally read-only receipt.
+    receipt.write_bytes(damaged)
+    receipt.chmod(0o400)
+    with pytest.raises(DeliveryError, match='identity conflict'):
+        record_completion(publisher, path, digest)
+    assert sidecar.read_bytes() == before
+    assert receipt.read_bytes() == damaged

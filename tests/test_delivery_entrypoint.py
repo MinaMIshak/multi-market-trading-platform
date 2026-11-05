@@ -243,9 +243,23 @@ def test_v2_publication_failure_retains_both_results(published_setup, operation_
     with pytest.raises(PublicationFailure) as caught:
         entry.invoke('cycle')
     assert caught.value.operation_error is (error if operation_fails else None)
+    assert caught.value.result is (None if operation_fails else supervisor.run_cycle.return_value)
     assert isinstance(caught.value.publication_error, DeliveryError)
     assert json.loads(destination.read_text()) == {}
     assert 'private failure' not in str(caught.value)
+
+
+def test_publication_failure_keeps_completed_release_outcome(published_setup):
+    from tools.delivery_entrypoint import PublicationFailure
+    _, supervisor, build, journal, _ = published_setup
+    entry = build()
+    supervisor.release.return_value = {'status': 'SUCCEEDED'}
+    journal.unlink()
+    with pytest.raises(PublicationFailure) as caught:
+        entry.invoke('release', {})
+    assert caught.value.operation_error is None
+    assert caught.value.result == {'status': 'SUCCEEDED'}
+    assert 'SUCCEEDED' not in str(caught.value)
 
 
 def test_v2_uncertain_writer_cleanup_publishes_blocker_and_keeps_error(published_setup):
@@ -456,3 +470,26 @@ def test_recovery_after_restart_never_runs_delivery(published_setup):
 def test_recovery_rejects_legacy_host(setup):
     with pytest.raises(DeliveryError, match='v2'):
         setup[-1]().recover_completions()
+
+
+def test_completed_release_survives_unsettleable_batch(published_setup):
+    from tools.delivery_entrypoint import PublicationFailure
+    from tools.delivery_observations import retain_completion
+    from tests.test_delivery_completion import event
+    _, supervisor, build, journal, destination = published_setup
+    entry = build()
+    path, _ = retain_completion(entry.publication, **event())
+    damaged = supervisor.state / 'observation-latest_codex_cycle-retained-1.json'
+    damaged.write_bytes(b'{')
+    damaged.chmod(0o600)
+    supervisor.release.return_value = {'status': 'SUCCEEDED'}
+    before = journal.read_bytes()
+    with pytest.raises(PublicationFailure) as caught:
+        entry.invoke('release', {})
+    assert caught.value.operation_error is None
+    assert caught.value.result == {'status': 'SUCCEEDED'}
+    assert str(caught.value.publication_error) == 'event identity conflict'
+    assert journal.read_bytes() == before
+    assert json.loads(destination.read_text())['status'] == json.loads(before)['status']
+    assert path.exists() and damaged.read_bytes() == b'{'
+    supervisor.release.assert_called_once_with({})
