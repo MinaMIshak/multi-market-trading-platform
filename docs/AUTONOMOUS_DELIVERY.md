@@ -1020,3 +1020,25 @@ completion semantics and preserve the envelope for retries. A protected file and
 hash alone do not prove those semantics. This repository implements the callback
 boundary; installed callers, protected storage retention, manifest provisioning,
 API mount and actual host acceptance remain pending. No sandbox privileges change.
+
+### Durable installed caller handoff
+
+Trusted installed callers may use `InstalledBootstrap.report_completion(**event)`
+with the seven completion fields other than `schema` (kind, event_id, source_head,
+status, observed_at, live_money, evidence). Module pins and v2 policy are checked
+before retention. Both leases serialize creation of the mode-0400 private
+`completion-<kind>-<event_id>.json` envelope, including file and directory fsync,
+then unwind before the existing pinned callback consumes it. All event fields
+must come from independently established host evidence; this helper does not
+parse logs, infer success or authorize release operations.
+
+The caller must durably preserve its original ID, timestamp and evidence for
+retry. Identical calls reuse exact bytes; changed content under the same identity
+fails. Callback/publication failure retains the envelope, allowing the restarted
+caller to repeat the same call or use `completion(path, digest)`. A newer event
+already published may cause an older retry to be rejected as stale; retention is
+not successful publication. Nothing automatically replays a directory of events.
+Envelopes and receipts remain private indefinitely; no automatic pruning is
+introduced. Host capacity/retention policy, installed callers and manifest pins
+still require provisioning. Temporary-file restart/failure tests are not evidence
+of host adoption or deployment.

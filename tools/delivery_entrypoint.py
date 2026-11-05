@@ -142,6 +142,14 @@ class HostEntrypoint:
         for argv, _ in self.commands.values():
             _protected(Path(argv[0]), self.owner)
 
+    def report_completion(self, **event):
+        """Retain a host-attested event before observation dispatch."""
+        from tools.delivery_observations import retain_completion
+        self._check()
+        require(self.publication is not None, 'completion requires delivery-host-v2')
+        path, digest = retain_completion(self.publication, **event)
+        return self.completion(path, digest)
+
     def completion(self, path, digest):
         """Trusted historical callback outside leases; never executes operations."""
         from tools.delivery_observations import record_completion

@@ -89,3 +89,37 @@ def record_completion(publication, path, digest):
         status=event['status'], observed_at=event['observed_at'],
         live_money=event['live_money'], evidence_path=path,
         expected_evidence_sha256=digest)
+
+
+def retain_completion(publication, *, kind, event_id, source_head, status,
+                      observed_at, live_money, evidence):
+    """Retain a trusted caller's event before dispatch; identical retries only.
+
+    Callers preserve original event IDs/timestamps across restart. No inference,
+    automatic discovery, deletion or delivery operation is performed here.
+    """
+    publication._check()
+    require(type(kind) is str and kind in OBSERVATIONS and type(event_id) is str
+            and re.fullmatch('[A-Za-z0-9_-]{1,128}', event_id), 'invalid event identity')
+    require(type(evidence) is str and bool(evidence.strip()), 'invalid completion evidence')
+    record = dict(status=status, source_head=source_head, observed_at=observed_at,
+                  live_money=live_money, evidence_sha256='0' * 64)
+    records = observation_records(dict(schema='delivery-observations-v1', **{kind: record}))
+    require(kind in records, 'invalid observation')
+    require(datetime.fromisoformat(records[kind]['observed_at']) <= datetime.now(timezone.utc),
+            'future observation')
+    event = dict(schema='delivery-completion-v1', kind=kind, event_id=event_id,
+                 source_head=source_head, status=status, observed_at=observed_at,
+                 live_money=live_money, evidence=evidence)
+    # Match atomic_json and bound the later hex-encoded archive too.
+    raw = (json.dumps(event, sort_keys=True, indent=2) + '\n').encode()
+    require(len(raw) * 2 + 4096 < 1000000, 'event evidence too large')
+    path = publication.state / ('completion-' + kind + '-' + event_id + '.json')
+    with supervisor_lock(publication.state), delivery_lock(publication.state):
+        publication._check()
+        if os.path.lexists(path):
+            require(protected_bytes(path, publication.owner) == raw, 'completion identity conflict')
+        else:
+            atomic_json(path, event, mode=0o400)
+        require(protected_bytes(path, publication.owner) == raw, 'completion retention mismatch')
+    return path, hashlib.sha256(raw).hexdigest()

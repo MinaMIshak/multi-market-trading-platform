@@ -315,3 +315,32 @@ def test_completion_requires_v2_and_private_state(setup):
     supervisor.startup.assert_not_called()
     supervisor.run_cycle.assert_not_called()
     supervisor.release.assert_not_called()
+
+
+def test_report_completion_retains_and_retries_without_operations(published_setup):
+    from tests.test_delivery_completion import event
+    _, supervisor, build, journal, destination = published_setup
+    entry = build()
+    before = journal.read_bytes()
+    with patch.object(entry.publication, 'publish', side_effect=OSError('offline')):
+        with pytest.raises(OSError):
+            entry.report_completion(**event())
+    paths = list(entry.state.glob('completion-*.json'))
+    assert len(paths) == 1
+    raw = paths[0].read_bytes()
+    restarted = build()
+    result = restarted.report_completion(**event())
+    assert result['observations']['latest_codex_cycle']['status'] == 'SUCCEEDED'
+    assert paths[0].read_bytes() == raw
+    assert journal.read_bytes() == before
+    supervisor.startup.assert_not_called()
+    supervisor.run_cycle.assert_not_called()
+    supervisor.release.assert_not_called()
+
+
+def test_report_completion_rejects_legacy_host(setup):
+    from tests.test_delivery_completion import event
+    entry = setup[-1]()
+    with pytest.raises(DeliveryError, match='v2'):
+        entry.report_completion(**event())
+    assert not list(entry.state.glob('completion-*.json'))

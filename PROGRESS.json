@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_COMPLETION_CALLBACK",
-  "current_capability": "Pinned protected completion envelopes now flow through InstalledBootstrap and HostEntrypoint into durable observation receipts. Exact bytes are rechecked under both leases; callbacks cannot invoke delivery operations. Installed host callers and acceptance remain pending.",
-  "starting_head": "c53b0cb97c27986b99b6b9f4a2d5d2afe618c2a0",
-  "head": "c53b0cb97c27986b99b6b9f4a2d5d2afe618c2a0",
+  "phase": "AUTONOMOUS_DELIVERY_DURABLE_CALLER_HANDOFF",
+  "current_capability": "Trusted installed caller API durably retains exact completion envelopes under both leases before callback dispatch. Restart retries preserve evidence and reject identity conflicts; no delivery operations are invoked. Host provisioning and acceptance remain pending.",
+  "starting_head": "3c742e2a8d3d19199132ccca4a6da6a23936afcf",
+  "head": "3c742e2a8d3d19199132ccca4a6da6a23936afcf",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Broad affected delivery/checkpoint run: 903 passed, 114 subtests, 1 failure (procfs process-exit ESRCH race) in 109.96s. Fixed disappeared-process handling with regression preserving permission-error failure. Final affected process/callback/bootstrap/entrypoint/producer/checkpoint suites: 176 passed, 85 subtests in 3.35s. Full release/socket tests not rerun; host acceptance pending. git diff --check passed.",
+  "tests": "Affected completion/bootstrap/entrypoint/producer/publication/observations/status/checkpoint suites: 269 passed, 85 subtests in 2.64s. git diff --check passed. No full release/socket tests rerun; host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Provision trusted installed completion callers and delivery-host-v2 manifest through the authorized host mechanism, including protected envelope retention and read-only API publication mount. Execute exact reporting-only SIG-v1 full/socket/runtime/spare-port gates before cutover.",
+  "next_action": "Provision trusted installed supervisor/reviewer/chain callers using report_completion with durable original event identities, pinned delivery-host-v2/bootstrap manifests and read-only API publication mount through the authorized host mechanism. Run exact reporting-only SIG-v1 full/socket/runtime/spare-port gates before cutover.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "COMPLETION_CALLBACK_IMPLEMENTED_HOST_ADOPTION_PENDING",
+    "status": "DURABLE_CALLER_HANDOFF_IMPLEMENTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -234,6 +234,7 @@
     "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed.",
     "publication": "HostEntrypoint delivery-host-v2 requires fixed protected publication destination disjoint from repository/private state. Publishes after operation leases unwind on success, failure and Python interruption; PublicationFailure retains both errors for trusted diagnostics. Invalid configuration/request/binding blocks admission. Legacy v1 does not publish. Temporary-file lock and simulated supervisor tests passed; actual installed host wiring/mount/deployment remain pending.",
     "observations": "Implemented locked protected evidence ingestion, SHA256 and exact-byte durable event receipts, conflict/stale/future rejection, crash retry, and pre-journal publication. Synthetic tests only. Trusted caller must attest event semantics; installed callbacks, retention and mount acceptance pending.",
-    "completion_callback": "Implemented strict host-private delivery-completion-v1 envelopes through bootstrap/entrypoint, dependency pin checks before dispatch, digest recheck under both leases, exact-envelope retention and idempotent publication. Artificial fixtures only; installed event authors and host acceptance pending. Broad validation also exposed and corrected procfs ESRCH disappearance during cleanup observation; permission errors remain fail-closed."
+    "completion_callback": "Implemented strict host-private delivery-completion-v1 envelopes through bootstrap/entrypoint, dependency pin checks before dispatch, digest recheck under both leases, exact-envelope retention and idempotent publication. Artificial fixtures only; installed event authors and host acceptance pending. Broad validation also exposed and corrected procfs ESRCH disappearance during cleanup observation; permission errors remain fail-closed.",
+    "completion_retention": "InstalledBootstrap.report_completion checks dependency pins before v2 retention. Locked mode-0400 envelopes are fsynced before callback, identical retries reuse bytes, conflicting IDs/unsafe files/invalid events fail closed. Publication failure and entrypoint restart tested with temporary private state; no actual installed caller, retention policy or deployment verified."
   }
 }

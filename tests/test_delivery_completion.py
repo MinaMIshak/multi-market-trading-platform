@@ -71,3 +71,59 @@ def test_concurrent_callback_and_wrong_pin(setup):
         record_completion(setup[0], path, '0' * 64)
     with delivery_lock(setup[0].state), pytest.raises(DeliveryError):
         record_completion(setup[0], path, digest)
+
+
+def event(**changes):
+    return dict(kind='latest_codex_cycle', event_id='retained-1', source_head=HEAD,
+                status='SUCCEEDED', observed_at=NOW.isoformat(), live_money=False,
+                evidence='artificial host completion') | changes
+
+
+def test_retention_survives_callback_failure_and_restarts(setup):
+    from tools.delivery_observations import retain_completion
+    publisher = setup[0]
+    path, digest = retain_completion(publisher, **event())
+    raw = path.read_bytes()
+    assert path.stat().st_mode & 0o777 == 0o400
+    with patch.object(publisher, 'publish', side_effect=OSError('publication unavailable')):
+        with pytest.raises(OSError):
+            record_completion(publisher, path, digest)
+    assert path.read_bytes() == raw
+    assert retain_completion(publisher, **event()) == (path, digest)
+    result = record_completion(publisher, path, digest)
+    assert result['observations']['latest_codex_cycle']['evidence_sha256'] == digest
+    assert b'artificial host completion' not in setup[2].read_bytes()
+
+
+@pytest.mark.parametrize('changes', [dict(evidence='changed'), dict(status='FAILED'),
+    dict(source_head='b' * 40), dict(observed_at='2026-01-01T00:00:00+00:00')])
+def test_retained_identity_cannot_be_rewritten(setup, changes):
+    from tools.delivery_observations import retain_completion
+    path, _ = retain_completion(setup[0], **event())
+    raw = path.read_bytes()
+    with pytest.raises(DeliveryError, match='identity conflict'):
+        retain_completion(setup[0], **event(**changes))
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize('changes', [dict(live_money=True), dict(kind='../bad'),
+    dict(event_id='../bad'), dict(evidence=''), dict(evidence='x' * 500000),
+    dict(source_head='bad'), dict(status='GREEN'),
+    dict(observed_at='2999-01-01T00:00:00+00:00')])
+def test_invalid_retention_leaves_no_envelope(setup, changes):
+    from tools.delivery_observations import retain_completion
+    with pytest.raises(DeliveryError):
+        retain_completion(setup[0], **event(**changes))
+    assert not list(setup[0].state.glob('completion-*.json'))
+
+
+def test_retention_lock_and_symlink_rejection(setup):
+    from tools.delivery_observations import retain_completion
+    with delivery_lock(setup[0].state), pytest.raises(DeliveryError):
+        retain_completion(setup[0], **event())
+    path, _ = retain_completion(setup[0], **event())
+    target = path.with_suffix('.saved')
+    path.rename(target)
+    path.symlink_to(target)
+    with pytest.raises((DeliveryError, OSError)):
+        retain_completion(setup[0], **event())

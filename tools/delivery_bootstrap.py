@@ -97,3 +97,9 @@ class InstalledBootstrap:
         self._check()
         require(self.entrypoint is self._entrypoint, 'bootstrap entrypoint changed')
         return self.entrypoint.completion(path, digest)
+
+    def report_completion(self, **event):
+        from tools import delivery_observations  # noqa: F401
+        self._check()
+        require(self.entrypoint is self._entrypoint, 'bootstrap entrypoint changed')
+        return self.entrypoint.report_completion(**event)

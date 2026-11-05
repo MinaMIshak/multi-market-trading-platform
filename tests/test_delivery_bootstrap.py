@@ -298,3 +298,14 @@ def test_completion_dispatch_checks_pins_and_entrypoint(setup):
     with pytest.raises(DeliveryError):
         bootstrap.completion('/host/event.json', 'a' * 64)
     assert entry.return_value.completion.call_count == 1
+
+
+def test_report_completion_checks_pins_before_retention(setup):
+    _, _, dependency, entry, build = setup
+    bootstrap = build()
+    bootstrap.report_completion(event_id='host-event')
+    entry.return_value.report_completion.assert_called_once_with(event_id='host-event')
+    dependency.write_text('drift')
+    with pytest.raises(DeliveryError):
+        bootstrap.report_completion(event_id='other-event')
+    assert entry.return_value.report_completion.call_count == 1
