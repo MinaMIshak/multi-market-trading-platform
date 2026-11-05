@@ -1,8 +1,9 @@
 # Autonomous delivery contract
 
 Status: transaction core, restart recovery, supervisor coordination, component
-composition, production backend and host invocation components implemented as offline
-code; host provisioning and actual supervisor invocation pending; SYSTEM receipt projection implemented with host publication pending. No release was deployed by this work.
+composition, production backend, host invocation, receipt publication and completion
+reporting implemented as offline code; host provisioning, actual supervisor invocation
+and the read-only API mount pending. No release was deployed by this work.
 `tools/delivery_runner.py` deliberately has no production CLI or default host
 adapter. Importing it cannot start, push or deploy anything.
 
@@ -74,7 +75,9 @@ an allowlisted SYSTEM view. Do not serve rollback backups or raw exception text.
    handling before accepting another delivery or starting a Codex writer cycle.
    Recovery is a host operation using the same trusted adapter, never request
    commands. A missing journal means no transaction to recover; malformed journals
-   require host reconciliation and must not be deleted to bypass the gate.
+   raise `DeliveryError`, require host reconciliation and must not be deleted to
+   bypass the gate. A dangling journal symlink is unsafe, not missing, including for
+   direct `deliver` callers, and is never replaced.
 7. Connect allowlisted delivery receipts to SYSTEM: source HEAD, origin sync,
    deployed release, Codex cycle, Claude review, tests, candidate validation,
    deployment/rollback, schedule target/health, EGX/US chain status and blocker.
@@ -88,8 +91,13 @@ release. LIVE_MONEY=DISABLED; automatic model/strategy/risk promotion is unautho
 
 The authoritative `delivery.json` journal is fsynced before the per-request
 receipt. A crash between those writes therefore leaves the recovery obligation
-visible. Terminal recovery repairs the receipt without host mutations. Request ID
-`delivery` is reserved to prevent collision with the journal filename.
+visible. Terminal recovery repairs the receipt without host mutations. A request
+ID names its receipt file in private state, so IDs that would collide with host-owned
+files are rejected before any write: `delivery`, `writer-active`, `observations`,
+`previous`, and anything starting with `completion-` or `observation-`. Recovery
+rejects a journal carrying such an ID without invoking the host. `previous` is the
+`ProductionBackend` rollback backup; nothing requires that backend's state directory
+to differ from this one, so a shared directory must not let a receipt replace it.
 
 Recovery validates identity, phase, disabled live money and rollback metadata
 before invoking host operations. A durable `RECOVERING` phase precedes restores.
@@ -107,9 +115,9 @@ The trusted adapter and supervisor integration remain necessary for real recover
 ## SYSTEM delivery receipt projection
 
 `/api/system` and SYSTEM now include an allowlisted `delivery` view. The host
-can configure `EGX_DELIVERY_RECEIPT` to an absolute regular file containing a
-published journal copy; default is UNAVAILABLE. Publication/wiring is pending.
-Do not grant the API access to the private transaction directory. The copy must
+can configure `EGX_DELIVERY_RECEIPT` to an absolute regular file containing the
+sanitized receipt from `DeliveryPublication`; default is UNAVAILABLE. Host wiring is
+pending. Do not grant the API access to the private transaction directory. The file must
 be host-owned, atomically replaced and accessible only to the API account;
 raw journals must never be served by a static-file endpoint. The reader rejects
 symlinks, nonregular files, malformed/oversized JSON, invalid identities, unknown
@@ -837,8 +845,8 @@ Before the factory runs, the gate requires:
 - the host configuration among the pinned files;
 - a module-level factory whose loaded module `__file__` matches its code path, with
   that source pinned;
-- a pin for the source of every loaded `tools.*` module, so a manifest cannot omit
-  delivery code that the process has already imported.
+- a pin for the source of every loaded `tools.*` module and of `app.delivery_status`,
+  so a manifest cannot omit delivery code that the process has already imported.
 
 The same checks repeat after construction and at every invocation, before dispatch.
 Factory module binding and entrypoint identity drift also block dispatch.
@@ -851,8 +859,8 @@ directory from the import path, the protected launcher must set that path itself
 Malformed or excessively nested manifest and host configuration JSON raises
 `DeliveryError` before the factory runs. Files above the 1 MiB read limit
 (such as interpreter binaries) cannot be pinned here and fail closed if listed. The
-interpreter, stdlib, third-party packages and OS stay host obligations, and anything
-outside `tools.*` is only covered if the manifest lists it.
+interpreter, stdlib, third-party packages and OS stay host obligations, and any other
+module outside `tools.*` is only covered if the manifest lists it.
 
 Tests use temporary files with ancestor checks mocked. Manifest tests stub the
 entrypoint; one integration test uses the real entrypoint with a simulated supervisor
@@ -996,6 +1004,8 @@ Temporary-file regression tests establish producer behavior only.
 
 ### Pinned host completion callback
 
+Contention on the operation leases raises `LeaseContention`, a `DeliveryError` subclass.
+
 `InstalledBootstrap.completion(path, digest)` now connects trusted host completion
 notifications to the observation producer through `HostEntrypoint.completion`.
 It loads callback dependencies before checking installed-module pins, rechecks the
@@ -1026,22 +1036,53 @@ API mount and actual host acceptance remain pending. No sandbox privileges chang
 Trusted installed callers may use `InstalledBootstrap.report_completion(**event)`
 with the seven completion fields other than `schema` (kind, event_id, source_head,
 status, observed_at, live_money, evidence). Module pins and v2 policy are checked
-before retention. Both leases serialize creation of the mode-0400 private
-`completion-<kind>-<event_id>.json` envelope, including file and directory fsync,
-then unwind before the existing pinned callback consumes it. All event fields
+before retention. A short `completion-spool.lock` serializes creation of the mode-0400
+private `completion-<kind>-<event_id>.json` envelope, including file and directory
+fsync, and unwinds before the existing pinned callback consumes it. All event fields
 must come from independently established host evidence; this helper does not
 parse logs, infer success or authorize release operations.
+
+Retention deliberately does not take the operation leases, because a writer session
+can hold them for hours and a chain finishing meanwhile must not lose its event. Lock
+order is supervisor, delivery, spool. Recording, recovery and archiving take all three;
+retention takes only the spool lock and waits at most 30 seconds. On timeout it raises
+`completion spool busy`, nothing is retained and the caller must retry.
+
+If an operation holds the leases, `report_completion` raises `CompletionDeferred`,
+carrying `path` and `digest`. The event is durably retained but **not published**, and
+the caller does not need its own spool. Observations and receipts never advance during
+the operation. After every v2 `invoke`, including failures, the entrypoint settles
+retained events through recovery and then publishes. Nothing does this while the host
+is idle, so a host with no further invocation must call `recover_completions` itself.
+A retained batch that cannot settle stays in place. The operation has already run and
+its receipt is still published, then the invocation raises `PublicationFailure` with
+the recovery error as `publication_error`, and repeats this until the host repairs the
+batch. With no retained events a damaged sidecar is not a failure: publication clears
+its observations as described above. Installed callers remain unprovisioned. The tests
+for this use temporary files within one process, so they are not host evidence.
 
 The caller must durably preserve its original ID, timestamp and evidence for
 retry. Identical calls reuse exact bytes; changed content under the same identity
 fails. Callback/publication failure retains the envelope, allowing the restarted
 caller to repeat the same call or use `completion(path, digest)`. A newer event
 already published may cause an older retry to be rejected as stale; retention is
-not successful publication. Nothing automatically replays a directory of events.
-Envelopes and receipts remain private indefinitely; no automatic pruning is
-introduced. Host capacity/retention policy, installed callers and manifest pins
-still require provisioning. Temporary-file restart/failure tests are not evidence
-of host adoption or deployment.
+not successful publication. The v2 invocation settlement and explicit
+`recover_completions` call consume only the bounded retained batch described below.
+A new event whose instant matches another event of its kind (in the sidecar or still
+retained) is rejected before retention with `observation time conflict`, so it cannot
+block recovery for every kind. The caller keeps that event and must resolve it.
+Damaged sidecar or sibling files do not stop retention; recording and recovery reject them.
+
+After successful publication, an envelope whose exact bytes are in its receipt, and
+whose event time the sidecar has reached, moves to the private `completion-archive/`
+directory. Nothing is deleted. Retrying a settled event returns its archived path and
+republishes; changed content under that identity still conflicts. A caller retrying
+`completion(path, digest)` with the old path must use the path returned by retention.
+Archive failure (including lease contention) leaves the envelope for a later recovery
+and does not fail the reported completion. Archived envelopes and receipts remain
+private indefinitely; no pruning is introduced, so the host still owes a disk-capacity
+and retention policy. Installed callers and manifest pins still require provisioning.
+Temporary-file restart/failure tests are not evidence of host adoption or deployment.
 
 ### Restart recovery of retained completion events
 
@@ -1060,10 +1101,34 @@ Receipt writes precede sidecar replacement. Interrupted writes and publication
 failure can be retried; existing receipts must match exactly. Publication occurs
 only after the leases unwind. No delivery operation or evidence deletion occurs.
 
-The batch is limited to 128 envelopes and 8 MiB of envelope bytes, in addition to
-per-file limits. Exceeding either limit fails closed. Host provisioning must supply
-a protected archival/retention policy before those bounds are reached; this code
+The batch is limited to 128 unsettled envelopes and 8 MiB of envelope bytes, in
+addition to per-file limits. Exceeding either limit fails closed. Settled envelopes
+leave the scan as described above, so these bounds apply to work not yet settled, such as
+events awaiting publication or repeated archive failures. Recovery also archives the
+superseded events it has receipted. Once archived, an event no longer rebuilds a
+lost sidecar; rebuilding from receipts would be explicit host reconciliation. This code
 does not authorize pruning evidence. Artificial filesystem and mocked host tests
-cover restart, invalid batches, conflicts and pin checks. Installed invocation,
+cover restart, invalid batches, conflicts, archiving and pin checks. Installed invocation,
 retention policy, read-only publication mount and actual host acceptance are still
 pending. This API is not an installer and does not satisfy release validation.
+
+### Writer latch visibility
+
+An unreconciled `writer-active.json` blocks writer and release admission through
+`delivery_lock`. It no longer blocks publication or completion reporting, which take
+the same supervisor and delivery leases through `_delivery_lease` instead. Live
+sessions are still excluded by those leases. These paths never read, clear or
+reconcile the latch, and they perform no delivery operation.
+
+Publication checks only whether the marker path exists, including a dangling symlink,
+and writes `writer_reconciliation_required: true` to the public receipt. The API shows
+`blocker: WRITER_RECONCILIATION_REQUIRED`, ahead of any phase-derived blocker. A
+journal cannot supply this flag: publication removes any such field and derives it
+from the marker. The blocker survives a missing or invalid journal, in which case the
+status stays UNAVAILABLE with no release claims. The next publication after
+reconciliation clears it. Earlier receipts stay visible beside the blocker as
+historical evidence only.
+
+This means uncertain writer cleanup now raises its original error instead of
+`PublicationFailure`, and an INTERRUPTED cycle can be reported while the latch is
+held. Temporary-file tests cover this; no installed host has been observed.

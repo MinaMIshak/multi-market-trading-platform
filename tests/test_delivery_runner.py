@@ -316,6 +316,8 @@ def test_recovery_requires_verified_safe_release_and_schedule(setup, field, valu
 
 
 @pytest.mark.parametrize('field,value', [('request_id', '../escape'), ('request_id', 'delivery'),
+    ('request_id', 'writer-active'), ('request_id', 'observations'), ('request_id', 'previous'),
+    ('request_id', 'completion-cycle-x'), ('request_id', 'observation-cycle-x'),
     ('source_head', 'short'), ('status', 'UNKNOWN'), ('live_money', True), ('rollback', None)])
 def test_invalid_recovery_journal_never_invokes_host(setup, field, value):
     from tools.delivery_runner import recover
@@ -342,6 +344,17 @@ def test_reserved_request_id_cannot_overwrite_journal(setup):
     with pytest.raises(DeliveryError, match='request id'):
         run(setup)
     assert not (setup[1] / 'delivery.json').exists()
+
+
+@pytest.mark.parametrize('identifier', ['writer-active', 'observations', 'previous',
+                                        'completion-cycle-x', 'observation-cycle-x'])
+def test_request_id_cannot_collide_with_host_state_files(setup, identifier):
+    setup[0]['request_id'] = identifier
+    with pytest.raises(DeliveryError, match='request id'):
+        run(setup)
+    assert [path.name for path in setup[1].iterdir()] == ['delivery.lock']
+    setup[2].check.assert_not_called()
+    assert not setup[3].method_calls
 
 
 def test_crash_between_journal_and_receipt_writes_blocks_delivery(setup, monkeypatch):

@@ -1,6 +1,6 @@
-"""Read-only, bounded delivery journal projection; never a live health probe.
+"""Read-only, bounded delivery receipt projection; never a live health probe.
 
-The host must publish a copy readable by the API via EGX_DELIVERY_RECEIPT.
+The host publishes a sanitized receipt readable by the API via EGX_DELIVERY_RECEIPT.
 Never point the API at the private delivery state directory or expose raw journals.
 """
 from datetime import datetime, timezone
@@ -17,6 +17,8 @@ SOCKET_TESTS = {
     'tests/test_experimental_runtime.py::test_failed_candidate_preserves_previous',
     'tests/test_experimental_runtime.py::test_success_records_identity_without_stopping_child',
 }
+# Set only by publication from the host's writer-active latch; not journal metadata.
+WRITER_LATCH = 'writer_reconciliation_required'
 
 
 def sha(value):
@@ -86,6 +88,8 @@ def project_delivery(raw, *, now=None):
                            'blocker', 'started_at', 'live_money'))
     result.update(status='UNAVAILABLE', evidence_scope='HISTORICAL_RECEIPT_ONLY',
                   runtime_verified=False)
+    if isinstance(raw, dict) and raw.get(WRITER_LATCH) is True:
+        result['blocker'] = 'WRITER_RECONCILIATION_REQUIRED'
     if isinstance(raw, dict) and raw.get('schema') == 'delivery-observation-publication-v1':
         result.update(project_observations(raw.get('observations'), now))
         return result
@@ -127,7 +131,7 @@ def project_delivery(raw, *, now=None):
         result.update(deployed_release=deployed, scheduler_target=deployed)
     elif phase in ('SUCCEEDED', 'ROLLED_BACK'):
         result['deployment_result'] = 'UNVERIFIED_TERMINAL_RECEIPT'
-    if phase in ('FAILED', 'RECOVERY_REQUIRED', 'RECOVERING', 'ROLLED_BACK'):
+    if not result['blocker'] and phase in ('FAILED', 'RECOVERY_REQUIRED', 'RECOVERING', 'ROLLED_BACK'):
         result['blocker'] = 'RECOVERY_REQUIRED' if phase in ('RECOVERY_REQUIRED', 'RECOVERING') else 'DELIVERY_FAILED'
     result.update(project_observations(raw.get("observations"), now))
     # Raw errors, rollback schedule, arbitrary metadata and paths never leave here.
@@ -137,15 +141,16 @@ def project_delivery(raw, *, now=None):
 def public_receipt(raw):
     """Reconstruct a minimal receipt without copying private strings or mappings."""
     view = project_delivery(raw)
+    latch = {WRITER_LATCH: True} if isinstance(raw, dict) and raw.get(WRITER_LATCH) is True else {}
     if view['status'] != 'AVAILABLE':
         observations = (observation_records(raw.get('observations'))
                         if isinstance(raw, dict) and raw.get('schema') ==
                         'delivery-observation-publication-v1' else {})
-        return (dict(schema='delivery-observation-publication-v1',
-                     observations=dict(schema='delivery-observations-v1', **observations))
-                if observations else {})
+        if observations:
+            latch['observations'] = dict(schema='delivery-observations-v1', **observations)
+        return dict(schema='delivery-observation-publication-v1', **latch) if latch else {}
     result = dict(schema='delivery-state-v1', source_head=view['source_head'],
-                  started_at=view['started_at'], live_money=False, status=raw['status'])
+                  started_at=view['started_at'], live_money=False, status=raw['status'], **latch)
     if view['origin_sync']:
         result['origin_sync'] = 'VERIFIED'
     if view['tests']:

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_COMPLETION_RECOVERY",
-  "current_capability": "Pinned installed caller API recovers bounded retained completion batches under both leases, validates all events before writes, preserves historical receipts and advances only newest observations. Crash/publication retries tested; no delivery operations or host installation performed.",
-  "starting_head": "27b6c49fa85bd8e607b1ee493871c3ed9de07ca7",
-  "head": "27b6c49fa85bd8e607b1ee493871c3ed9de07ca7",
+  "phase": "AUTONOMOUS_DELIVERY_COMPLETION_SETTLEMENT",
+  "current_capability": "Preserved delivery WIP completed: completion envelopes survive operation-lease contention, settle after v2 invocation, and archive after publication. Writer recovery latch stays visible without bypassing operation admission; host-state receipt collisions and damaged journals fail closed. Host adoption remains pending.",
+  "starting_head": "cc470169cbd26370af51685972c0aca5b451d80b",
+  "head": "cc470169cbd26370af51685972c0aca5b451d80b",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected completion/bootstrap/entrypoint/producer/publication/observations/status/checkpoint suites: 282 passed, 85 subtests in 3.00s. git diff --check passed. Full release/socket tests not rerun; host acceptance pending.",
+  "tests": "Delivery and checkpoint suites: 997 passed, 85 subtests in 112.85s after explicit protected fixture permissions corrected. git diff --check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Provision trusted host callers and pinned manifests through the authorized host mechanism; wire report_completion and recover_completions outside operation leases, establish protected archive/retention policy and read-only API publication mount. Then run exact reporting-only SIG-v1 full/socket/runtime/spare-port acceptance before any cutover.",
+  "next_action": "Provision pinned trusted host callers, supervisor v2 invocation, protected archive capacity policy and read-only API receipt mount through the authorized host mechanism. Run exact reporting-only SIG-v1 full/socket/runtime/spare-port acceptance and rollback gates before cutover. No strategy promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -202,7 +202,7 @@
     "promotion": "NOT_AUTHORIZED"
   },
   "delivery": {
-    "status": "COMPLETION_RECOVERY_IMPLEMENTED_HOST_ADOPTION_PENDING",
+    "status": "COMPLETION_SETTLEMENT_IMPLEMENTED_HOST_ADOPTION_PENDING",
     "contract": "docs/AUTONOMOUS_DELIVERY.md",
     "runtime_verified": false,
     "origin_sync": "UNKNOWN",
@@ -231,11 +231,12 @@
     "job_launch": "All release component commands now require explicit launcher bindings: environment, tests, runtime and candidate. PreparedRelease passes its launcher to environment creation; candidate forwards its spare listener FD. No process-group-only fallback. Incomplete receipts and partial environments remain on uncertain admission/cleanup. Simulated component tests and artificial-control JobLauncher tests only; kernel containment and production host wiring remain unverified.",
     "host_entrypoint": "HostEntrypoint requires protected digest-pinned strict configuration, owner/process identity, fixed commands/deadlines, stable composition and recovery before admission. 38 offline regressions cover malformed configuration, drift, unsafe files and restart failure. No privileged CLI, host install or invocation authorization service provisioned; installed factory/dependencies and isolation remain host obligations.",
     "writer_restart_recovery": "Configured composition reconciles writer-active-v1 under supervisor and delivery leases. Protected bounded marker reads, stable policy/isolation checks, cleanup of both writer and bridge groups, explicit quiescence and marker recheck precede unlink and directory fsync. Unknown/malformed state remains latched. No bridge replay. Legacy unconfigured supervisors still fail closed. Kernel service-death enforcement remains unverified.",
-    "bootstrap": "Strict digest-pinned protected manifest binds host configuration, module-level factory source and every loaded tools module. Rechecks reject file/identity/module/entrypoint drift, unsafe files and malformed or excessive JSON. 40 offline tests including real HostEntrypoint with simulated supervisor. Disk hashes do not attest loaded memory; protected launcher/import path/interpreter/dependencies and installed manifest remain host obligations. No privileged installation or host acceptance performed.",
-    "publication": "HostEntrypoint delivery-host-v2 requires fixed protected publication destination disjoint from repository/private state. Publishes after operation leases unwind on success, failure and Python interruption; PublicationFailure retains both errors for trusted diagnostics. Invalid configuration/request/binding blocks admission. Legacy v1 does not publish. Temporary-file lock and simulated supervisor tests passed; actual installed host wiring/mount/deployment remain pending.",
+    "bootstrap": "Pins include loaded tools modules and app.delivery_status; v2 settlement dependencies load before invocation pin verification. Installed manifests/interpreter/import isolation still require host provisioning.",
+    "publication": "Publication and observation paths acquire both operation leases without clearing writer-active. SYSTEM exposes WRITER_RECONCILIATION_REQUIRED even for missing/damaged journals. Live lease contention still rejects publication. Host mount and invocation pending.",
     "observations": "Implemented locked protected evidence ingestion, SHA256 and exact-byte durable event receipts, conflict/stale/future rejection, crash retry, and pre-journal publication. Synthetic tests only. Trusted caller must attest event semantics; installed callbacks, retention and mount acceptance pending.",
     "completion_callback": "Implemented strict host-private delivery-completion-v1 envelopes through bootstrap/entrypoint, dependency pin checks before dispatch, digest recheck under both leases, exact-envelope retention and idempotent publication. Artificial fixtures only; installed event authors and host acceptance pending. Broad validation also exposed and corrected procfs ESRCH disappearance during cleanup observation; permission errors remain fail-closed.",
-    "completion_retention": "InstalledBootstrap.report_completion checks dependency pins before v2 retention. Locked mode-0400 envelopes are fsynced before callback, identical retries reuse bytes, conflicting IDs/unsafe files/invalid events fail closed. Publication failure and entrypoint restart tested with temporary private state; no actual installed caller, retention policy or deployment verified.",
-    "completion_recovery": "Bounded 128-envelope/8-MiB recovery validates full protected batch and existing receipts before writes; preserves timestamps, rejects conflicts/future/live/unsafe evidence, archives superseded events without regressing observations. Publication and partial-receipt restart tests pass. Explicit pinned host API only; installed callers and retention remain pending."
+    "completion_retention": "Spool lease independent of operation leases retains exact mode-0400 envelopes during writer sessions. CompletionDeferred reports retained but unpublished evidence. Conflicting event times rejected before retention; identical archived identities preserved. Artificial tests only.",
+    "completion_recovery": "v2 invocation settles bounded retained batches after operation leases unwind. Published envelopes move to protected completion-archive without deletion; failures retain pending work. Receipt/sidecar/publication retries tested; host capacity and retention provisioning pending.",
+    "journal_safety": "Reserved receipt IDs reject collisions with delivery, writer-active, observations, previous, completion-* and observation-* state. Malformed or dangling journals fail closed without replacement or host operations."
   }
 }

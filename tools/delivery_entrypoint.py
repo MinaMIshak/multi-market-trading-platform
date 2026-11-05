@@ -11,7 +11,7 @@ from pathlib import Path
 import stat
 
 from tools.delivery_containment import _absolute, _protected
-from tools.delivery_runner import DeliveryError, require
+from tools.delivery_runner import DeliveryError, LeaseContention, require
 from tools.delivery_supervisor import DeliverySupervisor
 
 LIMIT = 1024 * 1024
@@ -53,6 +53,17 @@ class PublicationFailure(DeliveryError):
         super().__init__('delivery publication failed after host operation')
         self.operation_error = operation_error
         self.publication_error = publication_error
+
+
+class CompletionDeferred(DeliveryError):
+    """The event is durably retained but NOT published: an operation holds the leases.
+
+    The caller need not spool it. The next invocation or recover_completions settles it.
+    This stays an exception so a caller cannot mistake it for a published receipt.
+    """
+    def __init__(self, path, digest):
+        super().__init__('completion retained; publication deferred')
+        self.path, self.digest = path, digest
 
 
 class HostEntrypoint:
@@ -154,7 +165,10 @@ class HostEntrypoint:
         self._check()
         require(self.publication is not None, 'completion requires delivery-host-v2')
         path, digest = retain_completion(self.publication, **event)
-        return self.completion(path, digest)
+        try:
+            return self.completion(path, digest)
+        except LeaseContention as exc:
+            raise CompletionDeferred(path, digest) from exc
 
     def completion(self, path, digest):
         """Trusted historical callback outside leases; never executes operations."""
@@ -181,9 +195,22 @@ class HostEntrypoint:
             # Rejected policy/request checks above never trigger publication.
             if self.publication is not None:
                 try:
-                    self.publication.publish()
+                    self._settle_and_publish()
                 except Exception as exc:
                     raise PublicationFailure(operation_error, exc) from exc
+
+    def _settle_and_publish(self):
+        """Settle events deferred by this operation, then publish its outcome.
+
+        A retained batch that cannot settle stays retained and is reported as a failure,
+        but the receipt must still describe the operation that just ran.
+        """
+        from tools.delivery_observations import recover_completions
+        try:
+            recover_completions(self.publication)
+        except Exception:
+            self.publication.publish()
+            raise
 
     def _invoke(self, operation, request):
         # Every entry, including a fresh process after restart, reconciles first.

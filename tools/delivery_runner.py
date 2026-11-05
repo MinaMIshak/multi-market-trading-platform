@@ -26,6 +26,10 @@ class DeliveryError(RuntimeError):
     pass
 
 
+class LeaseContention(DeliveryError):
+    """Another host operation holds a lease; nothing was done under it."""
+
+
 def require(condition, reason):
     if not condition:
         raise DeliveryError(reason)
@@ -61,7 +65,7 @@ def _delivery_lease(directory):
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise DeliveryError('concurrent release rejected') from None
+            raise LeaseContention('concurrent release rejected') from None
         yield
     finally:
         os.close(fd)
@@ -73,6 +77,31 @@ def delivery_lock(directory):
         require(not os.path.lexists(directory / 'writer-active.json'),
                 'writer containment requires host reconciliation')
         yield
+
+
+def _journal_record(journal, reason):
+    """Damaged journals block work with a typed error; they are never overwritten."""
+    try:
+        return json.loads(journal.read_text())
+    except (ValueError, RecursionError):
+        raise DeliveryError(reason) from None
+
+
+def _valid_request_id(value):
+    """A request ID names `<id>.json` in state, so it must not name host-owned files."""
+    return (isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,100}', value)
+            and value not in ('delivery', 'writer-active', 'observations', 'previous')
+            and not value.startswith(('completion-', 'observation-')))
+
+
+def require_settled_journal(journal):
+    """Admit new work only over no journal or a terminal one; lexists sees dangling links."""
+    if os.path.lexists(journal):
+        require(journal.is_file() and not journal.is_symlink(), 'unsafe delivery journal')
+        record = _journal_record(journal, 'invalid delivery journal')
+        require(isinstance(record, dict) and record.get('status') in
+                ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
+                'unresolved delivery requires recovery')
 
 
 class GitSource:
@@ -155,9 +184,7 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
         sha = request['head']
         require(isinstance(sha, str) and SHA.fullmatch(sha), 'full SHA required')
         identifier = request['request_id']
-        require(isinstance(identifier, str) and
-                re.fullmatch(r'[A-Za-z0-9_-]{1,100}', identifier) and identifier != 'delivery',
-                'invalid request id')
+        require(_valid_request_id(identifier), 'invalid request id')
         try:
             created = datetime.fromisoformat(request['created_at'])
             age = (now - created).total_seconds()
@@ -165,10 +192,7 @@ def deliver(request, state: Path, source, host: HostOperations, now=None):
             raise DeliveryError('invalid request timestamp') from None
         require(0 <= age <= 900, 'stale or future request')
         journal = state / 'delivery.json'
-        if journal.exists():
-            previous = json.loads(journal.read_text())
-            require(previous.get('status') in ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
-                    'unresolved delivery requires recovery')
+        require_settled_journal(journal)
         receipt = state / (identifier + '.json')
         require(not receipt.exists(), 'replayed request')
         record = {'schema': 'delivery-state-v1', 'request_id': identifier,
@@ -267,14 +291,12 @@ def recover(state: Path, host: HostOperations):
     with delivery_lock(state):
         journal = state / 'delivery.json'
         require(journal.is_file() and not journal.is_symlink(), 'missing or unsafe recovery journal')
-        record = json.loads(journal.read_text())
+        record = _journal_record(journal, 'invalid recovery journal')
         require(isinstance(record, dict) and record.get('schema') == 'delivery-state-v1'
                 and record.get('live_money') is False, 'invalid recovery journal')
         identifier = record.get('request_id')
         sha = record.get('source_head')
-        require(isinstance(identifier, str) and
-                re.fullmatch(r'[A-Za-z0-9_-]{1,100}', identifier) and identifier != 'delivery',
-                'invalid recovery request id')
+        require(_valid_request_id(identifier), 'invalid recovery request id')
         require(isinstance(sha, str) and SHA.fullmatch(sha), 'invalid recovery SHA')
         receipt = state / (identifier + '.json')
         require(not receipt.is_symlink(), 'unsafe recovery receipt')

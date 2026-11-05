@@ -8,10 +8,10 @@ import json
 import os
 from pathlib import Path
 
-from app.delivery_status import public_receipt, observation_records
+from app.delivery_status import public_receipt, observation_records, WRITER_LATCH
 from tools.delivery_containment import _absolute, _protected
 from tools.delivery_entrypoint import protected_bytes, _unique
-from tools.delivery_runner import atomic_json, delivery_lock, require, DeliveryError
+from tools.delivery_runner import atomic_json, require, DeliveryError, _delivery_lease
 from tools.delivery_supervisor import supervisor_lock
 
 
@@ -39,9 +39,15 @@ class DeliveryPublication:
 
     def publish(self):
         self._check()
-        with supervisor_lock(self.state), delivery_lock(self.state):
+        # A writer latch blocks operations, not its own visibility. The leases still
+        # exclude live sessions, and publication never clears or interprets the latch.
+        with supervisor_lock(self.state), _delivery_lease(self.state):
             self._check()
             journal = self.state / 'delivery.json'
+            # lexists: an unsafe or dangling latch still blocks operations.
+            latch = ({WRITER_LATCH: True}
+                     if os.path.lexists(self.state / 'writer-active.json') else {})
+            unavailable = public_receipt(dict(schema='delivery-observation-publication-v1', **latch))
             try:
                 if not os.path.lexists(journal):
                     raw = dict(schema='delivery-observation-publication-v1')
@@ -50,6 +56,8 @@ class DeliveryPublication:
                 # Journal metadata is not an observation authority.
                 if isinstance(raw, dict):
                     raw.pop('observations', None)
+                    raw.pop(WRITER_LATCH, None)
+                    raw.update(latch)
                     try:
                         observations = json.loads(protected_bytes(
                             self.state / 'observations.json', self.owner), object_pairs_hook=_unique)
@@ -58,12 +66,12 @@ class DeliveryPublication:
                         records = {}
                     if records:
                         raw['observations'] = dict(schema='delivery-observations-v1', **records)
-                result = public_receipt(raw)
+                result = public_receipt(raw) or unavailable
                 require(os.path.lexists(journal) or bool(result),
                         'delivery publication source unavailable')
             except (OSError, ValueError, RecursionError, DeliveryError):
                 # Replace historical success with UNKNOWN when source is unreadable.
-                atomic_json(self.destination, {}, mode=0o644)
+                atomic_json(self.destination, unavailable, mode=0o644)
                 raise DeliveryError('delivery publication source unavailable') from None
             atomic_json(self.destination, result, mode=0o644)
             return result

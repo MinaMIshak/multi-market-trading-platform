@@ -15,7 +15,7 @@ def coordinator(setup):
 
 
 def interrupted(setup, phase='CUTOVER_PENDING'):
-    record = dict(schema='delivery-state-v1', request_id='previous', source_head=HEAD,
+    record = dict(schema='delivery-state-v1', request_id='interrupted-cycle', source_head=HEAD,
                   status=phase, live_money=False, started_at=NOW.isoformat())
     if phase == 'CUTOVER_PENDING':
         record['rollback'] = setup[3].snapshot.return_value
@@ -84,10 +84,42 @@ def test_failed_recovery_blocks_writer_and_push(setup, failure, operation):
 @pytest.mark.parametrize('payload', ['{', '[]', '{}'])
 def test_malformed_journal_never_bypassed(setup, payload):
     (setup[1] / 'delivery.json').write_text(payload)
-    with pytest.raises((DeliveryError, ValueError)):
+    with pytest.raises(DeliveryError):
         with coordinator(setup).writer_session():
             pytest.fail('writer entered')
     assert not setup[3].method_calls
+
+
+@pytest.mark.parametrize('payload', [b'{', b'\xff', b'[]', b'[' * 100000],
+                         ids=['open', 'bytes', 'list', 'deep'])
+def test_malformed_journal_is_typed_and_preserved_on_every_path(setup, payload):
+    journal = setup[1] / 'delivery.json'
+    journal.write_bytes(payload)
+    with pytest.raises(DeliveryError):
+        coordinator(setup).startup()
+    with pytest.raises(DeliveryError):
+        deliver(*setup, now=NOW)
+    assert journal.read_bytes() == payload
+    setup[2].push.assert_not_called()
+    assert not setup[3].method_calls
+
+
+def test_writer_recheck_rejects_journal_damaged_after_recovery(setup):
+    (setup[1] / 'delivery.json').write_text('{')
+    supervisor = coordinator(setup)
+    supervisor._recover = lambda: None
+    with pytest.raises(DeliveryError, match='invalid delivery journal'):
+        with supervisor.writer_session():
+            pytest.fail('writer entered')
+
+
+def test_direct_delivery_never_replaces_dangling_journal(setup):
+    journal = setup[1] / 'delivery.json'
+    journal.symlink_to(setup[1] / 'missing')
+    with pytest.raises(DeliveryError, match='unsafe delivery journal'):
+        deliver(*setup, now=NOW)
+    assert journal.is_symlink()
+    setup[2].push.assert_not_called()
 
 
 def test_dangling_journal_is_not_missing(setup):

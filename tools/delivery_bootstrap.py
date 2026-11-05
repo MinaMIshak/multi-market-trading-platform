@@ -12,9 +12,13 @@ from tools.delivery_runner import DeliveryError, require
 
 
 def _gate_sources():
-    """Source of every loaded tools module, so a manifest cannot omit code it trusts."""
+    """Source of every loaded delivery module, so a manifest cannot omit code it trusts.
+
+    app.delivery_status builds the published receipt, so it is delivery code too.
+    """
     return {Path(_absolute(getattr(module, '__file__', None)))
-            for name, module in tuple(sys.modules.items()) if name.startswith('tools.')}
+            for name, module in tuple(sys.modules.items())
+            if name.startswith('tools.') or name == 'app.delivery_status'}
 
 
 def _factory_source(factory):
@@ -32,8 +36,8 @@ def _factory_source(factory):
 class InstalledBootstrap:
     """The host supplies all arguments from immutable installed code.
 
-    Files must include the factory source, every loaded tools module and any other
-    declared Python/policy dependencies. Only those loaded tools modules are enforced;
+    Files must include the factory source, every loaded delivery module and any other
+    declared Python/policy dependencies. Only those loaded modules are enforced;
     the host still owns interpreter/stdlib isolation, bytecode caches and completeness
     for anything else. Pins compare files on disk, not code already imported.
     Never import a factory named by an untrusted request or by this manifest.
@@ -87,6 +91,9 @@ class InstalledBootstrap:
                     'installed bootstrap file pin mismatch')
 
     def invoke(self, operation, request=None):
+        # v2 settles retained completions after the operation, so pin that code first.
+        if self.entrypoint.publication is not None:
+            from tools import delivery_observations  # noqa: F401
         self._check()
         require(self.entrypoint is self._entrypoint, 'bootstrap entrypoint changed')
         return self.entrypoint.invoke(operation, request)

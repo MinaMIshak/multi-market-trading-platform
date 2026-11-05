@@ -248,6 +248,27 @@ def test_v2_publication_failure_retains_both_results(published_setup, operation_
     assert 'private failure' not in str(caught.value)
 
 
+def test_v2_uncertain_writer_cleanup_publishes_blocker_and_keeps_error(published_setup):
+    from app.delivery_status import project_delivery
+    from tools.delivery_process import CleanupError
+    _, supervisor, build, _, destination = published_setup
+    entry = build()
+    entry.invoke('startup')
+    assert project_delivery(json.loads(destination.read_text()))['blocker'] is None
+    marker = supervisor.state / 'writer-active.json'
+    error = CleanupError('uncertain writer cleanup')
+    def uncertain(*args, **kwargs):
+        marker.write_text('{"schema": "writer-active-v1"}')
+        raise error
+    supervisor.run_cycle.side_effect = uncertain
+    with pytest.raises(CleanupError) as caught:
+        entry.invoke('cycle')
+    assert caught.value is error
+    assert marker.exists()
+    view = project_delivery(json.loads(destination.read_text()))
+    assert view['blocker'] == 'WRITER_RECONCILIATION_REQUIRED'
+
+
 @pytest.mark.parametrize('drift', ['publisher', 'destination', 'state', 'owner'])
 def test_v2_binding_drift_blocks_admission(published_setup, drift):
     _, supervisor, build, _, destination = published_setup
@@ -331,11 +352,83 @@ def test_report_completion_retains_and_retries_without_operations(published_setu
     restarted = build()
     result = restarted.report_completion(**event())
     assert result['observations']['latest_codex_cycle']['status'] == 'SUCCEEDED'
-    assert paths[0].read_bytes() == raw
+    assert not paths[0].exists()
+    assert (entry.state / 'completion-archive' / paths[0].name).read_bytes() == raw
     assert journal.read_bytes() == before
     supervisor.startup.assert_not_called()
     supervisor.run_cycle.assert_not_called()
     supervisor.release.assert_not_called()
+
+
+def test_chain_finishing_during_cycle_is_deferred_then_settled(published_setup):
+    from tests.test_delivery_completion import event
+    from tools.delivery_entrypoint import CompletionDeferred
+    from tools.delivery_runner import delivery_lock
+    from tools.delivery_supervisor import supervisor_lock
+    _, supervisor, build, _, destination = published_setup
+    entry = build()
+    deferred = []
+    def cycle(*args, **kwargs):
+        with supervisor_lock(supervisor.state), delivery_lock(supervisor.state):
+            with pytest.raises(CompletionDeferred) as caught:
+                entry.report_completion(**event(kind='egx_chain_status', status='COMPLETED'))
+            deferred.append(caught.value)
+    supervisor.run_cycle.side_effect = cycle
+    entry.invoke('cycle')
+    path = deferred[0].path
+    published = json.loads(destination.read_text())
+    assert published['observations']['egx_chain_status']['evidence_sha256'] == deferred[0].digest
+    assert not path.exists()
+    assert (entry.state / 'completion-archive' / path.name).exists()
+
+
+def test_report_completion_publication_contention_is_deferred(published_setup):
+    from tests.test_delivery_completion import event
+    from tools.delivery_entrypoint import CompletionDeferred
+    from tools.delivery_runner import LeaseContention
+    _, _, build, _, _ = published_setup
+    entry = build()
+    with patch.object(entry.publication, 'publish', side_effect=LeaseContention('busy')):
+        with pytest.raises(CompletionDeferred) as caught:
+            entry.report_completion(**event())
+    assert caught.value.path.exists()
+    result = entry.recover_completions()
+    assert result['observations']['latest_codex_cycle']['evidence_sha256'] == caught.value.digest
+
+
+@pytest.mark.parametrize('operation_fails', [False, True])
+def test_unsettleable_batch_still_runs_operation_and_publishes_it(published_setup, operation_fails):
+    from app.delivery_status import project_delivery
+    from tests.test_delivery_status import receipt
+    from tools.delivery_entrypoint import PublicationFailure
+    _, supervisor, build, journal, destination = published_setup
+    entry = build()
+    bad = entry.state / 'completion-latest_codex_cycle-bad.json'
+    bad.write_text('{')
+    bad.chmod(0o600)
+    error = DeliveryError('private failure')
+    def action(*args, **kwargs):
+        journal.write_text(json.dumps(receipt() | {'status': 'FAILED'}))
+        if operation_fails:
+            raise error
+    supervisor.run_cycle.side_effect = action
+    with pytest.raises(PublicationFailure) as caught:
+        entry.invoke('cycle')
+    supervisor.run_cycle.assert_called_once()
+    assert caught.value.operation_error is (error if operation_fails else None)
+    assert isinstance(caught.value.publication_error, DeliveryError)
+    assert bad.exists()
+    assert project_delivery(json.loads(destination.read_text()))['deployment_result'] == 'FAILED'
+
+
+def test_damaged_sidecar_without_retained_work_does_not_fail_invocation(published_setup):
+    _, supervisor, build, _, destination = published_setup
+    entry = build()
+    sidecar = supervisor.state / 'observations.json'
+    sidecar.write_bytes(b'{')
+    sidecar.chmod(0o600)
+    entry.invoke('startup')
+    assert 'observations' not in json.loads(destination.read_text())
 
 
 def test_report_completion_rejects_legacy_host(setup):

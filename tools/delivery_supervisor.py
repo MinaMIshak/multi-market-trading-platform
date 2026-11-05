@@ -7,12 +7,12 @@ leaving the session. A lock is not a process termination mechanism.
 """
 from contextlib import contextmanager
 import fcntl
-import json
 import os
 from pathlib import Path
 import stat
 
-from tools.delivery_runner import DeliveryError, deliver, delivery_lock, recover, require, _delivery_lease
+from tools.delivery_runner import (LeaseContention, deliver, delivery_lock, recover, require,
+                                   require_settled_journal, _delivery_lease)
 
 
 @contextmanager
@@ -26,7 +26,7 @@ def supervisor_lock(state: Path):
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise DeliveryError('concurrent supervisor operation rejected') from None
+            raise LeaseContention('concurrent supervisor operation rejected') from None
         yield
     finally:
         os.close(fd)
@@ -82,14 +82,7 @@ class DeliverySupervisor:
             with delivery_lock(self.state):
                 # Recheck under lock in case a direct runner interrupted between
                 # recovery and acquisition. Do not run a writer on uncertain state.
-                journal = self.state / 'delivery.json'
-                if os.path.lexists(journal):
-                    require(journal.is_file() and not journal.is_symlink(),
-                            'unsafe delivery journal')
-                    record = json.loads(journal.read_text())
-                    require(isinstance(record, dict) and record.get('status') in
-                            ('SUCCEEDED', 'FAILED', 'ROLLED_BACK'),
-                            'unresolved delivery requires recovery')
+                require_settled_journal(self.state / 'delivery.json')
                 if self.preflight is not None:
                     self.preflight()
                 yield

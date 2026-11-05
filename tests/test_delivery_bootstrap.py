@@ -200,6 +200,15 @@ def test_gate_sources_cover_loaded_tools_modules():
     assert Path(delivery_bootstrap.__file__) in sources
 
 
+def test_gate_sources_cover_receipt_projection_only_from_app():
+    status = SimpleNamespace(__file__='/installed/app/delivery_status.py')
+    other = SimpleNamespace(__file__='/installed/app/unrelated.py')
+    with patch.dict(sys.modules, {'app.delivery_status': status, 'app.unrelated': other}):
+        sources = _gate_sources()
+    assert Path('/installed/app/delivery_status.py') in sources
+    assert Path('/installed/app/unrelated.py') not in sources
+
+
 def test_gate_sources_fail_closed_without_module_file():
     with patch.dict(sys.modules, {'tools.delivery_unknown': SimpleNamespace()}):
         with pytest.raises(DeliveryError):
@@ -298,6 +307,25 @@ def test_completion_dispatch_checks_pins_and_entrypoint(setup):
     with pytest.raises(DeliveryError):
         bootstrap.completion('/host/event.json', 'a' * 64)
     assert entry.return_value.completion.call_count == 1
+
+
+@pytest.mark.parametrize('published', [True, False], ids=['v2', 'v1'])
+def test_invoke_loads_settlement_code_only_for_v2_and_before_pin_check(setup, monkeypatch, published):
+    import tools
+    _, _, _, entry, build = setup
+    bootstrap = build()
+    if not published:
+        entry.return_value.publication = None
+    # Force a real import, because `from tools import x` reuses the package attribute.
+    monkeypatch.delitem(sys.modules, 'tools.delivery_observations', raising=False)
+    monkeypatch.delattr(tools, 'delivery_observations', raising=False)
+    loaded = []
+    def sources():
+        loaded.append('tools.delivery_observations' in sys.modules)
+        return set()
+    with patch('tools.delivery_bootstrap._gate_sources', side_effect=sources):
+        bootstrap.invoke('startup')
+    assert loaded == [published]
 
 
 def test_report_completion_checks_pins_before_retention(setup):
