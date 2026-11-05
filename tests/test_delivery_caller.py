@@ -275,3 +275,96 @@ def test_retry_rechecks_binding_after_callback(caller):
             CompletionRetry(caller, settle).run()
     handoff.assert_not_called()
     assert calls == [1]
+
+
+@pytest.mark.parametrize('settled', [False, True])
+def test_archived_time_conflict_rejected_without_stalling_later_event(caller, setup, settled):
+    original = event(observed_at='2026-11-03T00:00:00+00:00')
+    path, digest = caller.retain(**original)
+    raw = path.read_bytes()
+    caller.handoff()
+    if settled:
+        recover_completions(setup[0])
+    restarted = CompletionOutbox(caller.state, caller.receiver_state, caller.accept,
+                                owner=os.getuid())
+    with pytest.raises(DeliveryError, match='observation time conflict'):
+        restarted.retain(**event(event_id='conflict',
+                                observed_at='2026-11-03T02:00:00+02:00'))
+    assert not (caller.state / 'completion-latest_codex_cycle-conflict.json').exists()
+    assert restarted.retain(**original)[1] == digest
+    assert (caller.state / ARCHIVE / path.name).read_bytes() == raw
+    later, _ = restarted.retain(**event(event_id='later'))
+    assert CompletionRetry(restarted, lambda: recover_completions(setup[0])).run()['transferred'] == 1
+    assert (setup[0].state / ARCHIVE / later.name).exists()
+
+
+def test_receiver_archive_rejects_historical_conflict_after_newer_observation(caller, setup):
+    receiver = setup[0]
+    retain_completion(receiver, **event(observed_at='2026-11-02T00:00:00+00:00'))
+    recover_completions(receiver)
+    retain_completion(receiver, **event(event_id='newer'))
+    recover_completions(receiver)
+    with pytest.raises(DeliveryError, match='observation time conflict'):
+        retain_completion(receiver, **event(event_id='conflict',
+                          observed_at='2026-11-02T00:00:00+00:00'))
+
+
+@pytest.mark.parametrize('archived', [False, True])
+def test_legacy_conflicting_batch_rejected_before_any_receiver_call(caller, archived):
+    from tools.delivery_observations import completion_payload
+    first, _ = caller.retain(**event())
+    if archived:
+        caller.handoff()
+    _, raw, _ = completion_payload(**event(event_id='legacy-conflict'))
+    bad = caller.state / 'completion-latest_codex_cycle-legacy-conflict.json'
+    bad.write_bytes(raw)
+    bad.chmod(0o400)
+    with patch.object(caller, 'accept') as accept:
+        # Keep the pinned binding intact while instrumenting the callback.
+        instrumented = CompletionOutbox(caller.state, caller.receiver_state, accept,
+                                       owner=os.getuid())
+        with pytest.raises(DeliveryError, match='observation time conflict'):
+            instrumented.handoff()
+        accept.assert_not_called()
+    assert bad.read_bytes() == raw
+    assert (caller.state / ARCHIVE / first.name if archived else first).exists()
+
+
+@pytest.mark.parametrize('damage', ['malformed', 'symlink', 'filename', 'unsafe_root'])
+def test_damaged_archive_blocks_new_admission_preserving_retry(caller, damage):
+    path, pin = caller.retain(**event())
+    caller.handoff()
+    archive = caller.state / ARCHIVE
+    bad = archive / 'completion-latest_codex_cycle-damaged.json'
+    if damage == 'unsafe_root':
+        archive.chmod(0o777)
+    elif damage == 'symlink':
+        bad.symlink_to(archive / path.name)
+    else:
+        bad.write_bytes(b'{' if damage == 'malformed' else (archive / path.name).read_bytes())
+        bad.chmod(0o400)
+    with pytest.raises((DeliveryError, OSError)):
+        caller.retain(**event(event_id='later', observed_at='2026-11-04T01:00:00+00:00'))
+    assert not (caller.state / 'completion-latest_codex_cycle-later.json').exists()
+    if damage != 'unsafe_root':
+        assert caller.retain(**event())[1] == pin
+
+
+def test_archive_time_identity_is_scoped_by_kind(caller):
+    caller.retain(**event())
+    caller.handoff()
+    caller.retain(**event(kind='egx_chain_status', status='COMPLETED'))
+    assert caller.handoff()['transferred'] == 1
+
+
+def test_archive_history_does_not_consume_pending_capacity(caller):
+    with patch('tools.delivery_observations.MAX_PENDING_EVENTS', 1):
+        for day in (1, 2, 3):
+            caller.retain(**event(event_id=f'day-{day}',
+                                 observed_at=f'2026-11-0{day}T00:00:00+00:00'))
+            # Receiver capacity is independent of the caller's permanent history.
+            with patch('tools.delivery_observations.MAX_PENDING_EVENTS', 128):
+                assert caller.handoff()['transferred'] == 1
+        with pytest.raises(DeliveryError, match='observation time conflict'):
+            caller.retain(**event(event_id='historical-conflict',
+                                 observed_at='2026-11-01T00:00:00+00:00'))

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_HANDOFF_VALIDATION",
-  "current_capability": "Validated preserved delivery hardening: damaged receipts fail with typed conflicts, completed operation results survive publication failure, and the app package source is manifest-pinned. Expanded offline regression coverage; no host installation or deployment.",
-  "starting_head": "64c6a930fe8a39868f2f562949e8d10372d99447",
-  "head": "64c6a930fe8a39868f2f562949e8d10372d99447",
+  "phase": "AUTONOMOUS_DELIVERY_ARCHIVE_INTEGRITY",
+  "current_capability": "Archived completion timestamp identity is checked during caller/receiver admission and caller batch preflight. Conflicting identities fail closed across restart and newer observations; exact retries preserve evidence. No host deployment or scheduler change.",
+  "starting_head": "7a8ac9f4d498fcd9e1ef875a5591f295bcf3792d",
+  "head": "7a8ac9f4d498fcd9e1ef875a5591f295bcf3792d",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected delivery/checkpoint suites: umask 022 final 1055 passed, 85 subtests (189.79s); umask 002 1054 passed, 85 subtests (200.13s), plus subsequently added real-package omission test passed separately under 002. Checkpoint/SYSTEM plus real-package test: 15 passed, 85 subtests. Four disposable mutation checks detected regressions. Initial corruption fixture failed due to read-only receipt and was corrected; an added package test incorrectly expected unprotected worktree code to satisfy host permissions, corrected to test omission rejection only. Final diff check passed. Full platform/socket tests not rerun; exact-release host acceptance pending.",
+  "tests": "Affected completion/caller/observations/producer/publication/entrypoint/bootstrap suites: 350 passed in 18.07s. Initial focused run: 126 passed, 1 failure because unsafe-archive fixture corrupted the root before the newly stricter admission; moved corruption after retention to retain archive-failure coverage. Caller suite including archive-capacity regression plus checkpoint/SYSTEM checks: 54 passed, 85 subtests in 2.11s. git diff --check passed. Full platform/socket suite not rerun; authorized exact-release host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "After commit bridge and exact origin sync, resolve the reproduced caller archive/time-conflict stall without deleting evidence or relaxing identity checks; add settlement backlog visibility and define host supervisor handling of PublicationFailure without cutover replay. Then provision pinned callers/retry scheduling, supervisor v2 and read-only publication mount through the authorized host mechanism; run exact SIG-v1 full/socket/runtime/spare-port and rollback gates. Scanner v2 remains queued behind handoff/origin/delivery prerequisites.",
+  "next_action": "After commit bridge and exact origin sync, add settlement backlog visibility and provenance-preserving host repair workflow for legacy conflicting/damaged evidence; define installed supervisor handling of PublicationFailure without replay. Measure archive-history admission cost and provision pinned callers/retry scheduling, supervisor v2 and publication mount through authorized host mechanism. Run exact SIG-v1 full/socket/runtime/spare-port and rollback gates before cutover. Scanner v2 remains queued behind delivery prerequisites.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -243,7 +243,8 @@
     "caller_outbox": "Protected disjoint caller/receiver roots, bounded validated batch, locked exact-byte handoff, retained-only acknowledgement and permanent caller archive implemented. Temporary-file tests cover queue/storage rejection, crash after acceptance, newer receiver observations, partial handoff, concurrent rejection, malformed/symlink evidence and local capacity failure. Host callers, durable originating job records and periodic retries remain unprovisioned; no publication or runtime acceptance inferred.",
     "completion_retry": "CompletionRetry binds trusted outbox and settlement callback, performs receiver settlement/handoff/settlement without overlapping caller and receiver leases, preserves both phase failures and supports restart. Temporary-file full-queue, partial-transfer, publication-failure, busy-lease, binding-drift and termination tests only. Host retry scheduling and deployment remain unverified.",
     "publication_failure": "Completed operation result retained privately alongside typed publication/settlement error. Unsettleable batch regression confirms journal publication and evidence preservation; no automatic delivery replay. Termination still relies on durable journal.",
-    "open_recovery_findings": "Disposable reproduction confirms archived caller event permits same-time conflicting local event, whose receiver rejection stalls later events. Corrupt receipts intentionally block settlement; explicit repair procedure, backlog visibility and installed supervisor failure handling remain required before caller adoption.",
-    "handoff_validation_evidence": "/home/egx-agent/er1-autopilot/state/validation/delivery-handoff-64c6a93"
+    "open_recovery_findings": "New archived same-time conflicts are rejected before retention; caller preflight rejects legacy batch/archive conflicts before receiver callbacks. Historical receiver conflicts remain rejected after newer observations. Existing conflicting or damaged evidence stays preserved and fail-closed; host repair, backlog visibility and installed failure handling remain pending. Archive scan streams history but cost grows with history and pending batch size.",
+    "handoff_validation_evidence": "/home/egx-agent/er1-autopilot/state/validation/delivery-handoff-64c6a93",
+    "archive_timestamp_integrity": "Shared protected canonical archive validation under spool lease plus caller batch preflight. Temporary-file tests cover equivalent timestamps, restart, exact retries, later-event progress, newer receiver observations, kind separation, malformed/symlink/filename/unsafe-root rejection, and preserved legacy conflicts. No deletion, timestamp rewriting or host execution."
   }
 }

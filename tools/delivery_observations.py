@@ -185,8 +185,8 @@ def _archive_settled(publication, paths):
 def _reject_time_conflict(publication, kind, moment, digest):
     """Keep an ambiguous event out of retention, where it would block all recovery.
 
-    Unreadable state is left for recording and recovery to reject: damage elsewhere
-    must not stop this event's evidence from being retained.
+    Unreadable sidecars/pending siblings are left for recovery to reject. Permanent
+    archive damage fails admission closed because it may hide an identity conflict.
     """
     try:
         prior = _existing_observations(publication).get(kind)
@@ -194,6 +194,7 @@ def _reject_time_conflict(publication, kind, moment, digest):
         prior = None
     require(not prior or datetime.fromisoformat(prior['observed_at']) != moment
             or prior['evidence_sha256'] == digest, 'observation time conflict')
+    _reject_archived_time_conflict(publication, kind, moment, digest)
     prefix = 'completion-' + kind + '-'
     with os.scandir(publication.state) as entries:
         names = [e.name for e in entries if e.name.startswith(prefix) and e.name.endswith('.json')]
@@ -206,6 +207,33 @@ def _reject_time_conflict(publication, kind, moment, digest):
         except (DeliveryError, OSError, ValueError, TypeError):
             continue
         require(observed != moment, 'observation time conflict')
+
+
+def _reject_archived_time_conflict(publication, kind, moment, digest):
+    """Archive identities remain authoritative after the latest observation advances.
+
+    Caller holds the spool lease. Stream permanent evidence rather than applying
+    the pending-queue limit to history. Damage fails closed; never prune or silently
+    ignore an archived identity. Exact retries bypass admission in retain_completion.
+    """
+    if not os.path.lexists(publication.state / ARCHIVE):
+        return
+    root = _archive_root(publication)
+    prefix = 'completion-' + kind + '-'
+    with os.scandir(root) as entries:
+        for entry in entries:
+            if not (entry.name.startswith(prefix) and entry.name.endswith('.json')):
+                continue
+            path = root / entry.name
+            raw = protected_bytes(path, publication.owner)
+            pin = hashlib.sha256(raw).hexdigest()
+            event = _completion_event(publication, path, pin)
+            payload = {key: value for key, value in event.items() if key != 'schema'}
+            _, canonical, observed = completion_payload(**payload)
+            require(raw == canonical and event['kind'] == kind
+                    and entry.name == prefix + event['event_id'] + '.json',
+                    'completion archive identity mismatch')
+            require(observed != moment or pin == digest, 'observation time conflict')
 
 
 def _existing_receipt(path, owner):

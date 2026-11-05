@@ -1239,3 +1239,30 @@ termination propagates immediately, leaving durable envelopes for startup recove
 A completed tick reports transfer count only, never per-event publication, runtime
 health or deployment success. Host scheduling, protected originating job records,
 capacity monitoring and installation remain required and unverified.
+
+### Archived completion timestamp integrity
+
+New retention validates permanent envelopes of the same observation kind under
+the spool lease. A different identity at the same instant is rejected even after
+handoff, restart, or a newer receiver observation. Equivalent timezone offsets
+denote the same instant. Exact retained/archived retries still bypass admission;
+different observation kinds may share timestamps. The caller also checks its
+entire pending batch against itself and its archive before any receiver callback,
+so pre-existing conflicting work cannot cause a partially transferred batch.
+
+Archive roots, canonical bytes, filenames and event fields are validated. Damaged
+matching archive evidence fails closed rather than disappearing from conflict
+checks. No files are deleted, timestamps rewritten, or delivery operations replayed.
+New admission streams same-kind history; cost grows with permanent archive size
+(handoff repeats this check for each bounded pending event). Host retention capacity
+and latency still need measurement before installation; no bounded archive-cost
+claim is made.
+
+A legacy conflicting pending envelope remains preserved and blocks that caller's
+handoff. Repair requires independent provenance review through an authorized host
+procedure, preserving the original bytes and identifying the authoritative event;
+automatic conflict resolution or evidence pruning is deliberately not implemented.
+Other caller roots remain independent. Backlog visibility and host repair tooling
+remain pending. A `PublicationFailure` after a completed delivery must be handled
+as evidence settlement work using its retained operation result and durable journal,
+never as permission to replay a cutover.

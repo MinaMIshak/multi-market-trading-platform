@@ -424,9 +424,9 @@ def test_unsafe_archive_root_keeps_envelope(setup):
     from tools.delivery_observations import retain_completion
     publisher = setup[0]
     root = publisher.state / 'completion-archive'
+    path, digest = retain_completion(publisher, **event())
     root.mkdir()
     root.chmod(0o777)
-    path, digest = retain_completion(publisher, **event())
     record_completion(publisher, path, digest)
     assert path.exists() and not list(root.iterdir())
 

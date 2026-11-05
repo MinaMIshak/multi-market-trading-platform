@@ -12,7 +12,7 @@ from tools.delivery_entrypoint import protected_bytes
 from tools.delivery_observations import (
     ARCHIVE, MAX_PENDING_BYTES, _archive_root, _completion_event,
     _fsync_directory, _pending_paths, _spool_lock, completion_payload,
-    retain_completion,
+    retain_completion, _reject_archived_time_conflict,
 )
 from tools.delivery_runner import DeliveryError, require
 
@@ -53,7 +53,7 @@ class CompletionOutbox:
         self._check()
         with _spool_lock(self.state):
             self._check()
-            batch, total = [], 0
+            batch, total, moments = [], 0, {}
             for path in _pending_paths(self.state):
                 raw = protected_bytes(path, self.owner)
                 total += len(raw)
@@ -65,6 +65,11 @@ class CompletionOutbox:
                 require(raw == canonical, 'noncanonical caller envelope')
                 require(path.name == 'completion-' + event['kind'] + '-'
                         + event['event_id'] + '.json', 'caller filename identity mismatch')
+                key = (event['kind'], moment)
+                require(key not in moments or moments[key] == digest,
+                        'observation time conflict')
+                moments[key] = digest
+                _reject_archived_time_conflict(self, event['kind'], moment, digest)
                 batch.append((moment, path.name, path, raw, digest, event))
             transferred = 0
             for _, _, path, raw, digest, event in sorted(batch):
