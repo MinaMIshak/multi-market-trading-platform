@@ -6,7 +6,7 @@ import pytest
 
 from tests.test_delivery_publication import setup
 from tests.test_delivery_completion import event
-from tools.delivery_caller import CompletionOutbox
+from tools.delivery_caller import CompletionOutbox, CompletionRetry, CompletionRetryError
 from tools.delivery_observations import retain_completion, recover_completions, ARCHIVE
 from tools.delivery_runner import DeliveryError
 
@@ -144,3 +144,118 @@ def test_archive_fsync_failure_preserves_receiver_and_caller_evidence(caller, se
     assert (setup[0].state / path.name).exists()
     assert (caller.state / ARCHIVE / path.name).exists()
     assert caller.handoff()['transferred'] == 0
+
+
+def test_retry_frees_full_receiver_before_handoff(caller, setup):
+    receiver = setup[0]
+    retain_completion(receiver, **event(event_id='old', observed_at='2026-11-03T00:00:00+00:00'))
+    path, _ = caller.retain(**event())
+    with patch('tools.delivery_observations.MAX_PENDING_EVENTS', 1):
+        with pytest.raises(DeliveryError, match='capacity exceeded'):
+            caller.handoff()
+        result = CompletionRetry(caller, lambda: recover_completions(receiver)).run()
+    assert result == dict(status='RETRY_COMPLETED', transferred=1,
+                          publication_verified=False, live_money=False)
+    assert (receiver.state / ARCHIVE / path.name).exists()
+    assert not list(receiver.state.glob('completion-*.json'))
+
+
+def test_retry_settles_partial_transfer_and_restart(caller, setup):
+    receiver = setup[0]
+    first, _ = caller.retain(**event(observed_at='2026-11-03T00:00:00+00:00'))
+    second, _ = caller.retain(**event(event_id='second'))
+    def accept(**kw):
+        if kw['event_id'] == 'second':
+            raise OSError('unavailable')
+        return retain_completion(receiver, **kw)
+    partial = CompletionOutbox(caller.state, caller.receiver_state, accept, owner=os.getuid())
+    with pytest.raises(CompletionRetryError) as caught:
+        CompletionRetry(partial, lambda: recover_completions(receiver)).run()
+    assert [phase for phase, _ in caught.value.failures] == ['handoff']
+    assert (receiver.state / ARCHIVE / first.name).exists()
+    assert second.exists()
+    assert CompletionRetry(caller, lambda: recover_completions(receiver)).run()['transferred'] == 1
+    assert (receiver.state / ARCHIVE / second.name).exists()
+
+
+def test_retry_pre_settlement_failure_keeps_local_event(caller):
+    path, _ = caller.retain(**event())
+    def fail():
+        raise DeliveryError('lease busy')
+    with patch.object(caller, 'handoff') as handoff, pytest.raises(CompletionRetryError) as caught:
+        CompletionRetry(caller, fail).run()
+    handoff.assert_not_called()
+    assert path.exists()
+    assert caught.value.failures[0][0] == 'before_handoff'
+
+
+def test_retry_preserves_both_phase_failures(caller):
+    calls = []
+    def settle():
+        calls.append('settle')
+        if len(calls) == 2:
+            raise OSError('publication failed')
+    with patch.object(caller, 'handoff', side_effect=DeliveryError('retention failed')):
+        with pytest.raises(CompletionRetryError) as caught:
+            CompletionRetry(caller, settle).run()
+    assert [phase for phase, _ in caught.value.failures] == ['handoff', 'after_handoff']
+    assert isinstance(caught.value.failures[0][1], DeliveryError)
+    assert isinstance(caught.value.failures[1][1], OSError)
+
+
+def test_retry_post_settlement_failure_recovers_archived_caller(caller, setup):
+    path, _ = caller.retain(**event())
+    calls = []
+    def settle():
+        calls.append(1)
+        if len(calls) == 2:
+            raise OSError('publication unavailable')
+        return recover_completions(setup[0])
+    with pytest.raises(CompletionRetryError):
+        CompletionRetry(caller, settle).run()
+    assert (caller.state / ARCHIVE / path.name).exists()
+    assert (setup[0].state / path.name).exists()
+    assert CompletionRetry(caller, settle).run()['transferred'] == 0
+    assert (setup[0].state / ARCHIVE / path.name).exists()
+
+
+def test_retry_binding_drift_rejected(caller):
+    retry = CompletionRetry(caller, lambda: None)
+    retry.settle = lambda: None
+    with pytest.raises(DeliveryError, match='retry binding'):
+        retry.run()
+
+
+@pytest.mark.parametrize('failure', [KeyboardInterrupt, SystemExit])
+def test_retry_does_not_swallow_termination(caller, failure):
+    calls = []
+    def settle():
+        calls.append(1)
+    with patch.object(caller, 'handoff', side_effect=failure):
+        with pytest.raises(failure):
+            CompletionRetry(caller, settle).run()
+    assert calls == [1]
+
+
+def test_retry_busy_receiver_keeps_event_then_recovers(caller, setup):
+    from tools.delivery_supervisor import supervisor_lock
+    path, _ = caller.retain(**event())
+    retry = CompletionRetry(caller, lambda: recover_completions(setup[0]))
+    with supervisor_lock(setup[0].state):
+        with pytest.raises(CompletionRetryError) as caught:
+            retry.run()
+    assert caught.value.failures[0][0] == 'before_handoff'
+    assert path.exists()
+    assert retry.run()['transferred'] == 1
+
+
+def test_retry_rechecks_binding_after_callback(caller):
+    calls = []
+    def settle():
+        calls.append(1)
+        caller.owner = -1
+    with patch.object(caller, 'handoff') as handoff:
+        with pytest.raises(DeliveryError, match='binding changed'):
+            CompletionRetry(caller, settle).run()
+    handoff.assert_not_called()
+    assert calls == [1]

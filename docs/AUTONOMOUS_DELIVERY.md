@@ -1211,3 +1211,24 @@ installed manifest. Host authors still attest event semantics and configure
 protected roots, retry scheduling, process isolation and the read-only API mount.
 Temporary-file failure tests establish protocol behavior only; no installation,
 scheduler adoption, runtime acceptance or deployment was performed.
+
+### Bounded scheduled completion retry
+
+Installed callers may use `CompletionRetry(outbox,
+bootstrap.recover_completions).run()` at startup and on each host-scheduled retry.
+Both callbacks and all loaded delivery modules must be pinned by the installed
+bootstrap. One tick first settles the receiver, hands off one bounded caller
+batch, then settles again. This ordering frees a full receiver queue before
+admission and publishes retained partial transfers even if a later handoff fails.
+The caller spool lease is released before receiver operation leases are taken.
+A busy receiver or failed initial gate stops that tick before handoff; new producer
+records can still be retained locally through the independent outbox API.
+
+`CompletionRetryError.failures` preserves phase names and original errors. Handoff
+and final settlement failures are both retained when both occur. The host must
+record the failed tick and schedule a later retry; no internal sleep, unbounded
+loop, producer replay, release invocation or evidence deletion occurs. Process
+termination propagates immediately, leaving durable envelopes for startup recovery.
+A completed tick reports transfer count only, never per-event publication, runtime
+health or deployment success. Host scheduling, protected originating job records,
+capacity monitoring and installation remain required and unverified.

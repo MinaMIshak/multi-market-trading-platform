@@ -14,7 +14,7 @@ from tools.delivery_observations import (
     _fsync_directory, _pending_paths, _spool_lock, completion_payload,
     retain_completion,
 )
-from tools.delivery_runner import require
+from tools.delivery_runner import DeliveryError, require
 
 
 class CompletionOutbox:
@@ -87,3 +87,58 @@ class CompletionOutbox:
                 transferred += 1
             return {'status': 'RETAINED_BY_RECEIVER', 'transferred': transferred,
                     'publication_verified': False, 'live_money': False}
+
+
+class CompletionRetryError(DeliveryError):
+    """A retry remains incomplete; original phase failures stay inspectable."""
+    def __init__(self, failures):
+        self.failures = tuple(failures)
+        super().__init__('completion retry incomplete: '
+                         + ', '.join(phase for phase, _ in self.failures))
+
+
+class CompletionRetry:
+    """One bounded host-scheduled retry, never a delivery or producer replay.
+
+    Installed code supplies the pinned bootstrap recovery callback. Settle first
+    to free receiver capacity, then hand off, then settle even a partial handoff.
+    No caller spool lease is held while taking receiver operation leases.
+    """
+    def __init__(self, outbox, settle):
+        require(type(outbox) is CompletionOutbox and callable(settle),
+                'trusted outbox and settlement callback required')
+        self.outbox, self.settle = outbox, settle
+        self._binding = (outbox, settle, os.getpid())
+        self._check()
+
+    def _check(self):
+        require((self.outbox, self.settle, os.getpid()) == self._binding,
+                'retry binding changed')
+        self.outbox._check()
+
+    def run(self):
+        self._check()
+        # An unavailable receiver or failed policy gate stops admission this tick.
+        # Local retention remains independent, including during writer sessions.
+        try:
+            self.settle()
+        except (DeliveryError, OSError) as exc:
+            raise CompletionRetryError([('before_handoff', exc)]) from exc
+        self._check()
+        failures, handoff = [], None
+        try:
+            handoff = self.outbox.handoff()
+        except (DeliveryError, OSError) as exc:
+            failures.append(('handoff', exc))
+        # Do not hide partial acceptance behind the handoff failure. Settlement
+        # is safe to retry and never clears or replays the writer/delivery job.
+        self._check()
+        try:
+            self.settle()
+        except (DeliveryError, OSError) as exc:
+            failures.append(('after_handoff', exc))
+        self._check()
+        if failures:
+            raise CompletionRetryError(failures) from failures[0][1]
+        return {'status': 'RETRY_COMPLETED', 'transferred': handoff['transferred'],
+                'publication_verified': False, 'live_money': False}
