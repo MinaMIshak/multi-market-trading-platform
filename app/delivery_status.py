@@ -80,14 +80,37 @@ def project_observations(raw, now=None):
     return result
 
 
+def settlement_snapshot(raw):
+    """Fixed counters only; inventory never certifies validity or delivery."""
+    if not isinstance(raw, dict) or raw.get('status') not in ('INVENTORIED', 'UNAVAILABLE'):
+        return None
+    try:
+        observed = datetime.fromisoformat(raw['observed_at'])
+        if observed.tzinfo is None:
+            return None
+    except (KeyError, ValueError, TypeError):
+        return None
+    result = dict(status=raw['status'], observed_at=observed.isoformat(),
+                  evidence_scope='RECEIVER_PENDING_INVENTORY_ONLY')
+    if raw['status'] == 'INVENTORIED':
+        count, size = raw.get('pending_count'), raw.get('pending_bytes')
+        if (type(count) is not int or not 0 <= count <= 128
+                or type(size) is not int or not 0 <= size <= 8 * 1024 * 1024):
+            return None
+        result.update(pending_count=count, pending_bytes=size)
+    return result
+
+
 def project_delivery(raw, *, now=None):
     result = dict.fromkeys(('source_head', 'origin_sync', 'deployed_release',
                            'latest_codex_cycle', 'latest_claude_review', 'tests',
                            'candidate_validation', 'deployment_result', 'scheduler_target',
                            'scheduler_health', 'egx_chain_status', 'us_chain_status',
-                           'blocker', 'started_at', 'live_money'))
+                           'blocker', 'started_at', 'live_money', 'settlement_backlog'))
     result.update(status='UNAVAILABLE', evidence_scope='HISTORICAL_RECEIPT_ONLY',
                   runtime_verified=False)
+    if isinstance(raw, dict):
+        result['settlement_backlog'] = settlement_snapshot(raw.get('settlement_backlog'))
     if isinstance(raw, dict) and raw.get(WRITER_LATCH) is True:
         result['blocker'] = 'WRITER_RECONCILIATION_REQUIRED'
     if isinstance(raw, dict) and raw.get('schema') == 'delivery-observation-publication-v1':
@@ -142,6 +165,8 @@ def public_receipt(raw):
     """Reconstruct a minimal receipt without copying private strings or mappings."""
     view = project_delivery(raw)
     latch = {WRITER_LATCH: True} if isinstance(raw, dict) and raw.get(WRITER_LATCH) is True else {}
+    if view['settlement_backlog'] is not None:
+        latch['settlement_backlog'] = view['settlement_backlog']
     if view['status'] != 'AVAILABLE':
         observations = (observation_records(raw.get('observations'))
                         if isinstance(raw, dict) and raw.get('schema') ==

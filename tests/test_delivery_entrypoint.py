@@ -227,7 +227,12 @@ def test_v2_publishes_success_and_failure_after_leases(published_setup, operatio
         assert caught.value is error
     else:
         entry.invoke(operation, {} if operation == 'release' else None)
-    assert project_delivery(json.loads(destination.read_text())) == project_delivery(json.loads(journal.read_text()))
+    view = project_delivery(json.loads(destination.read_text()))
+    snapshot = view.pop("settlement_backlog")
+    assert snapshot["status"] == "INVENTORIED" and snapshot["pending_count"] == 0
+    expected = project_delivery(json.loads(journal.read_text()))
+    assert expected.pop("settlement_backlog") is None
+    assert view == expected
     assert SECRET not in destination.read_text()
 
 

@@ -4,6 +4,7 @@ Invoke after supervisor operations (including failures), outside their leases.
 The public directory must be disjoint from private state and writable only by the
 trusted host owner. Mount only that directory read-only into the API.
 """
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,24 @@ class DeliveryPublication:
             _protected(self.destination, self.owner)
             require(self.destination.is_file(), 'invalid publication destination')
 
+    def _backlog(self):
+        # Operation leases precede spool lease; retention takes only spool.
+        # Lazy import avoids the entrypoint/publication import cycle.
+        from tools.delivery_observations import _spool_lock, _pending_paths, MAX_PENDING_BYTES
+        snapshot = dict(status='UNAVAILABLE', observed_at=datetime.now(timezone.utc).isoformat())
+        try:
+            with _spool_lock(self.state):
+                self._check()
+                paths = _pending_paths(self.state)
+                total = 0
+                for path in paths:
+                    total += len(protected_bytes(path, self.owner))
+                    require(total <= MAX_PENDING_BYTES, 'completion inventory capacity exceeded')
+                snapshot.update(status='INVENTORIED', pending_count=len(paths), pending_bytes=total)
+        except (OSError, ValueError, DeliveryError):
+            pass
+        return snapshot
+
     def publish(self):
         self._check()
         # A writer latch blocks operations, not its own visibility. The leases still
@@ -47,6 +66,9 @@ class DeliveryPublication:
             # lexists: an unsafe or dangling latch still blocks operations.
             latch = ({WRITER_LATCH: True}
                      if os.path.lexists(self.state / 'writer-active.json') else {})
+            backlog = self._backlog()
+            if backlog['status'] != 'INVENTORIED' or backlog['pending_count']:
+                latch['settlement_backlog'] = backlog
             unavailable = public_receipt(dict(schema='delivery-observation-publication-v1', **latch))
             try:
                 if not os.path.lexists(journal):
@@ -57,6 +79,9 @@ class DeliveryPublication:
                 if isinstance(raw, dict):
                     raw.pop('observations', None)
                     raw.pop(WRITER_LATCH, None)
+                    raw.pop('settlement_backlog', None)
+                    if os.path.lexists(journal):
+                        raw['settlement_backlog'] = backlog
                     raw.update(latch)
                     try:
                         observations = json.loads(protected_bytes(

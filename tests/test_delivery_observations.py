@@ -107,6 +107,7 @@ def test_republication_does_not_refresh_observation_time(setup):
     path.chmod(0o600)
     first = publisher.publish()
     second = publisher.publish()
-    assert first == second
+    from tests.test_delivery_completion import evidence_only
+    assert evidence_only(first) == evidence_only(second)
     later = project_delivery(second, now=NOW + timedelta(days=8))
     assert all(later[key]['freshness'] == 'STALE' for key in OBSERVATIONS)

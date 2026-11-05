@@ -52,7 +52,7 @@ def test_publish_to_api_preserves_private_source(setup, monkeypatch):
     assert destination.stat().st_mode & 0o777 == 0o644
     assert json.loads(destination.read_text()) == result
     monkeypatch.setenv('EGX_DELIVERY_RECEIPT', str(destination))
-    assert load_delivery_status() == project_delivery(receipt())
+    assert load_delivery_status() == project_delivery(receipt() | {"settlement_backlog": result["settlement_backlog"]})
 
 
 @pytest.mark.parametrize('payload', [b'{', b'[]', b'{"schema":1,"schema":2}', b'x' * 1048577], ids=['malformed', 'array', 'duplicate', 'oversized'])

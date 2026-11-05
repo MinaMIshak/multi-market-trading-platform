@@ -390,7 +390,7 @@ def render_delivery(state):
     fields = ('status', 'source_head', 'origin_sync', 'deployed_release',
               'latest_codex_cycle', 'latest_claude_review', 'tests',
               'candidate_validation', 'deployment_result', 'scheduler_target',
-              'scheduler_health', 'egx_chain_status', 'us_chain_status', 'blocker', 'started_at')
+              'scheduler_health', 'settlement_backlog', 'egx_chain_status', 'us_chain_status', 'blocker', 'started_at')
     return ('<section><h2>Autonomous delivery</h2><p>Historical receipt only; '
             'not current deployment or scheduler health. Unconnected cycle, review and chain '
             'observations remain UNKNOWN. LIVE_MONEY=DISABLED.</p><table><tbody>'

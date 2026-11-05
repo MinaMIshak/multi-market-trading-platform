@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "AUTONOMOUS_DELIVERY_ARCHIVE_INTEGRITY",
-  "current_capability": "Archived completion timestamp identity is checked during caller/receiver admission and caller batch preflight. Conflicting identities fail closed across restart and newer observations; exact retries preserve evidence. No host deployment or scheduler change.",
-  "starting_head": "7a8ac9f4d498fcd9e1ef875a5591f295bcf3792d",
-  "head": "7a8ac9f4d498fcd9e1ef875a5591f295bcf3792d",
+  "phase": "AUTONOMOUS_DELIVERY_SETTLEMENT_VISIBILITY",
+  "current_capability": "Bounded receiver settlement backlog inventory published through sanitized delivery receipts and SYSTEM. Protected count/byte snapshots distinguish unreadable inventory; no settlement, host health or release acceptance inferred. Existing exact evidence and retry semantics preserved.",
+  "starting_head": "f6afe548baa40c45430ff0ae1d9433d7346b2fd0",
+  "head": "f6afe548baa40c45430ff0ae1d9433d7346b2fd0",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "Affected completion/caller/observations/producer/publication/entrypoint/bootstrap suites: 350 passed in 18.07s. Initial focused run: 126 passed, 1 failure because unsafe-archive fixture corrupted the root before the newly stricter admission; moved corruption after retention to retain archive-failure coverage. Caller suite including archive-capacity regression plus checkpoint/SYSTEM checks: 54 passed, 85 subtests in 2.11s. git diff --check passed. Full platform/socket suite not rerun; authorized exact-release host acceptance pending.",
+  "tests": "Affected publication/completion/status/observations/caller/entrypoint/bootstrap/producer/checkpoint/SYSTEM suites: 415 passed, 85 subtests in 18.51s. Extended backlog suite: 14 passed. Initial runs exposed snapshot-versus-durable-evidence equality assertions; updated comparisons preserve all evidence fields and explicitly test backlog transitions. git diff --check passed. Full/socket suite not rerun; exact-release host acceptance pending.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "After commit bridge and exact origin sync, add settlement backlog visibility and provenance-preserving host repair workflow for legacy conflicting/damaged evidence; define installed supervisor handling of PublicationFailure without replay. Measure archive-history admission cost and provision pinned callers/retry scheduling, supervisor v2 and publication mount through authorized host mechanism. Run exact SIG-v1 full/socket/runtime/spare-port and rollback gates before cutover. Scanner v2 remains queued behind delivery prerequisites.",
+  "next_action": "After commit bridge and exact origin sync, implement protected digest-bound provenance-preserving repair planning for legacy damaged/conflicting completion evidence; no automatic deletion or timestamp changes. Provision pinned callers/retry scheduling, supervisor v2 publication mount and explicit PublicationFailure handling without replay through authorized host mechanism. Measure archive admission cost. Run exact SIG-v1 full/socket/runtime/spare-port/rollback gates before cutover. Scanner v2 remains queued behind delivery prerequisites.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -245,6 +245,7 @@
     "publication_failure": "Completed operation result retained privately alongside typed publication/settlement error. Unsettleable batch regression confirms journal publication and evidence preservation; no automatic delivery replay. Termination still relies on durable journal.",
     "open_recovery_findings": "New archived same-time conflicts are rejected before retention; caller preflight rejects legacy batch/archive conflicts before receiver callbacks. Historical receiver conflicts remain rejected after newer observations. Existing conflicting or damaged evidence stays preserved and fail-closed; host repair, backlog visibility and installed failure handling remain pending. Archive scan streams history but cost grows with history and pending batch size.",
     "handoff_validation_evidence": "/home/egx-agent/er1-autopilot/state/validation/delivery-handoff-64c6a93",
-    "archive_timestamp_integrity": "Shared protected canonical archive validation under spool lease plus caller batch preflight. Temporary-file tests cover equivalent timestamps, restart, exact retries, later-event progress, newer receiver observations, kind separation, malformed/symlink/filename/unsafe-root rejection, and preserved legacy conflicts. No deletion, timestamp rewriting or host execution."
+    "archive_timestamp_integrity": "Shared protected canonical archive validation under spool lease plus caller batch preflight. Temporary-file tests cover equivalent timestamps, restart, exact retries, later-event progress, newer receiver observations, kind separation, malformed/symlink/filename/unsafe-root rejection, and preserved legacy conflicts. No deletion, timestamp rewriting or host execution.",
+    "settlement_visibility": "Bounded protected receiver pending inventory with timestamp, count and bytes; UNAVAILABLE omits counters. SYSTEM projection excludes private text and journal-forged counters. Artificial tests only. Inventory does not validate envelopes or inspect caller/archive state; publication precedes archive movement. Host repair policy documented; executor and installation pending."
   }
 }

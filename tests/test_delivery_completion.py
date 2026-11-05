@@ -13,6 +13,10 @@ from tools.delivery_observations import record_completion
 from tools.delivery_runner import DeliveryError, delivery_lock
 
 
+def evidence_only(result):
+    return {key: value for key, value in result.items() if key != "settlement_backlog"}
+
+
 def envelope(setup, **changes):
     event = dict(schema='delivery-completion-v1', kind='latest_codex_cycle',
                  event_id='cycle-1', source_head=HEAD, status='SUCCEEDED',
@@ -31,7 +35,7 @@ def test_callback_retains_exact_envelope_and_replays(setup, kind, status):
     path, digest = envelope(setup, kind=kind, status=status)
     result = record_completion(setup[0], path, digest)
     assert result['observations'][kind]['evidence_sha256'] == digest
-    assert record_completion(setup[0], path, digest) == result
+    assert evidence_only(record_completion(setup[0], path, digest)) == evidence_only(result)
     receipt = json.loads(next(setup[0].state.glob('observation-*.json')).read_bytes())
     assert bytes.fromhex(receipt['evidence_hex']) == path.read_bytes()
 
@@ -201,7 +205,7 @@ def test_recovery_retains_history_selects_latest_and_retries_publication(setup):
     assert len(list(publisher.state.glob('observation-*.json'))) == 3
     result = recover_completions(publisher)
     assert result['observations']['latest_codex_cycle']['observed_at'] == new['observed_at']
-    assert recover_completions(publisher) == result
+    assert evidence_only(recover_completions(publisher)) == evidence_only(result)
     assert 'artificial host completion' not in setup[2].read_text()
 
 
@@ -350,7 +354,7 @@ def test_archived_identity_retries_and_cannot_be_rewritten(setup):
         retain_completion(publisher, **event(status='FAILED'))
     assert not path.exists()
     assert retain_completion(publisher, **event()) == (archived(publisher, path), digest)
-    assert record_completion(publisher, archived(publisher, path), digest) == result
+    assert evidence_only(record_completion(publisher, archived(publisher, path), digest)) == evidence_only(result)
     assert archived(publisher, path).read_bytes() == raw
 
 
@@ -389,7 +393,7 @@ def test_archive_failure_does_not_undo_publication(setup):
         result = record_completion(publisher, path, digest)
     assert result['observations']['latest_codex_cycle']['evidence_sha256'] == digest
     assert path.exists()
-    assert recover_completions(publisher) == result
+    assert evidence_only(recover_completions(publisher)) == evidence_only(result)
     assert not path.exists() and archived(publisher, path).exists()
 
 
