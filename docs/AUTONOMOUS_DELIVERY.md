@@ -696,3 +696,27 @@ bindings, listener installation, cron daemon adoption and exact-release
 full/socket/runtime/spare-port validation remain pending. Cleanup callbacks must
 only reconcile temporary validation resources; they must never stop persistent
 serving or rollback services. A false or non-boolean quiescence result fails closed.
+
+## Temporary-job cleanup binding
+
+`tools/delivery_jobs.py:JobContainment` supplies `cleanup(key)` and
+`quiescent(key)` for `ProductionServices` temporary-validation callbacks. Protected
+host policy maps release identities to dedicated, pre-created cgroup-v2 leaves.
+Groups must be disjoint, protected against job writes/migration, and must exclude
+persistent serving/rollback services. The verifier rejects nested groups and any
+group containing the calling supervisor. Missing controls fail closed.
+
+Cleanup writes the kernel `cgroup.kill` control, then waits within a finite deadline
+for both `populated=0` and empty `cgroup.procs`, checking group identity before and
+after. It raises `CleanupError` for timeout, interruption, malformed observations,
+unsafe controls or replacement. Callers retain their unresolved-work latch on
+failure. An empty observation is valid only under the delivery lease with the
+host launcher excluded from admitting new jobs.
+
+This is cleanup plumbing, not a launcher or containment installation. Host wiring
+must place every job in its group **before execution**, deny migration/delegation,
+verify filesystem/privilege isolation, and enforce supervisor-death cleanup.
+`DeliverySupervisor.run_cycle` still requires that host launch binding; its current
+process-group cleanup alone cannot prove detached-child containment. Tests use
+artificial cgroup files and simulated population changes, including composition
+with `ProductionServices`; they do not establish real kernel kill behavior.
