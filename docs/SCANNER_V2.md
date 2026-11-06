@@ -239,3 +239,23 @@ Only temporary test databases were migrated. Host deployment must validate schem
 compatibility and rollback on copied state. Callers may pass retrieved envelopes
 to the existing offline identity binder; no runtime refresh, API, calendar or
 lifecycle admission is enabled by this change.
+
+## Retained calendar window projection
+
+`project_egx_calendar` reuses `MarketSession` rows and the existing EGX weekend
+policy. The offline caller supplies exact retained JSON bytes, expected SHA-256,
+observation time and decision time. A bounded contiguous window must start with
+a completed verified session, explicitly account for every intervening nontrading
+day and end with an unverified future schedule whose open is after the decision.
+Missing dates, unsupported weekend labels, contradictory hours, future verification,
+late observation, duplicate JSON keys and nonfinite values fail closed.
+
+The immutable result contains the historical close, next scheduled open/close and
+byte provenance. It deliberately reports `admission=NOT_ESTABLISHED`. Caller
+observation time and digest are trusted assertions, not durable admission evidence
+or proof of exchange authority. UNKNOWN future rows describe schedule assertions;
+VERIFIED completed-session status cannot stand in for advance schedule knowledge.
+No weekly fallback, mutable calendar lookup, freshness interval, identity binding,
+lifecycle admission or runtime/API activation is introduced. A trusted retained
+schedule-admission producer and exact post-commit observation binding remain the
+next gate before combining this projection with retained identity observations.
