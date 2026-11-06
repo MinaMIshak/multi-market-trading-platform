@@ -1,7 +1,8 @@
 # Scanner v2 — first contract and card slice
 
 Status: offline contract, read-only card and bounded EGX verification coverage
-adapter implemented; confirmed-setup adapters and runtime/API wiring pending.
+adapter and EGX-RANK-v1 reporting adapter validated offline; admitted binding
+producer and runtime/API wiring pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -69,5 +70,66 @@ inputs visibly excluded. Then connect the read-only API/UI with coverage evidenc
 No new breakout/ORB/RSI generators are part of this slice. The complete Scanner v2
 milestone remains pending those adapters, runtime integration and evidence checks.
 
+## EGX-RANK-v1 decision adapter (validated offline)
+
+`app.scanner_v2_egx_rank.bind_egx_rank_report` projects one published
+`egx-ranking-report-v1` artifact into trade-decision-v1 records. It is the first
+confirmed-setup adapter: EGX-RANK-v1 already publishes explicit decimal entry
+zone, entry reference, stop, T1 and T2 for STRONG_CANDIDATE/CANDIDATE.
+
+- The artifact bytes must match an expected SHA-256 taken from a verified
+  snapshot manifest. Report schema, rank version, admission, LIVE_MONEY=false,
+  session, counts and record uniqueness are checked; drift fails the whole call.
+- Published terms are copied exactly as decimal strings. Nothing is recomputed,
+  rounded or invented. `target` is T1, which matches `TradePlan.target_1` and the
+  simulator's half exit. T2 and the breakeven rule are carried in candidate
+  evidence.
+- `max_holding_sessions` = `MAX_HOLD + 1` = 11. `simulate()` exits at index
+  `MAX_HOLD`, and index 0 is the fill session.
+- The trigger is a new literal, `EGX_RANK_V1_NEXT_SESSION_ZONE_V1`. The
+  champion's lifecycle rule (next session only, gap below zone = NO_FILL) is
+  not the forward-shadow `LONG_ENTRY_ZONE_TOUCH_V1` rule, so it is not labeled
+  as that rule.
+- The trusted caller (`EgxRankBinding`) supplies the instrument UUIDs, session close,
+  freshness window, next-session open and validity, from admitted security-master and
+  calendar evidence. The report's `next_expected_session` is an unverified
+  expectation and is kept only as evidence.
+- WATCHLIST becomes SETUP_NOT_CONFIRMED and NO_TRADE becomes NO_TRADE. An
+  unbound identity gives IDENTITY_UNBOUND, and invalid or missing terms give
+  TERMS_INVALID. All of these are visible exclusions. A candidate record that
+  contradicts the champion gates is schema drift and fails closed.
+- Mapping champion CANDIDATE classes to Candidate state READY is a reporting
+  label. It is not admission, risk approval or evidence of edge. Risk stays
+  NOT_EVALUATED, confidence UNVALIDATED and promotion NOT_AUTHORIZED. The
+  supervisor context records that the champion's trade construction is
+  currently net-negative, and these cards must not suggest otherwise.
+
+There is no runtime caller, binding producer, HTTP route or persistence yet.
+Synthetic tests do not establish market coverage.
+
 SYSTEM's existing Project checkpoint reports this slice and its limitations via
 PROGRESS.json; it does not imply that the feature is deployed or scanning.
+
+Validation of the preserved handoff found eight invalid-term fixtures accidentally
+bound an out-of-scope identity; those fixtures now exercise term rejection with
+valid scope. Source/candidate/contract failures propagate, while only decimal
+parsing and term geometry failures become TERMS_INVALID. Stops must be below the
+whole zone, T1 above it, T2 above T1, and collapsed zones are excluded.
+Duplicate JSON keys and non-finite numbers reject the report, including unbound
+records. Generation must precede the admitted next-session open; its timestamp
+is retained in immutable evidence. This is a historical research projection,
+not a statement that entry remains possible when a card is viewed later.
+
+The projected constants have a literal configuration digest and drift guard;
+this identifies the adapter's interpretation, not a producer-attested code digest.
+Historical artifacts do not contain a producer configuration digest. Future
+producer changes require explicit versioning and compatibility review.
+No corporate-action clearance is inferred from split-adjusted prices: event risk
+remains UNKNOWN. Missing daily artifact IDs omit that reference; ranking-byte
+provenance remains, without claiming independently verified underlying bars.
+
+Before API/UI integration, bind admitted identities/calendar and include verified
+lifecycle evidence (sample size and measured net result), preserving negative or
+inconclusive findings. No such performance artifact was verified in this cycle.
+The handoff barrier remains for the supervisor to clear after commit; no route,
+activation, new setup logic or strategy promotion is included.

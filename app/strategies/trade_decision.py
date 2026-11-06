@@ -39,7 +39,10 @@ class DecisionSource(Contract):
 
 
 class DecisionTerms(Contract):
-    entry_trigger: Literal['LONG_ENTRY_ZONE_TOUCH_V1']
+    # TOUCH_V1 is the forward-shadow trigger rule. EGX_RANK_V1_NEXT_SESSION_ZONE_V1
+    # names the existing EGX-RANK-v1 lifecycle entry rule (next session only;
+    # open below the zone is NO_FILL_GAP_DOWN) so neither rule is mislabeled.
+    entry_trigger: Literal['LONG_ENTRY_ZONE_TOUCH_V1', 'EGX_RANK_V1_NEXT_SESSION_ZONE_V1']
     entry_low: Decimal = Field(gt=0)
     entry_high: Decimal = Field(gt=0)
     entry_reference: Decimal = Field(gt=0)
