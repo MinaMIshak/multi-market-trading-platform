@@ -285,3 +285,26 @@ state unchanged until a protected host migration/restore mechanism has demonstra
 rollback with preserved evidence and coordinated writers, or use separately pinned
 compatible release state. Without that evidence, reject cutover. This unit does
 not provide or execute a production migration or database restore mechanism.
+
+## Retained-evidence rank binding composition
+
+`app.scanner_v2_retained_binding.compose_egx_rank_binding` builds the existing
+`EgxRankBinding` only from an `ObservedIdentityProjection` and a retained
+`CalendarProjection`; callers no longer hand-assemble session, open, close,
+identity tuples or evidence IDs. Both inputs are revalidated, and the immutable
+`RetainedEgxRankBinding` cross-checks session equality, digest-derived evidence
+IDs, identity ordering and calendar observation inside the completed pre-open
+window. Unchecked copies are revalidated before use.
+
+Freshness policy `FRESH_UNTIL_NEXT_SESSION_OPEN_V1` sets `fresh_until` to the
+retained next-session open, so cards viewed at or after that open are DATA_STALE.
+`evidence_available_at` is the latest of raw identity receipt, admission
+observation and calendar observation (exact-retry manifests are conservative).
+`bind_retained_egx_rank_report` reuses `bind_egx_rank_report` unchanged and
+rejects ranking reports generated before that time: later evidence never
+backdates a decision. Identity exclusions and admission statuses are reported.
+
+No admission is upgraded: identity stays INTERNAL_SNAPSHOT_VERIFIED, calendar
+stays NOT_ESTABLISHED, `runtime_activation=false`, LIVE_MONEY=false. No IO,
+runtime caller, API route, schema change or promotion. Lifecycle evidence and
+API/UI wiring remain pending. Tests use synthetic projections only.
