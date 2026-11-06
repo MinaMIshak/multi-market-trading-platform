@@ -215,3 +215,27 @@ source-rights approval or trading admission. Trusted durable observation retenti
 admitted calendar windows known before entry, lifecycle evidence and runtime/API
 integration remain pending. No schema change, runtime writer or promotion is
 introduced by this slice.
+
+## Durable post-commit observation retention
+
+Schema v11 adds immutable observation envelopes to the existing security-master
+SQLite evidence store. `retain_admission_observation` obtains its own post-read
+observation, then transactionally retains the first exact canonical envelope and
+its digest. It accepts neither caller timestamps nor caller envelopes. Concurrent
+producers and retries preserve the winner's original bytes and availability time.
+A failed write creates no observation; loss of acknowledgement after commit can
+be recovered by exact lookup or retry without rewriting time.
+
+`get_admission_observation` requires provider, snapshot date and raw artifact hash.
+Missing history raises rather than synthesizing an observation. Reads validate
+envelope integrity, canonical encoding, exact committed receipt binding, disabled
+live money and ordered recording/observation/current timestamps. Damaged evidence
+is rejected and preserved. Database update/delete/replacement guards protect the
+retained records; database-writer trust and clock correctness remain required.
+This is internal evidence retention, not external attestation or source licensing.
+
+The explicit `allow_upgrade=True` migration adds no historical observations.
+Only temporary test databases were migrated. Host deployment must validate schema
+compatibility and rollback on copied state. Callers may pass retrieved envelopes
+to the existing offline identity binder; no runtime refresh, API, calendar or
+lifecycle admission is enabled by this change.

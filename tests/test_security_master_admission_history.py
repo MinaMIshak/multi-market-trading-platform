@@ -108,7 +108,7 @@ def test_schema_upgrade_requires_permission_and_never_backfills_history(tmp_path
     with pytest.raises(RuntimeError, match='upgrade required'):
         database.initialize(allow_upgrade=False)
     database.initialize(allow_upgrade=True)
-    assert database.schema_version() == 10
+    assert database.schema_version() == 11
     with database.connect() as connection:
         assert connection.execute('SELECT COUNT(*) FROM security_master_admissions').fetchone()[0] == 0
     assert SecurityMasterRepository(database).list_equity_tickers() == ('CCAP',)

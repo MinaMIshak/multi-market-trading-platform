@@ -383,6 +383,66 @@ class SecurityMasterRepository:
             'live_money': False,
         }
 
+    def retain_admission_observation(self, *, provider, snapshot_date, artifact_sha256):
+        """Persist first post-read evidence, never caller-supplied timestamps.
+
+        A crash before commit creates no historical observation. Concurrent retries
+        return the winner's unchanged envelope. Database writers are trusted;
+        the digest is not a cryptographic signature.
+        """
+        args = dict(provider=provider, snapshot_date=snapshot_date,
+                    artifact_sha256=artifact_sha256)
+        observation = self.observe_admission(**args)
+        payload = json.dumps(observation, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        with self.database.connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row = self._observation_row(connection, **args)
+            if row is None:
+                connection.execute(
+                    'INSERT INTO security_master_observations VALUES (?, ?, ?, ?, ?)',
+                    (provider, snapshot_date.isoformat(), artifact_sha256, payload,
+                     sha256(payload.encode()).hexdigest()))
+            else:
+                self._decode_observation(row, dict(observation, observed_at=_utc_now()))
+        return self.get_admission_observation(**args)
+
+    @staticmethod
+    def _observation_row(connection, *, provider, snapshot_date, artifact_sha256):
+        return connection.execute(
+            'SELECT * FROM security_master_observations '
+            'WHERE provider = ? AND snapshot_date = ? AND artifact_sha256 = ?',
+            (provider, snapshot_date.isoformat(), artifact_sha256),
+        ).fetchone()
+
+    @staticmethod
+    def _decode_observation(row, current):
+        payload = row['envelope_json']
+        if sha256(payload.encode()).hexdigest() != row['envelope_sha256']:
+            raise ValueError('security master observation integrity mismatch')
+        envelope = json.loads(payload)
+        if (type(envelope) is not dict or set(envelope) != set(current)
+                or any(envelope[k] != current[k] for k in current if k != 'observed_at')
+                or envelope['live_money'] is not False
+                or json.dumps(envelope, sort_keys=True, separators=(',', ':'),
+                              allow_nan=False) != payload):
+            raise ValueError('security master observation binding mismatch')
+        observed = datetime.fromisoformat(envelope['observed_at'])
+        recorded = datetime.fromisoformat(json.loads(current['receipt_json'])['recorded_at'])
+        now = datetime.fromisoformat(current['observed_at'])
+        if observed.utcoffset() is None or not recorded <= observed <= now:
+            raise ValueError('security master observation clock mismatch')
+        return envelope
+
+    def get_admission_observation(self, *, provider, snapshot_date, artifact_sha256):
+        """Read exact retained evidence; absence never synthesizes availability."""
+        args = dict(provider=provider, snapshot_date=snapshot_date,
+                    artifact_sha256=artifact_sha256)
+        with self.database.connect() as connection:
+            row = self._observation_row(connection, **args)
+        if row is None:
+            raise KeyError('retained security master observation unavailable')
+        return self._decode_observation(row, self.observe_admission(**args))
+
     def resolve(
         self,
         value: str,

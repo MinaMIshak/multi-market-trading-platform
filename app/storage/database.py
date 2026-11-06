@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 SCHEMA_SQL = """
@@ -72,6 +72,29 @@ CREATE TRIGGER IF NOT EXISTS security_master_admissions_no_delete
 BEFORE DELETE ON security_master_admissions BEGIN
     SELECT RAISE(ABORT, 'immutable security master admission');
 END;
+
+CREATE TABLE IF NOT EXISTS security_master_observations (
+    provider TEXT NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    artifact_sha256 TEXT NOT NULL,
+    envelope_json TEXT NOT NULL,
+    envelope_sha256 TEXT NOT NULL,
+    PRIMARY KEY (provider, snapshot_date, artifact_sha256),
+    FOREIGN KEY (provider, snapshot_date)
+        REFERENCES security_master_admissions(provider, snapshot_date) ON DELETE RESTRICT
+);
+CREATE TRIGGER IF NOT EXISTS security_master_observations_no_replace
+BEFORE INSERT ON security_master_observations
+WHEN EXISTS (SELECT 1 FROM security_master_observations
+    WHERE provider = NEW.provider AND snapshot_date = NEW.snapshot_date
+    AND artifact_sha256 = NEW.artifact_sha256)
+BEGIN SELECT RAISE(ABORT, 'immutable security master observation'); END;
+CREATE TRIGGER IF NOT EXISTS security_master_observations_no_update
+BEFORE UPDATE ON security_master_observations
+BEGIN SELECT RAISE(ABORT, 'immutable security master observation'); END;
+CREATE TRIGGER IF NOT EXISTS security_master_observations_no_delete
+BEFORE DELETE ON security_master_observations
+BEGIN SELECT RAISE(ABORT, 'immutable security master observation'); END;
 
 CREATE TABLE IF NOT EXISTS market_sessions (
     market_date TEXT PRIMARY KEY,
