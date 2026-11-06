@@ -190,3 +190,28 @@ raw-byte/canonical projection agreement before upgrading identity admission.
 Calendar schedule evidence known before entry and lifecycle evidence remain
 separate required gates. The existing identity projection still reports
 NOT_ESTABLISHED; runtime/API activation and promotion remain unauthorized.
+
+## Post-commit identity observation binding
+
+`SecurityMasterRepository.observe_admission` reads an exact historical receipt
+on a fresh connection and samples a timestamp after that read completes. It
+returns a versioned envelope containing the canonical receipt JSON and SHA-256.
+An uncommitted writer receipt is not visible; a backward clock rejects the
+observation. Reading an older receipt today never creates earlier availability.
+This method does not persist observations: a trusted caller must retain the exact
+envelope before later historical use. Digests are integrity checks, not signatures.
+
+`bind_observed_egid_identities` verifies that envelope, the raw manifest/bytes,
+the admission policy/counts and the entire reconstructed canonical snapshot,
+including unrequested instruments. Receipt, recording, post-commit observation
+and decision timestamps must be ordered. The immutable result reports
+INTERNAL_SNAPSHOT_VERIFIED only; its nested raw identity projection retains
+NOT_ESTABLISHED because raw receipt alone still does not establish admission.
+No current-master lookup or automatic fallback is used. Exact raw retries can
+have later receipt times without rewriting the original admission evidence.
+
+This is offline internal identity binding, not exchange-membership certification,
+source-rights approval or trading admission. Trusted durable observation retention,
+admitted calendar windows known before entry, lifecycle evidence and runtime/API
+integration remain pending. No schema change, runtime writer or promotion is
+introduced by this slice.

@@ -362,6 +362,27 @@ class SecurityMasterRepository:
             raise KeyError('historical security master admission unavailable')
         return self._decode_admission(row)
 
+    def observe_admission(self, *, provider, snapshot_date, artifact_sha256):
+        """Read committed history on a fresh connection, then sample availability.
+
+        This observation is not backdated to recorded_at. The caller must retain
+        the returned envelope in trusted evidence storage for later PIT use.
+        No observation is automatically persisted or inferred for older reads.
+        """
+        receipt = self.get_admission(provider=provider, snapshot_date=snapshot_date,
+                                     artifact_sha256=artifact_sha256)
+        observed_at = _utc_now()
+        if datetime.fromisoformat(receipt['recorded_at']) > datetime.fromisoformat(observed_at):
+            raise ValueError('admission observation clock precedes recording')
+        payload = json.dumps(receipt, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        return {
+            'schema_version': 'security-master-observation-v1',
+            'observed_at': observed_at,
+            'receipt_json': payload,
+            'receipt_sha256': sha256(payload.encode()).hexdigest(),
+            'live_money': False,
+        }
+
     def resolve(
         self,
         value: str,

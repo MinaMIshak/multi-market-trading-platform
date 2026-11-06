@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_DURABLE_ADMISSION_HISTORY",
-  "current_capability": "Atomic immutable EGID security-master admission history in existing repository transaction; exact historical lookup, conflict/stale-replay rejection and schema-v10 explicit upgrade. Offline only; post-commit PIT binding and runtime activation pending.",
-  "starting_head": "9b3d4c09e20448593225cb6d302dcfeaaa302a28",
-  "head": "9b3d4c09e20448593225cb6d302dcfeaaa302a28",
+  "phase": "SCANNER_V2_POST_COMMIT_IDENTITY_BINDING",
+  "current_capability": "Offline post-commit security-master observation and full raw/canonical identity binding; immutable internal admission projection. Trusted durable observation retention, calendar/lifecycle gates and runtime activation pending.",
+  "starting_head": "d0a36a25f01d5e28902ebe6f504f2c822180ac6b",
+  "head": "d0a36a25f01d5e28902ebe6f504f2c822180ac6b",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "315 passed, 85 subtests in affected security-master/admission, storage/schema migration, quota/PIT, Scanner v2, trade decision/card and checkpoint/SYSTEM suites (13.21s). Temporary databases/synthetic fixtures only. Full/socket release gates not rerun; git diff --check passed.",
+  "tests": "231 passed, 85 subtests in affected Scanner v2, security-master, storage, trade-decision and checkpoint/SYSTEM suites (5.05s). Synthetic fixtures and temporary databases only. Initial broad command matched a nonexistent trade-card glob and collected nothing; corrected nullglob command passed. Full/socket release gates not rerun; git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Supervisor commit bridge and exact origin sync. Prioritize authorized-host SIG-v1 delivery provisioning/acceptance when executable. At safe delivery checkpoint, bind trusted post-commit admission observation and verify raw/canonical identity agreement; then admitted calendar windows and lifecycle evidence before runtime/API exposure. Schema v10 host migration/rollback validation required; no promotion.",
+  "next_action": "Supervisor commit bridge and exact origin sync. Prioritize authorized-host SIG-v1 delivery provisioning/acceptance when executable. At safe delivery checkpoint, persist trusted post-commit observation envelopes through existing evidence storage before historical runtime use; then bind admitted calendar windows and lifecycle evidence. No runtime/API activation or promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -250,7 +250,7 @@
     "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
   },
   "scanner_v2": {
-    "status": "DURABLE_ADMISSION_HISTORY_VALIDATED_OFFLINE",
+    "status": "POST_COMMIT_IDENTITY_BINDING_VALIDATED_OFFLINE",
     "integration_points": {
       "candidate": "app.strategies.contracts.Candidate: immutable versioned research input",
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
@@ -260,14 +260,15 @@
       "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion.",
       "rank_adapter": "app.scanner_v2_egx_rank reuses egx_ranking published terms and system_candidates lifecycle constants, Candidate, DecisionSource, DecisionTerms and TradeDecision; no parallel risk admission or execution.",
       "identity": "app.scanner_v2_identity reuses RawArtifactManifest and build_canonical_security_master; immutable identity tuples and hash evidence feed EgxRankBinding without IO or mutable current-master lookup.",
-      "admission_history": "Extend existing SecurityMasterRepository transaction and schema with immutable exact-source snapshot receipts; refresh job supplies verified manifest. No second admission engine or runtime scanner activation."
+      "admission_history": "Extend existing SecurityMasterRepository transaction and schema with immutable exact-source snapshot receipts; refresh job supplies verified manifest. No second admission engine or runtime scanner activation.",
+      "post_commit_observation": "SecurityMasterRepository.observe_admission reads exact committed history then samples time; scanner_v2_identity.bind_observed_egid_identities compares entire canonical snapshot and produces immutable internal verification."
     },
-    "scope": "Atomic historical security-master admission producer and exact lookup, reusing existing repository; no new setup logic.",
+    "scope": "Read-committed admission observation producer and full raw/canonical binding, reusing existing repository and identity projection.",
     "promotion": "NOT_AUTHORIZED",
-    "limitations": "Receipt recorded_at is transaction recording time, not proof of commit visibility. Trusted post-commit availability and raw/canonical binding, admitted calendar and lifecycle evidence remain required. Identity admission remains NOT_ESTABLISHED; runtime/API not activated.",
-    "tests": "315 passed, 85 subtests in affected security-master/admission, storage/schema migration, quota/PIT, Scanner v2, trade decision/card and checkpoint/SYSTEM suites (13.21s). Temporary databases/synthetic fixtures only. Full/socket release gates not rerun; git diff --check passed.",
+    "limitations": "Internal snapshot verification only. Observation producer does not persist envelopes; trusted durable retention and admitted calendar/lifecycle evidence remain required. No licensing or authoritative membership certification; runtime/API inactive.",
+    "tests": "231 passed, 85 subtests in affected Scanner v2, security-master, storage, trade-decision and checkpoint/SYSTEM suites (5.05s). Synthetic fixtures and temporary databases only. Initial broad command matched a nonexistent trade-card glob and collected nothing; corrected nullglob command passed. Full/socket release gates not rerun; git diff --check passed.",
     "documentation": "docs/SCANNER_V2.md",
-    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches source HEAD 9b3d4c09e20448593225cb6d302dcfeaaa302a28 at 2026-11-06T00:33:10Z. Clean tree and no handoff/pending-origin markers at start. This unit awaits bridge/sync; no remote query.",
+    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches source HEAD d0a36a25f01d5e28902ebe6f504f2c822180ac6b at 2026-11-06T00:38:20Z. Clean tree and no handoff/pending-origin markers at start; current unit awaits bridge/sync. No remote query.",
     "handoff_validation": {
       "initial_result": "26 passed, 8 failed: out-of-scope identity in invalid-term fixtures; corrected scope without weakening gate.",
       "repairs": [
@@ -280,6 +281,7 @@
       "mutation_checks": "Float acceptance, missing observation window and missing artifact hash gates each produced expected failing regression; original source restored.",
       "barrier": "Prior unit bridged; handoff/review pending markers absent at current cycle start. Historical validation retained above."
     },
-    "admission_history": "Schema v10 immutable receipts transactionally coupled to master replacement, original receipts retained on exact retry, exact source/date/hash lookup, stale/conflicting replacement rejected. Explicit upgrade required; no backfill, licensing/membership certification, production migration or PIT-availability inference."
+    "admission_history": "Schema v10 immutable receipts transactionally coupled to master replacement, original receipts retained on exact retry, exact source/date/hash lookup, stale/conflicting replacement rejected. Explicit upgrade required; no backfill, licensing/membership certification, production migration or PIT-availability inference.",
+    "post_commit_binding": "Ordered receipt/recording/post-read/decision timestamps, exact receipt digest/source/policy/count validation and full canonical agreement. Tests cover uncommitted writer invisibility, historical lookup after replacement, backdating rejection, corrupt evidence, clock regression, strict JSON and immutable output. No persistent observation or runtime adoption claimed."
   }
 }
