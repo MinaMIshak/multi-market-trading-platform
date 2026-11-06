@@ -259,3 +259,29 @@ No weekly fallback, mutable calendar lookup, freshness interval, identity bindin
 lifecycle admission or runtime/API activation is introduced. A trusted retained
 schedule-admission producer and exact post-commit observation binding remain the
 next gate before combining this projection with retained identity observations.
+
+## Durable calendar observation retention
+
+Schema v12 adds immutable content-addressed calendar observations to the existing
+SQLite store. `TradingRepository.retain_calendar_observation` reads one committed
+window from `market_sessions`, checks column/payload identity, samples its own
+clock after the read and validates the exact bytes with `project_egx_calendar`.
+It accepts dates only, with 2–32 contiguous rows. An exact retry preserves the
+first observation; changed source bytes create a different digest. Lookup uses
+only retained history and rejects missing, corrupt, future or unavailable evidence.
+Neither method accepts a caller-supplied observation time.
+
+The retained projection still reports `admission=NOT_ESTABLISHED`. These records
+prove an internal observation under trusted database-writer and clock assumptions;
+they do not establish source authority or advance schedule admission. Runtime/API
+activation, identity binding and lifecycle admission remain gated.
+
+The migration requires explicit `allow_upgrade=True`, adds no historical records
+and preserves existing sessions. Tests exercise disposable databases only. A v12
+database cannot be opened by v11 code: release-pointer rollback alone is therefore
+insufficient after a shared-state upgrade. Before host adoption, validate both
+candidate and previous-release state compatibility on copied state. Keep shared
+state unchanged until a protected host migration/restore mechanism has demonstrated
+rollback with preserved evidence and coordinated writers, or use separately pinned
+compatible release state. Without that evidence, reject cutover. This unit does
+not provide or execute a production migration or database restore mechanism.

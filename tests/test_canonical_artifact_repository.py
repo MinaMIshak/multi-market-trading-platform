@@ -185,7 +185,7 @@ def test_current_schema_version_and_tables_exist(
 
     assert (
         database.schema_version()
-        == 9
+        == 12
     )
 
     with database.connect() as connection:

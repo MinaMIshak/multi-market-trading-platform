@@ -102,7 +102,7 @@ def test_explicit_upgrade_is_additive(
     assert (
         database.schema_version()
         == SCHEMA_VERSION
-        == 10
+        == 12
     )
 
     assert table_exists(

@@ -302,7 +302,7 @@ def test_schema_8_upgrade_is_explicit_additive_and_monotonic(tmp_path):
         assert not con.execute("SELECT 1 FROM sqlite_master WHERE name='reference_artifacts'").fetchone()
     db.initialize(allow_upgrade=True)
     db.initialize()
-    assert db.schema_version() == SCHEMA_VERSION == 10
+    assert db.schema_version() == SCHEMA_VERSION == 12
     with db.connect() as con:
         assert con.execute('SELECT value FROM sentinel').fetchone()[0] == 'preserved'
         assert con.execute('PRAGMA foreign_key_check').fetchall() == []

@@ -101,7 +101,7 @@ def test_explicit_upgrade_preserves_admission_without_backfill(tmp_path):
     with pytest.raises(RuntimeError, match='upgrade required'):
         repo.database.initialize()
     repo.database.initialize(allow_upgrade=True)
-    assert repo.database.schema_version() == 11
+    assert repo.database.schema_version() == 12
     assert repo.get_admission(**keys) == before
     with pytest.raises(KeyError):
         repo.get_admission_observation(**keys)

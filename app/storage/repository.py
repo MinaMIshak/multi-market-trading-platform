@@ -96,6 +96,62 @@ class TradingRepository:
             row["payload_json"]
         )
 
+    def retain_calendar_observation(self, *, session, through):
+        """Retain a committed calendar read; this does not establish admission.
+
+        Clock sampled after a single snapshot query, never supplied by callers.
+        Exact-byte retries preserve the first observation.
+        """
+        from datetime import date
+        from hashlib import sha256
+        from app.scanner_v2_calendar import project_egx_calendar
+
+        if type(session) is not date or type(through) is not date or not 1 <= (through - session).days <= 31:
+            raise ValueError('bounded calendar dates required')
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                'SELECT market_date, status, payload_json FROM market_sessions '
+                'WHERE market_date >= ? AND market_date <= ? ORDER BY market_date LIMIT 33',
+                (session.isoformat(), through.isoformat())).fetchall()
+        observed = datetime.fromisoformat(_utc_now())
+        if len(rows) != (through - session).days + 1:
+            raise ValueError('incomplete calendar window')
+        for row in rows:
+            item = MarketSession.model_validate_json(row['payload_json'])
+            if item.market_date.isoformat() != row['market_date'] or item.status.value != row['status']:
+                raise ValueError('calendar row identity mismatch')
+        artifact = ('[' + ','.join(row['payload_json'] for row in rows) + ']').encode()
+        digest = sha256(artifact).hexdigest()
+        project_egx_calendar(artifact, expected_sha256=digest, session=session,
+                             observed_at=observed, decision_time=observed)
+        with self.database.connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            existing = connection.execute(
+                'SELECT artifact FROM calendar_observations WHERE artifact_sha256 = ?', (digest,)).fetchone()
+            if existing is None:
+                connection.execute('INSERT INTO calendar_observations VALUES (?, ?, ?, ?)',
+                    (digest, session.isoformat(), artifact, observed.isoformat()))
+            elif existing['artifact'] != artifact:
+                raise ValueError('calendar observation integrity mismatch')
+        return self.get_calendar_observation(artifact_sha256=digest, decision_time=observed)
+
+    def get_calendar_observation(self, *, artifact_sha256, decision_time):
+        """Project exact retained history without consulting mutable sessions."""
+        from datetime import date
+        from app.scanner_v2_calendar import project_egx_calendar
+        from app.strategies.contracts import aware
+
+        if aware(decision_time) > datetime.fromisoformat(_utc_now()):
+            raise ValueError('future calendar decision time')
+        with self.database.connect() as connection:
+            row = connection.execute('SELECT * FROM calendar_observations WHERE artifact_sha256 = ?',
+                                     (artifact_sha256,)).fetchone()
+        if row is None:
+            raise KeyError('retained calendar observation unavailable')
+        return project_egx_calendar(row['artifact'], expected_sha256=artifact_sha256,
+            session=date.fromisoformat(row['session']),
+            observed_at=datetime.fromisoformat(row['observed_at']), decision_time=decision_time)
+
     def save_candidate(
         self,
         candidate: Candidate,

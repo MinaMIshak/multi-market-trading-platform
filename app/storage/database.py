@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 SCHEMA_SQL = """
@@ -102,6 +102,23 @@ CREATE TABLE IF NOT EXISTS market_sessions (
     payload_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS calendar_observations (
+    artifact_sha256 TEXT PRIMARY KEY,
+    session TEXT NOT NULL,
+    artifact BLOB NOT NULL,
+    observed_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS calendar_observations_no_replace
+BEFORE INSERT ON calendar_observations
+WHEN EXISTS (SELECT 1 FROM calendar_observations WHERE artifact_sha256 = NEW.artifact_sha256)
+BEGIN SELECT RAISE(ABORT, 'immutable calendar observation'); END;
+CREATE TRIGGER IF NOT EXISTS calendar_observations_no_update
+BEFORE UPDATE ON calendar_observations
+BEGIN SELECT RAISE(ABORT, 'immutable calendar observation'); END;
+CREATE TRIGGER IF NOT EXISTS calendar_observations_no_delete
+BEFORE DELETE ON calendar_observations
+BEGIN SELECT RAISE(ABORT, 'immutable calendar observation'); END;
 
 CREATE TABLE IF NOT EXISTS candidates (
     candidate_id TEXT PRIMARY KEY,

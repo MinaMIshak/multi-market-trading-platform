@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_RETAINED_CALENDAR_PROJECTION",
-  "current_capability": "Offline bounded retained EGX calendar window projection reusing MarketSession and EGX weekend policy; explicit temporal/integrity checks, admission NOT_ESTABLISHED; durable identity observations preserved.",
-  "starting_head": "e95d104b22791afec53fe95603ff031a6255450d",
-  "head": "e95d104b22791afec53fe95603ff031a6255450d",
+  "phase": "SCANNER_V2_DURABLE_CALENDAR_OBSERVATION",
+  "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
+  "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
+  "head": "e9fe289d5718943e785dd1196b5a6388b5511889",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "222 passed, 85 subtests in affected Scanner v2, trade-decision, calendar, repository and checkpoint/SYSTEM suites (2.61s). Artificial fixtures only; full/socket release gates not retried. git diff --check passed.",
+  "tests": "320 passed, 95 subtests in affected storage/calendar/Scanner v2/checkpoint suites (15.13s). Four isolated mutation checks detected removed guards. Broader suite in progress; two known sandbox socket tests explicitly deselected and required on authorized host.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Supervisor commit bridge and exact origin sync. Prioritize authorized-host SIG-v1 delivery provisioning/acceptance when executable. At safe delivery checkpoint, add trusted retained schedule-admission and post-commit observation evidence using existing calendar storage before binding calendar and retained identity observations. Lifecycle and runtime/API activation remain gated.",
+  "next_action": "Supervisor commit bridge and exact origin sync after validation. Prioritize authorized-host SIG-v1 provisioning and exact-release full/socket/spare-port acceptance when executable. Before v12 host adoption, demonstrate copied-state compatibility and database rollback; release-pointer rollback alone is insufficient. At safe delivery checkpoint, implement trusted retained schedule-admission evidence before binding calendar and identity observations. Runtime/API/lifecycle activation remains gated.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -134,9 +134,10 @@
     "performance": "No newly verified lifecycle evidence; no performance inferred from candidates or ranking.",
     "quant_direction": "Versioned monotonic quant challengers implemented and synthetic behavior tested; empirical volatility loading, independent OOS retest and multiplicity evidence pending.",
     "us_evaluation": "Missed-winner attribution incomplete; universe drift/survivorship and snapshot provenance need work.",
-    "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending."
+    "delivery": "Installed manifest/factory provisioning, supervisor publication invocation, read-only API mount, isolation, public probes, reporting-only source approval and exact-release full/socket/runtime/spare-port acceptance remain pending.",
+    "schema_adoption": "Schema v12 prevents v11 application rollback against the upgraded database. Host must prove compatible isolated state or protected backup/restore with writer coordination on copied state before cutover; shared production state was not touched."
   },
-  "commit_status": "Clean HEAD and matching ORIGIN_SYNCED marker/local origin ref at cycle start; no handoff or origin-pending markers. Contract/card unit validated and exact commit request prepared for supervisor; no direct stage/commit.",
+  "commit_status": "Preserved dirty Codex/Claude fallback WIP independently validated; final broader validation pending before commit request. Handoff markers remain supervisor-owned; no direct stage/commit.",
   "experiment": {
     "strategy": "EGX-EXP-V2E-ONE-POSITION-v1",
     "champion": "V1 (EGX-RANK-v1)",
@@ -171,7 +172,8 @@
     "previous_checkpoint": "docs/checkpoints/progress-before-2026-11-04.json",
     "runtime_verified": false,
     "published_evidence": "docs/checkpoints/published-evidence-2026-11-04.json",
-    "published_snapshot_observed": true
+    "published_snapshot_observed": true,
+    "current_cycle": "Git HEAD e9fe289d5718943e785dd1196b5a6388b5511889 and dirty status override stale CYCLE_CONTEXT HEAD 741f8b4/clean claim; current reviews are advisory only."
   },
   "validation_evidence": {
     "directory": "/home/egx-agent/er1-autopilot/state/validation/sig-v1-20261104",
@@ -250,7 +252,7 @@
     "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
   },
   "scanner_v2": {
-    "status": "RETAINED_CALENDAR_PROJECTION_VALIDATED_OFFLINE",
+    "status": "DURABLE_CALENDAR_OBSERVATION_VALIDATED_OFFLINE",
     "integration_points": {
       "candidate": "app.strategies.contracts.Candidate: immutable versioned research input",
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
@@ -263,14 +265,15 @@
       "admission_history": "Extend existing SecurityMasterRepository transaction and schema with immutable exact-source snapshot receipts; refresh job supplies verified manifest. No second admission engine or runtime scanner activation.",
       "post_commit_observation": "SecurityMasterRepository.observe_admission reads exact committed history then samples time; scanner_v2_identity.bind_observed_egid_identities compares entire canonical snapshot and produces immutable internal verification.",
       "observation_retention": "SecurityMasterRepository and existing SQLite evidence database: immutable first-observation envelopes, exact historical lookup and explicit schema upgrade; no parallel evidence engine.",
-      "calendar_projection": "Reuse MarketSession and BaseTradingCalendarPolicy for bounded exact-byte historical window projection. Require contiguous dated rows and retained observation time; do not infer prior schedule admission from mutable session status. No runtime activation."
+      "calendar_projection": "Reuse MarketSession and BaseTradingCalendarPolicy for bounded exact-byte historical window projection. Require contiguous dated rows and retained observation time; do not infer prior schedule admission from mutable session status. No runtime activation.",
+      "calendar_retention": "TradingRepository single-query committed calendar read, producer clock and immutable content-addressed observation in existing SQLite storage; no schedule admission."
     },
-    "scope": "Bounded exact-byte calendar projection, contiguous date accounting and PIT observation checks; no schema or runtime changes.",
+    "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",
     "limitations": "Trusted database writer and clock required; no signatures, licensing or authoritative membership certification. Calendar/lifecycle gates and runtime/API activation remain pending.",
-    "tests": "222 passed, 85 subtests in affected Scanner v2, trade-decision, calendar, repository and checkpoint/SYSTEM suites (2.61s). Artificial fixtures only; full/socket release gates not retried. git diff --check passed.",
+    "tests": "320 passed, 95 subtests in affected storage/calendar/Scanner v2/checkpoint suites (15.13s). Four isolated mutation checks detected removed guards. Broader suite in progress; two known sandbox socket tests explicitly deselected and required on authorized host.",
     "documentation": "docs/SCANNER_V2.md",
-    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches cycle-start HEAD e95d104b22791afec53fe95603ff031a6255450d at 2026-11-06T00:44:15Z. Tree clean and handoff/pending-origin markers absent at start. Current unit awaits bridge/sync; no remote query.",
+    "origin_sync_observation": "Current cycle started at e9fe289d5718943e785dd1196b5a6388b5511889 with preserved dirty WIP and CLAUDE_HANDOFF_PENDING; current unit not committed or origin-synced. No remote query performed.",
     "handoff_validation": {
       "initial_result": "26 passed, 8 failed: out-of-scope identity in invalid-term fixtures; corrected scope without weakening gate.",
       "repairs": [
@@ -281,11 +284,21 @@
         "Reject stop/target inside zone and collapsed zone"
       ],
       "mutation_checks": "Float acceptance, missing observation window and missing artifact hash gates each produced expected failing regression; original source restored.",
-      "barrier": "Prior unit bridged; handoff/review pending markers absent at current cycle start. Historical validation retained above."
+      "barrier": "Historical rank-adapter validation only. Current calendar handoff is recorded separately in calendar_handoff_validation; handoff/review markers present and supervisor-owned."
     },
     "admission_history": "Schema v10 immutable receipts transactionally coupled to master replacement, original receipts retained on exact retry, exact source/date/hash lookup, stale/conflicting replacement rejected. Explicit upgrade required; no backfill, licensing/membership certification, production migration or PIT-availability inference.",
     "post_commit_binding": "Ordered receipt/recording/post-read/decision timestamps, exact receipt digest/source/policy/count validation and full canonical agreement. Tests cover uncommitted writer invisibility, historical lookup after replacement, backdating rejection, corrupt evidence, clock regression, strict JSON and immutable output. No persistent observation or runtime adoption claimed.",
     "observation_retention": "Schema v11; producer-owned post-read clock, exact canonical envelope/digest, immutable guards, concurrent winner retention, lost-acknowledgement retry, restart retrieval, corruption rejection and no migration backfill. Tests use disposable databases only; host schema compatibility/rollback acceptance pending.",
-    "calendar_projection": "Immutable historical close and next scheduled window, SHA-256 evidence identity and NOT_ESTABLISHED admission. Reject missing dates, inconsistent hours, unsupported weekends, future verification and decisions at/after next open. Trusted caller timestamps are not durable schedule admission."
+    "calendar_projection": "Immutable historical close and next scheduled window, SHA-256 evidence identity and NOT_ESTABLISHED admission. Reject missing dates, inconsistent hours, unsupported weekends, future verification and decisions at/after next open. Trusted caller timestamps are not durable schedule admission.",
+    "calendar_retention": "Single committed snapshot query, row/payload identity verification and producer post-read clock; immutable SHA-256 keyed bytes, first-observation retry retention, historical lookup independent of mutable calendar, corrupt/future/late evidence rejection. Explicit v11-to-v12 upgrade preserves sessions and installs all three immutable guards; disposable databases only.",
+    "calendar_handoff_validation": {
+      "barrier": "Read executor and barrier reviews; independently validated preserved changes. Supervisor retains ownership of pending/review markers.",
+      "initial_focused": "23 passed in 2.10s before six additional integrity/upgrade tests.",
+      "affected": "320 passed, 95 subtests in 15.13s.",
+      "baseline": "Isolated git archive of exact HEAD: 5 failed, 102 passed in 12.21s across holiday evidence, M3 PIT, quota and schema guard suites. All five failures were existing ==10 assertions against schema v11; exact pins updated to v12, no gate weakened.",
+      "mutation_checks": "Four isolated copies each failed its targeted test when removing window completeness, stored-byte comparison, future-decision or row-identity checks. Working source never mutated.",
+      "evidence": "/home/egx-agent/er1-autopilot/state/calendar-retention-{baseline.log,mutations.json,suite.log}",
+      "production_schema": "Pending authorized-host copied-state upgrade/restore and prior-release compatibility evidence. Database.initialize rejects newer schemas; no production migration or rollback executed."
+    }
   }
 }
