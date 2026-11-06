@@ -158,3 +158,35 @@ status alone does not prove that a next-session schedule was known before entry.
 Do not substitute the ranking report's next-session expectation for that evidence.
 Lifecycle evidence and API/UI wiring also remain pending. The prior handoff was
 committed by the supervisor; its barrier marker was absent at this cycle start.
+
+## Durable security-master admission history
+
+Schema v10 adds `security_master_admissions` to the existing database. The EGID
+refresh job passes its verified raw manifest into `SecurityMasterRepository`;
+the repository records the canonical snapshot, source hash/date/size/count,
+receipt time, transaction recording time, prior instrument count and versioned
+completeness policy in the same transaction as current-master replacement.
+The existing equity/nonempty/90% retention checks are repeated under the SQLite
+writer lock. Receipt failure rolls back replacement, and replacement failure
+rolls back the receipt. Same-day conflicts and older refreshes after a newer
+admission fail closed. Exact retries preserve the original receipt and times.
+
+Receipts have a content digest and database update/delete guards. Exact historical
+lookup requires provider, date and artifact hash; it never falls back to the
+current master. Subsequent replacements preserve earlier canonical identity
+snapshots. Legacy repository writes without a manifest create no admission claim.
+This is an internal trusted-writer integrity record, not a signature or independent
+proof of source authority, licensing, exchange membership or raw-byte authenticity.
+
+The additive migration requires the existing explicit `allow_upgrade=True` gate;
+it does not backfill old admission history. Host adoption must validate schema
+compatibility and rollback against a copied state before release. No operator
+or production database was migrated during implementation.
+
+`recorded_at` is sampled inside the transaction, **not** the commit visibility
+time. Do not use it alone as a historical availability cutoff. The next slice
+must bind trusted post-commit observation evidence to these receipts and verify
+raw-byte/canonical projection agreement before upgrading identity admission.
+Calendar schedule evidence known before entry and lifecycle evidence remain
+separate required gates. The existing identity projection still reports
+NOT_ESTABLISHED; runtime/API activation and promotion remain unauthorized.

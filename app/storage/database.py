@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 SCHEMA_SQL = """
@@ -48,6 +48,30 @@ CREATE TABLE IF NOT EXISTS automatic_quota (
 
 INSERT OR IGNORE INTO automatic_quota (id, quota_day, used_units)
 VALUES (1, '0001-01-01', 0);
+
+CREATE TABLE IF NOT EXISTS security_master_admissions (
+    provider TEXT NOT NULL,
+    snapshot_date TEXT NOT NULL,
+    artifact_sha256 TEXT NOT NULL,
+    receipt_json TEXT NOT NULL,
+    receipt_sha256 TEXT NOT NULL,
+    PRIMARY KEY (provider, snapshot_date)
+);
+CREATE TRIGGER IF NOT EXISTS security_master_admissions_no_replace
+BEFORE INSERT ON security_master_admissions
+WHEN EXISTS (SELECT 1 FROM security_master_admissions
+             WHERE provider = NEW.provider AND snapshot_date = NEW.snapshot_date)
+BEGIN
+    SELECT RAISE(ABORT, 'immutable security master admission');
+END;
+CREATE TRIGGER IF NOT EXISTS security_master_admissions_no_update
+BEFORE UPDATE ON security_master_admissions BEGIN
+    SELECT RAISE(ABORT, 'immutable security master admission');
+END;
+CREATE TRIGGER IF NOT EXISTS security_master_admissions_no_delete
+BEFORE DELETE ON security_master_admissions BEGIN
+    SELECT RAISE(ABORT, 'immutable security master admission');
+END;
 
 CREATE TABLE IF NOT EXISTS market_sessions (
     market_date TEXT PRIMARY KEY,

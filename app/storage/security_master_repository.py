@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
+
 from datetime import (
     datetime,
     timezone,
 )
 
+from app.data.models import DataAssetType, RawArtifactManifest
 from app.data.security_master import (
     CanonicalInstrument,
 )
@@ -38,10 +41,27 @@ class SecurityMasterRepository:
         instruments: list[
             CanonicalInstrument
         ],
+        admission_manifest: RawArtifactManifest | None = None,
     ) -> None:
         provider = (
             provider.strip().lower()
         )
+
+        # Freeze caller-owned mutable models before opening the write transaction.
+        instruments = [CanonicalInstrument.model_validate(i.model_dump()) for i in instruments]
+        manifest = None
+        if admission_manifest is not None:
+            manifest = RawArtifactManifest.model_validate(admission_manifest.model_dump())
+            if (provider != 'egid' or manifest.provider != provider
+                    or manifest.asset_type != DataAssetType.SECURITY_MASTER
+                    or manifest.market_date is None or manifest.symbol is not None
+                    or manifest.granularity is not None
+                    or manifest.record_count != len(instruments)
+                    or any(c not in '0123456789abcdef' for c in manifest.sha256)
+                    or any(i.source_provider != provider or i.source_sha256 != manifest.sha256
+                           or i.source_market_date != manifest.market_date.isoformat()
+                           for i in instruments)):
+                raise ValueError('admission manifest does not bind snapshot')
 
         connection = (
             self.database.connect()
@@ -51,6 +71,9 @@ class SecurityMasterRepository:
             connection.execute(
                 "BEGIN IMMEDIATE"
             )
+
+            if manifest is not None:
+                self._record_admission(connection, provider, instruments, manifest)
 
             old_ids = connection.execute(
                 """
@@ -258,6 +281,86 @@ class SecurityMasterRepository:
 
         finally:
             connection.close()
+
+    @staticmethod
+    def _record_admission(connection, provider, instruments, manifest):
+        # Repeat existing refresh completeness gates under the same writer lock
+        # as replacement, so another admitted writer cannot race the count check.
+        from app.data.security_master_refresh_job import MIN_RETAINED_FRACTION
+        latest = connection.execute(
+            'SELECT MAX(snapshot_date) FROM security_master_admissions WHERE provider = ?',
+            (provider,),
+        ).fetchone()[0]
+        if latest is not None and latest > manifest.market_date.isoformat():
+            raise ValueError('historical admission cannot replace newer snapshot')
+        previous = connection.execute(
+            'SELECT COUNT(*) FROM canonical_instruments WHERE source_provider = ?',
+            (provider,),
+        ).fetchone()[0]
+        if (not any(i.instrument_type.value == 'EQUITY' for i in instruments)
+                or len(instruments) < previous * MIN_RETAINED_FRACTION):
+            raise ValueError('incomplete admitted snapshot')
+        snapshot = sorted((i.model_dump(mode='json') for i in instruments),
+                          key=lambda i: i['instrument_id'])
+        content = {
+            'schema_version': 'security-master-admission-v1',
+            'provider': provider, 'snapshot_date': manifest.market_date.isoformat(),
+            'artifact_sha256': manifest.sha256, 'byte_size': manifest.byte_size,
+            'record_count': manifest.record_count, 'instrument_count': len(instruments),
+            'instruments': snapshot,
+            'policy': 'EGID_EQUITY_NONEMPTY_RETAIN_90_PERCENT_V1',
+            'live_money': False,
+        }
+        recorded_at = _utc_now()
+        if manifest.received_at > datetime.fromisoformat(recorded_at):
+            raise ValueError('future security master receipt')
+        existing = connection.execute(
+            'SELECT * FROM security_master_admissions WHERE provider = ? AND snapshot_date = ?',
+            (provider, manifest.market_date.isoformat()),
+        ).fetchone()
+        if existing is not None:
+            saved = SecurityMasterRepository._decode_admission(existing)
+            comparable = {k: v for k, v in saved.items()
+                          if k not in ('recorded_at', 'received_at', 'previous_instrument_count')}
+            if comparable != content:
+                raise ValueError('immutable security master admission conflict')
+            return
+        content.update(recorded_at=recorded_at, received_at=manifest.received_at.isoformat(),
+                       previous_instrument_count=previous)
+        payload = json.dumps(content, sort_keys=True, separators=(',', ':'), allow_nan=False)
+        connection.execute(
+            'INSERT INTO security_master_admissions VALUES (?, ?, ?, ?, ?)',
+            (provider, manifest.market_date.isoformat(), manifest.sha256, payload,
+             sha256(payload.encode()).hexdigest()),
+        )
+
+    @staticmethod
+    def _decode_admission(row):
+        payload = row['receipt_json']
+        if sha256(payload.encode()).hexdigest() != row['receipt_sha256']:
+            raise ValueError('security master admission integrity mismatch')
+        result = json.loads(payload)
+        if (result['provider'] != row['provider']
+                or result['snapshot_date'] != row['snapshot_date']
+                or result['artifact_sha256'] != row['artifact_sha256']):
+            raise ValueError('security master admission identity mismatch')
+        return result
+
+    def get_admission(self, *, provider, snapshot_date, artifact_sha256):
+        """Exact historical receipt only; never fall back to the current master.
+
+        recorded_at is transaction recording time, not proof of commit visibility
+        at that instant. A trusted post-commit observation is needed for PIT use.
+        """
+        with self.database.connect() as connection:
+            row = connection.execute(
+                'SELECT * FROM security_master_admissions '
+                'WHERE provider = ? AND snapshot_date = ? AND artifact_sha256 = ?',
+                (provider, snapshot_date.isoformat(), artifact_sha256),
+            ).fetchone()
+        if row is None:
+            raise KeyError('historical security master admission unavailable')
+        return self._decode_admission(row)
 
     def resolve(
         self,

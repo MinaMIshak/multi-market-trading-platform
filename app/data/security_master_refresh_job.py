@@ -219,6 +219,7 @@ class SecurityMasterRefreshJob:
                         ingestion.provider
                     ),
                     instruments=instruments,
+                    admission_manifest=ingestion.manifest,
                 )
             )
 
