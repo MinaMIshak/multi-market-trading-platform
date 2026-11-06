@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_EGX_RANK_HANDOFF_VALIDATED",
-  "current_capability": "Preserved EGX-RANK-v1 reporting adapter independently repaired and validated offline: hash-bound immutable decisions, explicit next-session trigger, admitted-open cutoff, strict JSON, pinned interpretation and visible term exclusions. No runtime caller, API, activation or promotion.",
-  "starting_head": "6ab156e4ba48b31267cd95fbaca8be13bc10be81",
-  "head": "6ab156e4ba48b31267cd95fbaca8be13bc10be81",
+  "phase": "SCANNER_V2_HISTORICAL_IDENTITY_PROJECTION",
+  "current_capability": "Bounded read-only EGID snapshot identity projection reuses canonical security master and carries exact hash provenance into immutable rank decisions/cards. PIT/source/integrity gates and explicit missing/non-equity exclusions; admission remains NOT_ESTABLISHED. No runtime activation.",
+  "starting_head": "7731b75a26659c2a60efd45ba03a74b8be811f31",
+  "head": "7731b75a26659c2a60efd45ba03a74b8be811f31",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -119,10 +119,10 @@
       }
     }
   },
-  "tests": "174 passed, 85 subtests: adapter, trade decision/card, Scanner v2, checkpoint/SYSTEM, shadow admission/records, EGX ranking and dashboard. Three deliberate gate-removal mutations caught. Synthetic fixtures only; host full/socket gates not rerun.",
+  "tests": "170 passed, 85 subtests across identity projection, rank adapter, Scanner v2, trade decision/card, checkpoint/SYSTEM and existing security-master suites. Synthetic fixtures only. Host full/socket gates not rerun; git diff --check passed.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Supervisor commit bridge and exact origin sync; supervisor clears handoff markers after successful bridge. Prioritize any executable authorized-host delivery provisioning and SIG-v1 exact-release full/socket/spare-port/rollback acceptance. At a safe delivery checkpoint, implement admitted security-master/calendar binding producer for EGX ranking decisions; before API/UI exposure bind verified lifecycle evidence, including sample size and net result. No strategy promotion.",
+  "next_action": "Supervisor commit bridge and exact origin sync. Prioritize authorized-host delivery provisioning and exact-release SIG-v1 full/socket/spare-port/rollback acceptance when executable. At safe delivery checkpoint, persist and bind historical security-master admission evidence and admitted next-session calendar windows before runtime caller/API exposure; bind verified lifecycle sample size and net result. No promotion.",
   "hard_blocker": null,
   "live_money": false,
   "head_semantics": "Source HEAD this checkpoint was written against; the checkpoint itself is committed on top of it",
@@ -250,7 +250,7 @@
     "repair_planning": "Read-only protected request/digest API; 128 explicit references and 128 originating records maximum, bounded inventory, exact hashes and rechecks under supervisor/delivery/spool leases. Does not certify source authority, full archive completeness or resolution. No executor, host dispatch, evidence mutation, settlement or delivery replay. Artificial tests only."
   },
   "scanner_v2": {
-    "status": "EGX_RANK_REPORTING_ADAPTER_VALIDATED_OFFLINE",
+    "status": "HISTORICAL_IDENTITY_PROJECTION_VALIDATED_OFFLINE",
     "integration_points": {
       "candidate": "app.strategies.contracts.Candidate: immutable versioned research input",
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
@@ -258,14 +258,15 @@
       "coverage": "app.scanner_v2.scan_egx reuses app.egx_scan.scan_egx_scope without parallel admission or history publication; retains explicit-selection semantics and validates projected totals.",
       "card": "read-only typed projection; API route and runtime data wiring deferred",
       "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion.",
-      "rank_adapter": "app.scanner_v2_egx_rank reuses egx_ranking published terms and system_candidates lifecycle constants, Candidate, DecisionSource, DecisionTerms and TradeDecision; no parallel risk admission or execution."
+      "rank_adapter": "app.scanner_v2_egx_rank reuses egx_ranking published terms and system_candidates lifecycle constants, Candidate, DecisionSource, DecisionTerms and TradeDecision; no parallel risk admission or execution.",
+      "identity": "app.scanner_v2_identity reuses RawArtifactManifest and build_canonical_security_master; immutable identity tuples and hash evidence feed EgxRankBinding without IO or mutable current-master lookup."
     },
-    "scope": "Preserved EGX-RANK-v1 published-plan adapter only; existing coverage wrapper and contract/card reused.",
+    "scope": "Historical identity boundary and its rank-decision/card integration; no new setup logic.",
     "promotion": "NOT_AUTHORIZED",
-    "limitations": "Caller assertions still require admitted binding producer. No runtime invocation, US adapter, HTTP route or durable emission store. No performance, corporate-action clearance or current coverage established. Event risk UNKNOWN. Host delivery acceptance remains pending.",
-    "tests": "174 passed, 85 subtests: adapter, trade decision/card, Scanner v2, checkpoint/SYSTEM, shadow admission/records, EGX ranking and dashboard. Three deliberate gate-removal mutations caught. Synthetic fixtures only; host full/socket gates not rerun.",
+    "limitations": "Identity projection verifies preserved bytes and receipt availability only; admission NOT_ESTABLISHED. Historical admission receipt and calendar schedule known before entry remain required. No runtime caller, HTTP route, performance evidence or strategy promotion.",
+    "tests": "170 passed, 85 subtests across identity projection, rank adapter, Scanner v2, trade decision/card, checkpoint/SYSTEM and existing security-master suites. Synthetic fixtures only. Host full/socket gates not rerun; git diff --check passed.",
     "documentation": "docs/SCANNER_V2.md",
-    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches source HEAD 6ab156e4ba48b31267cd95fbaca8be13bc10be81 at 2026-11-05T19:48:19Z; current changes await bridge/sync. No remote query.",
+    "origin_sync_observation": "Supervisor ORIGIN_SYNCED marker matches source HEAD 7731b75a26659c2a60efd45ba03a74b8be811f31 at 2026-11-06T00:30:24Z. Clean tree and no handoff/pending-origin markers at cycle start; this unit awaits bridge/sync. No remote query.",
     "handoff_validation": {
       "initial_result": "26 passed, 8 failed: out-of-scope identity in invalid-term fixtures; corrected scope without weakening gate.",
       "repairs": [
@@ -276,7 +277,7 @@
         "Reject stop/target inside zone and collapsed zone"
       ],
       "mutation_checks": "Float acceptance, missing observation window and missing artifact hash gates each produced expected failing regression; original source restored.",
-      "barrier": "Validated locally; handoff/review markers left for supervisor. No direct stage/commit."
+      "barrier": "Prior unit bridged; handoff/review pending markers absent at current cycle start. Historical validation retained above."
     }
   }
 }

@@ -133,3 +133,28 @@ lifecycle evidence (sample size and measured net result), preserving negative or
 inconclusive findings. No such performance artifact was verified in this cycle.
 The handoff barrier remains for the supervisor to clear after commit; no route,
 activation, new setup logic or strategy promotion is included.
+
+## Historical identity projection
+
+`app.scanner_v2_identity.project_egid_identities` reconstructs exact canonical
+EGX identities from bounded preserved EGID bytes and a caller-trusted
+`RawArtifactManifest`. It reuses `build_canonical_security_master`, verifies
+hash/size/count/provider/asset/session and availability by observation time,
+and rejects ambiguous, malformed or non-finite input. Requested symbols are
+exact canonical identifiers; aliases are not guessed. Missing identities and
+non-equities remain explicit exclusions. The immutable projection can supply
+identity tuples and hash provenance to the existing rank binding and Trade Card.
+
+This is **not admission**: ingestion receipt does not establish successful
+security-master refresh admission, licensing, listing membership or validity
+between snapshots. The mutable repository replaces snapshots and cannot supply
+historical admission evidence. A same-session snapshot is required conservatively;
+no stale-snapshot fallback or validity interval is invented. The projection has
+`admission=NOT_ESTABLISHED`, does no IO and cannot activate the adapter.
+
+Next persist/bind independently verifiable admission evidence and admitted calendar
+windows before adding a runtime caller. In particular, the current `MarketSession`
+status alone does not prove that a next-session schedule was known before entry.
+Do not substitute the ranking report's next-session expectation for that evidence.
+Lifecycle evidence and API/UI wiring also remain pending. The prior handoff was
+committed by the supervisor; its barrier marker was absent at this cycle start.

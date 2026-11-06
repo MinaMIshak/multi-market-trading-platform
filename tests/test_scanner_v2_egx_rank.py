@@ -297,3 +297,36 @@ def test_observation_window_with_no_bound_candidates_still_rejects():
     for generated in ('2026-11-03T12:00:00+00:00', '2026-11-04T12:30:00+00:00'):
         with pytest.raises(ValueError, match='observation window'):
             bind(report(generated_at=generated), binding=binding(instrument_ids=()))
+
+
+def test_historical_identity_projection_flows_into_immutable_card():
+    from app.data.models import RawArtifactManifest
+    from app.scanner_v2_identity import project_egid_identities
+    from uuid import NAMESPACE_URL, uuid5
+    payload = json.dumps([{'SYMBOL_CODE': 'EG0001', 'Reuters': 'AAAA.CA'}]).encode()
+    manifest = RawArtifactManifest(
+        provider='egid', asset_type='SECURITY_MASTER', market_date=date(2026, 11, 3),
+        raw_path='unused', sha256=sha256(payload).hexdigest(), byte_size=len(payload),
+        record_count=1, received_at=CLOSE)
+    projection = project_egid_identities(payload, manifest=manifest, session=date(2026, 11, 3),
+        observed_at=datetime.fromisoformat(GENERATED), requested=('AAAA', 'BBBB'))
+    # Calendar/admission assertions remain artificial trusted-caller fixtures.
+    bound = binding(instrument_ids=projection.instrument_ids,
+                    identity_evidence_id=projection.evidence_id)
+    result = bind(report([record('AAAA', 'CANDIDATE'), record('BBBB', 'CANDIDATE')]), binding=bound)
+    assert result['candidate_count'] == 1
+    assert result['exclusion_counts']['IDENTITY_UNBOUND'] == 1
+    decision = result['decisions'][0]
+    assert decision.source.instrument_id == uuid5(NAMESPACE_URL, 'egx://instrument/egid/EG0001')
+    card = trade_card(decision, observed_at=datetime.fromisoformat(GENERATED))
+    assert projection.evidence_id in card['observed_fact']['provenance']['evidence_ids']
+    assert card['execution_allowed'] is False
+    # Changing snapshot identity creates a different decision, never edits history.
+    changed = payload.replace(b'EG0001', b'EG0002')
+    manifest.sha256 = sha256(changed).hexdigest()
+    other = project_egid_identities(changed, manifest=manifest, session=date(2026, 11, 3),
+        observed_at=datetime.fromisoformat(GENERATED), requested=('AAAA', 'BBBB'))
+    new = bind(report([record('AAAA', 'CANDIDATE'), record('BBBB', 'CANDIDATE')]),
+        binding=binding(instrument_ids=other.instrument_ids, identity_evidence_id=other.evidence_id))
+    assert new['decisions'][0].identity != decision.identity
+    assert decision.source.instrument_id == projection.instrument_ids[0][1]
