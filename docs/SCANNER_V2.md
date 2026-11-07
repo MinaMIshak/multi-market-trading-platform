@@ -2,8 +2,9 @@
 
 Status: offline contract, read-only card and bounded EGX verification coverage
 adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
-report projection added; code-declared SYSTEM feature status added (host
-validation pending); runtime binding producer and API route pending.
+report projection and code-declared SYSTEM feature status committed; retained
+card-report read gate added (host validation pending); runtime binding producer,
+retained report storage and API route pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -349,3 +350,45 @@ null, fixed limitations, SHADOW, LIVE_MONEY=false, promotion NOT_AUTHORIZED).
 `/api/system` exposes it as `scanner_v2`; the SYSTEM page renders it with escaped
 values and UNKNOWN for missing/malformed fields. It is not a scan, card count,
 deployment or runtime observation, and it does not read PROGRESS.json.
+
+## Retained card-report read gate (pending host validation)
+
+`app.scanner_v2_card_report_reader.read_retained_egx_card_report` is the read
+side a future read-only loader/API route must use before showing a retained
+`scanner-v2-egx-card-report-v1` document. It takes exact bytes (maximum 8 MiB)
+and the SHA-256 recorded by the trusted producer, does no IO and has no caller.
+Any failure raises `RetainedCardReportError` (a `ValueError`); callers must
+report UNAVAILABLE and must not show partial content.
+
+It checks:
+
+- strict UTF-8 JSON (duplicate keys and NaN/Infinity rejected) and exact field
+  sets at every level, so an added `expected_return` or BUY-style field fails;
+- fixed identity/safety values: schema, EGX, OFFLINE_PROJECTION_NOT_ACTIVATED,
+  SHADOW, LIVE_MONEY=false, execution disabled, runtime_activation=false,
+  promotion NOT_AUTHORIZED, risk NOT_EVALUATED, the exact limitations, and
+  lifecycle evidence NOT_VERIFIED with null sample size and net result;
+- coverage arithmetic, recomputed from the rows: requested, candidate, excluded,
+  classification and exclusion counts; unique lexical rows; exclusion reasons
+  must match the adapter's class mapping; authoritative universe size null;
+- provenance versions (adapter, rank, config digest, freshness policy), admission
+  labels (identity INTERNAL_SNAPSHOT_VERIFIED, calendar NOT_ESTABLISHED) and the
+  order evidence available <= ranking generation <= viewing time. Retained-binding
+  session, availability and safety fields must agree with the provenance;
+- each card in coverage order: decision ID, symbol, ranking artifact hash and
+  retained calendar/identity evidence IDs, `fresh_until` equal to the retained
+  binding, timestamp order, plan geometry (stop < zone < target, reference inside
+  the zone), risk per share recomputed as entry reference minus stop, and fixed
+  risk, research and confidence labels;
+- each card's state, recomputed with the same rule `trade_card` uses: a stored
+  RESEARCH_CANDIDATE or DATA_STALE label cannot hide an expired or stale plan.
+  `card_state_counts` must equal the recomputed states.
+
+Limitations: the gate does not re-run the binder, re-derive decision or
+candidate digests from a rebuilt `TradeDecision`, or verify the ranking bytes or
+underlying bars. An edit that keeps every recomputed relation consistent (for
+example, stop and risk per share changed together) is detected only by the
+producer-recorded hash. That hash is an integrity check, not a signature or proof
+of authority. Nothing is admitted, filled or promoted. A trusted retained-binding
+producer, retained report storage and the read-only route are still missing.
+`feature_status()` is deliberately unchanged: there is still no route or producer.
