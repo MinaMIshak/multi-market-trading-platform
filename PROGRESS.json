@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_RETAINED_BINDING_COMPOSITION",
+  "phase": "SCANNER_V2_CARD_REPORT_PROJECTION",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "e491b7722eaa6851f3693b9c54a18dc27e9a1d1c",
+  "head": "220b5168a8dc1fd277f56d3a5fd2ebc9aaf43468",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -267,13 +267,21 @@
       "observation_retention": "SecurityMasterRepository and existing SQLite evidence database: immutable first-observation envelopes, exact historical lookup and explicit schema upgrade; no parallel evidence engine.",
       "calendar_projection": "Reuse MarketSession and BaseTradingCalendarPolicy for bounded exact-byte historical window projection. Require contiguous dated rows and retained observation time; do not infer prior schedule admission from mutable session status. No runtime activation.",
       "calendar_retention": "TradingRepository single-query committed calendar read, producer clock and immutable content-addressed observation in existing SQLite storage; no schedule admission.",
-      "retained_binding": "app.scanner_v2_retained_binding composes existing EgxRankBinding from ObservedIdentityProjection + CalendarProjection and reuses bind_egx_rank_report unchanged; no IO, no admission upgrade."
+      "retained_binding": "app.scanner_v2_retained_binding composes existing EgxRankBinding from ObservedIdentityProjection + CalendarProjection and reuses bind_egx_rank_report unchanged; no IO, no admission upgrade.",
+      "card_report": "app.scanner_v2_card_report reuses bind_retained_egx_rank_report and trade_card unchanged to produce one JSON-ready coverage+provenance+cards report; no IO or route."
     },
     "retained_binding_composition": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "VALIDATED_OFFLINE",
       "summary": "Pure composition of retained identity and calendar observations into EgxRankBinding; fresh_until = retained next-session open (FRESH_UNTIL_NEXT_SESSION_OPEN_V1); ranking generation must not precede latest retained evidence. Identity INTERNAL_SNAPSHOT_VERIFIED and calendar NOT_ESTABLISHED preserved; runtime_activation=false.",
       "files": ["app/scanner_v2_retained_binding.py", "tests/test_scanner_v2_retained_binding.py", "docs/SCANNER_V2.md"],
-      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required."
+      "tests": "Committed at 220b5168a8dc1fd277f56d3a5fd2ebc9aaf43468; host scanner_core profile PASS (375 passed, diff_check_rc=0) per supervisor validation record 2026-11-06T18:22Z."
+    },
+    "card_report_projection": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.scanner_v2_card_report.project_egx_card_report: read-only scanner-v2-egx-card-report-v1 combining coverage, provenance, Trade Cards and card-state counts by re-running bind_retained_egx_rank_report and trade_card unchanged. Lifecycle evidence NOT_VERIFIED; fixed limitations; feature_status OFFLINE_PROJECTION_NOT_ACTIVATED; no IO/route/runtime caller.",
+      "files": ["app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required.",
+      "next": "Read-only API route serving this document from a host-retained artifact plus SYSTEM feature-status exposure."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

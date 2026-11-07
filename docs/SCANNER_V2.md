@@ -1,8 +1,9 @@
 # Scanner v2 — first contract and card slice
 
 Status: offline contract, read-only card and bounded EGX verification coverage
-adapter and EGX-RANK-v1 reporting adapter validated offline; admitted binding
-producer and runtime/API wiring pending.
+adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
+report projection added (host validation pending); runtime binding producer
+and API wiring pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -308,3 +309,33 @@ No admission is upgraded: identity stays INTERNAL_SNAPSHOT_VERIFIED, calendar
 stays NOT_ESTABLISHED, `runtime_activation=false`, LIVE_MONEY=false. No IO,
 runtime caller, API route, schema change or promotion. Lifecycle evidence and
 API/UI wiring remain pending. Tests use synthetic projections only.
+
+## EGX Trade Card report projection
+
+`app.scanner_v2_card_report.project_egx_card_report` is the read-only end of the
+first vertical slice: retained evidence -> trade-decision-v1 -> Trade Card. It
+accepts the exact ranking bytes, expected SHA-256, a `RetainedEgxRankBinding` and
+the viewer's `observed_at`; it never accepts a caller-assembled decision dict.
+It re-runs `bind_retained_egx_rank_report` and the existing `trade_card`
+unchanged, and returns one JSON-ready `scanner-v2-egx-card-report-v1` document:
+
+- `coverage`: requested ranking scope, classification counts, candidate and
+  exclusion counts/reasons, identity exclusions and per-symbol rows. The scope is
+  the published ranking scope; authoritative universe size stays `null`.
+- `provenance`: ranking artifact hash, adapter/rank/config versions, session,
+  generation time, latest retained-evidence time, freshness policy, identity
+  (INTERNAL_SNAPSHOT_VERIFIED) and calendar (NOT_ESTABLISHED) admission labels.
+- `cards`: one card per bound decision in lexical order; each decision ID must
+  match its coverage row. `card_state_counts` reports RESEARCH_CANDIDATE,
+  DATA_STALE (at/after retained next-session open) and PLAN_EXPIRED. Plan terms
+  and decision IDs are identical for every viewing time.
+- `lifecycle_evidence`: NOT_VERIFIED with null sample size and net result. No
+  lifecycle/performance artifact is bound; nothing is inferred from candidates.
+- fixed `limitations` and SHADOW / LIVE_MONEY=false / execution disabled /
+  runtime_activation=false / promotion NOT_AUTHORIZED.
+
+Viewing before ranking generation, naive timestamps, hash mismatch, forged
+evidence copies and decision/row drift fail closed. Feature status is
+`OFFLINE_PROJECTION_NOT_ACTIVATED`: there is no HTTP route, runtime producer of
+retained bindings or persistence yet. Next: a read-only API route serving this
+document from a host-retained artifact, with SYSTEM feature-status exposure.
