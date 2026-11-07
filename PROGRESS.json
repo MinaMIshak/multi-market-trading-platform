@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_RETAINED_CARD_REPORT_READER",
+  "phase": "SCANNER_V2_CARD_DECISION_REDERIVATION",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
   "head": "e47fa5a39d5e8638e3deb2614619ebd62855aa89",
@@ -296,11 +296,19 @@
       "next": "Read-only API route serving the card report from a host-retained artifact (requires a trusted retained-binding producer)."
     },
     "retained_card_report_reader": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "2c17bbef4a1d8fd836a692e73b057e0fde66ac31",
       "summary": "read_retained_egx_card_report(bytes, expected_sha256): bounded exact-byte hash check, strict JSON, exact field sets, fixed safety/limitation/lifecycle values, recomputed coverage counts and class-to-exclusion mapping, provenance/retained-binding agreement and timestamp order, per-card binding to ranking hash/retained evidence IDs/fresh_until, plan geometry, recomputed risk per share and recomputed card state/counts. Raises RetainedCardReportError (ValueError). Does not re-derive decision digests or verify ranking bytes; feature_status unchanged (no route/producer).",
       "files": ["app/scanner_v2_card_report_reader.py", "tests/test_scanner_v2_card_report_reader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect the new test file.",
-      "next": "Re-derive decision_id/candidate_sha256 by rebuilding TradeDecision from card fields (verify strict-mode JSON round-trip on host first), then a protected loader + read-only route that serves only reader-accepted documents."
+      "next": "Superseded by card_decision_rederivation below."
+    },
+    "card_decision_rederivation": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Reader rebuilds each card's exact TradeDecision from typed retained fields (parsed datetimes/Decimals/UUID, null float references as EGX-RANK-v1 emits) via existing Candidate/DecisionSource/DecisionTerms/TradeDecision validators; requires identity == decision_id, strategy_candidate_sha256 == candidate_sha256 and unchanged trade_card(rebuilt, observed_at) == retained card. Non-string evidence ids now fail closed instead of escaping as TypeError. Avoids pydantic strict-JSON coercion entirely.",
+      "files": ["app/scanner_v2_card_report_reader.py", "tests/test_scanner_v2_card_report_reader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required; the producer round-trip tests at VIEW/OPEN/NEXT_CLOSE are the key check that rebuilt projections equal producer cards.",
+      "next": "Protected read-only loader + route serving only reader-accepted documents (requires a trusted retained card-report producer); feature_status unchanged until then."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

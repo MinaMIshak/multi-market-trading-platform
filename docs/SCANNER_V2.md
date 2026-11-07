@@ -384,11 +384,21 @@ It checks:
   RESEARCH_CANDIDATE or DATA_STALE label cannot hide an expired or stale plan.
   `card_state_counts` must equal the recomputed states.
 
-Limitations: the gate does not re-run the binder, re-derive decision or
-candidate digests from a rebuilt `TradeDecision`, or verify the ranking bytes or
-underlying bars. An edit that keeps every recomputed relation consistent (for
-example, stop and risk per share changed together) is detected only by the
-producer-recorded hash. That hash is an integrity check, not a signature or proof
-of authority. Nothing is admitted, filled or promoted. A trusted retained-binding
+- each card's exact `TradeDecision` is rebuilt from its retained fields through
+  the existing `Candidate`, `DecisionSource`, `DecisionTerms` and `TradeDecision`
+  validators (EGX-RANK-v1 sets no float candidate references, so they are rebuilt
+  as null). The rebuilt `identity` must equal `decision_id`,
+  `strategy_candidate_sha256` must equal `candidate_sha256`, and the unchanged
+  `trade_card` projection of the rebuilt decision at the report's `observed_at`
+  must equal the retained card exactly. A consistent edit (for example, stop and
+  risk per share changed together, or a forged decision ID in both the row and
+  card) is therefore rejected even when the report hash is recomputed.
+
+Limitations: the gate does not re-run the binder or verify the ranking bytes or
+underlying bars; coverage rows for excluded symbols and provenance fields outside
+the cards are protected only by recomputed relations and the producer-recorded
+hash. That hash is an integrity check, not a signature or proof of authority.
+Decision digests are self-consistency checks, not evidence that the decision was
+produced from admitted inputs. Nothing is admitted, filled or promoted. A trusted retained-binding
 producer, retained report storage and the read-only route are still missing.
 `feature_status()` is deliberately unchanged: there is still no route or producer.

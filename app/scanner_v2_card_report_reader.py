@@ -7,10 +7,14 @@ the retained bytes and the SHA-256 recorded by its trusted producer.
 This gate checks integrity and internal consistency only. It recomputes
 coverage arithmetic, card-state counts, card freshness/expiry labels and risk
 per share from the retained fields, and binds every card to the report's
-ranking artifact and retained evidence identifiers. It does NOT re-run the
-binder, re-derive decision digests, verify the underlying ranking bytes,
-admit identity/calendar evidence, evaluate risk or establish edge. A digest is
-an integrity check, not a signature. Nothing is admitted, filled or promoted.
+ranking artifact and retained evidence identifiers. Each card's exact
+``TradeDecision`` is rebuilt from its retained fields through the existing
+contract validators; its decision ID and candidate digest must match, and the
+unchanged ``trade_card`` projection of the rebuilt decision must equal the
+retained card. It does NOT re-run the binder, verify the underlying ranking
+bytes, admit identity/calendar evidence, evaluate risk or establish edge. A
+digest is an integrity check, not a signature. Nothing is admitted, filled or
+promoted.
 """
 from collections import Counter
 from datetime import datetime
@@ -18,13 +22,17 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 import json
 import re
+from uuid import UUID
 
+from app.paper.shadow_candidate_admission import strategy_candidate_sha256
 from app.paper.system_candidates import CANDIDATE_CLASSES
 from app.scanner_v2_card_report import CARD_STATES, FEATURE_STATUS, LIMITATIONS, SCHEMA_VERSION
 from app.scanner_v2_egx_rank import (
     _EXCLUSION_BY_CLASS, ADAPTER_VERSION, CONFIG_ID, EXCLUSIONS, TRIGGER)
 from app.scanner_v2_retained_binding import FRESHNESS_POLICY
 from app.strategies import egx_ranking
+from app.strategies.contracts import Candidate
+from app.strategies.trade_decision import DecisionSource, DecisionTerms, TradeDecision, trade_card
 
 MAX_BYTES = 8 * 1024 * 1024
 _HEX64 = re.compile(r'[0-9a-f]{64}')
@@ -231,6 +239,7 @@ def _card(card, row, observed_text, observed_at, bound):
              and source['artifact_sha256'] == bound['artifact_sha256']
              and source['completed_bar'] is True
              and type(source['evidence_ids']) is list
+             and all(type(i) is str for i in source['evidence_ids'])
              and set(bound['evidence_ids']) <= set(source['evidence_ids']),
              'card provenance not bound to retained evidence')
     data_as_of = _time(source['data_as_of'], 'card data_as_of')
@@ -276,6 +285,37 @@ def _card(card, row, observed_text, observed_at, bound):
                 else (state, 'EXCLUDED'))
     _require((card['invalidation_reason'], card['status']) == expected,
              'card state does not match retained timestamps')
+
+    # Rebuild the exact decision through the existing contract validators. The
+    # EGX-RANK-v1 adapter never sets float candidate references; a producer that
+    # did would fail closed here rather than be reinterpreted.
+    _require(type(source['instrument_id']) is str, 'invalid card instrument_id')
+    try:
+        decision = TradeDecision(
+            candidate=Candidate(
+                strategy_id=inference['setup'], strategy_version=inference['setup_version'],
+                config_id=inference['config_id'], symbol=fact['symbol'],
+                decision_time=detected, data_cutoff=data_as_of, state=inference['why_found'],
+                entry_reference=None, stop_reference=None, target_reference=None,
+                evidence_json=research['signal_evidence_json']),
+            source=DecisionSource(
+                market=source['market'], symbol=source['symbol'],
+                instrument_id=UUID(source['instrument_id']), source_id=source['source_id'],
+                artifact_sha256=source['artifact_sha256'],
+                evidence_ids=tuple(source['evidence_ids']), data_as_of=data_as_of,
+                available_at=available, fresh_until=fresh_until, completed_bar=True),
+            terms=DecisionTerms(
+                entry_trigger=plan['entry_trigger'], entry_low=low, entry_high=high,
+                entry_reference=reference, stop=stop, target=target, valid_until=valid_until,
+                max_holding_sessions=plan['max_holding_sessions'], flat_by=flat_by))
+    except (ValueError, TypeError, ArithmeticError):
+        _fail('card decision cannot be rebuilt')
+    _require(decision.identity == card['decision_id'],
+             'card decision_id does not match rebuilt decision')
+    _require(strategy_candidate_sha256(decision.candidate) == research['candidate_sha256'],
+             'card candidate_sha256 does not match rebuilt candidate')
+    _require(trade_card(decision, observed_at=observed_at) == card,
+             'card does not match projection of rebuilt decision')
     return state
 
 

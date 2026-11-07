@@ -4,6 +4,7 @@ Each tamper case is re-hashed so the SHA-256 gate passes and only the
 consistency gates can reject it: a digest is integrity, not authenticity.
 """
 from copy import deepcopy
+from decimal import Decimal
 from hashlib import sha256
 import json
 
@@ -200,6 +201,70 @@ def test_expired_card_relabeled_stale_is_rejected():
     doc['card_state_counts'] = {'RESEARCH_CANDIDATE': 0, 'DATA_STALE': 1, 'PLAN_EXPIRED': 1}
     with pytest.raises(RetainedCardReportError, match='card state'):
         read(encode(doc))
+
+
+def consistent_stop_edit(doc):
+    # Keeps geometry and recomputed risk per share consistent: only the
+    # rebuilt decision digest can detect it.
+    card = doc['cards'][0]
+    plan = card['strategy_inference']['plan']
+    stop = Decimal(plan['stop']) - Decimal('0.01')
+    assert stop > 0
+    plan['stop'] = str(stop)
+    card['risk_decision']['risk_per_share'] = str(Decimal(plan['entry_reference']) - stop)
+
+
+def edit_signal_evidence(doc):
+    research = doc['cards'][0]['research_evidence']
+    research['signal_evidence_json'] = research['signal_evidence_json'] + ' '
+
+
+def forge_decision_id_everywhere(doc):
+    forged = 'a' * 64
+    doc['cards'][0]['decision_id'] = forged
+    row = next(r for r in doc['coverage']['symbols'] if r.get('decision_id')
+               and r['symbol'] == doc['cards'][0]['observed_fact']['symbol'])
+    row['decision_id'] = forged
+
+
+def edit_setup_version(doc):
+    doc['cards'][0]['strategy_inference']['setup_version'] = '2'
+
+
+def uppercase_instrument_id(doc):
+    source = doc['cards'][0]['observed_fact']['provenance']
+    source['instrument_id'] = source['instrument_id'].upper()
+
+
+@pytest.mark.parametrize('mutate,reason', [
+    (consistent_stop_edit, 'decision_id does not match'),
+    (edit_signal_evidence, 'decision_id does not match'),
+    (forge_decision_id_everywhere, 'decision_id does not match'),
+    (edit_setup_version, 'decision_id does not match'),
+    (put(('cards', 0, 'research_evidence', 'candidate_sha256'), '0' * 64),
+     'candidate_sha256 does not match'),
+    (uppercase_instrument_id, 'projection of rebuilt decision'),
+    (put(('cards', 0, 'observed_fact', 'provenance', 'instrument_id'), 7), 'instrument_id'),
+    (put(('cards', 0, 'observed_fact', 'provenance', 'instrument_id'), 'not-a-uuid'),
+     'cannot be rebuilt'),
+    (put(('cards', 0, 'strategy_inference', 'setup'), 1), 'cannot be rebuilt'),
+    (put(('cards', 0, 'observed_fact', 'provenance', 'evidence_ids'), [{}]),
+     'provenance not bound'),
+])
+def test_card_must_equal_projection_of_rebuilt_decision(mutate, reason):
+    doc = deepcopy(project())
+    mutate(doc)
+    with pytest.raises(RetainedCardReportError, match=reason):
+        read(encode(doc))
+
+
+@pytest.mark.parametrize('observed_at', [VIEW, OPEN, NEXT_CLOSE])
+def test_rebuilt_digests_match_producer_cards(observed_at):
+    doc = project(observed_at=observed_at)
+    assert doc['cards']
+    out = read(encode(doc))
+    assert [c['decision_id'] for c in out['cards']] == [
+        r['decision_id'] for r in out['coverage']['symbols'] if r['status'] == 'RESEARCH_CANDIDATE']
 
 
 def test_rejection_is_value_error_for_existing_fail_closed_callers():
