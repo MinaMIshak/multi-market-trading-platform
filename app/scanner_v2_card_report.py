@@ -34,6 +34,30 @@ LIMITATIONS = (
 )
 
 
+def feature_status():
+    """Code-declared Scanner v2 card-report status for SYSTEM visibility.
+
+    Constants only: no IO, scan, card, deployment or runtime observation. Counts
+    of published cards are null because no runtime producer or route exists.
+    Returns a fresh JSON-ready dict on every call.
+    """
+    return {
+        'feature': 'SCANNER_V2_TRADE_CARD_REPORT',
+        'schema_version': SCHEMA_VERSION,
+        'status': FEATURE_STATUS,
+        'market_adapters': {'EGX': 'OFFLINE_PROJECTION_ONLY', 'US': 'NOT_IMPLEMENTED'},
+        'api_route': None,
+        'runtime_producer': None,
+        'published_cards': None,
+        'runtime_activation': False,
+        'limitations': list(LIMITATIONS),
+        'source': ('Code-declared constants; not a scan, candidate count, deployment '
+                   'or runtime observation'),
+        'mode': 'SHADOW', 'live_money': False, 'execution_allowed': False,
+        'promotion': 'NOT_AUTHORIZED',
+    }
+
+
 def _card_state(card):
     reason = card['invalidation_reason']
     if reason is None and card['status'] == 'RESEARCH_CANDIDATE':

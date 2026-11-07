@@ -23,6 +23,7 @@ from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
+from app.scanner_v2_card_report import feature_status as scanner_v2_feature_status
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -120,6 +121,8 @@ def load_system_state():
         'us': us_summary(load_us_ranking()),
         'experiment': experiment_summary(load_experiment()),
         'learning': learning_summary(load_learning()),
+        # Code-declared Scanner v2 Trade Card status; not runtime/scan evidence.
+        'scanner_v2': scanner_v2_feature_status(),
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
@@ -399,6 +402,40 @@ def render_delivery(state):
                       + '</td></tr>' for key in fields) + '</tbody></table></section>')
 
 
+def render_scanner_v2(state):
+    """Render code-declared Scanner v2 status; no runtime, scan or card evidence."""
+    feature = state.get('scanner_v2')
+    if not isinstance(feature, dict):
+        return '<section id="scanner-v2"><h2>Scanner v2 Trade Cards: UNKNOWN</h2></section>'
+
+    def cell(value):
+        return escape(str(value)) if value is not None else 'UNKNOWN'
+
+    adapters = feature.get('market_adapters')
+    adapters = adapters if isinstance(adapters, dict) else {}
+    limitations = feature.get('limitations')
+    limitations = limitations if isinstance(limitations, list) else []
+    rows = (('Status', feature.get('status')),
+            ('Report schema', feature.get('schema_version')),
+            ('EGX adapter', adapters.get('EGX')),
+            ('US adapter', adapters.get('US')),
+            ('API route', feature.get('api_route') or 'NOT_INSTALLED'),
+            ('Runtime producer', feature.get('runtime_producer') or 'NOT_INSTALLED'),
+            ('Published cards', feature.get('published_cards')),
+            ('Runtime activation', feature.get('runtime_activation')),
+            ('Promotion', feature.get('promotion')))
+    return ('<section id="scanner-v2"><h2>Scanner v2 Trade Cards: ' + cell(feature.get('status'))
+            + '</h2><p>Code-declared feature status only; not a scan, candidate count, '
+            'deployment or runtime observation. Cards are research candidates, never fills. '
+            'LIVE_MONEY=DISABLED.</p><div class="table-scroll">'
+            '<table aria-label="Scanner v2 feature status"><tbody>'
+            + ''.join('<tr><th scope="row">' + title + '</th><td>' + cell(value) + '</td></tr>'
+                      for title, value in rows)
+            + '</tbody></table></div><p>Limitations: '
+            + (escape(', '.join(str(item) for item in limitations)) or 'UNKNOWN')
+            + '</p></section>')
+
+
 def render_system(state):
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>System progress</title><style>body{font:16px sans-serif;max-width:1100px;margin:32px auto;padding:20px;'
@@ -412,6 +449,7 @@ def render_system(state):
             '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
             + render_delivery(state)
+            + render_scanner_v2(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
             + render_calendar_maintenance(state.get('calendar_maintenance'))
             + render_pipelines(state)

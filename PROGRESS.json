@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_CARD_REPORT_PROJECTION",
+  "phase": "SCANNER_V2_SYSTEM_FEATURE_STATUS",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "220b5168a8dc1fd277f56d3a5fd2ebc9aaf43468",
+  "head": "48f5b685dec7332b807853e5d82bebd3b90149d2",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -282,6 +282,13 @@
       "files": ["app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required.",
       "next": "Read-only API route serving this document from a host-retained artifact plus SYSTEM feature-status exposure."
+    },
+    "system_feature_status": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.scanner_v2_card_report.feature_status: code-declared constants (OFFLINE_PROJECTION_NOT_ACTIVATED, EGX OFFLINE_PROJECTION_ONLY, US NOT_IMPLEMENTED, no route/producer, published_cards null, limitations, LIVE_MONEY=false). Exposed as /api/system scanner_v2 and rendered on SYSTEM page with escaping and UNKNOWN fallbacks. Not runtime/scan evidence.",
+      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required.",
+      "next": "Read-only API route serving the card report from a host-retained artifact (requires a trusted retained-binding producer)."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

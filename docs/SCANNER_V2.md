@@ -2,8 +2,8 @@
 
 Status: offline contract, read-only card and bounded EGX verification coverage
 adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
-report projection added (host validation pending); runtime binding producer
-and API wiring pending.
+report projection added; code-declared SYSTEM feature status added (host
+validation pending); runtime binding producer and API route pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -338,4 +338,14 @@ Viewing before ranking generation, naive timestamps, hash mismatch, forged
 evidence copies and decision/row drift fail closed. Feature status is
 `OFFLINE_PROJECTION_NOT_ACTIVATED`: there is no HTTP route, runtime producer of
 retained bindings or persistence yet. Next: a read-only API route serving this
-document from a host-retained artifact, with SYSTEM feature-status exposure.
+document from a host-retained artifact.
+
+## SYSTEM feature status
+
+`app.scanner_v2_card_report.feature_status()` returns code-declared constants
+(schema, `OFFLINE_PROJECTION_NOT_ACTIVATED`, EGX adapter OFFLINE_PROJECTION_ONLY,
+US adapter NOT_IMPLEMENTED, no API route or runtime producer, `published_cards`
+null, fixed limitations, SHADOW, LIVE_MONEY=false, promotion NOT_AUTHORIZED).
+`/api/system` exposes it as `scanner_v2`; the SYSTEM page renders it with escaped
+values and UNKNOWN for missing/malformed fields. It is not a scan, card count,
+deployment or runtime observation, and it does not read PROGRESS.json.
