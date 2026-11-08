@@ -4,7 +4,7 @@ import json
 from unittest.mock import patch
 
 from app.scanner_v2_card_report import (
-    FEATURE_STATUS, LIMITATIONS, SCHEMA_VERSION, feature_status)
+    API_ROUTE, FEATURE_STATUS, LIMITATIONS, SCHEMA_VERSION, feature_status)
 from app.ui.system import load_system_state, render_scanner_v2, render_system
 
 
@@ -14,7 +14,8 @@ def test_feature_status_is_fixed_inactive_and_fresh():
     assert status['schema_version'] == SCHEMA_VERSION
     assert status['market_adapters'] == {'EGX': 'OFFLINE_PROJECTION_ONLY',
                                          'US': 'NOT_IMPLEMENTED'}
-    assert status['api_route'] is None and status['runtime_producer'] is None
+    assert status['api_route'] == API_ROUTE == '/api/scanner-v2/egx/card-report'
+    assert status['runtime_producer'] is None
     assert status['published_cards'] is None
     assert status['live_money'] is status['execution_allowed'] is False
     assert status['runtime_activation'] is False
@@ -35,7 +36,7 @@ def test_system_state_and_page_expose_status_without_runtime_claims():
     before = deepcopy(state)
     html = render_scanner_v2(state)
     assert 'Scanner v2 Trade Cards: OFFLINE_PROJECTION_NOT_ACTIVATED' in html
-    assert 'API route</th><td>NOT_INSTALLED' in html
+    assert 'API route</th><td>' + API_ROUTE in html
     assert 'Runtime producer</th><td>NOT_INSTALLED' in html
     assert 'Published cards</th><td>UNKNOWN' in html
     assert 'US adapter</th><td>NOT_IMPLEMENTED' in html

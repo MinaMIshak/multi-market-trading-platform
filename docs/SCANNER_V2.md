@@ -3,8 +3,10 @@
 Status: offline contract, read-only card and bounded EGX verification coverage
 adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
 report projection and code-declared SYSTEM feature status committed; retained
-card-report read gate committed; protected read-only loader added (host
-validation pending); runtime binding/report producer and API route pending.
+card-report read gate and protected read-only loader committed; read-only GET
+route `/api/scanner-v2/egx/card-report` over the loader added (host validation
+pending); runtime binding/report producer pending, so the route currently
+answers NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -20,7 +22,8 @@ LIVE_MONEY=DISABLED.
   The next adapter should reuse their accounting, while retaining US-specific
   identity/calendar/source admission through existing US research adapters.
 - `app.ui.trade_card.render_trade_card` renders a read-only HTML fragment;
-  `trade_card` provides its JSON-ready projection. No HTTP route is installed yet.
+  `trade_card` provides its JSON-ready projection. No HTML card page is installed;
+  retained card reports are served read-only as JSON (see the route section).
 
 ## Contract
 
@@ -441,3 +444,19 @@ Ancestor directories are a host protection obligation (only the final component
 is opened without following symlinks). No producer publishes these files yet,
 so `feature_status()` is still unchanged. Next: the trusted producer and a
 read-only route serving only this loader's response.
+
+## Read-only card-report route (pending host validation)
+
+`GET /api/scanner-v2/egx/card-report` (`app.main.scanner_v2_egx_card_report`)
+returns exactly `load_retained_egx_card_report()` with the real UTC clock. It
+adds no fields, does no other IO, and has no write method. Without
+`EGX_SCANNER_V2_CARD_REPORT_DIR` it answers `NOT_CONFIGURED`; any other failure
+is the loader's `UNAVAILABLE` response with a fixed reason and no report.
+HTTP status is 200 for every outcome; clients must read `status`/`reason`.
+
+`feature_status()['api_route']` now names this path, so SYSTEM shows it instead
+of `NOT_INSTALLED`. Status stays `OFFLINE_PROJECTION_NOT_ACTIVATED`,
+`runtime_producer` and `published_cards` stay null and `runtime_activation`
+false: installing a route is not a producer, scan, coverage or activation.
+Next: a trusted host producer that writes content-addressed report bytes plus
+an atomic `current.json` pointer.

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_RETAINED_CARD_REPORT_LOADER",
+  "phase": "SCANNER_V2_CARD_REPORT_READ_ONLY_ROUTE",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "c4303eea5f75a8968a39c144250474522018a3e1",
+  "head": "8f3664b836faca115d3165551d56ef34f0fa7c23",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -258,7 +258,7 @@
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
       "paper": "app.paper.shadow_candidate_admission: separate explicit admission remains required",
       "coverage": "app.scanner_v2.scan_egx reuses app.egx_scan.scan_egx_scope without parallel admission or history publication; retains explicit-selection semantics and validates projected totals.",
-      "card": "read-only typed projection; API route and runtime data wiring deferred",
+      "card": "read-only typed projection; served only via the read-only card-report route over the protected loader; runtime producer deferred",
       "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion.",
       "rank_adapter": "app.scanner_v2_egx_rank reuses egx_ranking published terms and system_candidates lifecycle constants, Candidate, DecisionSource, DecisionTerms and TradeDecision; no parallel risk admission or execution.",
       "identity": "app.scanner_v2_identity reuses RawArtifactManifest and build_canonical_security_master; immutable identity tuples and hash evidence feed EgxRankBinding without IO or mutable current-master lookup.",
@@ -314,11 +314,20 @@
       "next": "Superseded by retained_card_report_loader below."
     },
     "retained_card_report_loader": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "8f3664b836faca115d3165551d56ef34f0fa7c23",
+      "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at c4303ee (375 passed); no record for 8f3664b was visible this cycle.",
       "summary": "app.scanner_v2_card_report_loader.load_retained_egx_card_report: reads EGX_SCANNER_V2_CARD_REPORT_DIR/current.json (strict scanner-v2-card-report-pointer-v1) and content-addressed <sha256>.json without following symlinks, regular files only, bounded reads, never writes; returns scanner-v2-card-report-response-v1 AVAILABLE only for reader-accepted bytes, else NOT_CONFIGURED/UNAVAILABLE with a fixed reason and no partial content. Reports load_freshness and cards_current_at_load without relabelling producer-time cards; load clock before report observed_at fails closed. No route, producer or caller; feature_status unchanged.",
       "files": ["app/scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_loader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_loader.py.",
-      "next": "Trusted retained card-report producer (publishes content-addressed bytes + atomic pointer) and a read-only API route serving only this loader's response; then update feature_status."
+      "next": "Superseded by card_report_route below."
+    },
+    "card_report_route": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "GET /api/scanner-v2/egx/card-report (app.main.scanner_v2_egx_card_report) returns exactly load_retained_egx_card_report() with the real UTC clock; no extra fields, IO or write method. feature_status api_route now names the path (SYSTEM shows it); status stays OFFLINE_PROJECTION_NOT_ACTIVATED, runtime_producer/published_cards null, runtime_activation false. Without a host-published directory the route answers NOT_CONFIGURED/UNAVAILABLE.",
+      "files": ["app/main.py", "app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_route.py.",
+      "next": "Trusted host retained card-report producer publishing content-addressed bytes plus atomic current.json pointer; deployment/mount of EGX_SCANNER_V2_CARD_REPORT_DIR remains a host obligation."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

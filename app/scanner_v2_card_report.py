@@ -20,6 +20,9 @@ from app.strategies.trade_decision import TradeDecision, trade_card
 
 SCHEMA_VERSION = 'scanner-v2-egx-card-report-v1'
 FEATURE_STATUS = 'OFFLINE_PROJECTION_NOT_ACTIVATED'
+# Read-only GET route serving only the protected loader's response. Until a
+# trusted host producer publishes a report it answers NOT_CONFIGURED/UNAVAILABLE.
+API_ROUTE = '/api/scanner-v2/egx/card-report'
 CARD_STATES = ('RESEARCH_CANDIDATE', 'DATA_STALE', 'PLAN_EXPIRED')
 LIMITATIONS = (
     'PUBLISHED_RANKING_SCOPE_NOT_AUTHORITATIVE_UNIVERSE',
@@ -37,8 +40,9 @@ LIMITATIONS = (
 def feature_status():
     """Code-declared Scanner v2 card-report status for SYSTEM visibility.
 
-    Constants only: no IO, scan, card, deployment or runtime observation. Counts
-    of published cards are null because no runtime producer or route exists.
+    Constants only: no IO, scan, card, deployment or runtime observation. The
+    read-only API route is code-installed, but no runtime producer exists, so
+    counts of published cards stay null and the status stays not activated.
     Returns a fresh JSON-ready dict on every call.
     """
     return {
@@ -46,7 +50,7 @@ def feature_status():
         'schema_version': SCHEMA_VERSION,
         'status': FEATURE_STATUS,
         'market_adapters': {'EGX': 'OFFLINE_PROJECTION_ONLY', 'US': 'NOT_IMPLEMENTED'},
-        'api_route': None,
+        'api_route': API_ROUTE,
         'runtime_producer': None,
         'published_cards': None,
         'runtime_activation': False,
