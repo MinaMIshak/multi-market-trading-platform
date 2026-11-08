@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_CARD_REPORT_READ_ONLY_ROUTE",
+  "phase": "SCANNER_V2_CARD_REPORT_PUBLISHER",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "a5a953f24b2356e82bdd26d1a8c09a683a67d3a6",
+  "head": "224e0897b42482550c95dc6d2e645c9868ed680d",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -258,7 +258,8 @@
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
       "paper": "app.paper.shadow_candidate_admission: separate explicit admission remains required",
       "coverage": "app.scanner_v2.scan_egx reuses app.egx_scan.scan_egx_scope without parallel admission or history publication; retains explicit-selection semantics and validates projected totals.",
-      "card": "read-only typed projection; served only via the read-only card-report route over the protected loader; runtime producer deferred",
+      "card": "read-only typed projection; served only via the read-only card-report route over the protected loader; publisher library added, scheduled runtime producer deferred",
+      "card_publisher": "app.scanner_v2_card_report_publisher reuses project_egx_card_report, the card-report reader and the loader read path/constants; writes only content-addressed bytes and the atomic pointer the loader already defines; no second storage format.",
       "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion.",
       "rank_adapter": "app.scanner_v2_egx_rank reuses egx_ranking published terms and system_candidates lifecycle constants, Candidate, DecisionSource, DecisionTerms and TradeDecision; no parallel risk admission or execution.",
       "identity": "app.scanner_v2_identity reuses RawArtifactManifest and build_canonical_security_master; immutable identity tuples and hash evidence feed EgxRankBinding without IO or mutable current-master lookup.",
@@ -332,12 +333,20 @@
       "next": "Superseded by reader_instrument_id_test_fix below."
     },
     "reader_instrument_id_test_fix": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "224e0897b42482550c95dc6d2e645c9868ed680d",
       "summary": "Test-only fix. The uppercase_instrument_id tamper case did nothing because the fixture IDs are UUID(int=n), which contain only digits and dashes, so .upper() leaves them unchanged and the reader correctly accepted the unchanged card. Replaced it with noncanonical_instrument_id (a braced UUID form): uuid.UUID still parses it, so the rebuild succeeds and only the projection-equality gate can reject it. No reader/gate change; nothing weakened.",
       "files": ["tests/test_scanner_v2_card_report_reader.py", "PROGRESS.json"],
       "tests": "Not run by the file-only Claude paced executor. The supervisor record says scanner_core PASS, 492 passed, at fingerprint 989c1f46. Host must re-validate the exact committed paths.",
       "housekeeping": "Untracked tests/test_scanner_v2_card_report_reader.py.bak.* files are editor backups and must NOT be committed; the host should delete them (the file-only executor cannot delete files).",
-      "next": "Trusted host retained card-report producer publishing content-addressed bytes plus atomic current.json pointer; deployment/mount of EGX_SCANNER_V2_CARD_REPORT_DIR remains a host obligation."
+      "next": "Superseded by card_report_publisher below."
+    },
+    "card_report_publisher": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.scanner_v2_card_report_publisher.publish_egx_card_report: projects with existing project_egx_card_report at the producer clock, canonical bytes must pass read_retained_egx_card_report with byte-identical round trip before any write; protected non-symlink non-group/world-writable directory, exclusive non-blocking flock, current publication read via the loader path (damaged -> preserved/refused, clock or ranking regression refused, same digest idempotent); content-addressed 0444 report via temp+fsync+hard link without overwrite (identical bytes complete interrupted publication, else CONTENT_CONFLICT); atomic pointer replace, directory fsync and post-publication loader verification. Never deletes reports. No scheduler/runtime caller; feature_status unchanged.",
+      "files": ["app/scanner_v2_card_report_publisher.py", "tests/test_scanner_v2_card_report_publisher.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_publisher.py.",
+      "next": "Trusted host job wiring: obtain manifest-verified ranking bytes plus retained identity/calendar observations, compose RetainedEgxRankBinding and call the publisher on schedule; provision/mount EGX_SCANNER_V2_CARD_REPORT_DIR. Then update feature_status runtime_producer only with host evidence."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

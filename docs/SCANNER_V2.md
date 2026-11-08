@@ -5,8 +5,9 @@ adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
 report projection and code-declared SYSTEM feature status committed; retained
 card-report read gate and protected read-only loader committed; read-only GET
 route `/api/scanner-v2/egx/card-report` over the loader added (host validation
-pending); runtime binding/report producer pending, so the route currently
-answers NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
+pending); trusted card-report publisher library added (host validation pending);
+no scheduled runtime producer invokes it yet, so the route currently answers
+NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -460,3 +461,37 @@ of `NOT_INSTALLED`. Status stays `OFFLINE_PROJECTION_NOT_ACTIVATED`,
 false: installing a route is not a producer, scan, coverage or activation.
 Next: a trusted host producer that writes content-addressed report bytes plus
 an atomic `current.json` pointer.
+
+## Trusted card-report publisher (pending host validation)
+
+`app.scanner_v2_card_report_publisher.publish_egx_card_report(directory,
+artifact, *, expected_sha256, evidence, now=None)` is the write side of the
+loader. It has no scheduler or runtime caller yet. It:
+
+1. runs the existing `project_egx_card_report` with its own clock as
+   `observed_at` (no caller-supplied observation time);
+2. encodes the document canonically (`encode_card_report`: sorted keys, compact,
+   no NaN) and passes the exact bytes through `read_retained_egx_card_report`
+   before any write, requiring a byte-identical round trip;
+3. opens the host-provisioned absolute directory without following symlinks,
+   refuses group/world-writable directories and takes an exclusive non-blocking
+   `flock` (a concurrent publisher gets `PUBLICATION_BUSY`);
+4. reads the current publication through the loader's own read path. Missing is
+   a first publication; the same digest returns `ALREADY_CURRENT` with no write;
+   a damaged pointer or rejected report is preserved and refused
+   (`EXISTING_PUBLICATION_INVALID`); an existing report observed after `now` is
+   `CLOCK_REGRESSION`; an older ranking `generated_at` is `RANKING_REGRESSION`;
+5. writes `<sha256>.json` (mode 0444) by temporary file, fsync and hard link,
+   never overwriting. Existing identical bytes complete an interrupted
+   publication; different bytes or a symlink are `CONTENT_CONFLICT`;
+6. atomically replaces `current.json`, fsyncs the directory and re-reads through
+   the loader path, requiring the new digest (`PUBLICATION_UNVERIFIED` otherwise).
+
+Projection and gate failures (`PROJECTION_REJECTED`, `REPORT_REJECTED`) and
+refusals in step 4 write nothing. Old report bytes are retained, never deleted.
+The publisher does not create the directory, provision ancestors, schedule
+itself or verify the retained-binding inputs beyond the existing projection; a
+trusted host job must supply manifest-verified ranking bytes and retained
+evidence. `feature_status()` is unchanged (runtime producer null): a library
+function is not a scheduled producer, scan, coverage or activation.
+LIVE_MONEY=false; nothing is admitted, filled or promoted.
