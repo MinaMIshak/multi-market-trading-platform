@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_CARD_DECISION_REDERIVATION",
+  "phase": "SCANNER_V2_RETAINED_CARD_REPORT_LOADER",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "e47fa5a39d5e8638e3deb2614619ebd62855aa89",
+  "head": "c4303eea5f75a8968a39c144250474522018a3e1",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -269,7 +269,8 @@
       "calendar_retention": "TradingRepository single-query committed calendar read, producer clock and immutable content-addressed observation in existing SQLite storage; no schedule admission.",
       "retained_binding": "app.scanner_v2_retained_binding composes existing EgxRankBinding from ObservedIdentityProjection + CalendarProjection and reuses bind_egx_rank_report unchanged; no IO, no admission upgrade.",
       "card_report": "app.scanner_v2_card_report reuses bind_retained_egx_rank_report and trade_card unchanged to produce one JSON-ready coverage+provenance+cards report; no IO or route.",
-      "card_reader": "app.scanner_v2_card_report_reader validates exact retained card-report bytes against producer SHA-256, reusing card-report, rank-adapter, retained-binding and egx_ranking constants; pure, no IO or route."
+      "card_reader": "app.scanner_v2_card_report_reader validates exact retained card-report bytes against producer SHA-256, reusing card-report, rank-adapter, retained-binding and egx_ranking constants; pure, no IO or route.",
+      "card_loader": "app.scanner_v2_card_report_loader follows the app.delivery_status protected-read pattern (absolute env path, O_NOFOLLOW, regular file, bounded read) and delegates all content validation to the card-report reader; no route or producer."
     },
     "retained_binding_composition": {
       "status": "VALIDATED_OFFLINE",
@@ -304,11 +305,20 @@
       "next": "Superseded by card_decision_rederivation below."
     },
     "card_decision_rederivation": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "c4303eea5f75a8968a39c144250474522018a3e1",
+      "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 2c17bbe (375 passed); no record for c4303ee was visible this cycle.",
       "summary": "Reader rebuilds each card's exact TradeDecision from typed retained fields (parsed datetimes/Decimals/UUID, null float references as EGX-RANK-v1 emits) via existing Candidate/DecisionSource/DecisionTerms/TradeDecision validators; requires identity == decision_id, strategy_candidate_sha256 == candidate_sha256 and unchanged trade_card(rebuilt, observed_at) == retained card. Non-string evidence ids now fail closed instead of escaping as TypeError. Avoids pydantic strict-JSON coercion entirely.",
       "files": ["app/scanner_v2_card_report_reader.py", "tests/test_scanner_v2_card_report_reader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required; the producer round-trip tests at VIEW/OPEN/NEXT_CLOSE are the key check that rebuilt projections equal producer cards.",
-      "next": "Protected read-only loader + route serving only reader-accepted documents (requires a trusted retained card-report producer); feature_status unchanged until then."
+      "next": "Superseded by retained_card_report_loader below."
+    },
+    "retained_card_report_loader": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.scanner_v2_card_report_loader.load_retained_egx_card_report: reads EGX_SCANNER_V2_CARD_REPORT_DIR/current.json (strict scanner-v2-card-report-pointer-v1) and content-addressed <sha256>.json without following symlinks, regular files only, bounded reads, never writes; returns scanner-v2-card-report-response-v1 AVAILABLE only for reader-accepted bytes, else NOT_CONFIGURED/UNAVAILABLE with a fixed reason and no partial content. Reports load_freshness and cards_current_at_load without relabelling producer-time cards; load clock before report observed_at fails closed. No route, producer or caller; feature_status unchanged.",
+      "files": ["app/scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_loader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_loader.py.",
+      "next": "Trusted retained card-report producer (publishes content-addressed bytes + atomic pointer) and a read-only API route serving only this loader's response; then update feature_status."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

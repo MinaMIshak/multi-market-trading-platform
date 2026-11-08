@@ -3,8 +3,8 @@
 Status: offline contract, read-only card and bounded EGX verification coverage
 adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
 report projection and code-declared SYSTEM feature status committed; retained
-card-report read gate added (host validation pending); runtime binding producer,
-retained report storage and API route pending.
+card-report read gate committed; protected read-only loader added (host
+validation pending); runtime binding/report producer and API route pending.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
 
@@ -402,3 +402,42 @@ Decision digests are self-consistency checks, not evidence that the decision was
 produced from admitted inputs. Nothing is admitted, filled or promoted. A trusted retained-binding
 producer, retained report storage and the read-only route are still missing.
 `feature_status()` is deliberately unchanged: there is still no route or producer.
+
+## Protected retained card-report loader (pending host validation)
+
+`app.scanner_v2_card_report_loader.load_retained_egx_card_report` is the IO
+side of the read gate. It has no caller and no route yet. The host directory is
+named by `EGX_SCANNER_V2_CARD_REPORT_DIR` (absolute path) and holds:
+
+- `<sha256>.json`: exact report bytes named by their SHA-256 and never rewritten;
+- `current.json`: `{"schema_version": "scanner-v2-card-report-pointer-v1",
+  "report_sha256": "<64 lowercase hex>"}`, atomically replaced on publication.
+
+Each load opens the directory and both files without following symlinks,
+requires regular files, bounds reads (4 KiB pointer, reader's 8 MiB report),
+parses the pointer strictly and hands the exact bytes and pointer hash to
+`read_retained_egx_card_report`. A pointer replaced mid-load still names
+immutable content-addressed bytes. The loader never writes.
+
+It returns `scanner-v2-card-report-response-v1` with status `AVAILABLE`,
+`NOT_CONFIGURED` or `UNAVAILABLE` and one fixed reason (`CONFIG_INVALID`,
+`DIRECTORY_UNAVAILABLE`, `NOT_PUBLISHED`, `POINTER_INVALID`, `REPORT_UNREADABLE`,
+`REPORT_REJECTED`, `REPORT_FROM_FUTURE`). `report` is set only when the reader
+accepted it; `detail` carries only the reader's code-defined rejection text.
+Deep-nesting `RecursionError` is rejected. A load clock earlier than the report's
+`observed_at` fails closed.
+
+Cards keep the state the producer computed at `observed_at`; they are not
+relabelled. The response separately reports `report_observed_at`,
+`load_freshness` (`WITHIN_RETAINED_WINDOW` or `STALE_AT_LOAD`, from the retained
+binding `fresh_until`) and `cards_current_at_load` (cards whose freshness,
+`valid_until` and `flat_by` still hold at load). A route must show these
+alongside the cards, so an old report is never presented as current. Every
+response carries SHADOW, LIVE_MONEY=false, execution disabled,
+runtime_activation=false and promotion NOT_AUTHORIZED.
+
+The pointer hash is integrity under a trusted host writer, not a signature.
+Ancestor directories are a host protection obligation (only the final component
+is opened without following symlinks). No producer publishes these files yet,
+so `feature_status()` is still unchanged. Next: the trusted producer and a
+read-only route serving only this loader's response.
