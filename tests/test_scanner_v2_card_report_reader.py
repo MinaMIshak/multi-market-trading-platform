@@ -231,9 +231,9 @@ def edit_setup_version(doc):
     doc['cards'][0]['strategy_inference']['setup_version'] = '2'
 
 
-def uppercase_instrument_id(doc):
+def noncanonical_instrument_id(doc):
     source = doc['cards'][0]['observed_fact']['provenance']
-    source['instrument_id'] = source['instrument_id'].upper()
+    source['instrument_id'] = '{' + source['instrument_id'] + '}'
 
 
 @pytest.mark.parametrize('mutate,reason', [
@@ -243,7 +243,7 @@ def uppercase_instrument_id(doc):
     (edit_setup_version, 'decision_id does not match'),
     (put(('cards', 0, 'research_evidence', 'candidate_sha256'), '0' * 64),
      'candidate_sha256 does not match'),
-    (uppercase_instrument_id, 'projection of rebuilt decision'),
+    (noncanonical_instrument_id, 'projection of rebuilt decision'),
     (put(('cards', 0, 'observed_fact', 'provenance', 'instrument_id'), 7), 'instrument_id'),
     (put(('cards', 0, 'observed_fact', 'provenance', 'instrument_id'), 'not-a-uuid'),
      'cannot be rebuilt'),

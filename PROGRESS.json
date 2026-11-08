@@ -4,7 +4,7 @@
   "phase": "SCANNER_V2_CARD_REPORT_READ_ONLY_ROUTE",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "8f3664b836faca115d3165551d56ef34f0fa7c23",
+  "head": "a5a953f24b2356e82bdd26d1a8c09a683a67d3a6",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -323,10 +323,20 @@
       "next": "Superseded by card_report_route below."
     },
     "card_report_route": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "a5a953f24b2356e82bdd26d1a8c09a683a67d3a6",
+      "host_validation_note": "Supervisor scanner_core run at a5a953f (fingerprint a29459a9): 1 failed, 491 passed; the failure was a test defect fixed by reader_instrument_id_test_fix below. A later supervisor scanner_core run at the same head (fingerprint 989c1f46) recorded PASS, 492 passed.",
       "summary": "GET /api/scanner-v2/egx/card-report (app.main.scanner_v2_egx_card_report) returns exactly load_retained_egx_card_report() with the real UTC clock; no extra fields, IO or write method. feature_status api_route now names the path (SYSTEM shows it); status stays OFFLINE_PROJECTION_NOT_ACTIVATED, runtime_producer/published_cards null, runtime_activation false. Without a host-published directory the route answers NOT_CONFIGURED/UNAVAILABLE.",
       "files": ["app/main.py", "app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_route.py.",
+      "next": "Superseded by reader_instrument_id_test_fix below."
+    },
+    "reader_instrument_id_test_fix": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Test-only fix. The uppercase_instrument_id tamper case did nothing because the fixture IDs are UUID(int=n), which contain only digits and dashes, so .upper() leaves them unchanged and the reader correctly accepted the unchanged card. Replaced it with noncanonical_instrument_id (a braced UUID form): uuid.UUID still parses it, so the rebuild succeeds and only the projection-equality gate can reject it. No reader/gate change; nothing weakened.",
+      "files": ["tests/test_scanner_v2_card_report_reader.py", "PROGRESS.json"],
+      "tests": "Not run by the file-only Claude paced executor. The supervisor record says scanner_core PASS, 492 passed, at fingerprint 989c1f46. Host must re-validate the exact committed paths.",
+      "housekeeping": "Untracked tests/test_scanner_v2_card_report_reader.py.bak.* files are editor backups and must NOT be committed; the host should delete them (the file-only executor cannot delete files).",
       "next": "Trusted host retained card-report producer publishing content-addressed bytes plus atomic current.json pointer; deployment/mount of EGX_SCANNER_V2_CARD_REPORT_DIR remains a host obligation."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
