@@ -5,8 +5,9 @@ adapter and EGX-RANK-v1 reporting adapter validated offline; offline EGX card
 report projection and code-declared SYSTEM feature status committed; retained
 card-report read gate and protected read-only loader committed; read-only GET
 route `/api/scanner-v2/egx/card-report` over the loader added (host validation
-pending); trusted card-report publisher library added (host validation pending);
-no scheduled runtime producer invokes it yet, so the route currently answers
+pending); trusted card-report publisher library and its read-only retained
+evidence input loader added (host validation pending);
+no scheduled runtime producer invokes them yet, so the route currently answers
 NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
 LIVE_MONEY=DISABLED.
@@ -495,3 +496,38 @@ trusted host job must supply manifest-verified ranking bytes and retained
 evidence. `feature_status()` is unchanged (runtime producer null): a library
 function is not a scheduled producer, scan, coverage or activation.
 LIVE_MONEY=false; nothing is admitted, filled or promoted.
+
+## Retained evidence input loader (pending host validation)
+
+`app.scanner_v2_retained_evidence.load_retained_egx_rank_binding(artifact, *,
+expected_sha256, identity_artifact, identity_manifest, security_master, trading,
+calendar_sha256)` builds the publisher's `evidence` argument from already
+retained storage, so the host job does not hand-assemble projections:
+
+1. `ranking_scope` checks the ranking bytes (8 MiB bound, manifest SHA-256,
+   strict JSON) and reads only `based_on_session`, an aware `generated_at` and
+   the unique published tickers (sorted). The full ranking contract is still
+   enforced later by the unchanged `bind_egx_rank_report`;
+2. `SecurityMasterRepository.get_admission_observation` reads the retained EGID
+   observation for that session and manifest digest, and the existing
+   `bind_observed_egid_identities` binds it with `observed_at = generated_at`
+   and `requested` = the ranking scope;
+3. `TradingRepository.get_calendar_observation` projects the retained calendar
+   window with `decision_time = generated_at`;
+4. the calendar session must equal the ranking session, then the existing
+   `compose_egx_rank_binding` builds the `RetainedEgxRankBinding`.
+
+The ranking generation time is the only decision time: identity or calendar
+evidence observed after it is rejected, so later observations never backdate a
+decision. Only read methods are called; it never calls `retain_*` or
+`observe_admission` as a substitute for missing retained evidence. Failures
+raise `RetainedEvidenceError` (a `ValueError`) with one fixed reason:
+`RANKING_INVALID`, `IDENTITY_OBSERVATION_UNAVAILABLE`, `IDENTITY_REJECTED`,
+`CALENDAR_OBSERVATION_UNAVAILABLE`, `CALENDAR_REJECTED` or `BINDING_REJECTED`.
+
+Admission labels are unchanged (identity INTERNAL_SNAPSHOT_VERIFIED, calendar
+NOT_ESTABLISHED); runtime_activation=false; LIVE_MONEY=false. It has no
+scheduler or runtime caller and `feature_status()` is unchanged. The host job
+still has to locate the manifest-verified ranking bytes, the preserved EGID bytes
+and manifest, and the retained calendar digest, then call the publisher.
+Tests use artificial fixtures and disposable databases only.
