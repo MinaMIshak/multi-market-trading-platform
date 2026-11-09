@@ -6,7 +6,9 @@ report projection and code-declared SYSTEM feature status committed; retained
 card-report read gate and protected read-only loader committed; read-only GET
 route `/api/scanner-v2/egx/card-report` over the loader added (host validation
 pending); trusted card-report publisher library and its read-only retained
-evidence input loader added (host validation pending);
+evidence input loader added (host validation pending); a host job entrypoint
+composing them (`python -m app.scanner_v2_card_report_job`) added (host
+validation pending, not scheduled);
 no scheduled runtime producer invokes them yet, so the route currently answers
 NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
@@ -531,3 +533,41 @@ scheduler or runtime caller and `feature_status()` is unchanged. The host job
 still has to locate the manifest-verified ranking bytes, the preserved EGID bytes
 and manifest, and the retained calendar digest, then call the publisher.
 Tests use artificial fixtures and disposable databases only.
+
+## Host card-report job entrypoint (pending host validation, not scheduled)
+
+`app.scanner_v2_card_report_job.run_egx_card_report_job` (CLI:
+`python -m app.scanner_v2_card_report_job --db-path --raw-root --ranking-report
+--ranking-sha256 --identity-raw-path --calendar-sha256 --output-dir`) only wires
+existing pieces; it adds no evidence store, scanner, risk or admission logic:
+
+1. all paths must be absolute (the identity raw path is the `data_ingestions`
+   key, relative to the raw root) and both digests 64 lowercase hex; nothing is
+   searched for or defaulted;
+2. the database file must already exist as a regular non-symlink file. It is
+   never created, initialized or upgraded; a missing schema is
+   `DATABASE_UNAVAILABLE`;
+3. the EGID manifest comes from `DataIngestionRepository.get_manifest_by_raw_path`
+   (provider `egid`, SECURITY_MASTER, size within the identity bound), and its
+   bytes from `ImmutableRawStore.read_verified` (size and SHA-256 checked);
+4. the ranking bytes are read from one absolute path without following a final
+   symlink, regular file only, bounded (oversize is `RANKING_INVALID` downstream);
+5. `load_retained_egx_rank_binding` and then `publish_egx_card_report` run
+   unchanged; the publisher's own clock is the report `observed_at`.
+
+Input failures raise `CardReportJobError` (`CONFIG_INVALID`,
+`DATABASE_UNAVAILABLE`, `RANKING_UNREADABLE`, `IDENTITY_MANIFEST_UNAVAILABLE`,
+`IDENTITY_MANIFEST_REJECTED`, `IDENTITY_ARTIFACT_UNREADABLE`); evidence and
+publication failures keep their existing errors. The CLI prints one
+`scanner-v2-card-report-job-v1` JSON line with `status` PUBLISHED,
+ALREADY_CURRENT or FAILED (with `stage` INPUT/EVIDENCE/PUBLICATION and a fixed
+reason), always SHADOW / LIVE_MONEY=false / execution disabled /
+runtime_activation=false / promotion NOT_AUTHORIZED, and exits non-zero on
+failure. Nothing is written before the publisher's own gates pass.
+
+The caller must take the ranking SHA-256 from a verified snapshot manifest and
+name the retained calendar digest. The job has no scheduler, cron or systemd
+entry here, and the output directory still has to be provisioned on the host
+(`EGX_SCANNER_V2_CARD_REPORT_DIR` for the route). `feature_status()` is unchanged
+(runtime producer null). Only host evidence of scheduled successful runs may
+change that. Tests use artificial inputs and disposable databases only.
