@@ -8,7 +8,10 @@ route `/api/scanner-v2/egx/card-report` over the loader added (host validation
 pending); trusted card-report publisher library and its read-only retained
 evidence input loader added (host validation pending); a host job entrypoint
 composing them (`python -m app.scanner_v2_card_report_job`) added (host
-validation pending, not scheduled);
+validation pending, not scheduled); a host job entrypoint retaining its
+prerequisite identity/calendar observations
+(`python -m app.scanner_v2_evidence_retention_job`) added (host validation
+pending, not scheduled);
 no scheduled runtime producer invokes them yet, so the route currently answers
 NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
@@ -584,3 +587,46 @@ checks that no scheduler/cron/delivery-schedule source under `app/` or `tools/`
 names it, so the NOT_SCHEDULED claim fails if a repository schedule is added
 without updating the status. Report bytes and the reader are unaffected
 (`LIMITATIONS` and the report's `feature_status` constant are unchanged).
+
+## Host evidence-retention job entrypoint (pending host validation, not scheduled)
+
+The card-report job only reads retained evidence, and before this unit nothing
+in the repository called the existing producers of that evidence.
+`app.scanner_v2_evidence_retention_job.run_egx_evidence_retention_job` (CLI:
+`python -m app.scanner_v2_evidence_retention_job --db-path --raw-root --session
+--through --identity-raw-path`) wires them and adds no evidence store, calendar
+or admission logic:
+
+1. paths must be absolute, `--session`/`--through` exact `YYYY-MM-DD`; the
+   database and EGID manifest/bytes are resolved with the card-report job's own
+   helpers (existing regular non-symlink database never created/initialized/
+   upgraded; provider `egid`, SECURITY_MASTER, bounded, `read_verified`);
+2. `SecurityMasterRepository.retain_admission_observation(egid, session,
+   manifest SHA-256)` runs unchanged. It requires an already committed admission
+   receipt for that exact triple (`IDENTITY_ADMISSION_UNAVAILABLE` otherwise);
+3. `TradingRepository.retain_calendar_observation(session, through)` runs
+   unchanged over committed `market_sessions` rows.
+
+Both repositories sample their own post-read clock; the job accepts no caller
+timestamp, so nothing can be backdated, and exact reruns keep the first
+observation. The point-in-time gate stays downstream and unchanged: the
+card-report loader rejects evidence observed after the ranking `generated_at`,
+so the host must run this job **before** EGX ranking generation for the session.
+The printed `calendar_sha256` is what the card-report job's `--calendar-sha256`
+expects; the host passes it explicitly.
+
+The CLI prints one `scanner-v2-evidence-retention-job-v1` JSON line: `status`
+RETAINED (with identity observation time/receipt digest, calendar digest,
+observation time, next session and `calendar_admission` NOT_ESTABLISHED) or
+FAILED with `stage` INPUT/IDENTITY/CALENDAR and a fixed reason, always SHADOW /
+LIVE_MONEY=false / execution disabled / runtime_activation=false / promotion
+NOT_AUTHORIZED; exit code is non-zero on failure. Identity runs first, so a
+calendar failure leaves the (immutable, true) identity observation retained; the
+calendar step is never reached after an identity failure.
+
+Limitations: a malformed admission row whose payload lacks identity keys
+surfaces as `KeyError` from the unchanged repository and is reported as
+`IDENTITY_ADMISSION_UNAVAILABLE` rather than a rejection (it still fails
+closed). No scheduler/cron entry, no SYSTEM field and no runtime evidence are
+added; retained observations establish no admission. Tests use artificial
+inputs, a fake security-master retention boundary and disposable databases only.

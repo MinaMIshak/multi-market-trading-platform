@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_CARD_REPORT_PUBLISHER",
+  "phase": "SCANNER_V2_EVIDENCE_RETENTION_JOB",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "319df8e5bdc2de10ef40d8da5aa36865442543d5",
+  "head": "4aa18e0390625b7cc7f090de32e8b19f806b7b6d",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -272,6 +272,7 @@
       "retained_binding": "app.scanner_v2_retained_binding composes existing EgxRankBinding from ObservedIdentityProjection + CalendarProjection and reuses bind_egx_rank_report unchanged; no IO, no admission upgrade.",
       "card_report": "app.scanner_v2_card_report reuses bind_retained_egx_rank_report and trade_card unchanged to produce one JSON-ready coverage+provenance+cards report; no IO or route.",
       "card_reader": "app.scanner_v2_card_report_reader validates exact retained card-report bytes against producer SHA-256, reusing card-report, rank-adapter, retained-binding and egx_ranking constants; pure, no IO or route.",
+      "evidence_retention_job": "app.scanner_v2_evidence_retention_job reuses the card-report job's database/EGID-manifest helpers and calls the unchanged SecurityMasterRepository.retain_admission_observation and TradingRepository.retain_calendar_observation; no new storage, clock or admission logic; not scheduled.",
       "card_job": "app.scanner_v2_card_report_job composes DataIngestionRepository manifest lookup, ImmutableRawStore.read_verified, load_retained_egx_rank_binding and publish_egx_card_report into one host CLI; no new storage, scanner or admission logic; not scheduled.",
       "card_loader": "app.scanner_v2_card_report_loader follows the app.delivery_status protected-read pattern (absolute env path, O_NOFOLLOW, regular file, bounded read) and delegates all content validation to the card-report reader; no route or producer."
     },
@@ -372,11 +373,20 @@
       "superseded_next": "Superseded by producer_entrypoint_status below."
     },
     "producer_entrypoint_status": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "4aa18e0390625b7cc7f090de32e8b19f806b7b6d",
+      "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 319df8e (494 passed); no record for 4aa18e0 was visible this cycle.",
       "summary": "feature_status() adds code-declared producer_entrypoint ('python -m app.scanner_v2_card_report_job') and producer_schedule ('NOT_SCHEDULED_IN_REPOSITORY'); SYSTEM renders both rows with NOT_INSTALLED/UNKNOWN fallbacks. status, runtime_producer (null), published_cards (null), runtime_activation (false), LIMITATIONS and report bytes unchanged. Test imports the declared module and asserts no app/ or tools/ scheduler/cron source names it.",
       "files": ["app/scanner_v2_card_report.py", "app/scanner_v2_card_report_job.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py, tests/test_scanner_v2_card_report_route.py).",
-      "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule the job after EGX ranking publication. Repository-side: retained-input resolver deriving ranking/identity/calendar inputs for a session from existing retained records, or proceed to News/Event Context once the slice is accepted."
+      "next": "Superseded by evidence_retention_job below."
+    },
+    "evidence_retention_job": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.scanner_v2_evidence_retention_job.run_egx_evidence_retention_job / python -m app.scanner_v2_evidence_retention_job: explicit absolute paths, exact YYYY-MM-DD session/through and identity raw path; reuses the card-report job's _existing_database/_identity helpers (database never created/initialized/upgraded; egid SECURITY_MASTER manifest, read_verified bytes); then unchanged SecurityMasterRepository.retain_admission_observation(egid, session, manifest sha256) and TradingRepository.retain_calendar_observation(session, through). No caller clock; reruns keep first observations. Prints one scanner-v2-evidence-retention-job-v1 JSON line (RETAINED with calendar_sha256 for the card-report job, or FAILED with stage INPUT/IDENTITY/CALENDAR and fixed reason); exit 1 on failure. Must run before EGX ranking generation; the downstream loader's PIT gate is unchanged. No scheduler/cron entry, no SYSTEM field change.",
+      "files": ["app/scanner_v2_evidence_retention_job.py", "tests/test_scanner_v2_evidence_retention_job.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_retention_job.py.",
+      "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR; schedule the evidence-retention job after the EGID refresh/calendar update and before EGX ranking generation, then the card-report job after ranking publication, passing calendar_sha256 explicitly. Repository-side: once host acceptance exists, the vertical slice is complete enough to proceed to News/Event Context per milestone order; otherwise a small end-to-end offline test chaining retention -> card-report job on one disposable database (requires a real admission receipt fixture)."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",
