@@ -568,6 +568,19 @@ failure. Nothing is written before the publisher's own gates pass.
 The caller must take the ranking SHA-256 from a verified snapshot manifest and
 name the retained calendar digest. The job has no scheduler, cron or systemd
 entry here, and the output directory still has to be provisioned on the host
-(`EGX_SCANNER_V2_CARD_REPORT_DIR` for the route). `feature_status()` is unchanged
-(runtime producer null). Only host evidence of scheduled successful runs may
-change that. Tests use artificial inputs and disposable databases only.
+(`EGX_SCANNER_V2_CARD_REPORT_DIR` for the route). Only host evidence of scheduled
+successful runs may set the runtime producer. Tests use artificial inputs and
+disposable databases only.
+
+### SYSTEM visibility of the producer entrypoint
+
+`feature_status()` now also declares `producer_entrypoint`
+(`python -m app.scanner_v2_card_report_job`) and `producer_schedule`
+(`NOT_SCHEDULED_IN_REPOSITORY`); SYSTEM renders both rows (missing fields degrade
+to NOT_INSTALLED / UNKNOWN). These are code-declared constants: `status` stays
+OFFLINE_PROJECTION_NOT_ACTIVATED, `runtime_producer` and `published_cards` stay
+null and `runtime_activation` false. A test imports the declared module and
+checks that no scheduler/cron/delivery-schedule source under `app/` or `tools/`
+names it, so the NOT_SCHEDULED claim fails if a repository schedule is added
+without updating the status. Report bytes and the reader are unaffected
+(`LIMITATIONS` and the report's `feature_status` constant are unchanged).

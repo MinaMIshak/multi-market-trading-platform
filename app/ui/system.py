@@ -420,6 +420,8 @@ def render_scanner_v2(state):
             ('EGX adapter', adapters.get('EGX')),
             ('US adapter', adapters.get('US')),
             ('API route', feature.get('api_route') or 'NOT_INSTALLED'),
+            ('Producer entrypoint', feature.get('producer_entrypoint') or 'NOT_INSTALLED'),
+            ('Producer schedule', feature.get('producer_schedule')),
             ('Runtime producer', feature.get('runtime_producer') or 'NOT_INSTALLED'),
             ('Published cards', feature.get('published_cards')),
             ('Runtime activation', feature.get('runtime_activation')),

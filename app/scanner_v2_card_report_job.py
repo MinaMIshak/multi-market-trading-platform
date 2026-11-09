@@ -25,7 +25,9 @@ defaulted. The database file must already exist; it is never created, initialize
 or upgraded, and only read methods are called. Failures raise with one fixed
 reason per stage and leave the current publication unchanged unless the
 publisher's own atomic steps already completed. There is no scheduler or cron
-entry in this repository, so ``feature_status()`` is unchanged: a host must
+entry in this repository, so ``feature_status()`` names this module only as the
+code-installed ``producer_entrypoint`` with ``producer_schedule`` =
+NOT_SCHEDULED_IN_REPOSITORY and keeps ``runtime_producer`` null: a host must
 provision the output directory and schedule this job, and only host evidence may
 later update the runtime producer status. Nothing is admitted, filled or
 promoted. LIVE_MONEY=false.

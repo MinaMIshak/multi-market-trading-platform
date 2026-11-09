@@ -4,7 +4,7 @@
   "phase": "SCANNER_V2_CARD_REPORT_PUBLISHER",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "224e0897b42482550c95dc6d2e645c9868ed680d",
+  "head": "319df8e5bdc2de10ef40d8da5aa36865442543d5",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -362,11 +362,21 @@
       "next": "Superseded by card_report_job below."
     },
     "card_report_job": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "319df8e5bdc2de10ef40d8da5aa36865442543d5",
+      "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 0355b35 (492 passed); no record for 319df8e was visible this cycle.",
       "summary": "app.scanner_v2_card_report_job.run_egx_card_report_job / python -m app.scanner_v2_card_report_job: explicit absolute paths and 64-hex digests only; existing regular non-symlink database (never created/initialized/upgraded); EGID manifest via DataIngestionRepository.get_manifest_by_raw_path (egid, SECURITY_MASTER, bounded) and bytes via ImmutableRawStore.read_verified; bounded no-follow ranking read; then unchanged load_retained_egx_rank_binding and publish_egx_card_report. Fixed CardReportJobError reasons; sqlite errors become DATABASE_UNAVAILABLE; CLI prints one scanner-v2-card-report-job-v1 JSON line (FAILED with stage INPUT/EVIDENCE/PUBLICATION) and exits 1 on failure. No scheduler/cron entry; feature_status unchanged.",
       "files": ["app/scanner_v2_card_report_job.py", "tests/test_scanner_v2_card_report_job.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_job.py.",
-      "next": "Host-side: provision a protected EGX_SCANNER_V2_CARD_REPORT_DIR and a scheduled invocation after the EGX ranking publication with retained EGID observation and calendar observation for the session (both producers must run before ranking generation). Repository-side next: a retained-input resolver that derives the three inputs for a session from existing retained records instead of operator-supplied digests, or proceed to News/Event Context per milestone order once the slice is accepted. Update feature_status runtime_producer only with host evidence."
+      "next": "Host-side: provision a protected EGX_SCANNER_V2_CARD_REPORT_DIR and a scheduled invocation after the EGX ranking publication with retained EGID observation and calendar observation for the session (both producers must run before ranking generation). Repository-side next: a retained-input resolver that derives the three inputs for a session from existing retained records instead of operator-supplied digests, or proceed to News/Event Context per milestone order once the slice is accepted. Update feature_status runtime_producer only with host evidence.",
+      "superseded_next": "Superseded by producer_entrypoint_status below."
+    },
+    "producer_entrypoint_status": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "feature_status() adds code-declared producer_entrypoint ('python -m app.scanner_v2_card_report_job') and producer_schedule ('NOT_SCHEDULED_IN_REPOSITORY'); SYSTEM renders both rows with NOT_INSTALLED/UNKNOWN fallbacks. status, runtime_producer (null), published_cards (null), runtime_activation (false), LIMITATIONS and report bytes unchanged. Test imports the declared module and asserts no app/ or tools/ scheduler/cron source names it.",
+      "files": ["app/scanner_v2_card_report.py", "app/scanner_v2_card_report_job.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py, tests/test_scanner_v2_card_report_route.py).",
+      "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule the job after EGX ranking publication. Repository-side: retained-input resolver deriving ranking/identity/calendar inputs for a session from existing retained records, or proceed to News/Event Context once the slice is accepted."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

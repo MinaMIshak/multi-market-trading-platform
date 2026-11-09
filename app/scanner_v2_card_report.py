@@ -23,6 +23,12 @@ FEATURE_STATUS = 'OFFLINE_PROJECTION_NOT_ACTIVATED'
 # Read-only GET route serving only the protected loader's response. Until a
 # trusted host producer publishes a report it answers NOT_CONFIGURED/UNAVAILABLE.
 API_ROUTE = '/api/scanner-v2/egx/card-report'
+# Host job CLI that can publish a report from retained evidence. Code-installed
+# only: this repository holds no scheduler/cron entry for it, so it is reported
+# as not scheduled and runtime_producer stays null until host evidence exists.
+# A string, not an import, to avoid a job -> publisher -> report import cycle.
+PRODUCER_ENTRYPOINT = 'python -m app.scanner_v2_card_report_job'
+PRODUCER_SCHEDULE = 'NOT_SCHEDULED_IN_REPOSITORY'
 CARD_STATES = ('RESEARCH_CANDIDATE', 'DATA_STALE', 'PLAN_EXPIRED')
 LIMITATIONS = (
     'PUBLISHED_RANKING_SCOPE_NOT_AUTHORITATIVE_UNIVERSE',
@@ -41,8 +47,9 @@ def feature_status():
     """Code-declared Scanner v2 card-report status for SYSTEM visibility.
 
     Constants only: no IO, scan, card, deployment or runtime observation. The
-    read-only API route is code-installed, but no runtime producer exists, so
-    counts of published cards stay null and the status stays not activated.
+    read-only API route and the host job entrypoint are code-installed, but the
+    job is not scheduled and no runtime producer has been observed, so counts of
+    published cards stay null and the status stays not activated.
     Returns a fresh JSON-ready dict on every call.
     """
     return {
@@ -51,6 +58,8 @@ def feature_status():
         'status': FEATURE_STATUS,
         'market_adapters': {'EGX': 'OFFLINE_PROJECTION_ONLY', 'US': 'NOT_IMPLEMENTED'},
         'api_route': API_ROUTE,
+        'producer_entrypoint': PRODUCER_ENTRYPOINT,
+        'producer_schedule': PRODUCER_SCHEDULE,
         'runtime_producer': None,
         'published_cards': None,
         'runtime_activation': False,
