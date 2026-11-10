@@ -644,3 +644,35 @@ parametrized over both declared modules: each must import with a callable
 `main` and runner, and no scheduler/cron/delivery-schedule source under `app/`
 or `tools/` may name either module. Report bytes, `LIMITATIONS` and the reader
 are unchanged.
+
+## End-to-end offline evidence chain test (pending host validation)
+
+`tests/test_scanner_v2_evidence_chain.py` is test-only; no application code
+changed. Earlier job tests replaced either the security-master retention
+boundary or the retained-evidence loader with fakes, so no test fed a real
+admission receipt through both host jobs. This one runs the unchanged
+implementations on one disposable database:
+
+1. `build_security_master_refresh_runtime` + `SecurityMasterRefreshJob.run` with
+   artificial EGID records for the ranking fixture's five tickers (real raw
+   store manifest and committed admission receipt);
+2. `run_egx_evidence_retention_job` (real `retain_admission_observation` and
+   `retain_calendar_observation`);
+3. `run_egx_card_report_job` over the ranking fixture bytes, then
+   `load_retained_egx_card_report`.
+
+Only wall clocks are replaced (`raw_store.datetime` and the three repository
+`_utc_now` helpers) with one shared controlled clock, so the ordering
+refresh < retention < ranking `generated_at` < publication < next-session open
+is explicit. Assertions: the served report's provenance carries the retained
+calendar digest, receipt digest, EGID artifact digest and the uuid5 instrument
+ids; `evidence_available_at` equals the retention time, not the ranking time;
+only the CANDIDATE/STRONG_CANDIDATE rows become cards; the card job writes no
+evidence; reruns (including a retention rerun after generation) keep the first
+observations and the publication is ALREADY_CURRENT; evidence retained after
+ranking generation fails with `IDENTITY_REJECTED` and publishes nothing; a card
+job with no retained evidence fails `IDENTITY_OBSERVATION_UNAVAILABLE`.
+
+Limitations: artificial records, calendar rows, ranking and clocks only; it
+proves composition of the existing repository code, not host scheduling,
+provider health, authoritative membership or any edge.
