@@ -415,10 +415,13 @@ def render_scanner_v2(state):
     adapters = adapters if isinstance(adapters, dict) else {}
     limitations = feature.get('limitations')
     limitations = limitations if isinstance(limitations, list) else []
+    us_gaps = feature.get('us_adapter_gaps')
+    us_gaps = (', '.join(str(item) for item in us_gaps) or None) if isinstance(us_gaps, list) else None
     rows = (('Status', feature.get('status')),
             ('Report schema', feature.get('schema_version')),
             ('EGX adapter', adapters.get('EGX')),
             ('US adapter', adapters.get('US')),
+            ('US adapter gaps', us_gaps),
             ('API route', feature.get('api_route') or 'NOT_INSTALLED'),
             ('Producer entrypoint', feature.get('producer_entrypoint') or 'NOT_INSTALLED'),
             ('Producer schedule', feature.get('producer_schedule')),

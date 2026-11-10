@@ -676,3 +676,26 @@ job with no retained evidence fails `IDENTITY_OBSERVATION_UNAVAILABLE`.
 Limitations: artificial records, calendar rows, ranking and clocks only; it
 proves composition of the existing repository code, not host scheduling,
 provider health, authoritative membership or any edge.
+
+## Declared US adapter gaps (pending host validation)
+
+The US market fails visibly rather than reusing EGX assumptions.
+`feature_status()` keeps `market_adapters.US = NOT_IMPLEMENTED` and adds
+`us_adapter_gaps` (`US_ADAPTER_GAPS`), rendered on SYSTEM as "US adapter gaps"
+(UNKNOWN when missing, malformed or empty; escaped):
+
+- `US_DECISION_ADAPTER_NOT_IMPLEMENTED`: no US-RANK-v1 projection into
+  trade-decision-v1 exists;
+- `US_INSTRUMENT_IDENTITY_NOT_BOUND`: `us-ranking-report-v1` records carry
+  ticker/ISIN only; `app.us_run` binds no admitted canonical instrument UUID
+  (the US1 retrospective listing-identity research path is not wired to it);
+- `US_CALENDAR_OBSERVATION_NOT_RETAINED`: retained calendar observations project
+  the EGX calendar only; the US report's next session is an NYSE rule-calendar
+  expectation and is not retained evidence;
+- `EGX_ADAPTER_RULES_NOT_REUSABLE_FOR_US`: the EGX adapter pins EGX-RANK-v1
+  rules/costs and Cairo session dates.
+
+`test_declared_us_adapter_gaps_match_the_code` checks each code against the
+repository, so a gap must be removed by the same change that closes it.
+Code-declared constants only: no US scan, coverage or provider observation.
+Report bytes, `LIMITATIONS`, the reader and the route are unchanged.

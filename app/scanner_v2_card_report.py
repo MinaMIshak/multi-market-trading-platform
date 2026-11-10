@@ -36,6 +36,22 @@ PRODUCER_SCHEDULE = 'NOT_SCHEDULED_IN_REPOSITORY'
 EVIDENCE_RETENTION_ENTRYPOINT = 'python -m app.scanner_v2_evidence_retention_job'
 EVIDENCE_RETENTION_SCHEDULE = 'NOT_SCHEDULED_IN_REPOSITORY'
 CARD_STATES = ('RESEARCH_CANDIDATE', 'DATA_STALE', 'PLAN_EXPIRED')
+# Why the US adapter is NOT_IMPLEMENTED: inputs a trade-decision-v1 US binding
+# needs that the repository does not provide. Each code is checked against the
+# code by tests/test_scanner_v2_system_status.py; remove a code only together
+# with the change that closes it. Not a runtime or data-coverage observation.
+US_ADAPTER_GAPS = (
+    # No US-RANK-v1 projection into trade-decision-v1 exists.
+    'US_DECISION_ADAPTER_NOT_IMPLEMENTED',
+    # us-ranking-report-v1 records carry ticker/ISIN only; the daily US pipeline
+    # binds no admitted canonical instrument UUID.
+    'US_INSTRUMENT_IDENTITY_NOT_BOUND',
+    # Retained calendar observations project the EGX calendar only; the US
+    # report's next session is an NYSE rule-calendar expectation, not retained.
+    'US_CALENDAR_OBSERVATION_NOT_RETAINED',
+    # The EGX adapter pins EGX-RANK-v1 rules/costs and Cairo session dates.
+    'EGX_ADAPTER_RULES_NOT_REUSABLE_FOR_US',
+)
 LIMITATIONS = (
     'PUBLISHED_RANKING_SCOPE_NOT_AUTHORITATIVE_UNIVERSE',
     'IDENTITY_INTERNAL_SNAPSHOT_VERIFIED_ONLY',
@@ -64,6 +80,7 @@ def feature_status():
         'schema_version': SCHEMA_VERSION,
         'status': FEATURE_STATUS,
         'market_adapters': {'EGX': 'OFFLINE_PROJECTION_ONLY', 'US': 'NOT_IMPLEMENTED'},
+        'us_adapter_gaps': list(US_ADAPTER_GAPS),
         'api_route': API_ROUTE,
         'producer_entrypoint': PRODUCER_ENTRYPOINT,
         'producer_schedule': PRODUCER_SCHEDULE,

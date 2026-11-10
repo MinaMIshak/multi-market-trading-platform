@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_EVIDENCE_CHAIN_TEST",
+  "phase": "SCANNER_V2_US_ADAPTER_GAPS_STATUS",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
   "head": "acdc531503cc366c1994dd8e88c39b76d8e7b93c",
@@ -405,7 +405,15 @@
       "summary": "Test-only: tests/test_scanner_v2_evidence_chain.py runs the unchanged security-master refresh runtime (artificial EGID records for the ranking fixture's five tickers, real committed admission receipt), run_egx_evidence_retention_job, run_egx_card_report_job and load_retained_egx_card_report on one disposable database. One shared controlled clock replaces raw_store.datetime and the ingestion/trading/security-master _utc_now helpers (refresh 2026-11-03T17:00Z < retention 2026-11-04T05:00Z < ranking generated 06:39:32Z < publication 07:00Z < next open 08:00Z). Covers provenance digests and uuid5 instrument ids in the served report, evidence_available_at = retention time, three cards for CANDIDATE/STRONG_CANDIDATE rows, read-only card job, rerun idempotence (including a retention rerun after generation), late-retained evidence rejected as IDENTITY_REJECTED with nothing published, and no retained evidence -> IDENTITY_OBSERVATION_UNAVAILABLE. No application code changed.",
       "files": ["tests/test_scanner_v2_evidence_chain.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_chain.py. If it fails, treat it as a possible real composition defect between the DB-round-tripped manifest and the admission receipt before assuming a test defect.",
-      "next": "Host-side unchanged: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule evidence retention before EGX ranking generation, then the card-report job after publication. Repository-side: once this chain test passes on the host, the offline Scanner v2 EGX slice (contract -> candidate -> card -> retained evidence -> publication -> route) is complete; next is News/Event Context per milestone order, unless host validation exposes a defect."
+      "next": "Host-side unchanged: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule evidence retention before EGX ranking generation, then the card-report job after publication. Repository-side: once this chain test passes on the host, the offline Scanner v2 EGX slice (contract -> candidate -> card -> retained evidence -> publication -> route) is complete; next is News/Event Context per milestone order, unless host validation exposes a defect.",
+      "superseded_next": "Superseded by us_adapter_gaps_status below."
+    },
+    "us_adapter_gaps_status": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "feature_status() keeps market_adapters.US=NOT_IMPLEMENTED and adds us_adapter_gaps (US_ADAPTER_GAPS): US_DECISION_ADAPTER_NOT_IMPLEMENTED, US_INSTRUMENT_IDENTITY_NOT_BOUND, US_CALENDAR_OBSERVATION_NOT_RETAINED, EGX_ADAPTER_RULES_NOT_REUSABLE_FOR_US. SYSTEM renders 'US adapter gaps' (escaped; UNKNOWN when missing/malformed/empty). A test checks each code against the repository (no US scanner_v2 module, no instrument_id/uuid in app/us_run.py, calendar retention uses project_egx_calendar only, EGX adapter pins EGX-RANK-v1 costs and Africa/Cairo). Code-declared only; no US scan/coverage claim; report bytes, LIMITATIONS, reader and route unchanged.",
+      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py).",
+      "next": "Host validation of evidence_chain_test and this unit. Then, per milestone order, either close US gaps one at a time (US identity binding first) or begin News/Event Context once the EGX slice is host-accepted."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",
