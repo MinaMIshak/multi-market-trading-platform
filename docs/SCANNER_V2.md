@@ -11,7 +11,7 @@ composing them (`python -m app.scanner_v2_card_report_job`) added (host
 validation pending, not scheduled); a host job entrypoint retaining its
 prerequisite identity/calendar observations
 (`python -m app.scanner_v2_evidence_retention_job`) added (host validation
-pending, not scheduled);
+pending, not scheduled); both entrypoints are declared in SYSTEM feature status;
 no scheduled runtime producer invokes them yet, so the route currently answers
 NOT_CONFIGURED/UNAVAILABLE unless a host directory is published.
 No strategy, model, risk policy, scheduler or Champion is activated or promoted.
@@ -627,6 +627,20 @@ calendar step is never reached after an identity failure.
 Limitations: a malformed admission row whose payload lacks identity keys
 surfaces as `KeyError` from the unchanged repository and is reported as
 `IDENTITY_ADMISSION_UNAVAILABLE` rather than a rejection (it still fails
-closed). No scheduler/cron entry, no SYSTEM field and no runtime evidence are
-added; retained observations establish no admission. Tests use artificial
-inputs, a fake security-master retention boundary and disposable databases only.
+closed). No scheduler/cron entry and no runtime evidence are added; retained
+observations establish no admission. Tests use artificial inputs, a fake
+security-master retention boundary and disposable databases only.
+
+### SYSTEM visibility of the evidence-retention entrypoint (pending host validation)
+
+`feature_status()` now also declares `evidence_retention_entrypoint`
+(`python -m app.scanner_v2_evidence_retention_job`) and
+`evidence_retention_schedule` (`NOT_SCHEDULED_IN_REPOSITORY`), so the operator
+sees both host jobs the card report depends on. SYSTEM renders both rows; missing
+fields degrade to NOT_INSTALLED / UNKNOWN. Code-declared constants only: `status`
+stays OFFLINE_PROJECTION_NOT_ACTIVATED, `runtime_producer` and `published_cards`
+stay null, `runtime_activation` false. The existing entrypoint test is now
+parametrized over both declared modules: each must import with a callable
+`main` and runner, and no scheduler/cron/delivery-schedule source under `app/`
+or `tools/` may name either module. Report bytes, `LIMITATIONS` and the reader
+are unchanged.

@@ -29,6 +29,12 @@ API_ROUTE = '/api/scanner-v2/egx/card-report'
 # A string, not an import, to avoid a job -> publisher -> report import cycle.
 PRODUCER_ENTRYPOINT = 'python -m app.scanner_v2_card_report_job'
 PRODUCER_SCHEDULE = 'NOT_SCHEDULED_IN_REPOSITORY'
+# Host job CLI that retains the EGID identity and calendar observations the
+# producer reads; it must run before EGX ranking generation for the session.
+# Code-installed and unscheduled, exactly like PRODUCER_ENTRYPOINT; a string so
+# this module imports no job code.
+EVIDENCE_RETENTION_ENTRYPOINT = 'python -m app.scanner_v2_evidence_retention_job'
+EVIDENCE_RETENTION_SCHEDULE = 'NOT_SCHEDULED_IN_REPOSITORY'
 CARD_STATES = ('RESEARCH_CANDIDATE', 'DATA_STALE', 'PLAN_EXPIRED')
 LIMITATIONS = (
     'PUBLISHED_RANKING_SCOPE_NOT_AUTHORITATIVE_UNIVERSE',
@@ -47,8 +53,9 @@ def feature_status():
     """Code-declared Scanner v2 card-report status for SYSTEM visibility.
 
     Constants only: no IO, scan, card, deployment or runtime observation. The
-    read-only API route and the host job entrypoint are code-installed, but the
-    job is not scheduled and no runtime producer has been observed, so counts of
+    read-only API route and the host job entrypoints (evidence retention and
+    card-report publication) are code-installed, but neither job is scheduled
+    and no runtime producer has been observed, so counts of
     published cards stay null and the status stays not activated.
     Returns a fresh JSON-ready dict on every call.
     """
@@ -60,6 +67,8 @@ def feature_status():
         'api_route': API_ROUTE,
         'producer_entrypoint': PRODUCER_ENTRYPOINT,
         'producer_schedule': PRODUCER_SCHEDULE,
+        'evidence_retention_entrypoint': EVIDENCE_RETENTION_ENTRYPOINT,
+        'evidence_retention_schedule': EVIDENCE_RETENTION_SCHEDULE,
         'runtime_producer': None,
         'published_cards': None,
         'runtime_activation': False,

@@ -4,7 +4,7 @@
   "phase": "SCANNER_V2_EVIDENCE_RETENTION_JOB",
   "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "4aa18e0390625b7cc7f090de32e8b19f806b7b6d",
+  "head": "ffedbdd9a03a787fe9a7fe44021b3c9da5b44c4e",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -382,11 +382,21 @@
       "next": "Superseded by evidence_retention_job below."
     },
     "evidence_retention_job": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "ffedbdd9a03a787fe9a7fe44021b3c9da5b44c4e",
+      "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 4aa18e0 (494 passed); no record for ffedbdd was visible this cycle.",
       "summary": "app.scanner_v2_evidence_retention_job.run_egx_evidence_retention_job / python -m app.scanner_v2_evidence_retention_job: explicit absolute paths, exact YYYY-MM-DD session/through and identity raw path; reuses the card-report job's _existing_database/_identity helpers (database never created/initialized/upgraded; egid SECURITY_MASTER manifest, read_verified bytes); then unchanged SecurityMasterRepository.retain_admission_observation(egid, session, manifest sha256) and TradingRepository.retain_calendar_observation(session, through). No caller clock; reruns keep first observations. Prints one scanner-v2-evidence-retention-job-v1 JSON line (RETAINED with calendar_sha256 for the card-report job, or FAILED with stage INPUT/IDENTITY/CALENDAR and fixed reason); exit 1 on failure. Must run before EGX ranking generation; the downstream loader's PIT gate is unchanged. No scheduler/cron entry, no SYSTEM field change.",
       "files": ["app/scanner_v2_evidence_retention_job.py", "tests/test_scanner_v2_evidence_retention_job.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_retention_job.py.",
-      "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR; schedule the evidence-retention job after the EGID refresh/calendar update and before EGX ranking generation, then the card-report job after ranking publication, passing calendar_sha256 explicitly. Repository-side: once host acceptance exists, the vertical slice is complete enough to proceed to News/Event Context per milestone order; otherwise a small end-to-end offline test chaining retention -> card-report job on one disposable database (requires a real admission receipt fixture)."
+      "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR; schedule the evidence-retention job after the EGID refresh/calendar update and before EGX ranking generation, then the card-report job after ranking publication, passing calendar_sha256 explicitly. Repository-side: once host acceptance exists, the vertical slice is complete enough to proceed to News/Event Context per milestone order; otherwise a small end-to-end offline test chaining retention -> card-report job on one disposable database (requires a real admission receipt fixture).",
+      "superseded_next": "Superseded by evidence_retention_entrypoint_status below."
+    },
+    "evidence_retention_entrypoint_status": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "feature_status() adds code-declared evidence_retention_entrypoint ('python -m app.scanner_v2_evidence_retention_job') and evidence_retention_schedule ('NOT_SCHEDULED_IN_REPOSITORY'); SYSTEM renders both rows with NOT_INSTALLED/UNKNOWN fallbacks. The entrypoint test is parametrized over both declared job modules (import, callable main/runner, no app/ or tools/ scheduler/cron source names them). status, runtime_producer (null), published_cards (null), runtime_activation (false), LIMITATIONS and report bytes unchanged.",
+      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py, tests/test_scanner_v2_card_report_route.py).",
+      "next": "Host-side unchanged: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule evidence retention before EGX ranking generation, then the card-report job after publication. Repository-side: end-to-end offline chain test (real admission receipt via the security-master refresh runtime fixture, controlled repository clocks before a ranking generated_at), or proceed to News/Event Context once the slice is accepted."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",
