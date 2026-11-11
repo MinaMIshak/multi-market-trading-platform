@@ -60,9 +60,38 @@ the same publication across revisions; EGX and US never share a key. `identity`
 
 An empty result is not proof that no relevant event exists.
 
+## Per-instrument context projection (`app.news_event_context`, news-event-context-v1)
+
+Status: pure function, pending host validation. Not attached to TradeDecision
+or the Trade Card (`event_risk` stays UNKNOWN); no caller, route or IO.
+
+`project_event_context(events, *, market, instrument_id, decision_time, policy,
+coverage_as_of)` returns an `EventContext` for one canonical instrument UUID
+(symbol alone is never used). It first applies `select_point_in_time`, then keeps
+events published within `policy.lookback_seconds` (inclusive) of decision time.
+
+`EventContextPolicy` is explicit and versioned (`policy_version`,
+`lookback_seconds`, `max_coverage_age_seconds`); no implicit defaults.
+`coverage_as_of` is when the platform last retained a source pass for the market
+at or before decision time; `None` means no retained coverage. A coverage time
+after decision time is rejected, not clipped.
+
+Status precedence: UNAVAILABLE (no coverage; no events listed) → STALE
+(coverage older than the policy allows; found events still listed) →
+EVENT_FOUND (MATCHED to this UUID) → AMBIGUOUS (this UUID is among an AMBIGUOUS
+event's candidates) → UNKNOWN (market events in the window could not be
+attributed: UNRESOLVED / IDENTITY_UNAVAILABLE) → NO_EVENT_FOUND.
+
+The record lists relevant and ambiguous event identities (sorted SHA-256
+digests), the unattributed count and the categories of relevant events only. It
+fixes `association_kind` INFERRED, `absence_is_proof` false, `risk_interpretation`
+NOT_EVALUATED, `trading_effect` NONE, SHADOW, `live_money` false and
+`execution_allowed` false. The validator recomputes the expected status, so an
+inconsistent status cannot be constructed.
+
 ## Not yet done
 
-Retained storage and an ingestion producer for a lawful free source, the Trade
-Card event-context projection (EVENT_FOUND / NO_EVENT_FOUND / STALE /
-UNAVAILABLE / AMBIGUOUS / UNKNOWN), freshness policy, SYSTEM state and empirical
-validation (Phases E–L). Tests use artificial records only.
+Retained storage and an ingestion producer for a lawful free source, attaching
+the context to the Trade Card display (separately from observed market facts),
+a concrete operational freshness policy, SYSTEM state and empirical validation
+(Phases G–L). Tests use artificial records only.
