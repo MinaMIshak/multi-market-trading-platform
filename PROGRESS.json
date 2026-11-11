@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "milestone": "M4",
-  "phase": "SCANNER_V2_US_ADAPTER_GAPS_STATUS",
-  "current_capability": "Immutable committed EGX calendar window observations in existing SQLite storage (schema v12); exact historical lookup, producer-owned clock and explicit upgrade without backfill. Admission remains NOT_ESTABLISHED; no runtime activation.",
+  "phase": "SCANNER_V2_TRADE_CARD_PAGE",
+  "current_capability": "Offline Scanner v2 EGX slice from retained evidence to Trade Card, served read-only as JSON and (pending host validation) as an HTML page. No scheduled producer, so both answer NOT_CONFIGURED/UNAVAILABLE unless a host publishes a report. Admission labels unchanged; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "acdc531503cc366c1994dd8e88c39b76d8e7b93c",
+  "head": "e5541953a8436abacb866293e34a409de3c8e6c8",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -258,7 +258,7 @@
       "geometry": "app.domain.models.TradePlan: canonical price geometry validation",
       "paper": "app.paper.shadow_candidate_admission: separate explicit admission remains required",
       "coverage": "app.scanner_v2.scan_egx reuses app.egx_scan.scan_egx_scope without parallel admission or history publication; retains explicit-selection semantics and validates projected totals.",
-      "card": "read-only typed projection; served only via the read-only card-report route over the protected loader; publisher library added, scheduled runtime producer deferred",
+      "card": "read-only typed projection; served only via the read-only card-report route and HTML page over the protected loader; publisher library added, scheduled runtime producer deferred",
       "retained_evidence": "app.scanner_v2_retained_evidence reuses SecurityMasterRepository.get_admission_observation, TradingRepository.get_calendar_observation, bind_observed_egid_identities and compose_egx_rank_binding at the ranking generation time; read-only, no second evidence store.",
       "card_publisher": "app.scanner_v2_card_report_publisher reuses project_egx_card_report, the card-report reader and the loader read path/constants; writes only content-addressed bytes and the atomic pointer the loader already defines; no second storage format.",
       "egx_adapter": "app.scanner_v2.scan_egx: bounded wrapper around app.egx_scan.scan_egx_scope; preserve existing coverage and admission. Legacy SWING WATCH/READY_NO_SIGNAL cannot emit confirmed TradeDecision; explicit exclusions, no state promotion.",
@@ -401,7 +401,9 @@
       "next": "Superseded by evidence_chain_test below."
     },
     "evidence_chain_test": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "8142c8f1387f34a7fc01dab547b5dc91648f77c7",
+      "host_validation_note": "Committed, but execution is unconfirmed. scanner_core recorded 495 passed both before and after this four-test file was added, which suggests the profile does not collect it. See trade_card_page.validation_coverage_concern.",
       "summary": "Test-only: tests/test_scanner_v2_evidence_chain.py runs the unchanged security-master refresh runtime (artificial EGID records for the ranking fixture's five tickers, real committed admission receipt), run_egx_evidence_retention_job, run_egx_card_report_job and load_retained_egx_card_report on one disposable database. One shared controlled clock replaces raw_store.datetime and the ingestion/trading/security-master _utc_now helpers (refresh 2026-11-03T17:00Z < retention 2026-11-04T05:00Z < ranking generated 06:39:32Z < publication 07:00Z < next open 08:00Z). Covers provenance digests and uuid5 instrument ids in the served report, evidence_available_at = retention time, three cards for CANDIDATE/STRONG_CANDIDATE rows, read-only card job, rerun idempotence (including a retention rerun after generation), late-retained evidence rejected as IDENTITY_REJECTED with nothing published, and no retained evidence -> IDENTITY_OBSERVATION_UNAVAILABLE. No application code changed.",
       "files": ["tests/test_scanner_v2_evidence_chain.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_chain.py. If it fails, treat it as a possible real composition defect between the DB-round-tripped manifest and the admission receipt before assuming a test defect.",
@@ -409,11 +411,21 @@
       "superseded_next": "Superseded by us_adapter_gaps_status below."
     },
     "us_adapter_gaps_status": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "e5541953a8436abacb866293e34a409de3c8e6c8",
+      "host_validation_note": "Latest supervisor record seen by the paced executor is scanner_core PASS, 496 passed, labelled head 8142c8f, fingerprint 76a719ff; the +1 count matches this unit's added status test.",
       "summary": "feature_status() keeps market_adapters.US=NOT_IMPLEMENTED and adds us_adapter_gaps (US_ADAPTER_GAPS): US_DECISION_ADAPTER_NOT_IMPLEMENTED, US_INSTRUMENT_IDENTITY_NOT_BOUND, US_CALENDAR_OBSERVATION_NOT_RETAINED, EGX_ADAPTER_RULES_NOT_REUSABLE_FOR_US. SYSTEM renders 'US adapter gaps' (escaped; UNKNOWN when missing/malformed/empty). A test checks each code against the repository (no US scanner_v2 module, no instrument_id/uuid in app/us_run.py, calendar retention uses project_egx_calendar only, EGX adapter pins EGX-RANK-v1 costs and Africa/Cairo). Code-declared only; no US scan/coverage claim; report bytes, LIMITATIONS, reader and route unchanged.",
       "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py).",
-      "next": "Host validation of evidence_chain_test and this unit. Then, per milestone order, either close US gaps one at a time (US identity binding first) or begin News/Event Context once the EGX slice is host-accepted."
+      "next": "Superseded by trade_card_page below."
+    },
+    "trade_card_page": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "GET /scanner-v2/egx/cards (app.main.scanner_v2_egx_card_page) renders exactly the JSON route's loader response via app.ui.trade_card.render_card_report_page. Cards appear only for AVAILABLE; other outcomes show the fixed status/reason. Each card keeps producer-time labels under an At load CURRENT/NOT_CURRENT line from card_current_at, now shared with the loader's count. Shows coverage as ranking scope only, provenance, admission labels, limitations and lifecycle NOT_VERIFIED. feature_status gains card_page and SYSTEM links it; status, runtime_producer (null), published_cards (null), runtime_activation (false), report bytes, LIMITATIONS and reader unchanged.",
+      "files": ["app/main.py", "app/scanner_v2_card_report.py", "app/scanner_v2_card_report_loader.py", "app/ui/system.py", "app/ui/trade_card.py", "tests/test_scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "tests/test_trade_decision.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required. New tests were added to existing test files rather than a new file.",
+      "validation_coverage_concern": "Inferred from recorded counts, not confirmed: scanner_core stayed at 492 across the publisher and retained-evidence units, and did not grow for the evidence-retention job or the four-test evidence chain. tests/test_scanner_v2_card_report_publisher.py, test_scanner_v2_retained_evidence.py, test_scanner_v2_card_report_job.py, test_scanner_v2_evidence_retention_job.py and test_scanner_v2_evidence_chain.py may never have run on the host. The host should add them to the profile and run them before treating the EGX slice as host-accepted.",
+      "next": "Host: confirm or fix scanner_core collection, run the five test files above and validate this unit; approve the page path in any host route allowlist. Repository: if those tests pass, the EGX slice is complete offline; then close US gaps (identity binding first) or begin News/Event Context per milestone order."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

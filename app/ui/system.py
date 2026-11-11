@@ -23,7 +23,8 @@ from app.ui.ranking import load_ranking
 from app.ui.readiness import render_readiness
 from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
-from app.scanner_v2_card_report import feature_status as scanner_v2_feature_status
+from app.scanner_v2_card_report import (
+    CARD_PAGE_ROUTE as SCANNER_V2_CARD_PAGE_ROUTE, feature_status as scanner_v2_feature_status)
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -423,6 +424,7 @@ def render_scanner_v2(state):
             ('US adapter', adapters.get('US')),
             ('US adapter gaps', us_gaps),
             ('API route', feature.get('api_route') or 'NOT_INSTALLED'),
+            ('Card page', feature.get('card_page') or 'NOT_INSTALLED'),
             ('Producer entrypoint', feature.get('producer_entrypoint') or 'NOT_INSTALLED'),
             ('Producer schedule', feature.get('producer_schedule')),
             ('Evidence retention entrypoint',
@@ -453,7 +455,8 @@ def render_system(state):
             'caption{text-align:left;margin-bottom:12px}' + DASHBOARD_STYLE
             + 'pre{white-space:pre-wrap;overflow-wrap:anywhere}td{overflow-wrap:anywhere}</style>'
             '</head><body><nav><a href="/">TODAY</a> · <a href="/shadow">Paper/Shadow</a> · '
-            '<a href="/performance">PERFORMANCE</a></nav><h1>SYSTEM</h1>'
+            '<a href="/performance">PERFORMANCE</a> · '
+            '<a href="' + SCANNER_V2_CARD_PAGE_ROUTE + '">Scanner v2 Trade Cards</a></nav><h1>SYSTEM</h1>'
             '<p>LIVE MONEY DISABLED · A candidate is not a fill · Unknown values appear as UNKNOWN (null in the API).</p>'
             + render_runtime_observation(state)
             + render_delivery(state)

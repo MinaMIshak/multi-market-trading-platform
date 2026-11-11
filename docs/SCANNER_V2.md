@@ -29,8 +29,8 @@ LIVE_MONEY=DISABLED.
   The next adapter should reuse their accounting, while retaining US-specific
   identity/calendar/source admission through existing US research adapters.
 - `app.ui.trade_card.render_trade_card` renders a read-only HTML fragment;
-  `trade_card` provides its JSON-ready projection. No HTML card page is installed;
-  retained card reports are served read-only as JSON (see the route section).
+  `trade_card` provides its JSON-ready projection. Retained card reports are
+  served read-only as JSON and as an HTML page (see the route and page sections).
 
 ## Contract
 
@@ -467,6 +467,25 @@ of `NOT_INSTALLED`. Status stays `OFFLINE_PROJECTION_NOT_ACTIVATED`,
 false: installing a route is not a producer, scan, coverage or activation.
 Next: a trusted host producer that writes content-addressed report bytes plus
 an atomic `current.json` pointer.
+
+## Read-only Trade Card page (pending host validation)
+
+`GET /scanner-v2/egx/cards` (`app.main.scanner_v2_egx_card_page`) renders exactly
+the JSON route's loader response through
+`app.ui.trade_card.render_card_report_page`. It adds no IO, evidence or write
+path. SYSTEM links to it and `feature_status()['card_page']` names it. Status
+stays `OFFLINE_PROJECTION_NOT_ACTIVATED`: a page is not a producer or activation.
+
+- Cards appear only for an `AVAILABLE` response. Any other outcome shows the
+  status and fixed reason, and says this does not mean no candidates exist.
+- Each card keeps its producer-time labels and is preceded by `At load: CURRENT`
+  or `At load: NOT_CURRENT`. Both the loader's count and the page use the shared
+  `card_current_at`, so a stale report cannot read as current.
+- The page shows coverage as ranking scope only (authoritative universe UNKNOWN),
+  provenance, admission labels, limitations and lifecycle evidence `NOT_VERIFIED`
+  with UNKNOWN sample size and net result. Per-symbol exclusions stay in the JSON.
+
+Any host reverse-proxy or route allowlist must approve the path separately.
 
 ## Trusted card-report publisher (pending host validation)
 

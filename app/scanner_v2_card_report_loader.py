@@ -93,6 +93,14 @@ def _pointer_sha256(payload):
     return pointer['report_sha256']
 
 
+def card_current_at(card, fresh_until, now):
+    """Whether a reader-accepted card's data window and plan still hold at ``now``."""
+    plan = card['strategy_inference']['plan']
+    flat_by = plan['flat_by']
+    return (now < fresh_until and now < datetime.fromisoformat(plan['valid_until'])
+            and (flat_by is None or now < datetime.fromisoformat(flat_by)))
+
+
 def _load(directory, now):
     try:
         dir_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -118,13 +126,7 @@ def _load(directory, now):
         raise _Unavailable('REPORT_FROM_FUTURE')
     fresh_until = datetime.fromisoformat(
         doc['provenance']['retained_evidence']['binding']['fresh_until'])
-    current = 0
-    for card in doc['cards']:
-        plan = card['strategy_inference']['plan']
-        flat_by = plan['flat_by']
-        if (now < fresh_until and now < datetime.fromisoformat(plan['valid_until'])
-                and (flat_by is None or now < datetime.fromisoformat(flat_by))):
-            current += 1
+    current = sum(card_current_at(card, fresh_until, now) for card in doc['cards'])
     return digest, doc, ('WITHIN_RETAINED_WINDOW' if now < fresh_until else 'STALE_AT_LOAD'), current
 
 

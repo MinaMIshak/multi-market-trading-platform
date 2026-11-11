@@ -29,8 +29,10 @@ from app.egx_scan_history import load_scan_history
 from app.scheduler_heartbeat import load_heartbeat
 from app.path_safety import symlinked
 from app.runtime_state import startup_event
-from app.scanner_v2_card_report import API_ROUTE as SCANNER_V2_CARD_REPORT_ROUTE
+from app.scanner_v2_card_report import (
+    API_ROUTE as SCANNER_V2_CARD_REPORT_ROUTE, CARD_PAGE_ROUTE as SCANNER_V2_CARD_PAGE_ROUTE)
 from app.scanner_v2_card_report_loader import load_retained_egx_card_report
+from app.ui.trade_card import render_card_report_page
 
 
 app = FastAPI(
@@ -143,6 +145,12 @@ def scanner_v2_egx_card_report() -> dict:
     # Read-only: serves only the protected loader's fail-closed response. No
     # producer, admission, fill or promotion; cards are research candidates.
     return load_retained_egx_card_report()
+
+
+@app.get(SCANNER_V2_CARD_PAGE_ROUTE, response_class=HTMLResponse)
+def scanner_v2_egx_card_page() -> HTMLResponse:
+    # Read-only HTML view of exactly the JSON route's loader response.
+    return HTMLResponse(render_card_report_page(scanner_v2_egx_card_report()))
 
 
 @app.get("/system", response_class=HTMLResponse)

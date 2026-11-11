@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from app.scanner_v2_card_report import (
-    API_ROUTE, EVIDENCE_RETENTION_ENTRYPOINT, EVIDENCE_RETENTION_SCHEDULE, FEATURE_STATUS,
+    API_ROUTE, CARD_PAGE_ROUTE, EVIDENCE_RETENTION_ENTRYPOINT, EVIDENCE_RETENTION_SCHEDULE, FEATURE_STATUS,
     LIMITATIONS, PRODUCER_ENTRYPOINT, PRODUCER_SCHEDULE, SCHEMA_VERSION, US_ADAPTER_GAPS,
     feature_status)
 from app.ui.system import load_system_state, render_scanner_v2, render_system
@@ -24,6 +24,7 @@ def test_feature_status_is_fixed_inactive_and_fresh():
     assert status['market_adapters'] == {'EGX': 'OFFLINE_PROJECTION_ONLY',
                                          'US': 'NOT_IMPLEMENTED'}
     assert status['api_route'] == API_ROUTE == '/api/scanner-v2/egx/card-report'
+    assert status['card_page'] == CARD_PAGE_ROUTE == '/scanner-v2/egx/cards'
     assert status['producer_entrypoint'] == PRODUCER_ENTRYPOINT
     assert status['producer_schedule'] == PRODUCER_SCHEDULE == 'NOT_SCHEDULED_IN_REPOSITORY'
     assert status['evidence_retention_entrypoint'] == EVIDENCE_RETENTION_ENTRYPOINT
@@ -80,6 +81,7 @@ def test_system_state_and_page_expose_status_without_runtime_claims():
     html = render_scanner_v2(state)
     assert 'Scanner v2 Trade Cards: OFFLINE_PROJECTION_NOT_ACTIVATED' in html
     assert 'API route</th><td>' + API_ROUTE in html
+    assert 'Card page</th><td>' + CARD_PAGE_ROUTE in html
     assert 'Producer entrypoint</th><td>' + PRODUCER_ENTRYPOINT in html
     assert 'Producer schedule</th><td>NOT_SCHEDULED_IN_REPOSITORY' in html
     assert 'Evidence retention entrypoint</th><td>' + EVIDENCE_RETENTION_ENTRYPOINT in html
@@ -91,7 +93,8 @@ def test_system_state_and_page_expose_status_without_runtime_claims():
     assert 'never fills' in html and 'LIVE_MONEY=DISABLED' in html
     for limitation in LIMITATIONS:
         assert limitation in html
-    assert html in render_system(state)
+    page = render_system(state)
+    assert html in page and f'<a href="{CARD_PAGE_ROUTE}">' in page
     assert state == before
 
 
@@ -118,9 +121,10 @@ def test_declared_entrypoints_are_real_and_unscheduled(entrypoint, runner):
 
 def test_degrades_when_producer_fields_missing():
     forged = {k: v for k, v in feature_status().items()
-              if k not in ('producer_entrypoint', 'producer_schedule',
+              if k not in ('card_page', 'producer_entrypoint', 'producer_schedule',
                            'evidence_retention_entrypoint', 'evidence_retention_schedule')}
     html = render_scanner_v2({'scanner_v2': forged})
+    assert 'Card page</th><td>NOT_INSTALLED' in html
     assert 'Producer entrypoint</th><td>NOT_INSTALLED' in html
     assert 'Producer schedule</th><td>UNKNOWN' in html
     assert 'Evidence retention entrypoint</th><td>NOT_INSTALLED' in html

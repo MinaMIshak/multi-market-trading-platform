@@ -10,7 +10,7 @@ import os
 import pytest
 
 from app.scanner_v2_card_report_loader import (
-    ENV, POINTER_NAME, POINTER_SCHEMA, REASONS, RESPONSE_SCHEMA,
+    ENV, POINTER_NAME, POINTER_SCHEMA, REASONS, RESPONSE_SCHEMA, card_current_at,
     load_retained_egx_card_report)
 from tests.test_scanner_v2_card_report import VIEW, project
 from tests.test_scanner_v2_egx_rank import NEXT_CLOSE, record, report
@@ -65,6 +65,21 @@ def test_old_report_is_reported_stale_without_relabelling_cards(tmp_path):
         assert out['cards_current_at_load'] == 0
         # Producer-time card labels are preserved exactly; the loader never edits them.
         assert out['report'] == json.loads(payload)
+
+
+def test_card_current_at_requires_every_window_to_hold():
+    fresh, valid, flat = (VIEW + timedelta(hours=h) for h in (3, 2, 1))
+
+    def card(flat_by):
+        return {'strategy_inference': {'plan': {
+            'valid_until': valid.isoformat(),
+            'flat_by': None if flat_by is None else flat_by.isoformat()}}}
+
+    assert card_current_at(card(None), fresh, VIEW)
+    assert card_current_at(card(flat), fresh, VIEW)
+    assert not card_current_at(card(flat), fresh, flat)
+    assert not card_current_at(card(None), fresh, valid)
+    assert not card_current_at(card(None), VIEW, VIEW)
 
 
 def test_report_without_cards_loads(tmp_path):

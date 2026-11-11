@@ -23,6 +23,8 @@ FEATURE_STATUS = 'OFFLINE_PROJECTION_NOT_ACTIVATED'
 # Read-only GET route serving only the protected loader's response. Until a
 # trusted host producer publishes a report it answers NOT_CONFIGURED/UNAVAILABLE.
 API_ROUTE = '/api/scanner-v2/egx/card-report'
+# Read-only HTML view of the same loader response.
+CARD_PAGE_ROUTE = '/scanner-v2/egx/cards'
 # Host job CLI that can publish a report from retained evidence. Code-installed
 # only: this repository holds no scheduler/cron entry for it, so it is reported
 # as not scheduled and runtime_producer stays null until host evidence exists.
@@ -82,6 +84,7 @@ def feature_status():
         'market_adapters': {'EGX': 'OFFLINE_PROJECTION_ONLY', 'US': 'NOT_IMPLEMENTED'},
         'us_adapter_gaps': list(US_ADAPTER_GAPS),
         'api_route': API_ROUTE,
+        'card_page': CARD_PAGE_ROUTE,
         'producer_entrypoint': PRODUCER_ENTRYPOINT,
         'producer_schedule': PRODUCER_SCHEDULE,
         'evidence_retention_entrypoint': EVIDENCE_RETENTION_ENTRYPOINT,

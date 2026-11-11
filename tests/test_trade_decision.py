@@ -98,5 +98,6 @@ def test_card_renderer_escapes_untrusted_evidence_and_labels_sections():
     for label in ('Observed fact', 'Strategy inference', 'Risk decision', 'Research evidence',
                   'WHY FOUND', 'SETUP', 'DATA AS OF', 'TRIGGER', 'ENTRY', 'STOP', 'TARGET',
                   'RISK', 'EVIDENCE', 'CONFIDENCE', 'EVENT RISK', 'PAPER/SHADOW STATUS',
-                  'INVALIDATION REASON', 'LIVE_MONEY=DISABLED'):
+                  'INVALIDATION REASON', 'LIVE_MONEY=DISABLED', 'Trade Card: TEST',
+                  'Detected at', 'Fresh until', 'Valid until'):
         assert label in html
