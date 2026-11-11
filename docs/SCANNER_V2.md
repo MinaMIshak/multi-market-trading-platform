@@ -483,7 +483,12 @@ stays `OFFLINE_PROJECTION_NOT_ACTIVATED`: a page is not a producer or activation
   `card_current_at`, so a stale report cannot read as current.
 - The page shows coverage as ranking scope only (authoritative universe UNKNOWN),
   provenance, admission labels, limitations and lifecycle evidence `NOT_VERIFIED`
-  with UNKNOWN sample size and net result. Per-symbol exclusions stay in the JSON.
+  with UNKNOWN sample size and net result.
+- After the cards, an "Excluded symbols" table gives each excluded symbol's
+  classification, fixed exclusion reason and retained identity exclusion, from the
+  report's own coverage rows. `NONE_REPORTED` means the report carries no identity
+  exclusion for that symbol, not that its identity was verified. The table is
+  omitted when nothing is excluded or no report was accepted.
 
 Any host reverse-proxy or route allowlist must approve the path separately.
 

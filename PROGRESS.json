@@ -2,9 +2,9 @@
   "schema_version": 1,
   "milestone": "M4",
   "phase": "SCANNER_V2_TRADE_CARD_PAGE",
-  "current_capability": "Offline Scanner v2 EGX slice from retained evidence to Trade Card, served read-only as JSON and (pending host validation) as an HTML page. No scheduled producer, so both answer NOT_CONFIGURED/UNAVAILABLE unless a host publishes a report. Admission labels unchanged; no runtime activation.",
+  "current_capability": "Offline Scanner v2 EGX slice from retained evidence to Trade Card, served read-only as JSON and as an HTML page; the page's per-symbol exclusion table is pending host validation. No scheduled producer, so both answer NOT_CONFIGURED/UNAVAILABLE unless a host publishes a report. Admission labels unchanged; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
-  "head": "e5541953a8436abacb866293e34a409de3c8e6c8",
+  "head": "ef88b533972763647c77669f9eb84ffd11ef8997",
   "egx": {
     "baseline_universe": 224,
     "authoritative_universe": null,
@@ -420,12 +420,21 @@
       "next": "Superseded by trade_card_page below."
     },
     "trade_card_page": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "status": "COMMITTED",
+      "commit": "ef88b533972763647c77669f9eb84ffd11ef8997",
+      "host_validation_note": "Latest supervisor record seen by the paced executor is scanner_core PASS, 504 passed, labelled head e554195, fingerprint 278aa38d. The +8 over 496 matches this unit's eight tests added to existing files, so attributing the record to this unit is inferred. It does not settle validation_coverage_concern.",
       "summary": "GET /scanner-v2/egx/cards (app.main.scanner_v2_egx_card_page) renders exactly the JSON route's loader response via app.ui.trade_card.render_card_report_page. Cards appear only for AVAILABLE; other outcomes show the fixed status/reason. Each card keeps producer-time labels under an At load CURRENT/NOT_CURRENT line from card_current_at, now shared with the loader's count. Shows coverage as ranking scope only, provenance, admission labels, limitations and lifecycle NOT_VERIFIED. feature_status gains card_page and SYSTEM links it; status, runtime_producer (null), published_cards (null), runtime_activation (false), report bytes, LIMITATIONS and reader unchanged.",
       "files": ["app/main.py", "app/scanner_v2_card_report.py", "app/scanner_v2_card_report_loader.py", "app/ui/system.py", "app/ui/trade_card.py", "tests/test_scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "tests/test_trade_decision.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required. New tests were added to existing test files rather than a new file.",
       "validation_coverage_concern": "Inferred from recorded counts, not confirmed: scanner_core stayed at 492 across the publisher and retained-evidence units, and did not grow for the evidence-retention job or the four-test evidence chain. tests/test_scanner_v2_card_report_publisher.py, test_scanner_v2_retained_evidence.py, test_scanner_v2_card_report_job.py, test_scanner_v2_evidence_retention_job.py and test_scanner_v2_evidence_chain.py may never have run on the host. The host should add them to the profile and run them before treating the EGX slice as host-accepted.",
-      "next": "Host: confirm or fix scanner_core collection, run the five test files above and validate this unit; approve the page path in any host route allowlist. Repository: if those tests pass, the EGX slice is complete offline; then close US gaps (identity binding first) or begin News/Event Context per milestone order."
+      "next": "Superseded by card_page_exclusions below."
+    },
+    "card_page_exclusions": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "render_card_report_page appends an escaped 'Excluded symbols: N of requested' table after the cards, built only from the accepted report's coverage rows and identity_exclusions: symbol, classification, fixed exclusion reason and identity exclusion (NONE_REPORTED when the report carries none, which is not identity verification). Omitted when nothing is excluded or no report was accepted. Report bytes, reader, loader, routes, feature_status and LIMITATIONS unchanged.",
+      "files": ["app/ui/trade_card.py", "tests/test_scanner_v2_card_report_route.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Three tests added to the existing tests/test_scanner_v2_card_report_route.py. Host validation required; scanner_core should grow by 3 if that file is collected.",
+      "next": "Host: confirm or fix scanner_core collection, run the five test files named in trade_card_page.validation_coverage_concern and validate this unit; approve the page path in any host route allowlist. Repository: if those tests pass, the EGX slice is complete offline; then close US gaps (identity binding first) or begin News/Event Context per milestone order."
     },
     "scope": "Schema v12 immutable committed calendar observation storage, exact-byte historical lookup and bounded PIT projection; explicit upgrade with no backfill. No runtime/API activation or admission promotion.",
     "promotion": "NOT_AUTHORIZED",

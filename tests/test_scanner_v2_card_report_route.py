@@ -155,6 +155,39 @@ def test_card_page_with_no_cards_keeps_scope_caveat(monkeypatch, tmp_path):
     assert 'not the authoritative EGX universe' in html
 
 
+def test_card_page_lists_each_exclusion_with_its_reason(monkeypatch, tmp_path):
+    html = serve_page(monkeypatch, tmp_path, encode(project()), VIEW)
+    section = html[html.index('<h2>Excluded symbols: 3 of 5</h2>'):]
+    for row in (('CCCC', 'WATCHLIST', 'SETUP_NOT_CONFIRMED', 'NONE_REPORTED'),
+                ('DDDD', 'NO_TRADE', 'NO_TRADE', 'NONE_REPORTED'),
+                ('EEEE', 'CANDIDATE', 'IDENTITY_UNBOUND', 'IDENTITY_MISSING')):
+        assert '<tr>' + ''.join(f'<td>{cell}</td>' for cell in row) + '</tr>' in section
+    # Symbols with cards are not exclusions, and cards come before this list.
+    assert '<td>AAAA</td>' not in section and '<td>BBBB</td>' not in section
+    assert html.index('Trade Card: BBBB') < html.index('Excluded symbols: 3 of 5')
+
+
+def test_card_page_omits_exclusions_when_none_or_report_rejected(monkeypatch, tmp_path):
+    artifact = report([record('AAAA', 'CANDIDATE'), record('BBBB', 'STRONG_CANDIDATE')])
+    html = serve_page(monkeypatch, tmp_path, encode(project(artifact=artifact)), VIEW)
+    assert 'Excluded</th><td>0' in html and 'Excluded symbols' not in html
+    publish(tmp_path, b'{}')
+    html = main.scanner_v2_egx_card_page().body.decode()
+    assert 'REPORT_REJECTED' in html and 'Excluded symbols' not in html
+
+
+def test_card_page_escapes_exclusion_values(tmp_path, monkeypatch):
+    publish(tmp_path, encode(project()))
+    monkeypatch.setenv(ENV, str(tmp_path))
+    out = load_retained_egx_card_report(now=VIEW)
+    coverage = out['report']['coverage']
+    coverage['symbols'][-1]['reason'] = '<s>r</s>'
+    coverage['identity_exclusions'][0]['reason'] = '<em>q</em>'
+    html = render_card_report_page(out)
+    assert '<s>' not in html and '&lt;s&gt;r' in html
+    assert '<em>' not in html and '&lt;em&gt;q' in html
+
+
 def test_card_page_escapes_every_supplied_value(tmp_path, monkeypatch):
     publish(tmp_path, encode(project()))
     monkeypatch.setenv(ENV, str(tmp_path))

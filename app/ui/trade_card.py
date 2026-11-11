@@ -84,6 +84,30 @@ def render_trade_card(decision: TradeDecision, *, observed_at: datetime) -> str:
     return render_card_projection(trade_card(decision, observed_at=observed_at))
 
 
+def _exclusion_section(coverage: dict) -> str:
+    """List why each excluded symbol in the ranking scope has no card.
+
+    Shows only the report's own coverage rows and identity exclusions; a symbol
+    with no retained identity exclusion reads NONE_REPORTED, not verified.
+    """
+    rows = [row for row in coverage['symbols'] if row['status'] == 'EXCLUDED']
+    if not rows:
+        return ''
+    identity = {item['symbol']: item['reason'] for item in coverage['identity_exclusions']}
+    head = ''.join('<th scope="col">' + label + '</th>' for label in (
+        'Symbol', 'Classification', 'Exclusion reason', 'Identity exclusion'))
+    body = ''.join(
+        '<tr>' + ''.join('<td>' + escape(str(value)) + '</td>' for value in (
+            row['symbol'], row['classification'], row['reason'],
+            identity.get(row['symbol'], 'NONE_REPORTED'))) + '</tr>'
+        for row in rows)
+    return ('<section><h2>Excluded symbols: ' + str(len(rows)) + ' of '
+            + escape(str(coverage['requested'])) + '</h2><p>Why each of these symbols in the '
+            'published ranking scope has no Trade Card, as classified at report time. '
+            'An exclusion is not a forecast.</p><table><tr>' + head + '</tr>' + body
+            + '</table></section>')
+
+
 def render_card_report_page(response: dict) -> str:
     """Render the protected loader's response as a read-only HTML page.
 
@@ -157,4 +181,5 @@ def render_card_report_page(response: dict) -> str:
         state = 'CURRENT' if card_current_at(card, fresh_until, loaded_at) else 'NOT_CURRENT'
         parts.append('<section><p><strong>At load: ' + state + '</strong></p>'
                      + render_card_projection(card) + '</section>')
+    parts.append(_exclusion_section(coverage))
     return ''.join(parts) + '</body></html>'
