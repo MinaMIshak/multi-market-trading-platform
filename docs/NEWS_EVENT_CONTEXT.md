@@ -89,9 +89,30 @@ NOT_EVALUATED, `trading_effect` NONE, SHADOW, `live_money` false and
 `execution_allowed` false. The validator recomputes the expected status, so an
 inconsistent status cannot be constructed.
 
+## Retained byte codec (`app.news_event_record`)
+
+Status: pure codec, pending host validation. No file/network/database IO, store,
+provider, route or caller.
+
+`encode_news_event(event)` returns the canonical bytes of one exact, revalidated
+`NewsEvent` (sorted keys, compact separators, ASCII, no NaN; bounded at 256 KiB).
+These are exactly the bytes hashed by `NewsEvent.identity`, so the SHA-256 of the
+retained bytes is the record identity and can be its content address.
+
+`read_retained_news_event(payload, *, expected_sha256)` fails closed with
+`RetainedNewsEventError` unless the input is bounded `bytes`, its SHA-256 equals
+the lowercase digest recorded by the trusted producer, it is strict JSON (no
+duplicate keys, no NaN/Infinity, a JSON object), it validates as an exact
+news-event-v1 record (extra fields such as `signal`, naive timestamps,
+`live_money` true, any trading effect, cross-market association all fail) and it
+re-encodes to identical bytes. Timestamp offsets are preserved. Decoded records
+still go through `select_point_in_time`; the codec adds no availability rule.
+
 ## Not yet done
 
-Retained storage and an ingestion producer for a lawful free source, attaching
+A host-provisioned retained store using this codec (write-once content-addressed
+files, following the Scanner v2 card-report publisher pattern), an ingestion
+producer for a lawful free source, attaching
 the context to the Trade Card display (separately from observed market facts),
 a concrete operational freshness policy, SYSTEM state and empirical validation
 (Phases G–L). Tests use artificial records only.
