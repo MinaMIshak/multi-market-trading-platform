@@ -1,7 +1,8 @@
 # News/Event Context — evidence contract (pending host validation)
 
-Status: pure contract and point-in-time read rule only. No provider, IO, storage,
-route, scheduler, Trade Card field or caller. News is evidence enrichment, never a
+Status: pure contract, point-in-time read rule, projection, codec, write-once
+store library and a separate card-section function. No provider, route,
+scheduler, Trade Card field or runtime caller. News is evidence enrichment, never a
 strategy: it cannot produce BUY/SELL, admission, risk approval or execution.
 PAPER/SHADOW only; LIVE_MONEY=DISABLED.
 
@@ -135,10 +136,36 @@ REVISION_CONFLICT; a later revision is stored beside the original. At most
 market ordered by identity, or fails closed with no partial content. Callers
 still apply `select_point_in_time`; the store adds no availability rule.
 
+## Trade Card event-context section (`app.news_event_card`, trade-card-event-context-v1)
+
+Status: pure function, pending host validation. No IO, route, page, report
+field or caller.
+
+`card_event_context(decision, context)` binds one exact `EventContext` to one
+exact `TradeDecision` (both revalidated) and returns a separate JSON-ready
+section to show beside the card. It fails closed unless market and canonical
+instrument UUID match and the context decision time is the same instant as the
+decision's detection time (offsets may differ). A context taken later could
+carry news retained after the decision, so it cannot be attached to an earlier
+card.
+
+The section is labelled `evidence_layer` NEWS_EVENT_INFERENCE,
+`observed_market_fact` false and `association_kind` INFERRED. It exposes the
+context status, NEWS/EVENT AS OF (`news_event_as_of` = retained coverage time,
+null when not configured), coverage, freshness (NOT_CONFIGURED / STALE /
+WITHIN_POLICY, derived from the context status), the policy, categories,
+relevant/ambiguous event identities (content addresses of retained records),
+the unattributed count and a SHA-256 of the canonical context. It fixes
+`absence_is_proof` false, `risk_interpretation` NOT_EVALUATED, `trading_effect`
+and `plan_effect` NONE, SHADOW, `live_money` and `execution_allowed` false, and
+reports `trade_decision_event_risk` as the decision's unchanged UNKNOWN.
+
+`trade_card`, the trade plan, `TradeDecision.event_risk` and the retained card
+report bytes are unchanged.
+
 ## Not yet done
 
-Host provisioning of the store directory, an ingestion
-producer for a lawful free source, attaching
-the context to the Trade Card display (separately from observed market facts),
-a concrete operational freshness policy, SYSTEM state and empirical validation
-(Phases G–L). Tests use artificial records only.
+Host provisioning of the store directory, an ingestion producer for a lawful
+free source, wiring the section into the card report/page (which needs a
+retained coverage time and a concrete operational policy), SYSTEM state and
+empirical validation (Phases G–L). Tests use artificial records only.
