@@ -163,9 +163,41 @@ reports `trade_decision_event_risk` as the decision's unchanged UNKNOWN.
 `trade_card`, the trade plan, `TradeDecision.event_risk` and the retained card
 report bytes are unchanged.
 
+## Per-decision observation record (`app.decision_observation`, decision-observation-v1)
+
+Status: pure function, pending host validation. Phase G groundwork only: no
+IO, store, route, scheduler or caller, and no outcome evaluation.
+
+`decision_observation(decision, context, *, recorded_at)` returns one
+JSON-ready record for one exact (revalidated) `TradeDecision`: decision
+identity, market, symbol, canonical instrument UUID, strategy id/version and
+config id, candidate state and SHA-256, detection/data/availability/freshness
+times, the immutable plan terms exactly as the decision serializes them
+(entry zone and reference, stop, target, valid_until, flat_by,
+max_holding_sessions, trigger), risk per share and provenance (source id,
+artifact SHA-256, evidence ids). When an `EventContext` is supplied, the
+record embeds the exact `card_event_context` section and its canonical
+SHA-256 (so all its binding rules apply: same market, instrument and
+detection instant); otherwise `event_context.status` is NOT_ATTACHED.
+
+Recording window: `recorded_at` must be aware, at or after detection and
+strictly before the source `fresh_until`, `valid_until` and `flat_by`. A
+record cannot be written after the decision stopped being current, so the
+choice to record cannot depend on later outcomes. The clock is labelled
+`CALLER_SUPPLIED_UNVERIFIED`; trusted time and write-once retention are not
+provided here.
+
+Fixed: `outcome_status` NOT_OBSERVED, `outcome` null, `evaluation_status`
+PENDING_OUTCOME, `performance_claim` NONE, SHADOW, `live_money` and
+`execution_allowed` false, `promotion` NOT_AUTHORIZED. `canonical_bytes`
+gives deterministic sorted compact ASCII JSON; the same instant in a different
+offset gives identical bytes. Cost/slippage assumptions belong to the later
+evaluation layer and are not recorded here.
+
 ## Not yet done
 
 Host provisioning of the store directory, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
-retained coverage time and a concrete operational policy), SYSTEM state and
-empirical validation (Phases G–L). Tests use artificial records only.
+retained coverage time and a concrete operational policy), SYSTEM state,
+write-once retention of observation records, outcome evaluation and metrics
+(Phases G–L beyond the record above). Tests use artificial records only.
