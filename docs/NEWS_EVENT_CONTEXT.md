@@ -108,10 +108,36 @@ news-event-v1 record (extra fields such as `signal`, naive timestamps,
 re-encodes to identical bytes. Timestamp offsets are preserved. Decoded records
 still go through `select_point_in_time`; the codec adds no availability rule.
 
+## Write-once store (`app.news_event_store`, news-event-retention-v1)
+
+Status: library only, pending host validation. No provider, scheduler, route or
+caller; the host must provision the directory.
+
+One host-provisioned directory holds `<identity>.json` per exact record (codec
+bytes, mode 0444); no pointer, nothing is replaced or deleted. It reuses the
+card-report publisher's temp/fsync/link helpers and the loader's no-follow
+bounded read.
+
+`retain_news_event(directory, event, *, now=None)` requires an absolute,
+non-symlink, non-group/world-writable directory and an exclusive non-blocking
+lock (STORE_BUSY). It round-trips the bytes through the codec before writing,
+reads every retained record (a damaged record, symlink, directory or unexpected
+name fails closed as STORE_INVALID; leftover `.publish-*.tmp` files are
+tolerated), returns ALREADY_RETAINED for an exact retry, and otherwise requires
+`observed_at` within `MAX_OBSERVATION_LAG` (5 minutes) at or before the store
+clock: OBSERVED_IN_FUTURE / OBSERVATION_BACKDATED. Backdating is refused because
+it would make a record look available to decisions taken before it was
+retained. A different record for the same event and revision is
+REVISION_CONFLICT; a later revision is stored beside the original. At most
+`MAX_RECORDS` (10000) records. The written bytes are re-read and verified.
+
+`load_retained_news_events(directory, *, market)` returns every record of one
+market ordered by identity, or fails closed with no partial content. Callers
+still apply `select_point_in_time`; the store adds no availability rule.
+
 ## Not yet done
 
-A host-provisioned retained store using this codec (write-once content-addressed
-files, following the Scanner v2 card-report publisher pattern), an ingestion
+Host provisioning of the store directory, an ingestion
 producer for a lawful free source, attaching
 the context to the Trade Card display (separately from observed market facts),
 a concrete operational freshness policy, SYSTEM state and empirical validation
