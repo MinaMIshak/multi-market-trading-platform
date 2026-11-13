@@ -194,10 +194,42 @@ gives deterministic sorted compact ASCII JSON; the same instant in a different
 offset gives identical bytes. Cost/slippage assumptions belong to the later
 evaluation layer and are not recorded here.
 
+## Observation store (`app.decision_observation_store`, decision-observation-retention-v1)
+
+Status: library, pending host validation. No provisioned directory, producer,
+scheduler, route or caller.
+
+`retain_decision_observation(directory, decision, context=None, *, now=None)`
+builds the record with the unchanged `decision_observation` function using the
+store clock as `recorded_at` (so the recording window is checked at retention
+time), and retains `canonical_bytes(record)` as `<sha256>.json` (0444). It
+reuses the news-event store's protected directory check, exclusive
+non-blocking lock, write-once hard link and no-follow bounded reads; the
+directory is never created and records are never replaced or deleted.
+
+One record per decision: a retry whose record differs only in `recorded_at`
+returns ALREADY_RETAINED with the FIRST record's identity and time; any other
+difference (for example a different attached event context) is
+OBSERVATION_CONFLICT. A retry after the window closed is RECORD_REJECTED.
+Two records for one decision, damaged, symlinked or unexpected entries fail
+closed (STORE_INVALID) for both retention and load.
+
+`read_retained_decision_observation(payload, *, expected_sha256)` accepts only
+bounded strict canonical JSON with the producer digest, the exact field set,
+the fixed safety values above, SHA-256 decision/candidate ids, EGX/US market,
+risk per share equal to entry_reference − stop (> 0), aware timestamps inside
+the recording window and, when ATTACHED, an event-context section whose
+digest matches and which is bound to the same decision id. It does NOT rebuild
+the `TradeDecision` or re-derive `decision_id`; a digest is integrity under a
+trusted host writer, not a signature. `load_retained_decision_observations`
+returns `(identity, record)` pairs for one market ordered by identity. Records
+remain pending observations: no outcome, metric or performance claim.
+
 ## Not yet done
 
-Host provisioning of the store directory, an ingestion producer for a lawful
+Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
-retained coverage time and a concrete operational policy), SYSTEM state,
-write-once retention of observation records, outcome evaluation and metrics
-(Phases G–L beyond the record above). Tests use artificial records only.
+retained coverage time and a concrete operational policy), SYSTEM state, a
+producer calling the observation store, outcome evaluation and metrics
+(Phases G–L beyond the record and store above). Tests use artificial records
+only.
