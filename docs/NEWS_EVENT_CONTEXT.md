@@ -286,11 +286,54 @@ holding sessions. Every result lists the bars used with provenance and fixes
 `performance_claim` NONE, SHADOW, `live_money`/`execution_allowed` false and
 `promotion` NOT_AUTHORIZED. A single outcome is not performance.
 
+## Segmented aggregate metrics (`app.decision_outcome_metrics`, decision-outcome-metrics-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler or caller.
+
+`aggregate_decision_outcomes(population, outcomes, *, market, assumptions,
+as_of)` summarises ONE market under ONE exact `OutcomeAssumptions`.
+`population` is a tuple of `(identity, record)` pairs (the shape returned by
+`load_retained_decision_observations`); `outcomes` is a tuple of
+decision-outcome-v1 dicts. Fails closed (ValueError) when:
+
+- a population record does not re-verify against its content address, belongs
+  to another market, was recorded after `as_of`, or repeats an identity or
+  decision;
+- an outcome has the wrong field set, contract/rules version, rules, fixed
+  safety labels or assumptions, names no population identity (or repeats
+  one), disagrees with its record on decision, market, symbol, instrument,
+  strategy id/version, config, detection time or entry trigger, was evaluated
+  after `as_of`, or is structurally inconsistent (unregistered status/reason,
+  exit/metrics present iff CLOSED, finite decimal R values, MAE ≤ 0 ≤ MFE).
+
+Population records with no outcome are counted as NOT_EVALUATED, so omitting a
+losing outcome is visible rather than silent. Population completeness is the
+caller's assertion (`CALLER_ASSERTED_UNVERIFIED`); outcome numbers are bound to
+their observation but not recomputed (no bars here).
+
+Metrics are reported only per segment (strategy id, strategy version, config
+id), with `cross_segment_headline` NOT_COMPUTED. Each segment exposes the
+sample size (observations), status counts including NOT_EVALUATED, reason and
+exit-reason counts, wins/losses/flat by net R sign, hit rate, mean win/loss net
+R, payoff ratio, expectancy net and gross R, total net R, max drawdown in R
+(cumulative net R at one R per decision ordered by exit date then identity, no
+portfolio constraints), mean MAE/MFE, mean and max holding sessions,
+missing-data rate ((UNEVALUABLE + NOT_EVALUATED) / observations) and the
+detection-time range. Ratios with a zero denominator are null;
+false-positive rate is NOT_DEFINED. Definitions are listed in every result
+(`decision-outcome-metric-definitions-v1`). Arithmetic uses 34-digit decimal
+precision; output is independent of input order and carries population and
+outcome SHA-256 digests. `sample_assessment` is NOT_ASSESSED; fixed
+HYPOTHETICAL_FROM_SESSION_BARS, `execution_evidence`/`performance_claim` NONE,
+SHADOW, `live_money`/`execution_allowed` false, `promotion` NOT_AUTHORIZED.
+
 ## Not yet done
 
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), SYSTEM state, a
 producer calling the observation store, a host source of retained session bars
-for the evaluator, outcome retention and segmented aggregate metrics with
-sample size (Phases H–L). Tests use artificial records only.
+for the evaluator, outcome retention, time-period/regime/event-state
+segmentation, sample-sufficiency policy and out-of-sample period labelling
+(Phases I–L). Tests use artificial records only.
