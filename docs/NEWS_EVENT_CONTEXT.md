@@ -225,11 +225,72 @@ trusted host writer, not a signature. `load_retained_decision_observations`
 returns `(identity, record)` pairs for one market ordered by identity. Records
 remain pending observations: no outcome, metric or performance claim.
 
+## Outcome evaluator (`app.decision_outcome`, decision-outcome-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler or caller; no aggregate metrics.
+
+`evaluate_decision_outcome(identity, record, bars, *, assumptions,
+path_complete_through_at, evaluated_at)` evaluates ONE retained
+decision-observation-v1 record. The record is re-encoded and passed through
+`read_retained_decision_observation` with its content address, so any edit
+fails closed; it is never modified. Bars are a tuple of the existing
+`PaperReplayBar` contract (one completed session per bar, same instrument UUID
+and symbol). `OutcomeAssumptions` (decision-outcome-assumptions-v1) is explicit
+and versioned per market: entry slippage, exit slippage and cost per side in
+basis points (exact finite Decimal, 0–1000), labelled DECLARED_UNVALIDATED. The
+assumptions market must equal the record market.
+
+Existing engines are not reused for the path because
+`simulate_paper_replay` needs a positive M5 risk admission that decisions do not
+have (inventing one would fabricate a risk approval), and
+`system_candidates.simulate` is the EGX-RANK-v1 two-target lifecycle. The exit
+ordering follows the replay engine's conservative rules.
+
+Point in time (ValueError): every bar must begin at or after detection, be
+available by `path_complete_through_at` and be in strictly ascending sessions;
+`detected_at <= path_complete_through_at <= evaluated_at`; naive clocks fail.
+Bars after the exit are never inspected, so later data cannot change a closed
+outcome. Path completeness, raw price basis and the clock are caller
+assertions and are labelled (`CALLER_ASSERTED_UNVERIFIED`,
+`RAW_UNADJUSTED_CALLER_ASSERTED`, `CALLER_SUPPLIED_UNVERIFIED`); corporate
+actions are `NOT_CHECKED`.
+
+Rules (`decision-outcome-rules-v1`, listed in every result):
+
+- `LONG_ENTRY_ZONE_TOUCH_V1`: first session ending by `valid_until` that trades
+  in the zone; fill at the open clamped to the zone.
+- `EGX_RANK_V1_NEXT_SESSION_ZONE_V1`: first supplied session only; open below
+  the zone is NO_FILL_GAP_DOWN; open above fills at zone high only if traded
+  back, else NO_FILL_GAP_UP.
+- Stop before target in one session; on the fill session a target counts only
+  if filled at the open or the close is at/above target; gap through stop exits
+  at the open, gap through target is capped at target; time exit at the close
+  of the `max_holding_sessions`-th session counting the fill session;
+  `valid_until` is only the entry deadline.
+- A filled plan with `flat_by` is UNEVALUABLE (session bars cannot resolve it).
+
+Statuses: CLOSED (STOP / TARGET / TIME_EXIT) with metrics; NO_ENTRY
+(NO_FILL_GAP_DOWN, NO_FILL_GAP_UP, ENTRY_WINDOW_EXPIRED,
+NOT_TOUCHED_BEFORE_EXPIRY); PENDING_PATH (AWAITING_ENTRY_WINDOW,
+POSITION_OPEN — no partial metrics); UNEVALUABLE
+(NO_SESSION_BARS_IN_ENTRY_WINDOW, ENTRY_OUTSIDE_STOP_TARGET after slippage,
+FLAT_BY_NOT_SUPPORTED_BY_SESSION_BARS, UNSUPPORTED_ENTRY_TRIGGER).
+
+Metrics per share in planned R (`entry_reference − stop`): gross and net R
+(slipped prices minus bps costs on both sides), cost per share, fill risk per
+share, MAE/MFE in R (adverse excursion never understated; favourable excursion
+excludes prices that may precede an intrabar fill or follow an exit) and
+holding sessions. Every result lists the bars used with provenance and fixes
+`fill_kind` HYPOTHETICAL_FROM_SESSION_BARS, `execution_evidence` NONE,
+`performance_claim` NONE, SHADOW, `live_money`/`execution_allowed` false and
+`promotion` NOT_AUTHORIZED. A single outcome is not performance.
+
 ## Not yet done
 
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), SYSTEM state, a
-producer calling the observation store, outcome evaluation and metrics
-(Phases G–L beyond the record and store above). Tests use artificial records
-only.
+producer calling the observation store, a host source of retained session bars
+for the evaluator, outcome retention and segmented aggregate metrics with
+sample size (Phases H–L). Tests use artificial records only.
