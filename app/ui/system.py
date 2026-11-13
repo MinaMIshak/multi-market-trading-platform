@@ -25,6 +25,7 @@ from app.runtime_state import runtime_state_report
 from app.ui.product import product_state, render_scan_runs, observed_receipt_summary, RECEIPT_STATUSES
 from app.scanner_v2_card_report import (
     CARD_PAGE_ROUTE as SCANNER_V2_CARD_PAGE_ROUTE, feature_status as scanner_v2_feature_status)
+from app.news_event_status import feature_status as news_empirical_feature_status
 
 
 CHECKPOINT = Path(__file__).resolve().parents[2] / 'PROGRESS.json'
@@ -124,6 +125,9 @@ def load_system_state():
         'learning': learning_summary(load_learning()),
         # Code-declared Scanner v2 Trade Card status; not runtime/scan evidence.
         'scanner_v2': scanner_v2_feature_status(),
+        # Code-declared News/Event and empirical-validation stages; no store
+        # read, observation count, outcome or metric.
+        'news_empirical': news_empirical_feature_status(),
         # Where each reader input came from; snapshot hashes verified, not assumed.
         'runtime_state': runtime_state_report(),
         'egx_scan_history': history,
@@ -446,6 +450,75 @@ def render_scanner_v2(state):
             + '</p></section>')
 
 
+NEWS_EMPIRICAL_STAGES = (
+    ('code_installed', 'Code installed'),
+    ('configured', 'Configured'),
+    ('scheduled', 'Scheduled'),
+    ('producing_evidence', 'Producing evidence'),
+    ('evidence_current', 'Evidence current'),
+    ('empirically_validated', 'Empirically validated'),
+    ('promoted', 'Promoted'),
+)
+
+
+def render_news_empirical(state):
+    """Render code-declared News/Event and empirical stages; no evidence counts."""
+    feature = state.get('news_empirical')
+    if not isinstance(feature, dict):
+        return '<section id="news-empirical"><h2>News/Event and empirical validation: UNKNOWN</h2></section>'
+
+    def cell(value):
+        return escape(str(value)) if value is not None else 'UNKNOWN'
+
+    def part(key):
+        value = feature.get(key)
+        return value if isinstance(value, dict) else {}
+
+    def joined(values):
+        if not isinstance(values, list):
+            return None
+        return ', '.join(str(item) for item in values) or None
+
+    def modules(values):
+        if not isinstance(values, list):
+            return None
+        return ', '.join(f"{item.get('module')} ({item.get('version')})" if isinstance(item, dict)
+                         else 'UNKNOWN' for item in values) or None
+
+    news, empirical = part('news_event_context'), part('empirical_validation')
+    news_stages = news.get('stages') if isinstance(news.get('stages'), dict) else {}
+    empirical_stages = (empirical.get('stages')
+                        if isinstance(empirical.get('stages'), dict) else {})
+    # Structural non-applicability, distinct from an unobserved (UNKNOWN) value.
+    na = 'NOT_APPLICABLE'
+    rows = [('Status', news.get('status'), empirical.get('status')),
+            ('News source', news.get('source_status'), na)]
+    rows += [(title, news_stages.get(key), empirical_stages.get(key))
+             for key, title in NEWS_EMPIRICAL_STAGES]
+    rows += [('Retained events / observations', news.get('retained_events'),
+              empirical.get('retained_observations')),
+             ('Evaluated outcomes', na, empirical.get('evaluated_outcomes')),
+             ('Sample assessment', na, empirical.get('sample_assessment')),
+             ('Cross-market headline', na, empirical.get('cross_market_headline')),
+             ('Performance claim', na, empirical.get('performance_claim')),
+             ('Trade decision event risk', news.get('trade_decision_event_risk'), na),
+             ('API route', news.get('api_route') or 'NOT_INSTALLED',
+              empirical.get('api_route') or 'NOT_INSTALLED'),
+             ('Components', modules(news.get('components')), modules(empirical.get('components'))),
+             ('Gaps', joined(news.get('gaps')), joined(empirical.get('gaps')))]
+    return ('<section id="news-empirical"><h2>News/Event and empirical validation</h2>'
+            '<p>Code-declared stages only; not a news fetch, store read, observation count, '
+            'outcome, metric or runtime observation. Absence of detected news is not proof '
+            'that no event exists. News never produces trade signals or orders. UNKNOWN means not observed, '
+            'not zero. LIVE_MONEY=DISABLED.</p><div class="table-scroll">'
+            '<table aria-label="News/Event and empirical validation status"><thead><tr>'
+            '<th scope="col">Stage</th><th scope="col">News/Event context</th>'
+            '<th scope="col">Empirical validation</th></tr></thead><tbody>'
+            + ''.join('<tr><th scope="row">' + title + '</th><td>' + cell(left) + '</td><td>'
+                      + cell(right) + '</td></tr>' for title, left, right in rows)
+            + '</tbody></table></div></section>')
+
+
 def render_system(state):
     return ('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>System progress</title><style>body{font:16px sans-serif;max-width:1100px;margin:32px auto;padding:20px;'
@@ -461,6 +534,7 @@ def render_system(state):
             + render_runtime_observation(state)
             + render_delivery(state)
             + render_scanner_v2(state)
+            + render_news_empirical(state)
             + (render_runtime_state(state['runtime_state']) if state.get('runtime_state') else '')
             + render_calendar_maintenance(state.get('calendar_maintenance'))
             + render_pipelines(state)

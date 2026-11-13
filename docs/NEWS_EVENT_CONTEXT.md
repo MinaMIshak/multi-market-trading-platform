@@ -1,7 +1,8 @@
 # News/Event Context — evidence contract (pending host validation)
 
 Status: pure contract, point-in-time read rule, projection, codec, write-once
-store library and a separate card-section function. No provider, route,
+store library, a separate card-section function, Phase G/H observation,
+outcome and metrics libraries, and code-declared SYSTEM stages. No provider, route,
 scheduler, Trade Card field or runtime caller. News is evidence enrichment, never a
 strategy: it cannot produce BUY/SELL, admission, risk approval or execution.
 PAPER/SHADOW only; LIVE_MONEY=DISABLED.
@@ -328,11 +329,41 @@ outcome SHA-256 digests. `sample_assessment` is NOT_ASSESSED; fixed
 HYPOTHETICAL_FROM_SESSION_BARS, `execution_evidence`/`performance_claim` NONE,
 SHADOW, `live_money`/`execution_allowed` false, `promotion` NOT_AUTHORIZED.
 
+## SYSTEM visibility (`app.news_event_status`, news-empirical-feature-status-v1)
+
+Status: code-declared constants, pending host validation. `/api/system` gains
+`news_empirical` and the SYSTEM page a "News/Event and empirical validation"
+table. The module imports nothing and reads nothing: no news fetch, store
+read, observation count, outcome or metric.
+
+Stages are reported separately for News/Event context and empirical
+validation: code installed (CODE_INSTALLED), configured
+(NOT_CONFIGURED_IN_REPOSITORY), scheduled (NOT_SCHEDULED_IN_REPOSITORY),
+producing evidence and evidence current (NOT_OBSERVED), empirically validated
+(NOT_APPLICABLE for news, NOT_VALIDATED for empirical) and promoted
+(NOT_AUTHORIZED). News status is NEWS_CONTEXT_OFFLINE_ONLY with source
+NEWS_SOURCE_NOT_CONFIGURED. The empirical status is
+EMPIRICAL_COLLECTION_NOT_ACTIVE: the milestone's EMPIRICAL_COLLECTION_ACTIVE,
+EMPIRICAL_SAMPLE_INSUFFICIENT and EMPIRICAL_EVIDENCE_AVAILABLE all imply a
+running producer or an observed sample, and none exists. Counts (retained
+events, retained observations, evaluated outcomes) are null, rendered UNKNOWN,
+never zero; sample assessment NOT_ASSESSED, cross-market headline NOT_COMPUTED,
+performance claim NONE, trade-decision event risk UNKNOWN.
+
+Declared components (module and contract/result version) and gaps are checked
+against the code by `tests/test_news_event_status.py`: versions must equal the
+modules' constants; no other `app/` or `tools/` source references a component
+(so no caller, producer, provider, route, card-report binding or scheduler
+entry); components read no environment variable; no outcome store exists; the
+metrics carry no period segmentation; `TradeDecision.event_risk` is
+`Literal['UNKNOWN']`. Change a declaration only together with the code change
+that closes it.
+
 ## Not yet done
 
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
-retained coverage time and a concrete operational policy), SYSTEM state, a
+retained coverage time and a concrete operational policy), a
 producer calling the observation store, a host source of retained session bars
 for the evaluator, outcome retention, time-period/regime/event-state
 segmentation, sample-sufficiency policy and out-of-sample period labelling
