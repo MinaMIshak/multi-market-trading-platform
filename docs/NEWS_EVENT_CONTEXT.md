@@ -362,6 +362,34 @@ NONE, SHADOW, `live_money`/`execution_allowed` false, `promotion`
 NOT_AUTHORIZED. Output carries the policy, its SHA-256 and the whole-input
 population/outcome digests, and is independent of input order.
 
+## Sample assessment (`app.decision_outcome_sample`, decision-outcome-sample-assessment-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler, caller or registered policy.
+
+`assess_decision_outcome_sample(population, outcomes, *, market, assumptions,
+as_of, policy)` takes the same inputs as `aggregate_decision_outcomes` plus an
+explicit, versioned `SampleAssessmentPolicy` (decision-outcome-sample-policy-v1:
+policy version, market, aware `registered_at` not after `as_of`,
+`min_closed_outcomes` 1..10000, exact Decimal `max_missing_data_rate` in
+[0, 1], basis DECLARED_UNVALIDATED, clock CALLER_SUPPLIED_UNVERIFIED). The
+policy is revalidated (model_construct bypass rejected).
+
+Metrics come from the unchanged `aggregate_decision_outcomes` (all its
+fail-closed rules apply) and are embedded unchanged. Each strategy
+id/version/config segment is MEETS_DECLARED_MINIMUM or BELOW_DECLARED_MINIMUM
+with reasons CLOSED_OUTCOMES_BELOW_POLICY_MINIMUM and/or
+MISSING_DATA_RATE_ABOVE_POLICY_MAXIMUM (thresholds inclusive). Because
+NOT_EVALUATED counts as missing, omitting a loss's outcome cannot improve the
+assessment. Each segment also reports whether the policy was registered at or
+before its first detection, so thresholds fixed after seeing data are visible.
+Meeting a declared minimum is not statistical significance
+(`statistical_significance` NOT_ASSESSED), not validation
+(`empirical_validation` NOT_VALIDATED) and not promotion. No cross-segment
+headline; `performance_claim`/`execution_evidence` NONE, SHADOW,
+`live_money`/`execution_allowed` false, `promotion` NOT_AUTHORIZED. Output is
+independent of input order and carries the policy and its SHA-256.
+
 ## SYSTEM visibility (`app.news_event_status`, news-empirical-feature-status-v1)
 
 Status: code-declared constants, pending host validation. `/api/system` gains
@@ -390,7 +418,10 @@ modules' constants; no other `app/` or `tools/` source references a component
 entry); components read no environment variable; no outcome store exists; the
 metrics module carries no period segmentation (that lives in
 `app.decision_outcome_periods`, with no registered policy instance, gap
-EVALUATION_PERIOD_POLICY_NOT_REGISTERED); `TradeDecision.event_risk` is
+EVALUATION_PERIOD_POLICY_NOT_REGISTERED); sample assessment lives in
+`app.decision_outcome_sample` with no registered policy instance (gap
+SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED, SYSTEM sample assessment still
+NOT_ASSESSED); `TradeDecision.event_risk` is
 `Literal['UNKNOWN']`. Change a declaration only together with the code change
 that closes it.
 
@@ -401,5 +432,5 @@ free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a
 producer calling the observation store, a host source of retained session bars
 for the evaluator, outcome retention, a registered operational
-evaluation-period policy, regime/event-state segmentation and a
-sample-sufficiency policy (Phases I–L). Tests use artificial records only.
+evaluation-period policy, regime/event-state segmentation and a registered
+sample-assessment policy (Phases I–L). Tests use artificial records only.

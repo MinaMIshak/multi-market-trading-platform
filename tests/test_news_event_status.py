@@ -99,7 +99,7 @@ def test_declared_gaps_match_the_code():
     for module, _ in COMPONENTS:
         text = _path(module).read_text(encoding='utf-8')
         assert 'environ' not in text and 'getenv' not in text, module
-    # OUTCOME_RETENTION_NOT_IMPLEMENTED / SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED.
+    # OUTCOME_RETENTION_NOT_IMPLEMENTED; the metrics module itself assesses nothing.
     assert not list((ROOT / 'app').glob('decision_outcome_store*.py'))
     metrics = (ROOT / 'app' / 'decision_outcome_metrics.py').read_text(encoding='utf-8')
     assert 'period' not in metrics and "'NOT_ASSESSED'" in metrics
@@ -110,6 +110,16 @@ def test_declared_gaps_match_the_code():
     periods = (ROOT / 'app' / 'decision_outcome_periods.py').read_text(encoding='utf-8')
     assert not re.search(r'^\w+\s*=\s*EvaluationPeriodPolicy\(', periods, re.MULTILINE)
     assert "'cross_period_headline': 'NOT_COMPUTED'" in periods
+    # SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED: assessment is a separate module
+    # whose declared policy is caller-supplied; no repository instance exists.
+    assert 'SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED' not in EMPIRICAL_GAPS
+    assert 'SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED' in EMPIRICAL_GAPS
+    sample = (ROOT / 'app' / 'decision_outcome_sample.py').read_text(encoding='utf-8')
+    assert not re.search(r'^\w+\s*=\s*SampleAssessmentPolicy\(', sample, re.MULTILINE)
+    assert "'cross_segment_headline': 'NOT_COMPUTED'" in sample
+    assert "'promotion': 'NOT_AUTHORIZED'" in sample
+    # SYSTEM keeps sample_assessment NOT_ASSESSED: nothing observes a sample.
+    assert feature_status()['empirical_validation']['sample_assessment'] == 'NOT_ASSESSED'
     # News cannot change the decision's event risk.
     from app.strategies.trade_decision import TradeDecision
     field = TradeDecision.model_fields['event_risk']

@@ -39,6 +39,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome', 'decision-outcome-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
+    ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
@@ -61,7 +62,9 @@ EMPIRICAL_GAPS = (
     'OUTCOME_RETENTION_NOT_IMPLEMENTED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',
-    'SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED',
+    # Sample-assessment code exists; no sample policy is registered, and its
+    # thresholds would be declared, not statistically validated.
+    'SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED',
 )
 
 
