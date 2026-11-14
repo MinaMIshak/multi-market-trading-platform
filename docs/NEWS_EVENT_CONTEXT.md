@@ -420,6 +420,36 @@ time equal to the record's detection instant and a registered context status
 No operational records carry an attached section yet (the card section is not
 in the card report and no observation producer exists).
 
+## Data-age segmentation (`app.decision_outcome_data_age`, decision-outcome-data-age-metrics-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler, caller or registered policy.
+
+`aggregate_decision_outcomes_by_data_age(population, outcomes, *, market,
+assumptions, as_of, policy)` validates the whole input once with the unchanged
+`aggregate_decision_outcomes`, then partitions records by data age at detection,
+`detected_at - data_as_of` in wall-clock seconds, read from the retained record
+only (never outcome, exit or evaluation time). The explicit, versioned
+`DataAgePolicy` (decision-outcome-data-age-policy-v1: market, aware
+`registered_at` not after `as_of` with a CALLER_SUPPLIED_UNVERIFIED clock, 1–8
+strictly ascending integer inclusive upper bounds in (0, 366 days], basis
+DECLARED_UNVALIDATED; `model_construct` bypass revalidated) defines buckets
+`AGE_LE_<b1>S`, `AGE_GT_<b1>S_LE_<b2>S` … `AGE_GT_<bn>S`. Every bucket is always
+reported in fixed order with its own unchanged decision-outcome-metrics-v1
+aggregate and `bucket_counts`; `cross_bucket_headline` NOT_COMPUTED.
+
+Each record must satisfy `data_as_of <= available_at <= detected_at <
+fresh_until` (enforced by `TradeDecision`, not re-checked by the observation
+reader) or the call fails closed, so every record was within its
+source-declared freshness at detection. Age is not session-aware (`age_basis`
+says so): EGX weekends and U.S. holidays add wall-clock age without missed
+sessions. `policy_registration` is REGISTERED_AT_OR_BEFORE_FIRST_DETECTION,
+REGISTERED_AFTER_FIRST_DETECTION or NO_OBSERVATIONS. `age_interpretation`
+NOT_EVALUATED, `trading_effect` NONE, sample NOT_ASSESSED,
+`performance_claim`/`execution_evidence` NONE, SHADOW, `live_money` false,
+`promotion` NOT_AUTHORIZED. No bucket is used to accept, reject or rank
+anything.
+
 ## SYSTEM visibility (`app.news_event_status`, news-empirical-feature-status-v1)
 
 Status: code-declared constants, pending host validation. `/api/system` gains
@@ -451,7 +481,9 @@ metrics module carries no period segmentation (that lives in
 EVALUATION_PERIOD_POLICY_NOT_REGISTERED); sample assessment lives in
 `app.decision_outcome_sample` with no registered policy instance (gap
 SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED, SYSTEM sample assessment still
-NOT_ASSESSED); `TradeDecision.event_risk` is
+NOT_ASSESSED); data-age segmentation lives in `app.decision_outcome_data_age`
+with no registered policy instance (gap DATA_AGE_POLICY_NOT_REGISTERED);
+`TradeDecision.event_risk` is
 `Literal['UNKNOWN']`. Change a declaration only together with the code change
 that closes it.
 
@@ -462,5 +494,6 @@ free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a
 producer calling the observation store, a host source of retained session bars
 for the evaluator, outcome retention, a registered operational
-evaluation-period policy, regime segmentation and a registered
-sample-assessment policy (Phases I–L). Tests use artificial records only.
+evaluation-period policy, regime segmentation, a registered
+sample-assessment policy, a registered data-age policy and session-aware data
+age (Phases I–L). Tests use artificial records only.

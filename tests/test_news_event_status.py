@@ -124,6 +124,14 @@ def test_declared_gaps_match_the_code():
     assert "'cross_state_headline': 'NOT_COMPUTED'" in event_states
     assert "'risk_interpretation': 'NOT_EVALUATED'" in event_states
     assert "'trading_effect': 'NONE'" in event_states
+    # Data-age segmentation is a separate pure module whose declared bucket
+    # policy is caller-supplied; no repository instance exists and no headline.
+    assert 'DATA_AGE_POLICY_NOT_REGISTERED' in EMPIRICAL_GAPS
+    data_age = (ROOT / 'app' / 'decision_outcome_data_age.py').read_text(encoding='utf-8')
+    assert not re.search(r'^\w+\s*=\s*DataAgePolicy\(', data_age, re.MULTILINE)
+    assert "'cross_bucket_headline': 'NOT_COMPUTED'" in data_age
+    assert "'age_interpretation': 'NOT_EVALUATED'" in data_age
+    assert "'promotion': 'NOT_AUTHORIZED'" in data_age
     # SYSTEM keeps sample_assessment NOT_ASSESSED: nothing observes a sample.
     assert feature_status()['empirical_validation']['sample_assessment'] == 'NOT_ASSESSED'
     # News cannot change the decision's event risk.
