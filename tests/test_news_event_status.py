@@ -118,6 +118,12 @@ def test_declared_gaps_match_the_code():
     assert not re.search(r'^\w+\s*=\s*SampleAssessmentPolicy\(', sample, re.MULTILINE)
     assert "'cross_segment_headline': 'NOT_COMPUTED'" in sample
     assert "'promotion': 'NOT_AUTHORIZED'" in sample
+    # Event-state segmentation is a separate pure module: it reports each retained
+    # event-context state separately, interprets no risk and has no headline.
+    event_states = (ROOT / 'app' / 'decision_outcome_event_states.py').read_text(encoding='utf-8')
+    assert "'cross_state_headline': 'NOT_COMPUTED'" in event_states
+    assert "'risk_interpretation': 'NOT_EVALUATED'" in event_states
+    assert "'trading_effect': 'NONE'" in event_states
     # SYSTEM keeps sample_assessment NOT_ASSESSED: nothing observes a sample.
     assert feature_status()['empirical_validation']['sample_assessment'] == 'NOT_ASSESSED'
     # News cannot change the decision's event risk.

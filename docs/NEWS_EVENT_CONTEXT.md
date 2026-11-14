@@ -390,6 +390,36 @@ headline; `performance_claim`/`execution_evidence` NONE, SHADOW,
 `live_money`/`execution_allowed` false, `promotion` NOT_AUTHORIZED. Output is
 independent of input order and carries the policy and its SHA-256.
 
+## Event-state segmentation (`app.decision_outcome_event_states`, decision-outcome-event-state-metrics-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler or caller.
+
+`aggregate_decision_outcomes_by_event_state(population, outcomes, *, market,
+assumptions, as_of)` validates the whole input once with the unchanged
+`aggregate_decision_outcomes`, then partitions records by the News/Event state
+each record retained when it was recorded: NOT_ATTACHED (no card section) or the
+attached trade-card-event-context-v1 section's `event_context_status`
+(EVENT_FOUND, NO_EVENT_FOUND, STALE, UNAVAILABLE, AMBIGUOUS, UNKNOWN). Each
+state gets its own unchanged decision-outcome-metrics-v1 aggregate. All seven
+states are always reported in a fixed order, empty or not, with
+`state_counts`; there is no cross-state headline (`cross_state_headline`
+NOT_COMPUTED).
+
+Assignment uses only the retained section (bound by the card section to the
+detection time), never outcome, exit or evaluation time. Attached sections fail
+closed unless they carry the card-section contract version, the
+NEWS_EVENT_INFERENCE layer with `observed_market_fact` false and
+`trading_effect` NONE, the record's market and canonical instrument, a decision
+time equal to the record's detection instant and a registered context status
+(the observation reader checks only the section digest, decision binding and
+`live_money`). The state is inference: `absence_is_proof` false,
+`risk_interpretation` NOT_EVALUATED, `trading_effect` NONE, sample NOT_ASSESSED,
+`performance_claim`/`execution_evidence` NONE, SHADOW, `live_money` false,
+`promotion` NOT_AUTHORIZED. No state is used to accept, reject or rank anything.
+No operational records carry an attached section yet (the card section is not
+in the card report and no observation producer exists).
+
 ## SYSTEM visibility (`app.news_event_status`, news-empirical-feature-status-v1)
 
 Status: code-declared constants, pending host validation. `/api/system` gains
@@ -432,5 +462,5 @@ free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a
 producer calling the observation store, a host source of retained session bars
 for the evaluator, outcome retention, a registered operational
-evaluation-period policy, regime/event-state segmentation and a registered
+evaluation-period policy, regime segmentation and a registered
 sample-assessment policy (Phases I–L). Tests use artificial records only.
