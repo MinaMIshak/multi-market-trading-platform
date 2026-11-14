@@ -38,6 +38,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_observation_store', 'decision-observation-retention-v1'),
     ('app.decision_outcome', 'decision-outcome-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
+    ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
@@ -58,7 +59,8 @@ EMPIRICAL_GAPS = (
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
     'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND',
     'OUTCOME_RETENTION_NOT_IMPLEMENTED',
-    'TIME_PERIOD_SEGMENTATION_NOT_IMPLEMENTED',
+    # Period segmentation code exists; no evaluation-period policy is registered.
+    'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',
     'SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED',
 )
 

@@ -99,10 +99,17 @@ def test_declared_gaps_match_the_code():
     for module, _ in COMPONENTS:
         text = _path(module).read_text(encoding='utf-8')
         assert 'environ' not in text and 'getenv' not in text, module
-    # OUTCOME_RETENTION_NOT_IMPLEMENTED / TIME_PERIOD_SEGMENTATION_NOT_IMPLEMENTED.
+    # OUTCOME_RETENTION_NOT_IMPLEMENTED / SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED.
     assert not list((ROOT / 'app').glob('decision_outcome_store*.py'))
     metrics = (ROOT / 'app' / 'decision_outcome_metrics.py').read_text(encoding='utf-8')
     assert 'period' not in metrics and "'NOT_ASSESSED'" in metrics
+    # EVALUATION_PERIOD_POLICY_NOT_REGISTERED: segmentation is a separate module
+    # whose policy is caller-supplied; no repository policy instance exists, and
+    # no caller exists (checked above). The period result is not a headline.
+    assert 'TIME_PERIOD_SEGMENTATION_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    periods = (ROOT / 'app' / 'decision_outcome_periods.py').read_text(encoding='utf-8')
+    assert not re.search(r'^\w+\s*=\s*EvaluationPeriodPolicy\(', periods, re.MULTILINE)
+    assert "'cross_period_headline': 'NOT_COMPUTED'" in periods
     # News cannot change the decision's event risk.
     from app.strategies.trade_decision import TradeDecision
     field = TradeDecision.model_fields['event_risk']

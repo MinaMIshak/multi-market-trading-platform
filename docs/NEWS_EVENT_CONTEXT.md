@@ -329,6 +329,39 @@ outcome SHA-256 digests. `sample_assessment` is NOT_ASSESSED; fixed
 HYPOTHETICAL_FROM_SESSION_BARS, `execution_evidence`/`performance_claim` NONE,
 SHADOW, `live_money`/`execution_allowed` false, `promotion` NOT_AUTHORIZED.
 
+## Time-period segmentation (`app.decision_outcome_periods`, decision-outcome-period-metrics-v1)
+
+Status: pure function, pending host validation. No IO, store, route,
+scheduler, caller or registered policy.
+
+`aggregate_decision_outcomes_by_period(population, outcomes, *, market,
+assumptions, as_of, policy)` takes the same inputs as
+`aggregate_decision_outcomes` plus an explicit, versioned
+`EvaluationPeriodPolicy` (decision-outcome-period-policy-v1: policy version,
+market, aware `registered_at`, one to four `EvaluationPeriod`s). Labels are
+DEVELOPMENT, VALIDATION, OUT_OF_SAMPLE and FORWARD_SHADOW, each at most once,
+in that chronological order, non-overlapping half-open `[start, end)` aware
+intervals. FORWARD_SHADOW must start at or after `registered_at`;
+`registered_at` must not be after `as_of`. The policy is revalidated
+(model_construct bypass rejected) and its clock is labelled
+CALLER_SUPPLIED_UNVERIFIED.
+
+The whole input is first validated once by the unchanged
+`aggregate_decision_outcomes`, so every existing fail-closed rule still
+applies. Each record is then assigned by its `detected_at` only (never exit or
+evaluation time), and each period gets its own unchanged
+decision-outcome-metrics-v1 result over its subset, so per-strategy-version
+segments stay separate inside each period. Records outside every period are
+reported as UNASSIGNED (observation and outcome counts plus identity digest),
+not dropped. Each period reports `end_reached_by_as_of` and whether the policy
+was registered at or before its start (`REGISTERED_AT_OR_BEFORE_START` /
+`REGISTERED_AFTER_START`); holdout integrity is CALLER_ASSERTED_UNVERIFIED.
+There is no cross-period headline (`cross_period_headline` NOT_COMPUTED);
+`sample_assessment` NOT_ASSESSED, `performance_claim`/`execution_evidence`
+NONE, SHADOW, `live_money`/`execution_allowed` false, `promotion`
+NOT_AUTHORIZED. Output carries the policy, its SHA-256 and the whole-input
+population/outcome digests, and is independent of input order.
+
 ## SYSTEM visibility (`app.news_event_status`, news-empirical-feature-status-v1)
 
 Status: code-declared constants, pending host validation. `/api/system` gains
@@ -355,7 +388,9 @@ against the code by `tests/test_news_event_status.py`: versions must equal the
 modules' constants; no other `app/` or `tools/` source references a component
 (so no caller, producer, provider, route, card-report binding or scheduler
 entry); components read no environment variable; no outcome store exists; the
-metrics carry no period segmentation; `TradeDecision.event_risk` is
+metrics module carries no period segmentation (that lives in
+`app.decision_outcome_periods`, with no registered policy instance, gap
+EVALUATION_PERIOD_POLICY_NOT_REGISTERED); `TradeDecision.event_risk` is
 `Literal['UNKNOWN']`. Change a declaration only together with the code change
 that closes it.
 
@@ -365,6 +400,6 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a
 producer calling the observation store, a host source of retained session bars
-for the evaluator, outcome retention, time-period/regime/event-state
-segmentation, sample-sufficiency policy and out-of-sample period labelling
-(Phases I–L). Tests use artificial records only.
+for the evaluator, outcome retention, a registered operational
+evaluation-period policy, regime/event-state segmentation and a
+sample-sufficiency policy (Phases I–L). Tests use artificial records only.
