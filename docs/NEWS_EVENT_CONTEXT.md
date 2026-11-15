@@ -228,8 +228,9 @@ remain pending observations: no outcome, metric or performance claim.
 
 ## Observation producer (`app.decision_observation_producer`, decision-observation-production-v1)
 
-Status: library, pending host validation. No job entrypoint, scheduler, route
-or caller; the store directory is an explicit argument.
+Status: library, pending host validation. No scheduler or route; its only
+caller is the host job entrypoint below; the store directory is an explicit
+argument.
 
 `produce_egx_decision_observations(directory, artifact, *, expected_sha256,
 evidence, now=None)` takes the same retained EGX-RANK-v1 bytes, manifest
@@ -252,8 +253,41 @@ RETENTION_FAILED (carries the store reason). Records retained before a
 failure stay (write-once, individually valid); a rerun within the window is
 idempotent (ALREADY_RETAINED keeps the first observation). SYSTEM replaces gap
 DECISION_OBSERVATION_PRODUCER_NOT_IMPLEMENTED with
-DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED. No outcome, performance claim NONE,
-SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED (since replaced, see below). No
+outcome, performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+
+## Observation job (`app.decision_observation_job`, decision-observation-job-v1)
+
+Status: host CLI entrypoint, pending host validation. Not scheduled: there is
+no scheduler or cron entry for it in the repository, and the output directory
+is not provisioned.
+
+    python -m app.decision_observation_job --db-path /abs/platform.db \
+        --raw-root /abs/raw --ranking-report /abs/egx-ranking.json \
+        --ranking-sha256 <manifest sha256> --identity-raw-path <EGID raw_path> \
+        --calendar-sha256 <retained calendar digest> \
+        --output-dir /abs/decision-observations
+
+The arguments are exactly those of `app.scanner_v2_card_report_job`, except
+that `--output-dir` names the observation store. The job checks configuration
+and reads the database, EGID bytes and ranking bytes with that job's unchanged
+helpers (CONFIG_INVALID, DATABASE_UNAVAILABLE, IDENTITY_MANIFEST_*,
+IDENTITY_ARTIFACT_UNREADABLE, RANKING_UNREADABLE; the database is never
+created or upgraded). It builds the binding with the unchanged
+`load_retained_egx_rank_binding` and the same arguments, so card reports and
+observations bind the same retained evidence. It then calls the unchanged
+producer with the producer's own clock.
+
+Result statuses: PRODUCED (every bound decision RETAINED or ALREADY_RETAINED,
+including a ranking with no candidates), WINDOW_CLOSED_PRESENT (run completed,
+but at least one decision's window had closed, so it was reported and not
+retained; CLI exit 2 so a late run is visible), FAILED (CLI exit 1, stage
+INPUT, EVIDENCE or PRODUCTION with the fixed reason). SYSTEM declares the
+component and replaces gap DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED with
+DECISION_OBSERVATION_JOB_NOT_SCHEDULED; the empirical `scheduled` stage stays
+NOT_SCHEDULED_IN_REPOSITORY and the status stays
+EMPIRICAL_COLLECTION_NOT_ACTIVE. No outcome, performance claim NONE, SHADOW,
+LIVE_MONEY=false, NOT_AUTHORIZED.
 
 ## Outcome evaluator (`app.decision_outcome`, decision-outcome-v1)
 

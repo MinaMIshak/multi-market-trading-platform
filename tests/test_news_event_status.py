@@ -132,16 +132,27 @@ def test_declared_gaps_match_the_code():
     assert "'cross_bucket_headline': 'NOT_COMPUTED'" in data_age
     assert "'age_interpretation': 'NOT_EVALUATED'" in data_age
     assert "'promotion': 'NOT_AUTHORIZED'" in data_age
-    # The observation producer library exists (so its gap is replaced), but it
-    # attaches no event context and no job entrypoint or scheduler invokes it
-    # (no caller, checked above).
+    # The observation producer library exists (so its gap is replaced) and
+    # attaches no event context. Its host job entrypoint exists (so the job gap
+    # is replaced), but no scheduler, cron entry or other source invokes the job
+    # (no caller outside the component modules, checked above; app/core/schedule.py
+    # is among the checked sources), so it stays NOT_SCHEDULED.
     assert 'DECISION_OBSERVATION_PRODUCER_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
-    assert 'DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
+    assert 'DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    assert 'DECISION_OBSERVATION_JOB_NOT_SCHEDULED' in EMPIRICAL_GAPS
+    assert feature_status()['empirical_validation']['stages']['scheduled'] == NOT_SCHEDULED
     producer = (ROOT / 'app' / 'decision_observation_producer.py').read_text(encoding='utf-8')
     assert "'event_context': 'NOT_ATTACHED'" in producer
     assert 'retain_decision_observation(directory, decision, None, now=now)' in producer
     assert "'performance_claim': 'NONE'" in producer and "'promotion': 'NOT_AUTHORIZED'" in producer
-    assert not list((ROOT / 'app').glob('decision_observation_job*.py'))
+    assert [p.name for p in (ROOT / 'app').glob('decision_observation_job*.py')] == [
+        'decision_observation_job.py']
+    observation_job = (ROOT / 'app' / 'decision_observation_job.py').read_text(encoding='utf-8')
+    # The job only wires the unchanged binding loader into the unchanged producer.
+    assert 'produce_egx_decision_observations(\n        directory, artifact,' in observation_job
+    assert 'load_retained_egx_rank_binding(' in observation_job
+    assert "'performance_claim': 'NONE'" in observation_job
+    assert "'promotion': 'NOT_AUTHORIZED'" in observation_job
     # SYSTEM keeps sample_assessment NOT_ASSESSED: nothing observes a sample.
     assert feature_status()['empirical_validation']['sample_assessment'] == 'NOT_ASSESSED'
     # News cannot change the decision's event risk.

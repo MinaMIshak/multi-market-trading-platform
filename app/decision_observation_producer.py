@@ -31,8 +31,9 @@ Failure: any store refusal raises ``DecisionObservationProductionError``
 run stay (each is write-once and individually valid); a rerun inside the window
 is idempotent (ALREADY_RETAINED keeps the first observation).
 
-No network or database IO, no scheduler, job entrypoint, route or caller; the
-store directory is an explicit argument. Records carry no outcome;
+No network or database IO, no scheduler or route; its only caller is the host
+job entrypoint ``app.decision_observation_job``; the store directory is an
+explicit argument. Records carry no outcome;
 performance_claim NONE; nothing is admitted, filled or promoted; SHADOW;
 LIVE_MONEY=false.
 """

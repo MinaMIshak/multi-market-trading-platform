@@ -37,7 +37,8 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_observation', 'decision-observation-v1'),
     ('app.decision_observation_store', 'decision-observation-retention-v1'),
     ('app.decision_observation_producer', 'decision-observation-production-v1'),
-    ('app.decision_outcome', 'decision-outcome-v1'),
+    ('app.decision_observation_job', 'decision-observation-job-v1'),
+    ('app.decision_outcome','decision-outcome-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -59,9 +60,9 @@ NEWS_GAPS = (
     'CARD_EVENT_SECTION_NOT_IN_CARD_REPORT',
 )
 EMPIRICAL_GAPS = (
-    # Producer library exists (retained EGX ranking -> observation store); no
-    # host job entrypoint or scheduler invokes it.
-    'DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED',
+    # Producer library and its host job entrypoint exist (retained EGX ranking
+    # -> observation store); no scheduler or cron entry in the repository runs it.
+    'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
     'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND',
     'OUTCOME_RETENTION_NOT_IMPLEMENTED',
