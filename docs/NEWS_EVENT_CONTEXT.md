@@ -350,6 +350,47 @@ holding sessions. Every result lists the bars used with provenance and fixes
 `performance_claim` NONE, SHADOW, `live_money`/`execution_allowed` false and
 `promotion` NOT_AUTHORIZED. A single outcome is not performance.
 
+## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
+
+Status: library only, pending host validation; no directory provisioned, no
+producer, scheduler, route or caller. `retain_decision_outcome(directory,
+observation, outcome, *, now=None)` retains one decision-outcome-v1 result for
+the retained `(identity, record)` observation it was evaluated for, write-once
+and content-addressed (`<sha256>.json`, 0444), reusing the observation and
+news-event store directory, lock, write-once and bounded no-follow read
+helpers.
+
+- Only terminal outcomes (CLOSED, NO_ENTRY, UNEVALUABLE) are retained;
+  PENDING_PATH is OUTCOME_NOT_FINAL. A decision with no retained outcome stays
+  NOT_EVALUATED in the aggregate, so withholding an outcome cannot improve a
+  segment.
+- Before any write: the observation is re-verified against its content
+  address and must be recorded by the store clock; the outcome is checked by
+  the unchanged `decision_outcome_metrics._check_outcome` against that
+  observation (field set, fixed safety labels, current rules, exact
+  assumptions in canonical form and of the record's market, binding, evaluated
+  by the store clock, registered status/reason, metrics iff CLOSED).
+- One outcome per decision and exact assumptions set. A retry differing only
+  in `path_complete_through_at`, `evaluated_at` or `bars_supplied` is
+  ALREADY_RETAINED with the first record; any other difference (another
+  observation, status, exit, price, metric or bar provenance, for example
+  after a data backfill or revision) is OUTCOME_CONFLICT. A held loss or a
+  missing-data UNEVALUABLE cannot be silently replaced.
+- `load_retained_decision_outcomes(directory, *, market, assumptions)` returns
+  that market's outcomes under one exact assumptions set ordered by
+  observation identity, ready for `aggregate_decision_outcomes` with the
+  caller's population; any damaged or unexpected entry, a planted
+  non-terminal record or two outcomes for one decision and assumptions fails
+  closed (STORE_INVALID).
+
+The reader cannot see the observation and checks structure only; the binding
+is checked at retention and again by the aggregate. Bars are not retained, so
+numbers are not recomputed; a digest is integrity under a trusted host writer,
+not a signature. Results carry `fill_kind` HYPOTHETICAL_FROM_SESSION_BARS,
+`execution_evidence` NONE, `performance_claim` NONE, SHADOW, LIVE_MONEY=false,
+NOT_AUTHORIZED. SYSTEM declares the component and replaces gap
+OUTCOME_RETENTION_NOT_IMPLEMENTED with OUTCOME_STORE_NOT_PROVISIONED.
+
 ## Segmented aggregate metrics (`app.decision_outcome_metrics`, decision-outcome-metrics-v1)
 
 Status: pure function, pending host validation. No IO, store, route,
@@ -538,8 +579,9 @@ Declared components (module and contract/result version) and gaps are checked
 against the code by `tests/test_news_event_status.py`: versions must equal the
 modules' constants; no other `app/` or `tools/` source references a component
 (so no caller, producer, provider, route, card-report binding or scheduler
-entry); components read no environment variable; no outcome store exists; the
-metrics module carries no period segmentation (that lives in
+entry); components read no environment variable; exactly one outcome store
+module exists and retains terminal outcomes only (gap
+OUTCOME_STORE_NOT_PROVISIONED); the metrics module carries no period segmentation (that lives in
 `app.decision_outcome_periods`, with no registered policy instance, gap
 EVALUATION_PERIOD_POLICY_NOT_REGISTERED); sample assessment lives in
 `app.decision_outcome_sample` with no registered policy instance (gap
@@ -554,9 +596,9 @@ that closes it.
 
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
-retained coverage time and a concrete operational policy), a host job
-entrypoint and schedule invoking the observation producer, a host source of retained session bars
-for the evaluator, outcome retention, a registered operational
+retained coverage time and a concrete operational policy), a schedule invoking
+the observation job, a host source of retained session bars for the evaluator,
+a producer and provisioned directory for outcome retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
 age (Phases I–L). Tests use artificial records only.

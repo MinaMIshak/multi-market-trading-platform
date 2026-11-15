@@ -39,6 +39,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_observation_producer', 'decision-observation-production-v1'),
     ('app.decision_observation_job', 'decision-observation-job-v1'),
     ('app.decision_outcome','decision-outcome-v1'),
+    ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -65,7 +66,9 @@ EMPIRICAL_GAPS = (
     'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
     'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND',
-    'OUTCOME_RETENTION_NOT_IMPLEMENTED',
+    # Terminal-outcome store library exists; no directory is provisioned and
+    # no producer or caller retains outcomes into it.
+    'OUTCOME_STORE_NOT_PROVISIONED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',
     # Sample-assessment code exists; no sample policy is registered, and its

@@ -99,8 +99,19 @@ def test_declared_gaps_match_the_code():
     for module, _ in COMPONENTS:
         text = _path(module).read_text(encoding='utf-8')
         assert 'environ' not in text and 'getenv' not in text, module
-    # OUTCOME_RETENTION_NOT_IMPLEMENTED; the metrics module itself assesses nothing.
-    assert not list((ROOT / 'app').glob('decision_outcome_store*.py'))
+    # The terminal-outcome store library exists (so its gap is replaced), but no
+    # directory is provisioned and nothing calls it (no caller outside the
+    # component modules, checked above). It never retains PENDING_PATH.
+    assert 'OUTCOME_RETENTION_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    assert 'OUTCOME_STORE_NOT_PROVISIONED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_store*.py')] == [
+        'decision_outcome_store.py']
+    outcome_store = (ROOT / 'app' / 'decision_outcome_store.py').read_text(encoding='utf-8')
+    assert "TERMINAL_STATUSES = ('CLOSED', 'NO_ENTRY', 'UNEVALUABLE')" in outcome_store
+    assert "'performance_claim': 'NONE'" in outcome_store
+    assert "'promotion': 'NOT_AUTHORIZED'" in outcome_store
+    assert feature_status()['empirical_validation']['evaluated_outcomes'] is None
+    # The metrics module itself assesses nothing.
     metrics = (ROOT / 'app' / 'decision_outcome_metrics.py').read_text(encoding='utf-8')
     assert 'period' not in metrics and "'NOT_ASSESSED'" in metrics
     # EVALUATION_PERIOD_POLICY_NOT_REGISTERED: segmentation is a separate module
