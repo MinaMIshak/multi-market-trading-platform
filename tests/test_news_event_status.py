@@ -132,6 +132,16 @@ def test_declared_gaps_match_the_code():
     assert "'cross_bucket_headline': 'NOT_COMPUTED'" in data_age
     assert "'age_interpretation': 'NOT_EVALUATED'" in data_age
     assert "'promotion': 'NOT_AUTHORIZED'" in data_age
+    # The observation producer library exists (so its gap is replaced), but it
+    # attaches no event context and no job entrypoint or scheduler invokes it
+    # (no caller, checked above).
+    assert 'DECISION_OBSERVATION_PRODUCER_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    assert 'DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
+    producer = (ROOT / 'app' / 'decision_observation_producer.py').read_text(encoding='utf-8')
+    assert "'event_context': 'NOT_ATTACHED'" in producer
+    assert 'retain_decision_observation(directory, decision, None, now=now)' in producer
+    assert "'performance_claim': 'NONE'" in producer and "'promotion': 'NOT_AUTHORIZED'" in producer
+    assert not list((ROOT / 'app').glob('decision_observation_job*.py'))
     # SYSTEM keeps sample_assessment NOT_ASSESSED: nothing observes a sample.
     assert feature_status()['empirical_validation']['sample_assessment'] == 'NOT_ASSESSED'
     # News cannot change the decision's event risk.

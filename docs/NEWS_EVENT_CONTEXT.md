@@ -226,6 +226,35 @@ trusted host writer, not a signature. `load_retained_decision_observations`
 returns `(identity, record)` pairs for one market ordered by identity. Records
 remain pending observations: no outcome, metric or performance claim.
 
+## Observation producer (`app.decision_observation_producer`, decision-observation-production-v1)
+
+Status: library, pending host validation. No job entrypoint, scheduler, route
+or caller; the store directory is an explicit argument.
+
+`produce_egx_decision_observations(directory, artifact, *, expected_sha256,
+evidence, now=None)` takes the same retained EGX-RANK-v1 bytes, manifest
+digest and `RetainedEgxRankBinding` the card-report publisher uses. It
+re-derives the exact `TradeDecision` objects with
+`bind_retained_egx_rank_report` (the card report retains cards, not decision
+objects, and caller-assembled decisions are never accepted) and applies the
+card report's coverage checks. Each decision whose recording window is open
+at the producer clock (detection <= now < fresh_until, valid_until, flat_by)
+is retained by the unchanged `retain_decision_observation` with
+`recorded_at` = producer clock and no event context (NOT_ATTACHED: no news
+source or operational EventContextPolicy exists).
+
+Decisions whose window has closed are not retained and are listed one by one
+as WINDOW_CLOSED with their decision id; they are never back-filled with a
+backdated clock, so a late run is visible. Non-candidate rows are reported
+only as the binding's exclusion counts. Reasons: CONFIG_INVALID,
+BINDING_REJECTED, CLOCK_BEFORE_GENERATION (clock before ranking generation),
+RETENTION_FAILED (carries the store reason). Records retained before a
+failure stay (write-once, individually valid); a rerun within the window is
+idempotent (ALREADY_RETAINED keeps the first observation). SYSTEM replaces gap
+DECISION_OBSERVATION_PRODUCER_NOT_IMPLEMENTED with
+DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED. No outcome, performance claim NONE,
+SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+
 ## Outcome evaluator (`app.decision_outcome`, decision-outcome-v1)
 
 Status: pure function, pending host validation. No IO, store, route,
@@ -491,8 +520,8 @@ that closes it.
 
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
-retained coverage time and a concrete operational policy), a
-producer calling the observation store, a host source of retained session bars
+retained coverage time and a concrete operational policy), a host job
+entrypoint and schedule invoking the observation producer, a host source of retained session bars
 for the evaluator, outcome retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
