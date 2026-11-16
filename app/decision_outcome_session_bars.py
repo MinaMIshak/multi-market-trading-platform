@@ -35,7 +35,8 @@ available at ``complete`` (never earlier than its session close or the receipt),
 so no bar can be used before the whole path was known. Prices are the canonical
 VALID_EXECUTABLE OHLC (provider_adjusted_close_reference is never used).
 Corporate actions are NOT checked and calendar admission stays NOT_ESTABLISHED.
-The receipt time is caller-asserted. No IO, store, route, scheduler or caller.
+The receipt time is caller-asserted. No IO, store, route or scheduler; its only
+caller is the outcome producer library ``app.decision_outcome_producer``.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from datetime import datetime, timedelta, timezone

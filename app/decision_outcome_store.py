@@ -1,6 +1,7 @@
 """Write-once content-addressed store for terminal decision-outcome-v1 results.
 
-Phase G/H groundwork. A trusted host caller (none exists yet) passes one retained
+Phase G/H groundwork. A trusted host caller (the outcome producer library
+``app.decision_outcome_producer``; no job runs it yet) passes one retained
 decision-observation-v1 ``(identity, record)`` pair and the decision-outcome-v1
 result that ``evaluate_decision_outcome`` produced for it. The outcome is
 retained so later metrics are computed from immutable retained evidence rather
@@ -41,7 +42,7 @@ observation binding is checked at retention and again by
 integrity under a trusted host writer, not a signature. Bars are not retained
 here, so numbers are not recomputed. Outcomes are hypothetical results from
 session bars: not fills, not execution evidence, not performance. No provider,
-scheduler, route or caller. PAPER/SHADOW only; LIVE_MONEY=false.
+scheduler or route. PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from contextlib import contextmanager
 from datetime import datetime, timezone

@@ -41,6 +41,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome','decision-outcome-v1'),
     ('app.decision_outcome_session_bars', 'decision-outcome-session-bars-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
+    ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -66,13 +67,16 @@ EMPIRICAL_GAPS = (
     # -> observation store); no scheduler or cron entry in the repository runs it.
     'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
-    # Session-bar binding code exists (retained canonical daily rows + retained
-    # sessions -> outcome bars); nothing loads retained daily artifacts into it,
-    # evaluates retained observations or retains their outcomes.
-    'OUTCOME_PRODUCER_NOT_IMPLEMENTED',
+    # Outcome producer library exists (retained observations + caller-supplied
+    # retained daily rows/sessions -> binding -> evaluator -> outcome store); no
+    # job entrypoint loads retained daily artifacts and sessions into it.
+    'OUTCOME_JOB_NOT_IMPLEMENTED',
     # Terminal-outcome store library exists; no directory is provisioned and
-    # no producer or caller retains outcomes into it.
+    # no job or scheduler runs the producer that retains outcomes into it.
     'OUTCOME_STORE_NOT_PROVISIONED',
+    # The outcome path labels corporate actions NOT_CHECKED; no outcome or
+    # metric from it is empirical evidence until this is closed.
+    'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',
     # Sample-assessment code exists; no sample policy is registered, and its

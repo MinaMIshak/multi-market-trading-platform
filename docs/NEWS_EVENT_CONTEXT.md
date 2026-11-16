@@ -352,8 +352,9 @@ holding sessions. Every result lists the bars used with provenance and fixes
 
 ## Outcome session-bar binding (`app.decision_outcome_session_bars`, decision-outcome-session-bars-v1)
 
-Status: pure library, pending host validation; no loader, producer, store,
-route, scheduler or caller. `bind_egx_outcome_session_bars(identity, record,
+Status: pure library, pending host validation; no loader, store, route or
+scheduler; its only caller is the outcome producer library below.
+`bind_egx_outcome_session_bars(identity, record,
 rows, sessions, *, received_at)` turns retained evidence, instead of an
 arbitrary caller list, into the evaluator's inputs for ONE retained EGX
 observation (re-read from its exact bytes): `rows` are `CanonicalDailyBar`s of
@@ -381,6 +382,45 @@ AVAILABLE_AT_PATH_COMPLETION_V1 (every bar available at completion). The report
 labels the receipt clock CALLER_ASSERTED_UNVERIFIED, calendar admission
 NOT_ESTABLISHED, corporate actions NOT_CHECKED, outcome NOT_EVALUATED,
 performance claim NONE. The output feeds the unchanged `evaluate_decision_outcome`.
+
+## Outcome producer (`app.decision_outcome_producer`, decision-outcome-production-v1)
+
+Status: library only, pending host validation; no job entrypoint, scheduler,
+route or caller, no provisioned directory. `produce_egx_decision_outcomes(
+observation_directory, outcome_directory, *, daily, sessions, assumptions,
+now=None)` composes the unchanged pieces for every retained EGX observation:
+`load_retained_decision_observations` → `load_retained_decision_outcomes`
+(one exact `OutcomeAssumptions`) → `bind_egx_outcome_session_bars` →
+`evaluate_decision_outcome` (`evaluated_at` = producer clock) →
+`retain_decision_outcome` (same clock, terminal outcomes only).
+
+- `daily` maps canonical instrument UUID strings to `EgxDailyEvidence(rows,
+  received_at)` (retained canonical daily rows of one artifact and the
+  caller-asserted receipt time of those bytes); `sessions` is a tuple of
+  retained `MarketSession` rows. Rule CALENDAR_THROUGH_RECEIPT_DATE_V1: each
+  observation is offered the sessions from its Cairo detection date through
+  the receipt date, so sessions after the receipt never enter the path.
+- Refused as CONFIG_INVALID: relative or identical store directories,
+  non-EGX or inexact assumptions, non-tuple or inexact sessions, malformed
+  daily mapping, naive receipt time, receipt after the producer clock.
+  Damaged stores: OBSERVATIONS_UNAVAILABLE / OUTCOMES_UNAVAILABLE. Any outcome
+  store refusal aborts the run (RETENTION_FAILED); earlier write-once outcomes
+  stay and reruns are idempotent.
+- One entry per observation, none dropped: RETAINED, ALREADY_RETAINED (an
+  existing outcome is not re-evaluated; `retained_outcome_reevaluation`
+  NOT_PERFORMED), PENDING_PATH (never retained), AWAITING_DAILY_EVIDENCE
+  (NO_DAILY_EVIDENCE / RECEIVED_BEFORE_DETECTION), OBSERVATION_AFTER_CLOCK,
+  BINDING_REJECTED and EVALUATION_REJECTED (fail-closed message in `detail`).
+  Decisions without a retained outcome stay NOT_EVALUATED in the unchanged
+  aggregate, so a gap cannot improve a segment. Retained outcomes whose
+  observation is absent are counted.
+
+Labels: receipt clock CALLER_ASSERTED_UNVERIFIED, calendar admission
+NOT_ESTABLISHED, corporate actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS,
+execution evidence NONE, performance claim NONE, SHADOW, LIVE_MONEY=false,
+NOT_AUTHORIZED. SYSTEM declares the component, replaces gap
+OUTCOME_PRODUCER_NOT_IMPLEMENTED with OUTCOME_JOB_NOT_IMPLEMENTED and adds
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED.
 
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
@@ -629,10 +669,11 @@ that closes it.
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
-the observation job, a host loader feeding retained daily artifacts and sessions
-into the session-bar binding, corporate-action checks on the outcome path, an
-outcome producer (gap OUTCOME_PRODUCER_NOT_IMPLEMENTED) and provisioned directory
-for outcome retention, a registered operational
+the observation job, a host job loading retained daily artifacts and sessions
+into the outcome producer (gap OUTCOME_JOB_NOT_IMPLEMENTED),
+corporate-action checks on the outcome path (gap
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
+retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
 age (Phases I–L). Tests use artificial records only.

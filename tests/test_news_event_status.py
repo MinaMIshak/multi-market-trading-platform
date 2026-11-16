@@ -143,16 +143,33 @@ def test_declared_gaps_match_the_code():
     assert "'cross_bucket_headline': 'NOT_COMPUTED'" in data_age
     assert "'age_interpretation': 'NOT_EVALUATED'" in data_age
     assert "'promotion': 'NOT_AUTHORIZED'" in data_age
-    # The session-bar binding exists (so its gap is replaced), but it evaluates
-    # and retains nothing, and no caller loads retained daily artifacts into it
-    # (checked above), so the outcome producer gap remains.
+    # The session-bar binding exists (so its gap is replaced); it evaluates and
+    # retains nothing itself.
     assert 'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND' not in EMPIRICAL_GAPS
-    assert 'OUTCOME_PRODUCER_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
     session_bars = (ROOT / 'app' / 'decision_outcome_session_bars.py').read_text(encoding='utf-8')
     assert 'evaluate_decision_outcome(' not in session_bars
     assert 'retain_decision_outcome' not in session_bars
     assert "'outcome': 'NOT_EVALUATED'" in session_bars
     assert "'corporate_actions': 'NOT_CHECKED'" in session_bars
+    # The outcome producer library exists (so its gap is replaced) and only
+    # composes the unchanged binding, evaluator and store; no job entrypoint,
+    # scheduler or other source invokes it (no caller outside the component
+    # modules, checked above), and corporate actions stay NOT_CHECKED.
+    assert 'OUTCOME_PRODUCER_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    assert 'OUTCOME_JOB_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
+    assert 'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_producer*.py')] == [
+        'decision_outcome_producer.py']
+    assert not list((ROOT / 'app').glob('decision_outcome_job*.py'))
+    outcome_producer = (ROOT / 'app' / 'decision_outcome_producer.py').read_text(encoding='utf-8')
+    for call in ('bind_egx_outcome_session_bars(', 'evaluate_decision_outcome(',
+                 'retain_decision_outcome(outcome_directory, (identity, record), outcome, now=now)',
+                 'load_retained_decision_observations(', 'load_retained_decision_outcomes('):
+        assert call in outcome_producer, call
+    assert "'corporate_actions': 'NOT_CHECKED'" in outcome_producer
+    assert "'performance_claim': 'NONE'" in outcome_producer
+    assert "'promotion': 'NOT_AUTHORIZED'" in outcome_producer
+    assert "'live_money': False" in outcome_producer
     # The observation producer library exists (so its gap is replaced) and
     # attaches no event context. Its host job entrypoint exists (so the job gap
     # is replaced), but no scheduler, cron entry or other source invokes the job
