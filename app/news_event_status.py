@@ -42,6 +42,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_session_bars', 'decision-outcome-session-bars-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
+    ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -68,8 +69,9 @@ EMPIRICAL_GAPS = (
     'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
     # Outcome producer library exists (retained observations + caller-supplied
-    # retained daily rows/sessions -> binding -> evaluator -> outcome store); no
-    # job entrypoint loads retained daily artifacts and sessions into it.
+    # retained daily rows/sessions -> binding -> evaluator -> outcome store), and
+    # a library loads named retained daily ingestions into its daily input; no
+    # job entrypoint loads daily evidence and retained sessions into it.
     'OUTCOME_JOB_NOT_IMPLEMENTED',
     # Terminal-outcome store library exists; no directory is provisioned and
     # no job or scheduler runs the producer that retains outcomes into it.

@@ -422,6 +422,37 @@ NOT_AUTHORIZED. SYSTEM declares the component, replaces gap
 OUTCOME_PRODUCER_NOT_IMPLEMENTED with OUTCOME_JOB_NOT_IMPLEMENTED and adds
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED.
 
+## Outcome daily evidence loader (`app.decision_outcome_daily_evidence`, decision-outcome-daily-evidence-v1)
+
+Status: library only, pending host validation; no job entrypoint, scheduler,
+route or caller. `load_egx_daily_evidence(database, raw_root, raw_paths)` builds
+the producer's `daily` input from a tuple of exact `data_ingestions.raw_path`
+values named by the caller (nothing searched for, defaulted or chosen as
+"latest"):
+
+- each path is resolved with the unchanged `get_manifest_by_raw_path`; the
+  ingestion must be DAILY_BARS/D1, RECEIVED or VALIDATED, carry a source URI
+  and the ingestor's metadata (canonical lowercase instrument UUID, canonical
+  symbol equal to the manifest symbol, snapshot date equal to the manifest
+  date, requested start <= end <= snapshot);
+- the exact bytes are verified with `ImmutableRawStore.read_verified` and
+  canonicalized by the unchanged `DailyCanonicalPipeline.canonicalize_ingestion`;
+  every row must lie inside the requested dates; quarantined rows pass through
+  (the session-bar binding rejects them on an outcome path);
+- `received_at` is the ingestion manifest's receipt time, labelled
+  INGESTION_MANIFEST_UNVERIFIED.
+
+Refusals (whole load, no partial mapping): CONFIG_INVALID (relative raw root,
+non-tuple, empty, over 1000 or duplicate paths), DATABASE_UNAVAILABLE,
+INGESTION_UNAVAILABLE, INGESTION_REJECTED, ARTIFACT_UNREADABLE,
+CANONICALIZATION_REJECTED, DUPLICATE_INSTRUMENT (two named ingestions for one
+instrument are refused, never resolved by preference). The database is only
+read. Returns `daily`, one provenance entry per path in order, and labels market
+membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
+each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
+SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; gap
+OUTCOME_JOB_NOT_IMPLEMENTED stays (retained sessions and the job are not wired).
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -669,8 +700,9 @@ that closes it.
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
-the observation job, a host job loading retained daily artifacts and sessions
-into the outcome producer (gap OUTCOME_JOB_NOT_IMPLEMENTED),
+the observation job, a host job loading retained sessions and (via the daily
+evidence loader) named daily ingestions into the outcome producer (gap
+OUTCOME_JOB_NOT_IMPLEMENTED),
 corporate-action checks on the outcome path (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational

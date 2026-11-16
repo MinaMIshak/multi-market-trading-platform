@@ -170,6 +170,17 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in outcome_producer
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_producer
     assert "'live_money': False" in outcome_producer
+    # The daily-evidence loader exists but no job calls it (no caller outside
+    # the component modules, checked above), so OUTCOME_JOB_NOT_IMPLEMENTED stays.
+    # It reuses the unchanged ingestion lookup and canonical pipeline and never
+    # writes the database.
+    daily_evidence = (ROOT / 'app' / 'decision_outcome_daily_evidence.py').read_text(
+        encoding='utf-8')
+    assert 'get_manifest_by_raw_path(raw_path)' in daily_evidence
+    assert 'canonicalize_ingestion(ingestion)' in daily_evidence
+    assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize)\b', daily_evidence)
+    assert "'corporate_actions': 'NOT_CHECKED'" in daily_evidence
+    assert "'live_money': False" in daily_evidence
     # The observation producer library exists (so its gap is replaced) and
     # attaches no event context. Its host job entrypoint exists (so the job gap
     # is replaced), but no scheduler, cron entry or other source invokes the job
