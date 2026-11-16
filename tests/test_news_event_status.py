@@ -143,6 +143,16 @@ def test_declared_gaps_match_the_code():
     assert "'cross_bucket_headline': 'NOT_COMPUTED'" in data_age
     assert "'age_interpretation': 'NOT_EVALUATED'" in data_age
     assert "'promotion': 'NOT_AUTHORIZED'" in data_age
+    # The session-bar binding exists (so its gap is replaced), but it evaluates
+    # and retains nothing, and no caller loads retained daily artifacts into it
+    # (checked above), so the outcome producer gap remains.
+    assert 'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND' not in EMPIRICAL_GAPS
+    assert 'OUTCOME_PRODUCER_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
+    session_bars = (ROOT / 'app' / 'decision_outcome_session_bars.py').read_text(encoding='utf-8')
+    assert 'evaluate_decision_outcome(' not in session_bars
+    assert 'retain_decision_outcome' not in session_bars
+    assert "'outcome': 'NOT_EVALUATED'" in session_bars
+    assert "'corporate_actions': 'NOT_CHECKED'" in session_bars
     # The observation producer library exists (so its gap is replaced) and
     # attaches no event context. Its host job entrypoint exists (so the job gap
     # is replaced), but no scheduler, cron entry or other source invokes the job

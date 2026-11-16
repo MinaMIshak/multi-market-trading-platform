@@ -39,6 +39,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_observation_producer', 'decision-observation-production-v1'),
     ('app.decision_observation_job', 'decision-observation-job-v1'),
     ('app.decision_outcome','decision-outcome-v1'),
+    ('app.decision_outcome_session_bars', 'decision-outcome-session-bars-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
@@ -65,7 +66,10 @@ EMPIRICAL_GAPS = (
     # -> observation store); no scheduler or cron entry in the repository runs it.
     'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
-    'SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND',
+    # Session-bar binding code exists (retained canonical daily rows + retained
+    # sessions -> outcome bars); nothing loads retained daily artifacts into it,
+    # evaluates retained observations or retains their outcomes.
+    'OUTCOME_PRODUCER_NOT_IMPLEMENTED',
     # Terminal-outcome store library exists; no directory is provisioned and
     # no producer or caller retains outcomes into it.
     'OUTCOME_STORE_NOT_PROVISIONED',

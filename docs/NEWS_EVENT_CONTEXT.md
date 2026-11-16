@@ -350,6 +350,38 @@ holding sessions. Every result lists the bars used with provenance and fixes
 `performance_claim` NONE, SHADOW, `live_money`/`execution_allowed` false and
 `promotion` NOT_AUTHORIZED. A single outcome is not performance.
 
+## Outcome session-bar binding (`app.decision_outcome_session_bars`, decision-outcome-session-bars-v1)
+
+Status: pure library, pending host validation; no loader, producer, store,
+route, scheduler or caller. `bind_egx_outcome_session_bars(identity, record,
+rows, sessions, *, received_at)` turns retained evidence, instead of an
+arbitrary caller list, into the evaluator's inputs for ONE retained EGX
+observation (re-read from its exact bytes): `rows` are `CanonicalDailyBar`s of
+one canonical daily artifact (one instrument, provider, snapshot and raw
+digest; matching the record's instrument and symbol), `sessions` a contiguous
+window of retained `MarketSession` rows (Africa/Cairo) and `received_at` the
+ingestion receipt time of the exact daily bytes (caller-asserted).
+
+Completeness: `path_complete_through_at` is the later of the receipt and every
+in-path session's verification time; the calendar must start on or before the
+detection date and end on the completion date. Each session opening at or
+after detection must be WEEKEND (EGX policy) or HOLIDAY with no hours and no
+bar, VERIFIED and closed by completion with exactly one VALID_EXECUTABLE bar
+received after its close, or (final day only, not VERIFIED) not closed at
+completion and without a bar (`pending_session`). Anything else fails closed:
+missing or quarantined bars, bars on non-session days or after the calendar,
+duplicate dates, mixed artifacts, unestablished session states (UNKNOWN,
+DATA_PENDING, ...), sessions closed after the receipt, receipt before
+detection, naive clocks. A gap is never skipped. Rows before the detection
+date, or for a session that opened before detection, are look-back and ignored.
+
+Bars: `session_id` `XCAI:<date>`, `source_id` the raw digest, `provenance_id`
+`<provider>:<snapshot>:row-<n>`; availability rule
+AVAILABLE_AT_PATH_COMPLETION_V1 (every bar available at completion). The report
+labels the receipt clock CALLER_ASSERTED_UNVERIFIED, calendar admission
+NOT_ESTABLISHED, corporate actions NOT_CHECKED, outcome NOT_EVALUATED,
+performance claim NONE. The output feeds the unchanged `evaluate_decision_outcome`.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -597,8 +629,10 @@ that closes it.
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
-the observation job, a host source of retained session bars for the evaluator,
-a producer and provisioned directory for outcome retention, a registered operational
+the observation job, a host loader feeding retained daily artifacts and sessions
+into the session-bar binding, corporate-action checks on the outcome path, an
+outcome producer (gap OUTCOME_PRODUCER_NOT_IMPLEMENTED) and provisioned directory
+for outcome retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
 age (Phases I–L). Tests use artificial records only.
