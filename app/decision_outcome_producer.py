@@ -33,8 +33,9 @@ The daily rows, receipt times and sessions are caller-supplied retained
 evidence (no database or network IO here); the receipt clock is
 CALLER_ASSERTED_UNVERIFIED, calendar admission NOT_ESTABLISHED and corporate
 actions NOT_CHECKED, so no outcome or metric derived from this run is
-empirical evidence until those gaps close. No job entrypoint, scheduler, route
-or caller; both store directories are explicit arguments. Outcomes are
+empirical evidence until those gaps close. Its only caller is the host job
+entrypoint ``app.decision_outcome_job`` (not scheduled); no route; both store
+directories are explicit arguments. Outcomes are
 hypothetical results from session bars: not fills, not performance.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """

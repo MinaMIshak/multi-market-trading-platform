@@ -43,6 +43,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
+    ('app.decision_outcome_job', 'decision-outcome-job-v1'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -68,11 +69,14 @@ EMPIRICAL_GAPS = (
     # -> observation store); no scheduler or cron entry in the repository runs it.
     'DECISION_OBSERVATION_JOB_NOT_SCHEDULED',
     'DECISION_OBSERVATION_STORE_NOT_PROVISIONED',
-    # Outcome producer library exists (retained observations + caller-supplied
-    # retained daily rows/sessions -> binding -> evaluator -> outcome store), and
-    # a library loads named retained daily ingestions into its daily input; no
-    # job entrypoint loads daily evidence and retained sessions into it.
-    'OUTCOME_JOB_NOT_IMPLEMENTED',
+    # Outcome producer library and its host job entrypoint exist (named daily
+    # ingestions + market_sessions rows -> binding -> evaluator -> outcome
+    # store); no scheduler or cron entry in the repository runs the job.
+    'OUTCOME_JOB_NOT_SCHEDULED',
+    # The outcome job reads current market_sessions rows, which are upserted
+    # (mutable), not write-once retained calendar observations; it records a
+    # digest of what it read, but the calendar is not retained evidence.
+    'OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS',
     # Terminal-outcome store library exists; no directory is provisioned and
     # no job or scheduler runs the producer that retains outcomes into it.
     'OUTCOME_STORE_NOT_PROVISIONED',

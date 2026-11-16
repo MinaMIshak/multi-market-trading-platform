@@ -424,8 +424,8 @@ OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED.
 
 ## Outcome daily evidence loader (`app.decision_outcome_daily_evidence`, decision-outcome-daily-evidence-v1)
 
-Status: library only, pending host validation; no job entrypoint, scheduler,
-route or caller. `load_egx_daily_evidence(database, raw_root, raw_paths)` builds
+Status: library, pending host validation; its only caller is the outcome job
+below (not scheduled); no route. `load_egx_daily_evidence(database, raw_root, raw_paths)` builds
 the producer's `daily` input from a tuple of exact `data_ingestions.raw_path`
 values named by the caller (nothing searched for, defaulted or chosen as
 "latest"):
@@ -450,8 +450,42 @@ instrument are refused, never resolved by preference). The database is only
 read. Returns `daily`, one provenance entry per path in order, and labels market
 membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
 each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
-SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; gap
-OUTCOME_JOB_NOT_IMPLEMENTED stays (retained sessions and the job are not wired).
+SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component.
+
+## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v1)
+
+Status: host CLI entrypoint, pending host validation; not scheduled, no route,
+no provisioned directory. `python -m app.decision_outcome_job` takes
+`--db-path`, `--raw-root`, `--observation-dir`, `--outcome-dir`, one or more
+`--daily-raw-path`, `--calendar-from`/`--calendar-through` (ISO dates,
+1..400 days) and explicit `--assumptions-version`, `--entry-slippage-bps`,
+`--exit-slippage-bps`, `--cost-bps-per-side` (no default costs or slippage).
+It only wires unchanged pieces:
+
+1. the existing database file is opened with the card-report job's
+   `_existing_database` (never created or upgraded; read methods only);
+2. every date in the calendar range is read with the unchanged
+   `TradingRepository.get_market_session`; a missing date is
+   CALENDAR_INCOMPLETE and a row whose date does not match or whose timezone
+   is not Africa/Cairo (or that does not parse) is CALENDAR_ROW_REJECTED, so
+   gaps are never skipped or filled;
+3. `load_egx_daily_evidence` loads exactly the named raw paths;
+4. `produce_egx_decision_outcomes` binds, evaluates and retains terminal
+   outcomes with its own clock.
+
+`market_sessions` rows are upserted (mutable), not write-once retained
+observations: the result labels the calendar MARKET_SESSIONS_CURRENT_ROWS /
+MUTABLE_NOT_RETAINED and returns the SHA-256 of the exact session JSON read,
+and SYSTEM adds gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS. Statuses: PRODUCED
+(exit 0; no observation rejected, waiting states PENDING_PATH and
+AWAITING_DAILY_EVIDENCE allowed), REJECTIONS_PRESENT (exit 2; at least one
+OBSERVATION_AFTER_CLOCK, BINDING_REJECTED or EVALUATION_REJECTED), FAILED
+(exit 1; stage INPUT, CALENDAR, DAILY_EVIDENCE or PRODUCTION with a fixed
+reason). The result carries daily-evidence provenance per raw path, corporate
+actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS, execution evidence NONE,
+performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM
+declares the component and replaces gap OUTCOME_JOB_NOT_IMPLEMENTED with
+OUTCOME_JOB_NOT_SCHEDULED.
 
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
@@ -700,9 +734,9 @@ that closes it.
 Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
-the observation job, a host job loading retained sessions and (via the daily
-evidence loader) named daily ingestions into the outcome producer (gap
-OUTCOME_JOB_NOT_IMPLEMENTED),
+the observation job, a schedule invoking the outcome job (gap
+OUTCOME_JOB_NOT_SCHEDULED), a write-once retained calendar source for outcomes
+(gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS),
 corporate-action checks on the outcome path (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational

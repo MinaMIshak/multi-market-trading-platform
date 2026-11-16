@@ -29,8 +29,9 @@ INGESTION_MANIFEST_UNVERIFIED (it is not independently attested). Market
 membership is not established here: an instrument that matches no EGX
 observation is simply unused, and the binding re-checks instrument UUID and
 symbol against every record. Corporate actions NOT_CHECKED. Read only: the
-database is never created, initialized, upgraded or written. No job
-entrypoint, scheduler, route or caller yet. PAPER/SHADOW only; LIVE_MONEY=false.
+database is never created, initialized, upgraded or written. Its only caller is
+the host job entrypoint ``app.decision_outcome_job`` (not scheduled); no route.
+PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from datetime import date, datetime
 import json

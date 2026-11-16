@@ -152,15 +152,33 @@ def test_declared_gaps_match_the_code():
     assert "'outcome': 'NOT_EVALUATED'" in session_bars
     assert "'corporate_actions': 'NOT_CHECKED'" in session_bars
     # The outcome producer library exists (so its gap is replaced) and only
-    # composes the unchanged binding, evaluator and store; no job entrypoint,
-    # scheduler or other source invokes it (no caller outside the component
-    # modules, checked above), and corporate actions stay NOT_CHECKED.
+    # composes the unchanged binding, evaluator and store; only its host job
+    # entrypoint (a component) invokes it, and corporate actions stay NOT_CHECKED.
     assert 'OUTCOME_PRODUCER_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
-    assert 'OUTCOME_JOB_NOT_IMPLEMENTED' in EMPIRICAL_GAPS
     assert 'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED' in EMPIRICAL_GAPS
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_producer*.py')] == [
         'decision_outcome_producer.py']
-    assert not list((ROOT / 'app').glob('decision_outcome_job*.py'))
+    # The outcome job exists (so its gap is replaced), but no scheduler, cron
+    # entry or other source invokes it (no caller outside the component modules,
+    # checked above; app/core/schedule.py is among the checked sources). It only
+    # wires the unchanged calendar accessor, daily loader and producer, writes no
+    # database row, and its calendar is current mutable rows (gap kept visible).
+    assert 'OUTCOME_JOB_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
+    assert 'OUTCOME_JOB_NOT_SCHEDULED' in EMPIRICAL_GAPS
+    assert 'OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_job*.py')] == [
+        'decision_outcome_job.py']
+    outcome_job = (ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
+    for call in ('trading.get_market_session(day)',
+                 'load_egx_daily_evidence(database, raw_root, daily_raw_paths)',
+                 'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,'):
+        assert call in outcome_job, call
+    assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
+    assert "CALENDAR_RETENTION = 'MUTABLE_NOT_RETAINED'" in outcome_job
+    assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
+    assert "'performance_claim': 'NONE'" in outcome_job
+    assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job
+    assert "'live_money': False" in outcome_job
     outcome_producer = (ROOT / 'app' / 'decision_outcome_producer.py').read_text(encoding='utf-8')
     for call in ('bind_egx_outcome_session_bars(', 'evaluate_decision_outcome(',
                  'retain_decision_outcome(outcome_directory, (identity, record), outcome, now=now)',
@@ -170,8 +188,7 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in outcome_producer
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_producer
     assert "'live_money': False" in outcome_producer
-    # The daily-evidence loader exists but no job calls it (no caller outside
-    # the component modules, checked above), so OUTCOME_JOB_NOT_IMPLEMENTED stays.
+    # The daily-evidence loader's only caller is the outcome job (a component).
     # It reuses the unchanged ingestion lookup and canonical pipeline and never
     # writes the database.
     daily_evidence = (ROOT / 'app' / 'decision_outcome_daily_evidence.py').read_text(
