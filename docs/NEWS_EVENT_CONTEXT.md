@@ -523,6 +523,32 @@ In this repository only the scanner-v2 evidence retention job calls
 `retain_calendar_observation`, so a chain can exist only for sessions that job
 retained when it ran; a missing link refuses the chain.
 
+## Retained calendar observation loader (`app.decision_outcome_calendar_loader`, decision-outcome-calendar-observations-v1)
+
+Status: read-only library, pending host validation; no caller yet (gap
+OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS stays until the outcome job uses it).
+`TradingRepository` only offers a projection getter for one digest, so
+`load_egx_calendar_observations(database, artifact_digests)` reads the exact
+`calendar_observations` rows the chain needs.
+
+- The caller names a tuple of 1..400 unique lowercase SHA-256 digests; nothing
+  is searched for, ranged, defaulted or chosen as latest (CONFIG_INVALID
+  otherwise). Only `calendar_observations` is read; `market_sessions` is never
+  read, so a later upsert cannot change what is loaded.
+- Each row must exist (OBSERVATION_UNAVAILABLE); its artifact must be a BLOB of
+  1..64 KiB whose SHA-256 equals the named digest, `session` an exact ISO date
+  and `observed_at` an ISO timestamp with an offset (naive refused); otherwise
+  OBSERVATION_REJECTED. SQLite/OS failures are DATABASE_UNAVAILABLE. Any
+  failure refuses the whole load.
+- Returns `RetainedCalendarObservation` values in the caller's order (the
+  unchanged chain orders and validates them) plus per-digest provenance
+  (stored observed_at text, byte length); labels CALLER_NAMED_DIGESTS,
+  CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED,
+  REPOSITORY_CLOCK_UNVERIFIED, calendar validation NOT_PERFORMED_BY_LOADER,
+  admission NOT_ESTABLISHED, performance claim NONE, SHADOW, LIVE_MONEY=false,
+  NOT_AUTHORIZED. The database is never created (a missing file is refused
+  before any connection), initialized or written.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -772,7 +798,7 @@ free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
 OUTCOME_JOB_NOT_SCHEDULED), wiring the outcome job to the retained calendar
-chain via a read-only `calendar_observations` loader (gap
+chain through the read-only `calendar_observations` loader (gap
 OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS),
 corporate-action checks on the outcome path (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome

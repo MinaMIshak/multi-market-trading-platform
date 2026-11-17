@@ -184,6 +184,17 @@ def test_declared_gaps_match_the_code():
     assert "'admission': 'NOT_ESTABLISHED'" in calendar_chain
     assert "'live_money': False" in calendar_chain
     assert 'decision_outcome_calendar' not in outcome_job
+    # The retained-calendar loader reads caller-named calendar_observations rows
+    # only (never market_sessions), writes nothing, admits nothing and has no
+    # caller yet (checked above), so the mutable-calendar gap stays.
+    calendar_loader = (ROOT / 'app' / 'decision_outcome_calendar_loader.py').read_text(
+        encoding='utf-8')
+    assert 'FROM calendar_observations WHERE artifact_sha256 = ?' in calendar_loader
+    assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b',
+                         calendar_loader)
+    assert 'FROM market_sessions' not in calendar_loader
+    assert "'admission': 'NOT_ESTABLISHED'" in calendar_loader
+    assert "'live_money': False" in calendar_loader
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

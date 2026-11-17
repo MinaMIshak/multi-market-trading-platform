@@ -41,6 +41,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome','decision-outcome-v1'),
     ('app.decision_outcome_session_bars', 'decision-outcome-session-bars-v1'),
     ('app.decision_outcome_calendar', 'decision-outcome-calendar-chain-v1'),
+    ('app.decision_outcome_calendar_loader', 'decision-outcome-calendar-observations-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
@@ -77,8 +78,9 @@ EMPIRICAL_GAPS = (
     # The outcome job reads current market_sessions rows, which are upserted
     # (mutable), not write-once retained calendar observations; it records a
     # digest of what it read, but the calendar is not retained evidence. A pure
-    # chain over write-once calendar_observations exists, but the job does not
-    # use it yet, so the gap stays until the job is wired to retained rows.
+    # chain over write-once calendar_observations and a read-only loader for
+    # caller-named observation digests exist, but the job uses neither yet, so
+    # the gap stays until the job is wired to retained rows.
     'OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS',
     # Terminal-outcome store library exists; no directory is provisioned and
     # no job or scheduler runs the producer that retains outcomes into it.
