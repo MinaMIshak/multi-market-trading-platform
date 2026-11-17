@@ -487,6 +487,42 @@ performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM
 declares the component and replaces gap OUTCOME_JOB_NOT_IMPLEMENTED with
 OUTCOME_JOB_NOT_SCHEDULED.
 
+## Retained outcome calendar chain (`app.decision_outcome_calendar`, decision-outcome-calendar-chain-v1)
+
+Status: pure library, pending host validation; no caller yet (the outcome job
+still reads mutable `market_sessions` rows, so gap
+OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS stays).
+`chain_egx_calendar_observations(observations, *, as_of)` takes a tuple of
+`RetainedCalendarObservation` (artifact SHA-256, session date, exact bytes,
+aware observed_at: the columns of the write-once `calendar_observations`
+table) and returns a contiguous `MarketSession` tuple for the unchanged
+producer/binding plus a JSON-ready report.
+
+- Each observation is re-validated by the unchanged `project_egx_calendar`
+  with `decision_time` = its own `observed_at` (digest, contiguity, EGX weekend
+  policy, hours, completed-session verification at observation, observed
+  before the next session opened); failures are OBSERVATION_REJECTED.
+- Ordered by session (input order irrelevant); two observations for one
+  session are DUPLICATE_SESSION (never resolved by preference); each
+  `next_session` must equal the next observation's session
+  (CHAIN_NOT_CONTIGUOUS), so no trading day is skipped; observed after `as_of`
+  is OBSERVED_AFTER_CLOCK; more than 400 days CHAIN_TOO_LONG; bad types
+  CONFIG_INVALID.
+- Each observation contributes its VERIFIED session and intervening
+  non-trading rows; an UNKNOWN schedule row is superseded by the later
+  VERIFIED row for that date, and a changed schedule (opened/first-15/closed)
+  is listed in `schedule_revisions`. Only the last observation's UNKNOWN row is
+  kept, as the final pending day.
+- Report: dates, days, `sessions_sha256` (same formula as the job's calendar
+  digest), per-observation digest/session/next_session/observed_at, latest
+  observed_at, labels CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED,
+  admission NOT_ESTABLISHED, outcome NOT_EVALUATED, performance claim NONE,
+  SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+
+In this repository only the scanner-v2 evidence retention job calls
+`retain_calendar_observation`, so a chain can exist only for sessions that job
+retained when it ran; a missing link refuses the chain.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -735,8 +771,9 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), a write-once retained calendar source for outcomes
-(gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS),
+OUTCOME_JOB_NOT_SCHEDULED), wiring the outcome job to the retained calendar
+chain via a read-only `calendar_observations` loader (gap
+OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS),
 corporate-action checks on the outcome path (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational

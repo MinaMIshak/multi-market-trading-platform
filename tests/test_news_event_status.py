@@ -175,6 +175,15 @@ def test_declared_gaps_match_the_code():
         assert call in outcome_job, call
     assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
     assert "CALENDAR_RETENTION = 'MUTABLE_NOT_RETAINED'" in outcome_job
+    # The retained-calendar chain is a pure component: it re-validates each
+    # retained observation with the unchanged scanner-path projection, reads no
+    # database, admits nothing and is not yet used by the job (gap kept above).
+    calendar_chain = (ROOT / 'app' / 'decision_outcome_calendar.py').read_text(encoding='utf-8')
+    assert 'project_egx_calendar(' in calendar_chain
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE)\b', calendar_chain)
+    assert "'admission': 'NOT_ESTABLISHED'" in calendar_chain
+    assert "'live_money': False" in calendar_chain
+    assert 'decision_outcome_calendar' not in outcome_job
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job
