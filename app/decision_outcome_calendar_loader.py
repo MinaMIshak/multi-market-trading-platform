@@ -28,9 +28,9 @@ REPOSITORY_CLOCK_UNVERIFIED (it is not independently attested). Calendar
 admission stays NOT_ESTABLISHED. Read only: the database is never created,
 initialized, upgraded or written by this module (the caller supplies an
 existing ``app.storage.Database``; a missing file is refused before any
-connection). No caller yet: the outcome job still reads
-mutable ``market_sessions`` rows, so SYSTEM keeps the gap
-OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS. No scheduler or route.
+connection). The only caller is the host job ``app.decision_outcome_job``
+(decision-outcome-job-v2, not scheduled), which chains the loaded observations
+at its own clock. No scheduler or route.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from datetime import date, datetime

@@ -1,8 +1,8 @@
 """Chain write-once retained EGX calendar observations into an outcome calendar.
 
-Phase G/H groundwork (decision-outcome-calendar-chain-v1). The outcome job
-currently reads current ``market_sessions`` rows, which are upserted (mutable),
-so SYSTEM keeps the gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS. The repository
+Phase G/H groundwork (decision-outcome-calendar-chain-v1). Current
+``market_sessions`` rows are upserted (mutable), so the outcome job
+(decision-outcome-job-v2, the only caller) uses this chain instead. The repository
 already retains write-once calendar observations (``calendar_observations``,
 written by ``TradingRepository.retain_calendar_observation``): each one is the
 exact JSON array of ``MarketSession`` rows from a VERIFIED completed session,
@@ -33,8 +33,8 @@ set of such retained observations. It adds no calendar semantics of its own:
 
 Calendar admission stays NOT_ESTABLISHED: a retained observation is evidence of
 what the repository recorded, not an exchange-authoritative calendar. No IO,
-database read, store, route, scheduler or caller; the outcome job still reads
-mutable rows until a later change wires this in. Nothing is evaluated here.
+database read, store, route or scheduler; the only caller is the host job
+``app.decision_outcome_job`` (not scheduled). Nothing is evaluated here.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from dataclasses import dataclass

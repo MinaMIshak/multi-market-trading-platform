@@ -452,31 +452,37 @@ membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
 each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
 SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component.
 
-## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v1)
+## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v2)
 
 Status: host CLI entrypoint, pending host validation; not scheduled, no route,
 no provisioned directory. `python -m app.decision_outcome_job` takes
 `--db-path`, `--raw-root`, `--observation-dir`, `--outcome-dir`, one or more
-`--daily-raw-path`, `--calendar-from`/`--calendar-through` (ISO dates,
-1..400 days) and explicit `--assumptions-version`, `--entry-slippage-bps`,
+`--daily-raw-path`, one or more `--calendar-observation` (exact
+`calendar_observations` SHA-256 digests, 1..400, unique, lowercase) and
+explicit `--assumptions-version`, `--entry-slippage-bps`,
 `--exit-slippage-bps`, `--cost-bps-per-side` (no default costs or slippage).
 It only wires unchanged pieces:
 
 1. the existing database file is opened with the card-report job's
-   `_existing_database` (never created or upgraded; read methods only);
-2. every date in the calendar range is read with the unchanged
-   `TradingRepository.get_market_session`; a missing date is
-   CALENDAR_INCOMPLETE and a row whose date does not match or whose timezone
-   is not Africa/Cairo (or that does not parse) is CALENDAR_ROW_REJECTED, so
-   gaps are never skipped or filled;
-3. `load_egx_daily_evidence` loads exactly the named raw paths;
-4. `produce_egx_decision_outcomes` binds, evaluates and retains terminal
-   outcomes with its own clock.
+   `_existing_database` (never created or upgraded; read only);
+2. one job clock is sampled and used both as the calendar chain's `as_of` and
+   as the producer clock;
+3. `load_egx_calendar_observations` reads exactly the named write-once
+   `calendar_observations` rows and `chain_egx_calendar_observations`
+   re-validates each at its own observation time and chains them (missing
+   link CHAIN_NOT_CONTIGUOUS, duplicate session, observed after the job clock,
+   tampered or unknown rows all refuse the run at stage CALENDAR with the
+   loader's or chain's reason); `market_sessions` is never read;
+4. `load_egx_daily_evidence` loads exactly the named raw paths;
+5. `produce_egx_decision_outcomes` binds, evaluates and retains terminal
+   outcomes with the job clock.
 
-`market_sessions` rows are upserted (mutable), not write-once retained
-observations: the result labels the calendar MARKET_SESSIONS_CURRENT_ROWS /
-MUTABLE_NOT_RETAINED and returns the SHA-256 of the exact session JSON read,
-and SYSTEM adds gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS. Statuses: PRODUCED
+decision-outcome-job-v1 read current, upserted `market_sessions` rows by date
+range (labelled MUTABLE_NOT_RETAINED, gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS).
+v2 labels the calendar CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED,
+returns the chain report (including `sessions_sha256` and `as_of`) and
+per-digest provenance with observed-at clock REPOSITORY_CLOCK_UNVERIFIED and
+admission NOT_ESTABLISHED, and SYSTEM drops that gap. Statuses: PRODUCED
 (exit 0; no observation rejected, waiting states PENDING_PATH and
 AWAITING_DAILY_EVIDENCE allowed), REJECTIONS_PRESENT (exit 2; at least one
 OBSERVATION_AFTER_CLOCK, BINDING_REJECTED or EVALUATION_REJECTED), FAILED
@@ -484,14 +490,14 @@ OBSERVATION_AFTER_CLOCK, BINDING_REJECTED or EVALUATION_REJECTED), FAILED
 reason). The result carries daily-evidence provenance per raw path, corporate
 actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS, execution evidence NONE,
 performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM
-declares the component and replaces gap OUTCOME_JOB_NOT_IMPLEMENTED with
-OUTCOME_JOB_NOT_SCHEDULED.
+declares the component and keeps gap OUTCOME_JOB_NOT_SCHEDULED. A host must
+name digests of observations that the scanner-v2 evidence retention job
+actually retained; a chain can cover only those sessions.
 
 ## Retained outcome calendar chain (`app.decision_outcome_calendar`, decision-outcome-calendar-chain-v1)
 
-Status: pure library, pending host validation; no caller yet (the outcome job
-still reads mutable `market_sessions` rows, so gap
-OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS stays).
+Status: pure library, pending host validation; only caller is the outcome
+job (decision-outcome-job-v2).
 `chain_egx_calendar_observations(observations, *, as_of)` takes a tuple of
 `RetainedCalendarObservation` (artifact SHA-256, session date, exact bytes,
 aware observed_at: the columns of the write-once `calendar_observations`
@@ -513,7 +519,7 @@ producer/binding plus a JSON-ready report.
   VERIFIED row for that date, and a changed schedule (opened/first-15/closed)
   is listed in `schedule_revisions`. Only the last observation's UNKNOWN row is
   kept, as the final pending day.
-- Report: dates, days, `sessions_sha256` (same formula as the job's calendar
+- Report: dates, days, `sessions_sha256` (same formula as the v1 job's calendar
   digest), per-observation digest/session/next_session/observed_at, latest
   observed_at, labels CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED,
   admission NOT_ESTABLISHED, outcome NOT_EVALUATED, performance claim NONE,
@@ -525,8 +531,8 @@ retained when it ran; a missing link refuses the chain.
 
 ## Retained calendar observation loader (`app.decision_outcome_calendar_loader`, decision-outcome-calendar-observations-v1)
 
-Status: read-only library, pending host validation; no caller yet (gap
-OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS stays until the outcome job uses it).
+Status: read-only library, pending host validation; only caller is the
+outcome job (decision-outcome-job-v2).
 `TradingRepository` only offers a projection getter for one digest, so
 `load_egx_calendar_observations(database, artifact_digests)` reads the exact
 `calendar_observations` rows the chain needs.
@@ -797,10 +803,7 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), wiring the outcome job to the retained calendar
-chain through the read-only `calendar_observations` loader (gap
-OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS),
-corporate-action checks on the outcome path (gap
+OUTCOME_JOB_NOT_SCHEDULED), corporate-action checks on the outcome path (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered

@@ -161,32 +161,38 @@ def test_declared_gaps_match_the_code():
     # The outcome job exists (so its gap is replaced), but no scheduler, cron
     # entry or other source invokes it (no caller outside the component modules,
     # checked above; app/core/schedule.py is among the checked sources). It only
-    # wires the unchanged calendar accessor, daily loader and producer, writes no
-    # database row, and its calendar is current mutable rows (gap kept visible).
+    # wires the unchanged retained-calendar loader and chain (one job clock as
+    # the chain's as_of and the producer clock), daily loader and producer,
+    # writes no database row and never reads mutable market_sessions rows, so
+    # the mutable-calendar gap is closed.
     assert 'OUTCOME_JOB_NOT_IMPLEMENTED' not in EMPIRICAL_GAPS
     assert 'OUTCOME_JOB_NOT_SCHEDULED' in EMPIRICAL_GAPS
-    assert 'OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS' in EMPIRICAL_GAPS
+    assert 'OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS' not in EMPIRICAL_GAPS
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_job*.py')] == [
         'decision_outcome_job.py']
     outcome_job = (ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
-    for call in ('trading.get_market_session(day)',
+    for call in ('load_egx_calendar_observations(database, calendar_observations)',
+                 "chain_egx_calendar_observations(calendar['observations'], as_of=now)",
                  'load_egx_daily_evidence(database, raw_root, daily_raw_paths)',
-                 'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,'):
+                 'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,',
+                 "sessions=chained['sessions'], assumptions=assumptions, now=now)"):
         assert call in outcome_job, call
     assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
-    assert "CALENDAR_RETENTION = 'MUTABLE_NOT_RETAINED'" in outcome_job
+    assert not re.search(r'\b(get_market_session|TradingRepository|FROM market_sessions)\b',
+                         outcome_job)
+    assert "CALENDAR_RETENTION = 'WRITE_ONCE_RETAINED'" in outcome_job
+    assert "'admission': 'NOT_ESTABLISHED'" in outcome_job
     # The retained-calendar chain is a pure component: it re-validates each
     # retained observation with the unchanged scanner-path projection, reads no
-    # database, admits nothing and is not yet used by the job (gap kept above).
+    # database and admits nothing; its only caller is the outcome job.
     calendar_chain = (ROOT / 'app' / 'decision_outcome_calendar.py').read_text(encoding='utf-8')
     assert 'project_egx_calendar(' in calendar_chain
     assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE)\b', calendar_chain)
     assert "'admission': 'NOT_ESTABLISHED'" in calendar_chain
     assert "'live_money': False" in calendar_chain
-    assert 'decision_outcome_calendar' not in outcome_job
     # The retained-calendar loader reads caller-named calendar_observations rows
-    # only (never market_sessions), writes nothing, admits nothing and has no
-    # caller yet (checked above), so the mutable-calendar gap stays.
+    # only (never market_sessions), writes nothing and admits nothing; its only
+    # caller is the outcome job (a component, checked above).
     calendar_loader = (ROOT / 'app' / 'decision_outcome_calendar_loader.py').read_text(
         encoding='utf-8')
     assert 'FROM calendar_observations WHERE artifact_sha256 = ?' in calendar_loader
