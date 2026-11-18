@@ -201,6 +201,19 @@ def test_declared_gaps_match_the_code():
     assert 'FROM market_sessions' not in calendar_loader
     assert "'admission': 'NOT_ESTABLISHED'" in calendar_loader
     assert "'live_money': False" in calendar_loader
+    # The corporate-action path check is a pure component: it reads no database
+    # or file, adjusts no price, evaluates no outcome and has no caller (checked
+    # above), so the outcome path still labels corporate actions NOT_CHECKED and
+    # the gap stays open.
+    corporate_actions = (ROOT / 'app' / 'decision_outcome_corporate_actions.py').read_text(
+        encoding='utf-8')
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository)\b',
+                         corporate_actions.split('"""', 2)[2])
+    assert "'price_adjustment': 'NOT_APPLIED'" in corporate_actions
+    assert "'outcome': 'NOT_EVALUATED'" in corporate_actions
+    assert "'review_verification': 'CALLER_ASSERTED_UNVERIFIED'" in corporate_actions
+    assert "'live_money': False" in corporate_actions
+    assert "'promotion': 'NOT_AUTHORIZED'" in corporate_actions
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

@@ -42,6 +42,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_session_bars', 'decision-outcome-session-bars-v1'),
     ('app.decision_outcome_calendar', 'decision-outcome-calendar-chain-v1'),
     ('app.decision_outcome_calendar_loader', 'decision-outcome-calendar-observations-v1'),
+    ('app.decision_outcome_corporate_actions', 'decision-outcome-corporate-actions-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
@@ -82,7 +83,9 @@ EMPIRICAL_GAPS = (
     # no job or scheduler runs the producer that retains outcomes into it.
     'OUTCOME_STORE_NOT_PROVISIONED',
     # The outcome path labels corporate actions NOT_CHECKED; no outcome or
-    # metric from it is empirical evidence until this is closed.
+    # metric from it is empirical evidence until this is closed. A pure check
+    # of retained egx-actions-v1 coverage over one path exists, but no loader,
+    # producer, job, evaluator or store uses it yet, so the gap stays open.
     'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',

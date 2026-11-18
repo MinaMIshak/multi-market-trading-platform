@@ -555,6 +555,39 @@ outcome job (decision-outcome-job-v2).
   NOT_AUTHORIZED. The database is never created (a missing file is refused
   before any connection), initialized or written.
 
+## Outcome-path corporate-action check (`app.decision_outcome_corporate_actions`, decision-outcome-corporate-actions-v1)
+
+Status: pure library, pending host validation; no caller. The outcome path
+compares raw canonical OHLC with plan prices fixed as of `data_as_of`, so an
+action effective inside the path makes the outcome non-evidence.
+`check_egx_outcome_corporate_actions(identity, record, evidence, *,
+source_ingestion_id, review_ingestion_ids, path_through, as_of)` checks one
+retained EGX observation against one exact `egx-actions-v1` `ActionEvidence`
+document, which is the complete, bounded, reviewed coverage that the existing
+`ReferenceRepository.actions` selects point-in-time.
+
+- Window DATA_AS_OF_DATE_THROUGH_PATH_DATE_INCLUSIVE_V1: Africa/Cairo dates
+  from the record's `data_as_of` date through `path_through` inclusive. The
+  `data_as_of` date is included on purpose, so the check errs toward
+  ACTIONS_IN_PATH.
+- Fails closed (ValueError) on an edited or non-EGX record, evidence for
+  another instrument, coverage that does not span the whole window (an absent
+  action outside declared coverage is never evidence), evidence published
+  after `as_of`, a path date before detection or after `as_of`, a
+  non-canonical or duplicate source/review UUID, a review id equal to the
+  source id, and naive clocks. The evidence is revalidated, so a
+  `model_construct` bypass is rejected.
+- Result CLEAR (with `clear_basis` COMPLETE_DECLARED_COVERAGE) or
+  ACTIONS_IN_PATH, listing every in-window action of any type in date order
+  with its declared adjustment effect. Nothing is adjusted
+  (`price_adjustment` NOT_APPLIED) and no outcome is evaluated, changed or
+  retained. Review ids are labelled CALLER_ASSERTED_UNVERIFIED. Performance
+  claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+- The evaluator, binding, producer, store and job are unchanged and still
+  label corporate actions NOT_CHECKED. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+  stays open until a loader and the outcome path use this check, making an
+  ACTIONS_IN_PATH path or missing coverage visible as non-evidence.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -803,7 +836,8 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), corporate-action checks on the outcome path (gap
+OUTCOME_JOB_NOT_SCHEDULED), wiring the pure corporate-action path check into
+the outcome path through a ReferenceRepository-backed loader (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
