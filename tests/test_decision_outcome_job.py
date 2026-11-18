@@ -162,7 +162,10 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
         'received_at_clock': 'INGESTION_MANIFEST_UNVERIFIED',
         'market_membership': 'NOT_ESTABLISHED'}
     production = out['production']
-    assert production['schema_version'] == 'decision-outcome-production-v1'
+    assert production['schema_version'] == 'decision-outcome-production-v2'
+    # The job does not pass action selections yet: the run is labelled unchecked.
+    assert production['corporate_actions'] == 'NOT_CHECKED'
+    assert production['action_selections_without_observation'] is None
     (entry,) = production['outcomes']
     assert entry['observation_identity'] == identity
     assert (entry['status'], entry['outcome_status']) == ('RETAINED', 'CLOSED')

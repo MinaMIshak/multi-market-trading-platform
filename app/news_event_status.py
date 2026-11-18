@@ -45,7 +45,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_corporate_actions', 'decision-outcome-corporate-actions-v1'),
     ('app.decision_outcome_action_evidence', 'decision-outcome-action-evidence-v1'),
     ('app.decision_outcome_store', 'decision-outcome-retention-v1'),
-    ('app.decision_outcome_producer', 'decision-outcome-production-v1'),
+    ('app.decision_outcome_producer', 'decision-outcome-production-v2'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
     ('app.decision_outcome_job', 'decision-outcome-job-v2'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
@@ -85,9 +85,12 @@ EMPIRICAL_GAPS = (
     'OUTCOME_STORE_NOT_PROVISIONED',
     # The outcome path labels corporate actions NOT_CHECKED; no outcome or
     # metric from it is empirical evidence until this is closed. A pure check
-    # of retained egx-actions-v1 coverage over one path and a loader of the
-    # ReferenceRepository.actions selection it consumes exist, but no producer,
-    # job, evaluator or store uses them yet, so the gap stays open.
+    # of retained egx-actions-v1 coverage over one path, a loader of the
+    # ReferenceRepository.actions selection it consumes, and an optional
+    # producer gate (decision-outcome-production-v2: retain only CLEAR when
+    # selections are supplied) exist, but the job passes no selections and the
+    # retained decision-outcome-v1 record does not carry the check, so the gap
+    # stays open.
     'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',

@@ -1,6 +1,6 @@
 """EGX decision-outcome producer over retained observations and daily evidence.
 
-Phase G/H collection step (decision-outcome-production-v1). For every EGX
+Phase G/H collection step (decision-outcome-production-v2). For every EGX
 decision-observation-v1 record in a host-provisioned observation store it
 composes the existing pieces unchanged; it adds no binding, evaluation, record
 or store logic:
@@ -17,8 +17,29 @@ or store logic:
    dates from the detection date through the receipt date, so sessions after
    the receipt are never offered to the path);
 4. ``evaluate_decision_outcome`` with ``evaluated_at`` = the producer clock;
-5. ``retain_decision_outcome`` for terminal outcomes (CLOSED, NO_ENTRY,
-   UNEVALUABLE) with the same clock. PENDING_PATH is reported, never retained.
+5. only when the caller supplies ``actions`` (observation identity ->
+   ``OutcomeActionSelection``, the exact ``ReferenceRepository.actions``
+   selection returned by ``app.decision_outcome_action_evidence``): for a
+   terminal outcome, the unchanged pure
+   ``check_egx_outcome_corporate_actions`` with ``path_through`` = the Africa/
+   Cairo date of the binding's ``path_complete_through_at`` (the calendar's
+   final date, PATH_COMPLETION_DATE_CAIRO_V1) and ``as_of`` = the producer
+   clock. Only CLEAR is retained; ACTIONS_IN_PATH (with the full check report),
+   AWAITING_ACTION_EVIDENCE (no selection for that observation) and
+   ACTION_CHECK_REJECTED (fail-closed message) are reported per observation and
+   never retained, so they stay NOT_EVALUATED in the unchanged aggregate. No
+   price is adjusted. Without ``actions`` the v1 behaviour is unchanged and the
+   run is labelled corporate actions NOT_CHECKED;
+6. ``retain_decision_outcome`` for terminal outcomes (CLOSED, NO_ENTRY,
+   UNEVALUABLE) with the same clock. PENDING_PATH is reported, never retained
+   (and not checked).
+
+v2 changes only this optional check (and its result fields/statuses). The
+retained decision-outcome-v1 record does not carry the check, so outcomes
+already in the store (ALREADY_RETAINED) and outcomes retained by an unchecked
+run are indistinguishable there: ``retained_outcome_corporate_actions`` is
+NOT_RECORDED_IN_OUTCOME and the SYSTEM gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+stays open.
 
 Per-observation results are visible, never dropped: AWAITING_DAILY_EVIDENCE
 (no rows supplied for the instrument, or rows received before detection),
@@ -31,10 +52,11 @@ is idempotent.
 
 The daily rows, receipt times and sessions are caller-supplied retained
 evidence (no database or network IO here); the receipt clock is
-CALLER_ASSERTED_UNVERIFIED, calendar admission NOT_ESTABLISHED and corporate
-actions NOT_CHECKED, so no outcome or metric derived from this run is
-empirical evidence until those gaps close. Its only caller is the host job
-entrypoint ``app.decision_outcome_job`` (not scheduled); no route; both store
+CALLER_ASSERTED_UNVERIFIED and calendar admission NOT_ESTABLISHED, and the
+corporate-action check is unrecorded in retained outcomes, so no outcome or
+metric derived from this run is empirical evidence until those gaps close. Its
+only caller is the host job entrypoint ``app.decision_outcome_job`` (not
+scheduled; it does not pass ``actions`` yet); no route; both store
 directories are explicit arguments. Outcomes are
 hypothetical results from session bars: not fills, not performance.
 PAPER/SHADOW only; LIVE_MONEY=false.
@@ -48,6 +70,9 @@ from app.decision_observation import canonical_bytes
 from app.decision_observation_store import (
     DecisionObservationStoreError, _time, load_retained_decision_observations)
 from app.decision_outcome import OutcomeAssumptions, evaluate_decision_outcome
+from app.decision_outcome_action_evidence import OutcomeActionSelection
+from app.decision_outcome_corporate_actions import (
+    WINDOW_RULE as ACTION_WINDOW_RULE, check_egx_outcome_corporate_actions)
 from app.decision_outcome_session_bars import bind_egx_outcome_session_bars
 from app.decision_outcome_store import (
     TERMINAL_STATUSES, DecisionOutcomeStoreError, load_retained_decision_outcomes,
@@ -55,14 +80,16 @@ from app.decision_outcome_store import (
 from app.domain.models import MarketSession
 from app.scanner_v2_egx_rank import CAIRO
 
-CONTRACT_VERSION = 'decision-outcome-production-v1'
+CONTRACT_VERSION = 'decision-outcome-production-v2'
 CALENDAR_RULE = 'CALENDAR_THROUGH_RECEIPT_DATE_V1'
+ACTION_PATH_RULE = 'PATH_COMPLETION_DATE_CAIRO_V1'
 PRODUCTION_REASONS = (
     'CONFIG_INVALID', 'OBSERVATIONS_UNAVAILABLE', 'OUTCOMES_UNAVAILABLE', 'RETENTION_FAILED')
 ENTRY_STATUSES = (
     'RETAINED', 'ALREADY_RETAINED', 'PENDING_PATH', 'AWAITING_DAILY_EVIDENCE',
-    'OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED')
-AWAITING_REASONS = ('NO_DAILY_EVIDENCE', 'RECEIVED_BEFORE_DETECTION')
+    'OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED',
+    'AWAITING_ACTION_EVIDENCE', 'ACTIONS_IN_PATH', 'ACTION_CHECK_REJECTED')
+AWAITING_REASONS = ('NO_DAILY_EVIDENCE', 'RECEIVED_BEFORE_DETECTION', 'NO_ACTION_EVIDENCE')
 MAX_DETAIL = 200
 
 
@@ -97,7 +124,7 @@ def _directory(value):
     return os.path.normpath(value)
 
 
-def _config(observation_directory, outcome_directory, daily, sessions, assumptions, now):
+def _config(observation_directory, outcome_directory, daily, sessions, assumptions, actions, now):
     if _directory(observation_directory) == _directory(outcome_directory):
         raise DecisionOutcomeProductionError('CONFIG_INVALID', 'stores must be distinct')
     if type(assumptions) is not OutcomeAssumptions:
@@ -121,6 +148,13 @@ def _config(observation_directory, outcome_directory, daily, sessions, assumptio
         # A receipt after the producer clock would let bytes not yet received shape an outcome.
         if evidence.received_at > now:
             raise DecisionOutcomeProductionError('CONFIG_INVALID', 'daily evidence received after clock')
+    if actions is not None:
+        if type(actions) is not dict:
+            raise DecisionOutcomeProductionError('CONFIG_INVALID', 'action selection mapping required')
+        for key, selection in actions.items():
+            if type(key) is not str or type(selection) is not OutcomeActionSelection:
+                raise DecisionOutcomeProductionError(
+                    'CONFIG_INVALID', 'observation identity -> OutcomeActionSelection required')
     return assumptions
 
 
@@ -137,6 +171,7 @@ def _entry(identity, record):
         'status': None, 'reason': None, 'detail': None,
         'outcome_identity': None, 'outcome_status': None, 'outcome_reason': None,
         'path_complete_through_at': None, 'sessions_bound': None,
+        'corporate_action_status': None, 'corporate_action_check': None,
     }
 
 
@@ -146,7 +181,33 @@ def _window(sessions, detected, received):
     return tuple(item for item in sessions if first <= item.market_date <= last)
 
 
-def _produce_one(entry, identity, record, outcome_directory, daily, sessions, assumptions, now):
+def _check_actions(entry, identity, record, bound, actions, now):
+    """True only when the unchanged check reports CLEAR; otherwise the entry says why."""
+    selection = actions.get(identity)
+    if selection is None:
+        entry.update(status='AWAITING_ACTION_EVIDENCE', reason='NO_ACTION_EVIDENCE')
+        return False
+    try:
+        report = check_egx_outcome_corporate_actions(
+            identity, record, selection.evidence,
+            source_ingestion_id=selection.source_ingestion_id,
+            review_ingestion_ids=selection.review_ingestion_ids,
+            # PATH_COMPLETION_DATE_CAIRO_V1: the binding's calendar ends on this date.
+            path_through=bound['path_complete_through_at'].astimezone(CAIRO).date(),
+            as_of=now)
+    except ValueError as exc:
+        entry.update(status='ACTION_CHECK_REJECTED', detail=_detail(exc))
+        return False
+    entry.update(corporate_action_status=report['status'], corporate_action_check=report)
+    if report['status'] != 'CLEAR':
+        # The raw path is not comparable with the plan: never retained, never adjusted.
+        entry['status'] = 'ACTIONS_IN_PATH'
+        return False
+    return True
+
+
+def _produce_one(entry, identity, record, outcome_directory, daily, sessions, assumptions,
+                 actions, now):
     if _time(record['recorded_at'], 'recorded_at') > now:
         entry['status'] = 'OBSERVATION_AFTER_CLOCK'
         return
@@ -179,6 +240,8 @@ def _produce_one(entry, identity, record, outcome_directory, daily, sessions, as
     if outcome['status'] not in TERMINAL_STATUSES:
         entry['status'] = 'PENDING_PATH'
         return
+    if actions is not None and not _check_actions(entry, identity, record, bound, actions, now):
+        return
     try:
         retained = retain_decision_outcome(outcome_directory, (identity, record), outcome, now=now)
     except DecisionOutcomeStoreError as exc:
@@ -191,21 +254,24 @@ def _produce_one(entry, identity, record, outcome_directory, daily, sessions, as
 
 
 def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, daily, sessions,
-                                  assumptions, now=None):
+                                  assumptions, now=None, actions=None):
     """Evaluate and retain terminal outcomes for every retained EGX observation.
 
     ``daily`` maps canonical instrument UUID strings to ``EgxDailyEvidence``;
     ``sessions`` is a tuple of retained ``MarketSession`` rows (Africa/Cairo);
     ``now`` is the producer clock (defaults to real UTC), used as both
-    ``evaluated_at`` and the outcome-store clock. Returns a
-    ``decision-outcome-production-v1`` result with one entry per observation.
+    ``evaluated_at``, the outcome-store clock and the corporate-action check's
+    ``as_of``. ``actions`` (optional) maps observation identities to
+    ``OutcomeActionSelection``; when given, a terminal outcome is retained only
+    if the unchanged check reports CLEAR. Returns a
+    ``decision-outcome-production-v2`` result with one entry per observation.
     Refusals raise ``DecisionOutcomeProductionError``.
     """
     now = datetime.now(timezone.utc) if now is None else now
     if not _aware(now):
         raise TypeError('now must be a timezone-aware datetime')
     assumptions = _config(observation_directory, outcome_directory, daily, sessions,
-                          assumptions, now)
+                          assumptions, actions, now)
     try:
         observations = load_retained_decision_observations(observation_directory, market='EGX')
     except DecisionObservationStoreError as exc:
@@ -229,7 +295,7 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
                          path_complete_through_at=outcome['path_complete_through_at'])
         else:
             _produce_one(entry, identity, record, outcome_directory, daily, sessions,
-                         assumptions, now)
+                         assumptions, actions, now)
         entries.append(entry)
 
     return {
@@ -245,7 +311,15 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
         'retained_outcome_reevaluation': 'NOT_PERFORMED',
         'daily_receipt_clock': 'CALLER_ASSERTED_UNVERIFIED',
         'calendar_admission': 'NOT_ESTABLISHED',
-        'corporate_actions': 'NOT_CHECKED',
+        'corporate_actions': 'NOT_CHECKED' if actions is None else 'CHECKED_BEFORE_RETENTION',
+        'corporate_action_window_rule': None if actions is None else ACTION_WINDOW_RULE,
+        'corporate_action_path_rule': None if actions is None else ACTION_PATH_RULE,
+        # Selections naming no observation in the store (visible, never used).
+        'action_selections_without_observation': (
+            None if actions is None else sum(i not in population for i in actions)),
+        # decision-outcome-v1 records do not carry the check result.
+        'retained_outcome_corporate_actions': 'NOT_RECORDED_IN_OUTCOME',
+        'price_adjustment': 'NOT_APPLIED',
         'fill_kind': 'HYPOTHETICAL_FROM_SESSION_BARS', 'execution_evidence': 'NONE',
         'performance_claim': 'NONE', 'mode': 'SHADOW', 'live_money': False,
         'execution_allowed': False, 'runtime_activation': False,

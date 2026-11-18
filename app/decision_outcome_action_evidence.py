@@ -38,8 +38,10 @@ durable ``data_quality_issues`` audit row (ACTIONS_MISSING_OR_AMBIGUOUS,
 SOURCE_UNVALIDATED or REFERENCE_INTEGRITY); that is its established behaviour
 and is labelled, not suppressed. Review records are verified by
 ``ReferenceRepository.require_review`` (subject id, digest, provider and
-contract); reviewer authority itself is not attested. No caller, job,
-scheduler or route. PAPER/SHADOW only; LIVE_MONEY=false.
+contract); reviewer authority itself is not attested. The loader has no
+caller, job, scheduler or route; only its ``OutcomeActionSelection`` type is
+accepted by the outcome producer's optional corporate-action gate.
+PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from dataclasses import dataclass
 from datetime import date, datetime, timezone

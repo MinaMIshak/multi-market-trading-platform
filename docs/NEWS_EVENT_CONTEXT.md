@@ -383,7 +383,7 @@ labels the receipt clock CALLER_ASSERTED_UNVERIFIED, calendar admission
 NOT_ESTABLISHED, corporate actions NOT_CHECKED, outcome NOT_EVALUATED,
 performance claim NONE. The output feeds the unchanged `evaluate_decision_outcome`.
 
-## Outcome producer (`app.decision_outcome_producer`, decision-outcome-production-v1)
+## Outcome producer (`app.decision_outcome_producer`, decision-outcome-production-v1; v2 adds the optional corporate-action gate below)
 
 Status: library only, pending host validation; no job entrypoint, scheduler,
 route or caller, no provisioned directory. `produce_egx_decision_outcomes(
@@ -619,8 +619,36 @@ takes a tuple of caller-named (observation identity, retained record,
   REFERENCE_REPOSITORY_REQUIRE_REVIEW, reviewer authority NOT_ATTESTED, price
   adjustment NOT_APPLIED, outcome NOT_EVALUATED, performance claim NONE,
   SHADOW, LIVE_MONEY=false and NOT_AUTHORIZED.
-- The check is not called here. The producer, job, evaluator and store are
-  unchanged, so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
+- The check is not called here. The job, evaluator and store are unchanged,
+  so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
+
+## Producer corporate-action gate (decision-outcome-production-v2)
+
+Status: library change, pending host validation; the job does not use it yet.
+`produce_egx_decision_outcomes(..., now=None, actions=None)` gains an optional
+`actions` mapping (observation identity → exact `OutcomeActionSelection`, the
+shape the action-evidence loader returns; anything else CONFIG_INVALID).
+
+- Without `actions` the v1 behaviour is unchanged and the run says
+  `corporate_actions` NOT_CHECKED.
+- With `actions`, each terminal outcome (CLOSED, NO_ENTRY, UNEVALUABLE) is
+  passed, before retention, to the unchanged pure
+  `check_egx_outcome_corporate_actions` with `path_through` = the Cairo date of
+  the binding's `path_complete_through_at` (PATH_COMPLETION_DATE_CAIRO_V1, the
+  calendar's final date) and `as_of` = the producer clock. Only CLEAR is
+  retained. ACTIONS_IN_PATH (full check report in the entry),
+  AWAITING_ACTION_EVIDENCE / NO_ACTION_EVIDENCE (no selection) and
+  ACTION_CHECK_REJECTED (fail-closed message) are reported per observation and
+  never retained, so the unchanged aggregate counts them NOT_EVALUATED. The
+  hypothetical outcome status stays visible in the entry. PENDING_PATH is not
+  checked. The run says CHECKED_BEFORE_RETENTION, gives the window and path
+  rules and counts `action_selections_without_observation`.
+- No price is adjusted (`price_adjustment` NOT_APPLIED). Already retained
+  outcomes are not re-checked, and the retained decision-outcome-v1 record does
+  not carry the check (`retained_outcome_corporate_actions`
+  NOT_RECORDED_IN_OUTCOME), so checked and unchecked retained outcomes cannot
+  be told apart in the store. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+  therefore stays open.
 
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
@@ -870,8 +898,8 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), wiring the pure corporate-action path check into
-the outcome path through a ReferenceRepository-backed loader (gap
+OUTCOME_JOB_NOT_SCHEDULED), passing loader selections from the outcome job
+into the producer gate and recording the check with retained outcomes (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered

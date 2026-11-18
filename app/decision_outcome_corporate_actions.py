@@ -35,8 +35,10 @@ in it) or ACTIONS_IN_PATH (every action in the window listed, any type, with
 its declared adjustment effect). Nothing is adjusted: prices are never
 rescaled, no ratio is applied and no outcome is evaluated, changed or retained.
 The review ids are caller-asserted; this function does not re-read reviews.
-No IO, store, route, scheduler or caller; the outcome evaluator, binding,
-producer and store are unchanged and still label corporate actions NOT_CHECKED.
+No IO, store, route or scheduler. Its only caller is the optional gate of the
+outcome producer (decision-outcome-production-v2), which retains a terminal
+outcome only on CLEAR when the caller supplies selections; the evaluator,
+binding and store are unchanged and the job supplies no selections yet.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from datetime import date, datetime, timezone

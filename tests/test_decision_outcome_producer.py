@@ -1,4 +1,4 @@
-"""decision-outcome-production-v1: retained observations + daily evidence -> retained outcomes."""
+"""decision-outcome-production-v2: retained observations + daily evidence -> retained outcomes."""
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal as D
 from hashlib import sha256
@@ -10,14 +10,19 @@ from app.decision_observation import canonical_bytes
 from app.decision_observation_store import (
     load_retained_decision_observations, retain_decision_observation)
 from app.decision_outcome import TOUCH, OutcomeAssumptions, evaluate_decision_outcome
+from app.decision_outcome_action_evidence import OutcomeActionSelection
+from app.decision_outcome_corporate_actions import WINDOW_RULE, check_egx_outcome_corporate_actions
 from app.decision_outcome_metrics import aggregate_decision_outcomes
 from app.decision_outcome_producer import (
-    CALENDAR_RULE, CONTRACT_VERSION, ENTRY_STATUSES, PRODUCTION_REASONS,
-    DecisionOutcomeProductionError, EgxDailyEvidence, produce_egx_decision_outcomes)
+    ACTION_PATH_RULE, AWAITING_REASONS, CALENDAR_RULE, CONTRACT_VERSION, ENTRY_STATUSES,
+    PRODUCTION_REASONS, DecisionOutcomeProductionError, EgxDailyEvidence,
+    produce_egx_decision_outcomes)
 from app.decision_outcome_session_bars import bind_egx_outcome_session_bars
 from app.decision_outcome_store import load_retained_decision_outcomes
 from app.strategies.contracts import Candidate
 from app.strategies.trade_decision import DecisionSource, DecisionTerms, TradeDecision
+from tests.test_decision_outcome_corporate_actions import (
+    REVIEWS, SOURCE, action, evidence as action_evidence)
 from tests.test_decision_outcome_session_bars import (
     AT, CAL, INSTRUMENT, LOOKBACK, RECEIVED, ROWS, VALID_UNTIL, ZERO, row, session)
 
@@ -67,11 +72,18 @@ def observe(directory, *decisions):
     return load_retained_decision_observations(str(directory), market='EGX')
 
 
-def produce(stores, daily=None, sessions=CAL, now=NOW, assumptions=ZERO):
+def produce(stores, daily=None, sessions=CAL, now=NOW, assumptions=ZERO, actions=None):
     observations, outcomes = stores
     daily = {str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED)} if daily is None else daily
     return produce_egx_decision_outcomes(str(observations), str(outcomes), daily=daily,
-                                         sessions=sessions, assumptions=assumptions, now=now)
+                                         sessions=sessions, assumptions=assumptions, now=now,
+                                         actions=actions)
+
+
+def selection(doc=None):
+    """The exact ReferenceRepository.actions selection shape (fixture document)."""
+    return OutcomeActionSelection(evidence=action_evidence() if doc is None else doc,
+                                  source_ingestion_id=SOURCE, review_ingestion_ids=REVIEWS)
 
 
 def snapshot(directory):
@@ -89,7 +101,7 @@ def refused(reason, call, *args, **kwargs):
 def test_terminal_outcome_is_evaluated_from_retained_evidence_and_retained(stores):
     (identity, record), = observe(stores[0])
     out = produce(stores)
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v1'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v2'
     assert out['market'] == 'EGX' and out['observations'] == 1
     assert out['produced_at'] == '2026-11-09T15:00:00Z'
     (entry,) = out['outcomes']
@@ -121,7 +133,15 @@ def test_result_is_labelled_and_claims_nothing(stores):
     out = produce(stores)
     assert {k: out[k] for k in SAFETY} == SAFETY
     assert out['calendar_rule'] == CALENDAR_RULE == 'CALENDAR_THROUGH_RECEIPT_DATE_V1'
+    # Without action selections the v1 behaviour is kept and labelled unchecked.
     assert out['corporate_actions'] == 'NOT_CHECKED'
+    assert out['corporate_action_window_rule'] is None
+    assert out['corporate_action_path_rule'] is None
+    assert out['action_selections_without_observation'] is None
+    assert out['retained_outcome_corporate_actions'] == 'NOT_RECORDED_IN_OUTCOME'
+    assert out['price_adjustment'] == 'NOT_APPLIED'
+    assert out['outcomes'][0]['corporate_action_status'] is None
+    assert out['outcomes'][0]['corporate_action_check'] is None
     assert out['calendar_admission'] == 'NOT_ESTABLISHED'
     assert out['daily_receipt_clock'] == 'CALLER_ASSERTED_UNVERIFIED'
     assert out['retained_outcome_reevaluation'] == 'NOT_PERFORMED'
@@ -239,6 +259,113 @@ def test_damaged_stores_fail_closed(stores):
     error = refused('OBSERVATIONS_UNAVAILABLE', produce, stores)
     assert error.detail == 'STORE_INVALID'
     assert snapshot(outcomes) == []
+
+
+def test_clear_action_check_is_required_before_retention(stores):
+    (identity, record), = observe(stores[0])
+    # Actions outside the window (before the data_as_of date, after the path) only.
+    doc = action_evidence((action(3), action(12)))
+    out = produce(stores, actions={identity: selection(doc)})
+    assert out['schema_version'] == 'decision-outcome-production-v2'
+    assert out['corporate_actions'] == 'CHECKED_BEFORE_RETENTION'
+    assert out['corporate_action_window_rule'] == WINDOW_RULE
+    assert out['corporate_action_path_rule'] == ACTION_PATH_RULE == 'PATH_COMPLETION_DATE_CAIRO_V1'
+    assert out['action_selections_without_observation'] == 0
+    assert out['price_adjustment'] == 'NOT_APPLIED'
+    (entry,) = out['outcomes']
+    assert (entry['status'], entry['outcome_status']) == ('RETAINED', 'CLOSED')
+    assert entry['corporate_action_status'] == 'CLEAR'
+    # The report is exactly the unchanged pure check at the path-completion date
+    # (2026-11-09T14:00Z is 16:00 Cairo on 2026-11-09) with the producer clock.
+    assert entry['corporate_action_check'] == check_egx_outcome_corporate_actions(
+        identity, record, doc, source_ingestion_id=SOURCE, review_ingestion_ids=REVIEWS,
+        path_through=date(2026, 11, 9), as_of=NOW)
+    # The retained outcome is the same unchanged evaluator result as an unchecked run.
+    bound = bind_egx_outcome_session_bars(identity, record, ROWS, CAL, received_at=RECEIVED)
+    expected = evaluate_decision_outcome(identity, record, bound['bars'], assumptions=ZERO,
+                                         path_complete_through_at=bound['path_complete_through_at'],
+                                         evaluated_at=NOW)
+    assert load_retained_decision_outcomes(str(stores[1]), market='EGX',
+                                           assumptions=ZERO) == (expected,)
+    # A retained outcome is not re-checked; the outcome record does not carry the check.
+    (again,) = produce(stores, actions={})['outcomes']
+    assert again['status'] == 'ALREADY_RETAINED' and again['corporate_action_status'] is None
+    assert out['retained_outcome_corporate_actions'] == 'NOT_RECORDED_IN_OUTCOME'
+
+
+def test_action_in_path_is_visible_and_never_retained(stores):
+    (identity, record), = observe(stores[0])
+    # A dividend effective on Sunday 2026-11-08, inside the path.
+    out = produce(stores, actions={identity: selection(action_evidence((action(8),)))})
+    (entry,) = out['outcomes']
+    assert entry['status'] == 'ACTIONS_IN_PATH'
+    assert entry['corporate_action_status'] == 'ACTIONS_IN_PATH'
+    assert [a['event_id'] for a in entry['corporate_action_check']['actions_in_path']] == ['ev-8']
+    assert entry['corporate_action_check']['price_adjustment'] == 'NOT_APPLIED'
+    # The hypothetical outcome stays visible but is not retained or adjusted.
+    assert entry['outcome_status'] == 'CLOSED' and entry['outcome_identity'] is None
+    assert out['status_counts']['ACTIONS_IN_PATH'] == 1
+    assert out['status_counts']['RETAINED'] == 0
+    assert snapshot(stores[1]) == []
+    # The unchanged aggregate keeps the decision as NOT_EVALUATED (no silent drop).
+    metrics = aggregate_decision_outcomes(
+        load_retained_decision_observations(str(stores[0]), market='EGX'), (),
+        market='EGX', assumptions=ZERO, as_of=NOW)
+    assert metrics['contract_version'] == 'decision-outcome-metrics-v1'
+
+
+def test_missing_selection_awaits_action_evidence(stores):
+    observed = observe(stores[0], decision(), decision(symbol='OTHR', instrument=OTHER))
+    other_rows = tuple(r.model_copy(update={'instrument_id': OTHER, 'canonical_symbol': 'OTHR'})
+                       for r in ROWS)
+    identities = {record['symbol']: identity for identity, record in observed}
+    out = produce(stores, daily={str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED),
+                                 str(OTHER): EgxDailyEvidence(other_rows, RECEIVED)},
+                  actions={identities['TEST']: selection(), 'f' * 64: selection()})
+    by_symbol = {e['symbol']: e for e in out['outcomes']}
+    assert by_symbol['TEST']['status'] == 'RETAINED'
+    waiting = by_symbol['OTHR']
+    assert (waiting['status'], waiting['reason']) == ('AWAITING_ACTION_EVIDENCE',
+                                                      'NO_ACTION_EVIDENCE')
+    assert 'NO_ACTION_EVIDENCE' in AWAITING_REASONS
+    assert waiting['outcome_status'] == 'CLOSED' and waiting['outcome_identity'] is None
+    assert waiting['corporate_action_check'] is None
+    # A selection naming no stored observation is counted, never used.
+    assert out['action_selections_without_observation'] == 1
+    assert len(snapshot(stores[1])) == 1
+
+
+@pytest.mark.parametrize('doc,why', [
+    (action_evidence(end=date(2026, 11, 8)), 'coverage'),        # ends before the path date
+    (action_evidence(start=date(2026, 11, 6)), 'coverage'),      # starts after data_as_of date
+    (action_evidence(published=NOW + timedelta(seconds=1)), 'published after'),
+    (action_evidence(instrument=OTHER), 'instrument'),
+])
+def test_unusable_action_evidence_rejects_only_that_observation(stores, doc, why):
+    (identity, _), = observe(stores[0])
+    (entry,) = produce(stores, actions={identity: selection(doc)})['outcomes']
+    assert entry['status'] == 'ACTION_CHECK_REJECTED' and why in entry['detail']
+    assert entry['corporate_action_status'] is None and entry['outcome_identity'] is None
+    assert snapshot(stores[1]) == []
+
+
+def test_pending_path_is_not_checked(stores):
+    observe(stores[0])
+    received = datetime(2026, 11, 6, 7, tzinfo=UTC)
+    rows = tuple(r.model_copy(update={'source_snapshot_date': date(2026, 11, 6)})
+                 for r in LOOKBACK + (row(5, '10', '10.6', '9.8', '10.4', 3),))
+    (entry,) = produce(stores, daily={str(INSTRUMENT): EgxDailyEvidence(rows, received)},
+                       now=received + timedelta(hours=1), actions={})['outcomes']
+    assert entry['status'] == 'PENDING_PATH' and entry['corporate_action_status'] is None
+    assert snapshot(stores[1]) == []
+
+
+def test_invalid_action_selections_are_refused(stores):
+    (identity, _), = observe(stores[0])
+    doc = action_evidence()
+    for actions in ([selection()], {identity: (doc, SOURCE, REVIEWS)}, {1: selection()}):
+        refused('CONFIG_INVALID', produce, stores, actions=actions)
+    assert snapshot(stores[1]) == []
 
 
 def test_production_is_deterministic_for_a_fixed_clock(tmp_path):

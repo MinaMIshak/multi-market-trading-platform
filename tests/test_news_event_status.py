@@ -202,9 +202,9 @@ def test_declared_gaps_match_the_code():
     assert "'admission': 'NOT_ESTABLISHED'" in calendar_loader
     assert "'live_money': False" in calendar_loader
     # The corporate-action path check is a pure component: it reads no database
-    # or file, adjusts no price and evaluates no outcome; only the action-evidence
-    # loader (a component) references it, and the loader does not call it, so the
-    # outcome path still labels corporate actions NOT_CHECKED and the gap stays open.
+    # or file, adjusts no price and evaluates no outcome; only components reference
+    # it (the action-evidence loader, which does not call it, and the outcome
+    # producer's optional gate, checked below), and the gap stays open.
     corporate_actions = (ROOT / 'app' / 'decision_outcome_corporate_actions.py').read_text(
         encoding='utf-8')
     assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository)\b',
@@ -237,7 +237,16 @@ def test_declared_gaps_match_the_code():
                  'retain_decision_outcome(outcome_directory, (identity, record), outcome, now=now)',
                  'load_retained_decision_observations(', 'load_retained_decision_outcomes('):
         assert call in outcome_producer, call
-    assert "'corporate_actions': 'NOT_CHECKED'" in outcome_producer
+    # decision-outcome-production-v2: the unchanged pure check gates retention
+    # only when the caller supplies selections; otherwise the run says NOT_CHECKED.
+    # The retained outcome record does not carry the check, and the job passes no
+    # selections, so the gap stays open (asserted above).
+    assert ("'corporate_actions': 'NOT_CHECKED' if actions is None else "
+            "'CHECKED_BEFORE_RETENTION'") in outcome_producer
+    assert 'check_egx_outcome_corporate_actions(' in outcome_producer
+    assert "'retained_outcome_corporate_actions': 'NOT_RECORDED_IN_OUTCOME'" in outcome_producer
+    assert "'price_adjustment': 'NOT_APPLIED'" in outcome_producer
+    assert 'actions=' not in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_producer
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_producer
     assert "'live_money': False" in outcome_producer
