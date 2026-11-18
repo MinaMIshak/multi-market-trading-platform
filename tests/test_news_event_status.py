@@ -202,9 +202,9 @@ def test_declared_gaps_match_the_code():
     assert "'admission': 'NOT_ESTABLISHED'" in calendar_loader
     assert "'live_money': False" in calendar_loader
     # The corporate-action path check is a pure component: it reads no database
-    # or file, adjusts no price, evaluates no outcome and has no caller (checked
-    # above), so the outcome path still labels corporate actions NOT_CHECKED and
-    # the gap stays open.
+    # or file, adjusts no price and evaluates no outcome; only the action-evidence
+    # loader (a component) references it, and the loader does not call it, so the
+    # outcome path still labels corporate actions NOT_CHECKED and the gap stays open.
     corporate_actions = (ROOT / 'app' / 'decision_outcome_corporate_actions.py').read_text(
         encoding='utf-8')
     assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository)\b',
@@ -214,6 +214,20 @@ def test_declared_gaps_match_the_code():
     assert "'review_verification': 'CALLER_ASSERTED_UNVERIFIED'" in corporate_actions
     assert "'live_money': False" in corporate_actions
     assert "'promotion': 'NOT_AUTHORIZED'" in corporate_actions
+    # The action-evidence loader only delegates selection to the unchanged
+    # ReferenceRepository.actions: no SQL of its own, no check call, no price
+    # adjustment; nothing calls it yet (no caller outside the components).
+    action_evidence = (ROOT / 'app' / 'decision_outcome_action_evidence.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'repository.actions(' in action_evidence
+    assert not re.search(r'\b(execute|SELECT|INSERT|UPDATE|DELETE|initialize)\b',
+                         action_evidence)
+    assert 'check_egx_outcome_corporate_actions' not in action_evidence
+    assert "'corporate_action_check': 'NOT_PERFORMED_BY_LOADER'" in action_evidence
+    assert "'price_adjustment': 'NOT_APPLIED'" in action_evidence
+    assert "'database_writes': 'NONE_ON_SUCCESS'" in action_evidence
+    assert "'live_money': False" in action_evidence
+    assert "'promotion': 'NOT_AUTHORIZED'" in action_evidence
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

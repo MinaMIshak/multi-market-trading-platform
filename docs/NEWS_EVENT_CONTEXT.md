@@ -588,6 +588,40 @@ document, which is the complete, bounded, reviewed coverage that the existing
   stays open until a loader and the outcome path use this check, making an
   ACTIONS_IN_PATH path or missing coverage visible as non-evidence.
 
+## Outcome-path action evidence loader (`app.decision_outcome_action_evidence`, decision-outcome-action-evidence-v1)
+
+Status: library, pending host validation; no caller. It supplies the check's
+`evidence`, `source_ingestion_id` and `review_ingestion_ids` inputs and adds no
+selection, review or check logic of its own.
+`load_egx_outcome_action_evidence(database, raw_root, requests, *, as_of)`
+takes a tuple of caller-named (observation identity, retained record,
+`path_through`) triples.
+
+- Each record is re-read from its exact bytes by the check's own reader (content
+  address, EGX). The window is the check's
+  DATA_AS_OF_DATE_THROUGH_PATH_DATE_INCLUSIVE_V1 rule, and `path_through` must
+  lie between the detection date and the `as_of` date (else CONFIG_INVALID).
+- Selection is made only by the unchanged `ReferenceRepository.actions`:
+  exactly one validated, reviewed egx-actions-v1 document received, completed
+  and published by `as_of` whose coverage spans the window. Missing, partial,
+  overlapping, unreviewed or damaged evidence is ACTIONS_UNAVAILABLE and is
+  never resolved by preference. The returned document, source id and review ids
+  are re-checked (ACTIONS_REJECTED), never repaired.
+- Whole load refused on any failure (CONFIG_INVALID, DATABASE_UNAVAILABLE,
+  ACTIONS_UNAVAILABLE, ACTIONS_REJECTED). A missing database file is refused
+  before any connection, so nothing is created. The module issues no SQL of
+  its own and nothing is written on success. On refusal the unchanged
+  repository may record its existing `data_quality_issues` audit row.
+- Result: per-identity `OutcomeActionSelection` plus per-request provenance
+  (window, raw path/digest, provider, receipt/completion, coverage,
+  publication, review ids) in caller order. It is labelled
+  `corporate_action_check` NOT_PERFORMED_BY_LOADER, review verification
+  REFERENCE_REPOSITORY_REQUIRE_REVIEW, reviewer authority NOT_ATTESTED, price
+  adjustment NOT_APPLIED, outcome NOT_EVALUATED, performance claim NONE,
+  SHADOW, LIVE_MONEY=false and NOT_AUTHORIZED.
+- The check is not called here. The producer, job, evaluator and store are
+  unchanged, so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
