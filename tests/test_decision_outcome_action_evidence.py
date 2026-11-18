@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal as D
 from hashlib import sha256
 import json
+import sqlite3
 from uuid import UUID
 
 import pytest
@@ -13,8 +14,9 @@ from app.data.reference import ActionEvidence
 from app.decision_observation import canonical_bytes, decision_observation
 from app.decision_outcome import TOUCH
 from app.decision_outcome_action_evidence import (
-    CONTRACT_VERSION, LOAD_REASONS, ActionEvidenceLoadError, OutcomeActionSelection,
-    load_egx_outcome_action_evidence)
+    BY_REQUEST_CONTRACT_VERSION, CONTRACT_VERSION, LOAD_REASONS, REQUEST_STATUSES,
+    SELECTION_FIELDS, ActionEvidenceLoadError, OutcomeActionSelection,
+    load_egx_outcome_action_evidence, load_egx_outcome_action_evidence_by_request)
 from app.decision_outcome_corporate_actions import WINDOW_RULE, check_egx_outcome_corporate_actions
 from app.storage.database import Database
 from app.storage.reference_repository import ReferenceRepository
@@ -263,3 +265,163 @@ def test_load_is_deterministic(repo):
     second = load(repo, ((identity, record, PATH),), as_of=as_of)
     assert first == second
     json.dumps({k: v for k, v in first.items() if k != 'selections'}, allow_nan=False)
+
+
+# decision-outcome-action-evidence-by-request-v1: one observation's missing or
+# rejected evidence no longer blocks the others; it only leaves that observation
+# without a selection (the producer gate then reports AWAITING_ACTION_EVIDENCE).
+
+def load_by_request(repo, requests, *, as_of=None, raw_root=None):
+    return load_egx_outcome_action_evidence_by_request(
+        repo.database, str(repo.raw_store.root) if raw_root is None else raw_root, requests,
+        as_of=now() if as_of is None else as_of)
+
+
+def window(first, last):
+    return {'rule': WINDOW_RULE, 'first_date': first, 'last_date': last,
+            'timezone': 'Africa/Cairo'}
+
+
+def without_status(sources):
+    return [{k: v for k, v in s.items() if k not in ('status', 'detail')} for s in sources]
+
+
+def test_by_request_equals_the_whole_load_when_every_request_is_selected(repo):
+    reviewed(repo, actions_doc((dividend(6),)))
+    reviewed(repo, actions_doc(instrument=OTHER))
+    first = observation()
+    second = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC), instrument=OTHER)
+    requests = ((second[0], second[1], date(2026, 11, 10)), (first[0], first[1], PATH))
+    as_of = now()
+    issues = issue_count(repo)
+    whole = load(repo, requests, as_of=as_of)
+    result = load_by_request(repo, requests, as_of=as_of)
+    assert issue_count(repo) == issues
+    assert result['selections'] == whole['selections']
+    assert [s['status'] for s in result['sources']] == ['SELECTED', 'SELECTED']
+    assert [s['detail'] for s in result['sources']] == [None, None]
+    assert without_status(result['sources']) == whole['sources']
+    assert result['request_counts'] == {
+        'requests': 2, 'SELECTED': 2, 'ACTIONS_UNAVAILABLE': 0, 'ACTIONS_REJECTED': 0}
+    assert result['database_writes'] == 'NONE'
+
+
+def test_missing_coverage_refuses_only_that_request(repo):
+    manifest, review_manifest = reviewed(repo, actions_doc())      # INSTRUMENT only
+    first = observation()
+    second = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC), instrument=OTHER)
+    requests = ((second[0], second[1], date(2026, 11, 10)), (first[0], first[1], PATH))
+    issues = issue_count(repo)
+    result = load_by_request(repo, requests)
+    # The unchanged repository records its existing audit row for the refusal.
+    assert issue_count(repo) == issues + 1
+    assert set(result['selections']) == {first[0]}
+    refused, selected = result['sources']
+    assert refused == {
+        'observation_identity': second[0], 'decision_id': second[1]['decision_id'],
+        'symbol': 'TEST', 'instrument_id': str(OTHER),
+        'window': window('2026-11-08', '2026-11-10'),
+        **dict.fromkeys(SELECTION_FIELDS),
+        'status': 'ACTIONS_UNAVAILABLE', 'detail': refused['detail']}
+    assert refused['detail'].startswith(f'{second[0]}: ') and 'coverage' in refused['detail']
+    assert selected['status'] == 'SELECTED' and selected['detail'] is None
+    assert selected['source_ingestion_id'] == str(manifest.ingestion_id)
+    assert selected['review_ingestion_ids'] == [str(review_manifest.ingestion_id)]
+    assert result['request_counts'] == {
+        'requests': 2, 'SELECTED': 1, 'ACTIONS_UNAVAILABLE': 1, 'ACTIONS_REJECTED': 0}
+    assert result['database_writes'] == 'REPOSITORY_AUDIT_ROWS_POSSIBLE_FOR_REFUSED_REQUESTS'
+    # The v1 whole load still refuses everything for the same requests.
+    with pytest.raises(ActionEvidenceLoadError) as error:
+        load(repo, requests)
+    assert error.value.reason == 'ACTIONS_UNAVAILABLE'
+
+
+def test_coverage_ending_before_one_path_refuses_only_that_request(repo):
+    reviewed(repo, actions_doc(end='2026-11-09'))
+    first = observation()
+    later = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC))   # same instrument
+    result = load_by_request(repo, ((first[0], first[1], PATH),
+                                    (later[0], later[1], date(2026, 11, 10))))
+    assert [s['status'] for s in result['sources']] == ['SELECTED', 'ACTIONS_UNAVAILABLE']
+    assert set(result['selections']) == {first[0]}
+    # Never resolved by stretching or substituting the covered document.
+    assert result['sources'][1]['coverage_end'] is None
+    assert result['sources'][1]['window'] == window('2026-11-08', '2026-11-10')
+
+
+def test_rejected_selection_refuses_only_that_request(repo, monkeypatch):
+    reviewed(repo, actions_doc())
+    original = ReferenceRepository.actions
+
+    def other_instrument(self, *, instrument_id, start, end, as_of):
+        # Defensive re-check: a document for a different instrument is rejected.
+        return original(self, instrument_id=INSTRUMENT, start=start, end=end, as_of=as_of)
+
+    monkeypatch.setattr(ReferenceRepository, 'actions', other_instrument)
+    first = observation()
+    second = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC), instrument=OTHER)
+    result = load_by_request(repo, ((first[0], first[1], PATH),
+                                    (second[0], second[1], date(2026, 11, 10))))
+    assert [s['status'] for s in result['sources']] == ['SELECTED', 'ACTIONS_REJECTED']
+    assert 'does not cover the window' in result['sources'][1]['detail']
+    assert set(result['selections']) == {first[0]}
+    assert result['request_counts']['ACTIONS_REJECTED'] == 1
+
+
+def test_by_request_still_refuses_bad_requests_and_database_failures(repo, tmp_path, monkeypatch):
+    reviewed(repo, actions_doc())
+    identity, record = observation()
+    other = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC), instrument=OTHER)
+    for requests in (
+            ((identity, record, PATH), (identity, record, PATH)),               # duplicate
+            ((other[0], other[1], date(2026, 11, 10)),
+             (identity, record, date(2026, 11, 4))),                           # before detection
+            ((identity, record, PATH), ('0' * 64, record, PATH))):             # wrong address
+        issues = issue_count(repo)
+        with pytest.raises(ActionEvidenceLoadError) as error:
+            load_by_request(repo, requests)
+        assert error.value.reason == 'CONFIG_INVALID', requests
+        assert issue_count(repo) == issues                                     # nothing read
+    missing = tmp_path / 'absent' / 'missing.db'
+    with pytest.raises(ActionEvidenceLoadError) as error:
+        load_egx_outcome_action_evidence_by_request(
+            Database(missing), str(tmp_path), ((identity, record, PATH),), as_of=now())
+    assert error.value.reason == 'DATABASE_UNAVAILABLE'
+    assert not missing.exists() and not missing.parent.exists()
+
+    def locked(self, **kwargs):
+        raise sqlite3.OperationalError('database is locked')
+
+    monkeypatch.setattr(ReferenceRepository, 'actions', locked)
+    with pytest.raises(ActionEvidenceLoadError) as error:
+        load_by_request(repo, ((identity, record, PATH),))
+    assert error.value.reason == 'DATABASE_UNAVAILABLE'
+
+
+def test_by_request_result_is_labelled_deterministic_and_claims_nothing(repo):
+    reviewed(repo, actions_doc())
+    first = observation()
+    second = observation(at=datetime(2026, 11, 8, 6, tzinfo=UTC), instrument=OTHER)
+    requests = ((first[0], first[1], PATH), (second[0], second[1], date(2026, 11, 10)))
+    as_of = now()
+    result = load_by_request(repo, requests, as_of=as_of)
+    assert result == load_by_request(repo, requests, as_of=as_of)
+    assert result['schema_version'] == BY_REQUEST_CONTRACT_VERSION == (
+        'decision-outcome-action-evidence-by-request-v1')
+    assert REQUEST_STATUSES == ('SELECTED', 'ACTIONS_UNAVAILABLE', 'ACTIONS_REJECTED')
+    assert {s['status'] for s in result['sources']} <= set(REQUEST_STATUSES)
+    assert result['market'] == 'EGX'
+    assert result['as_of'] == as_of.isoformat().replace('+00:00', 'Z')
+    assert result['request_selection'] == 'CALLER_NAMED_OBSERVATIONS'
+    assert result['refusal_scope'] == 'PER_REQUEST_EVIDENCE_ONLY'
+    assert result['refused_request_effect'] == 'NO_SELECTION_FOR_REQUEST'
+    assert result['evidence_selection'] == 'REFERENCE_REPOSITORY_ACTIONS_POINT_IN_TIME'
+    assert result['review_verification'] == 'REFERENCE_REPOSITORY_REQUIRE_REVIEW'
+    assert result['reviewer_authority'] == 'NOT_ATTESTED'
+    assert result['corporate_action_check'] == 'NOT_PERFORMED_BY_LOADER'
+    assert result['price_adjustment'] == 'NOT_APPLIED' and result['outcome'] == 'NOT_EVALUATED'
+    assert result['performance_claim'] == 'NONE' and result['mode'] == 'SHADOW'
+    assert result['live_money'] is False and result['execution_allowed'] is False
+    assert result['promotion'] == 'NOT_AUTHORIZED'
+    assert 'clear_basis' not in json.dumps(result['sources'])
+    json.dumps({k: v for k, v in result.items() if k != 'selections'}, allow_nan=False)

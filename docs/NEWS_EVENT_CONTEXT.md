@@ -622,6 +622,37 @@ takes a tuple of caller-named (observation identity, retained record,
 - The check is not called here. The job, evaluator and store are unchanged,
   so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
 
+### Per-request refusal (decision-outcome-action-evidence-by-request-v1)
+
+Status: library function, pending host validation; no caller.
+`load_egx_outcome_action_evidence_by_request(database, raw_root, requests, *, as_of)`
+has the same arguments, request checks and per-request selection as the v1
+loader, so one observation's missing evidence no longer blocks every other
+observation.
+
+- ACTIONS_UNAVAILABLE and ACTIONS_REJECTED are reported on that request's own
+  `sources` entry (`status`, `detail`; every selection field None; identity
+  and window kept) and the request gets no selection. Fed to the producer
+  gate, that observation becomes AWAITING_ACTION_EVIDENCE and nothing is
+  retained for it. Other evidence is never substituted.
+- CONFIG_INVALID (checked for every request before the database is opened) and
+  DATABASE_UNAVAILABLE (missing file, SQLite error) still refuse the whole
+  load.
+- Every entry carries `status` SELECTED / ACTIONS_UNAVAILABLE /
+  ACTIONS_REJECTED, and `request_counts` reports totals. `database_writes` is
+  NONE when nothing was refused; otherwise it is
+  REPOSITORY_AUDIT_ROWS_POSSIBLE_FOR_REFUSED_REQUESTS, because the unchanged
+  repository may record its audit row. Labels otherwise match v1, plus
+  `refusal_scope` PER_REQUEST_EVIDENCE_ONLY and `refused_request_effect`
+  NO_SELECTION_FOR_REQUEST.
+- The v1 function's behaviour and output are unchanged. The job still passes
+  no selections, so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
+  Still open before the job can use this: which `path_through` the job names
+  per observation. The producer checks through the path-completion date, which
+  is known only after binding, and the repository treats any overlapping
+  document as ambiguous, so a later path date can refuse where the exact one
+  would not.
+
 ## Producer corporate-action gate (decision-outcome-production-v2)
 
 Status: library change, pending host validation; the job does not use it yet.

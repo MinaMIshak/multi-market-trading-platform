@@ -24,8 +24,20 @@ or check logic of its own:
    unreviewed or damaged evidence is refused by it (never resolved here by
    preference).
 
-Any failure refuses the whole load with one fixed reason (no partial mapping
-is returned). The returned selections are inputs only: this module does not
+``load_egx_outcome_action_evidence`` (v1) refuses the whole load on any
+failure with one fixed reason (no partial mapping is returned).
+``load_egx_outcome_action_evidence_by_request``
+(decision-outcome-action-evidence-by-request-v1) applies the same request
+checks and the same per-request selection, but a refusal that concerns only
+one observation's evidence (ACTIONS_UNAVAILABLE or ACTIONS_REJECTED) is
+reported on that request's own entry (status, detail, no selection) instead of
+refusing every other observation; that observation then has no selection, so
+the outcome producer's gate reports it AWAITING_ACTION_EVIDENCE and retains
+nothing for it. Malformed requests (CONFIG_INVALID) and database failures
+(DATABASE_UNAVAILABLE) still refuse the whole load, and no refusal is ever
+resolved by choosing other evidence.
+
+The returned selections are inputs only: this module does not
 call the check, so no CLEAR / ACTIONS_IN_PATH result exists here, no price is
 adjusted, no outcome is evaluated, changed or retained, and the outcome
 evaluator, binding, producer, job and store are unchanged (still labelling
@@ -33,8 +45,9 @@ corporate actions NOT_CHECKED).
 
 Database: a missing file is refused before any connection (nothing created);
 this module issues no SQL of its own. On a successful load nothing is written.
-On refusal the unchanged ``ReferenceRepository`` may record its existing
-durable ``data_quality_issues`` audit row (ACTIONS_MISSING_OR_AMBIGUOUS,
+On refusal (of the load, or of one request in the by-request form) the
+unchanged ``ReferenceRepository`` may record its existing durable
+``data_quality_issues`` audit row (ACTIONS_MISSING_OR_AMBIGUOUS,
 SOURCE_UNVALIDATED or REFERENCE_INTEGRITY); that is its established behaviour
 and is labelled, not suppressed. Review records are verified by
 ``ReferenceRepository.require_review`` (subject id, digest, provider and
@@ -61,6 +74,13 @@ from app.storage.reference_repository import ReferenceRepository
 CONTRACT_VERSION = 'decision-outcome-action-evidence-v1'
 LOAD_REASONS = ('CONFIG_INVALID', 'DATABASE_UNAVAILABLE', 'ACTIONS_UNAVAILABLE',
                 'ACTIONS_REJECTED')
+BY_REQUEST_CONTRACT_VERSION = 'decision-outcome-action-evidence-by-request-v1'
+REQUEST_STATUSES = ('SELECTED', 'ACTIONS_UNAVAILABLE', 'ACTIONS_REJECTED')
+# Only these refusals concern one request's evidence; any other reason refuses the load.
+REQUEST_REFUSALS = REQUEST_STATUSES[1:]
+SELECTION_FIELDS = ('source_ingestion_id', 'raw_path', 'raw_sha256', 'provider', 'received_at',
+                    'completed_at', 'coverage_start', 'coverage_end', 'published_at',
+                    'actions_declared', 'review_ingestion_ids')
 MAX_REQUESTS = 1000
 MAX_DETAIL = 200
 
@@ -165,6 +185,48 @@ def _select(repository, identity, instrument_id, first, path_through, as_of):
         evidence=document, source_ingestion_id=source, review_ingestion_ids=reviews)
 
 
+def _checked(requests, as_of):
+    """Every request re-read and windowed before any database access."""
+    checked = []
+    for identity, record, path_through in requests:
+        try:
+            record = _record(identity, record)
+            instrument_id, first = _window(identity, record, path_through, as_of)
+        except (ValueError, TypeError, KeyError) as exc:
+            _fail('CONFIG_INVALID', identity, f'record rejected: {exc}')
+        checked.append((identity, record, path_through, instrument_id, first))
+    return checked
+
+
+def _request_entry(identity, record, instrument_id, first, path_through):
+    return {
+        'observation_identity': identity,
+        'decision_id': record['decision_id'],
+        'symbol': record['symbol'],
+        'instrument_id': str(instrument_id),
+        'window': {'rule': WINDOW_RULE, 'first_date': first.isoformat(),
+                   'last_date': path_through.isoformat(), 'timezone': 'Africa/Cairo'},
+    }
+
+
+def _source(identity, record, instrument_id, first, path_through, row, selection):
+    document = selection.evidence
+    return {
+        **_request_entry(identity, record, instrument_id, first, path_through),
+        'source_ingestion_id': selection.source_ingestion_id,
+        'raw_path': row['raw_path'],
+        'raw_sha256': row['sha256'],
+        'provider': row['provider'],
+        'received_at': row['received_at'],
+        'completed_at': row['completed_at'],
+        'coverage_start': document.coverage_start.isoformat(),
+        'coverage_end': document.coverage_end.isoformat(),
+        'published_at': _utc(document.published_at),
+        'actions_declared': len(document.actions),
+        'review_ingestion_ids': list(selection.review_ingestion_ids),
+    }
+
+
 def load_egx_outcome_action_evidence(database, raw_root, requests, *, as_of) -> dict:
     """Return ``{'selections': {identity: OutcomeActionSelection}, 'sources': [...]}``.
 
@@ -177,41 +239,13 @@ def load_egx_outcome_action_evidence(database, raw_root, requests, *, as_of) -> 
     ``ActionEvidenceLoadError``.
     """
     as_of = _aware(as_of)
-    requests = _requests(requests)
-    checked = []
-    for identity, record, path_through in requests:
-        try:
-            record = _record(identity, record)
-            instrument_id, first = _window(identity, record, path_through, as_of)
-        except (ValueError, TypeError, KeyError) as exc:
-            _fail('CONFIG_INVALID', identity, f'record rejected: {exc}')
-        checked.append((identity, record, path_through, instrument_id, first))
-
+    checked = _checked(_requests(requests), as_of)
     repository = _repository(database, raw_root)
     selections, sources = {}, []
     for identity, record, path_through, instrument_id, first in checked:
         row, selection = _select(repository, identity, instrument_id, first, path_through, as_of)
         selections[identity] = selection
-        document = selection.evidence
-        sources.append({
-            'observation_identity': identity,
-            'decision_id': record['decision_id'],
-            'symbol': record['symbol'],
-            'instrument_id': str(instrument_id),
-            'window': {'rule': WINDOW_RULE, 'first_date': first.isoformat(),
-                       'last_date': path_through.isoformat(), 'timezone': 'Africa/Cairo'},
-            'source_ingestion_id': selection.source_ingestion_id,
-            'raw_path': row['raw_path'],
-            'raw_sha256': row['sha256'],
-            'provider': row['provider'],
-            'received_at': row['received_at'],
-            'completed_at': row['completed_at'],
-            'coverage_start': document.coverage_start.isoformat(),
-            'coverage_end': document.coverage_end.isoformat(),
-            'published_at': _utc(document.published_at),
-            'actions_declared': len(document.actions),
-            'review_ingestion_ids': list(selection.review_ingestion_ids),
-        })
+        sources.append(_source(identity, record, instrument_id, first, path_through, row, selection))
     return {
         'schema_version': CONTRACT_VERSION,
         'market': 'EGX',
@@ -226,6 +260,63 @@ def load_egx_outcome_action_evidence(database, raw_root, requests, *, as_of) -> 
         'price_adjustment': 'NOT_APPLIED',
         'outcome': 'NOT_EVALUATED',
         'database_writes': 'NONE_ON_SUCCESS',
+        'performance_claim': 'NONE', 'mode': 'SHADOW', 'live_money': False,
+        'execution_allowed': False, 'promotion': 'NOT_AUTHORIZED',
+    }
+
+
+def load_egx_outcome_action_evidence_by_request(database, raw_root, requests, *, as_of) -> dict:
+    """Like ``load_egx_outcome_action_evidence`` but refusing per request.
+
+    Same arguments and request checks. Each ``sources`` entry (one per
+    request, caller order) carries ``status`` (one of REQUEST_STATUSES) and
+    ``detail``; refused entries keep the request's identity and window and set
+    every selection field to None. ``selections`` holds SELECTED requests
+    only. CONFIG_INVALID and DATABASE_UNAVAILABLE still raise
+    ``ActionEvidenceLoadError`` for the whole load.
+    """
+    as_of = _aware(as_of)
+    checked = _checked(_requests(requests), as_of)
+    repository = _repository(database, raw_root)
+    selections, sources = {}, []
+    for identity, record, path_through, instrument_id, first in checked:
+        try:
+            row, selection = _select(
+                repository, identity, instrument_id, first, path_through, as_of)
+        except ActionEvidenceLoadError as exc:
+            if exc.reason not in REQUEST_REFUSALS:
+                raise
+            sources.append({
+                **_request_entry(identity, record, instrument_id, first, path_through),
+                **dict.fromkeys(SELECTION_FIELDS),
+                'status': exc.reason, 'detail': exc.detail,
+            })
+            continue
+        selections[identity] = selection
+        sources.append({
+            **_source(identity, record, instrument_id, first, path_through, row, selection),
+            'status': 'SELECTED', 'detail': None,
+        })
+    counts = {status: sum(s['status'] == status for s in sources) for status in REQUEST_STATUSES}
+    refused = len(sources) - counts['SELECTED']
+    return {
+        'schema_version': BY_REQUEST_CONTRACT_VERSION,
+        'market': 'EGX',
+        'as_of': _utc(as_of),
+        'selections': selections,
+        'sources': sources,
+        'request_counts': {'requests': len(sources), **counts},
+        'request_selection': 'CALLER_NAMED_OBSERVATIONS',
+        'refusal_scope': 'PER_REQUEST_EVIDENCE_ONLY',
+        'refused_request_effect': 'NO_SELECTION_FOR_REQUEST',
+        'evidence_selection': 'REFERENCE_REPOSITORY_ACTIONS_POINT_IN_TIME',
+        'review_verification': 'REFERENCE_REPOSITORY_REQUIRE_REVIEW',
+        'reviewer_authority': 'NOT_ATTESTED',
+        'corporate_action_check': 'NOT_PERFORMED_BY_LOADER',
+        'price_adjustment': 'NOT_APPLIED',
+        'outcome': 'NOT_EVALUATED',
+        'database_writes': ('NONE' if refused == 0
+                            else 'REPOSITORY_AUDIT_ROWS_POSSIBLE_FOR_REFUSED_REQUESTS'),
         'performance_claim': 'NONE', 'mode': 'SHADOW', 'live_money': False,
         'execution_allowed': False, 'promotion': 'NOT_AUTHORIZED',
     }
