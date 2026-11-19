@@ -747,6 +747,32 @@ refused. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKE
 stays open until the producer retains attestations (write-once, beside the
 outcomes) and a loader restricts metrics to attested outcomes.
 
+## Outcome attestation store (`app.decision_outcome_attestation_store`, decision-outcome-attestation-retention-v1)
+
+Status: library only, pending host validation; no directory provisioned
+(gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED), no producer, job, scheduler,
+route or caller. A write-once SIDECAR beside the outcome store (a separate
+directory; an outcome record in it fails closed on scan).
+`retain_outcome_action_attestation(directory, attestation, outcome,
+observation, *, now=None)` takes the retained `(identity, record)` outcome and
+observation pairs, re-derives the attestation with the unchanged
+`verify_outcome_action_attestation` and refuses a check `as_of` after the store
+clock (RECORD_REJECTED) before any write. One attestation per outcome
+identity: an exact retry, or one differing only in check time (`check_as_of`,
+`check_timing`, the embedded check's `as_of`, `check_sha256`), is
+ALREADY_RETAINED with the first record; any other difference (evidence,
+coverage, reviews) is ATTESTATION_CONFLICT. Same layout, lock, write-once and
+post-write verification as the outcome store; result labels
+`store_clock` CALLER_SUPPLIED_UNVERIFIED, NOT_APPLIED, HYPOTHETICAL_FROM_SESSION_BARS,
+NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+`read_retained_outcome_attestation` / `load_retained_outcome_attestations`
+check structure only (field set, fixed labels, terminal outcome status, check
+timing consistency, embedded check digest and identity fields); a loaded
+attestation is not evidence until re-verified against its retained outcome and
+observation, and a missing attestation means unattested, never clear. Gap
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open until the producer retains
+attestations and a loader restricts metrics to verified attested outcomes.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -995,8 +1021,9 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), retaining the pure outcome action attestation
-beside each checked outcome and restricting metrics to attested outcomes (gap
+OUTCOME_JOB_NOT_SCHEDULED), a producer retaining the outcome action
+attestation into the sidecar store beside each checked outcome, a provisioned
+attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and restricting metrics to attested outcomes (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered

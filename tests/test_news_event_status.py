@@ -248,6 +248,27 @@ def test_declared_gaps_match_the_code():
     for source in (ROOT / 'app' / 'decision_outcome_producer.py',
                    ROOT / 'app' / 'decision_outcome_job.py'):
         assert 'decision_outcome_action_attestation' not in source.read_text(encoding='utf-8')
+    # The attestation sidecar store library exists, but no directory is
+    # provisioned and nothing calls it (no caller outside the component modules,
+    # checked above; the producer and job do not reference it), so the
+    # corporate-action gap stays open. It retains only re-verified attestations
+    # and never touches the outcome store or prices.
+    assert 'OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_attestation_store*.py')] == [
+        'decision_outcome_attestation_store.py']
+    attestation_store = (ROOT / 'app' / 'decision_outcome_attestation_store.py').read_text(
+        encoding='utf-8')
+    assert 'verify_outcome_action_attestation(\n        attestation,' in attestation_store
+    assert not re.search(r'\b(connect|sqlite3|ReferenceRepository|retain_decision_outcome|'
+                         r'check_egx_outcome_corporate_actions)\b',
+                         attestation_store.split('"""', 2)[2])
+    assert "'price_adjustment': 'NOT_APPLIED'" in attestation_store
+    assert "'performance_claim': 'NONE'" in attestation_store
+    assert "'live_money': False" in attestation_store
+    assert "'promotion': 'NOT_AUTHORIZED'" in attestation_store
+    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
+                   ROOT / 'app' / 'decision_outcome_job.py'):
+        assert 'decision_outcome_attestation_store' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job
