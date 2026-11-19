@@ -229,6 +229,25 @@ def test_declared_gaps_match_the_code():
     assert "'database_writes': 'NONE_ON_SUCCESS'" in action_evidence
     assert "'live_money': False" in action_evidence
     assert "'promotion': 'NOT_AUTHORIZED'" in action_evidence
+    # The outcome action attestation is a pure component: no IO, no store, no
+    # price adjustment, no re-run of the check; nothing references it outside
+    # the components (checked above), so the gap stays open.
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_action_attestation*.py')] == [
+        'decision_outcome_action_attestation.py']
+    attestation = (ROOT / 'app' / 'decision_outcome_action_attestation.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_decision_outcome|check_egx_outcome_corporate_actions)\b',
+                         attestation)
+    assert "'corporate_action_status': 'CLEAR'" in attestation
+    assert "'check_recomputation': 'NOT_PERFORMED'" in attestation
+    assert "'price_adjustment': 'NOT_APPLIED'" in attestation
+    assert "'performance_claim': 'NONE'" in attestation
+    assert "'live_money': False" in attestation
+    assert "'promotion': 'NOT_AUTHORIZED'" in attestation
+    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
+                   ROOT / 'app' / 'decision_outcome_job.py'):
+        assert 'decision_outcome_action_attestation' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

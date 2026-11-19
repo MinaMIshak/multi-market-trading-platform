@@ -706,6 +706,47 @@ shape the action-evidence loader returns; anything else CONFIG_INVALID).
   be told apart in the store. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
   therefore stays open.
 
+## Outcome action attestation (`app.decision_outcome_action_attestation`, decision-outcome-action-attestation-v1)
+
+Status: pure library, pending host validation; nothing builds, retains or reads
+it yet. It is the record that will let checked outcomes be told apart from
+unchecked ones without changing decision-outcome-v1, the outcome store or the
+aggregate (whose exact outcome field set stays as is): a separate attestation
+next to the retained outcome rather than an outcome version bump.
+
+`attest_outcome_corporate_actions(outcome_identity, outcome, observation, check)`
+binds:
+
+- one retained terminal outcome by content address (re-read through the
+  unchanged `read_retained_decision_outcome` and re-bound to its observation by
+  the unchanged `decision_outcome_metrics._check_outcome`);
+- the retained EGX decision-observation-v1 `(identity, record)` it was
+  evaluated for (re-read from exact bytes);
+- one exact CLEAR decision-outcome-corporate-actions-v1 report, structurally
+  re-checked: exact field sets, fixed safety labels, no action in path,
+  COMPLETE_DECLARED_COVERAGE, same observation/decision/symbol/instrument,
+  window rule DATA_AS_OF_DATE_THROUGH_PATH_DATE_INCLUSIVE_V1 from the record's
+  Cairo `data_as_of` date to the Cairo date of the outcome's
+  `path_complete_through_at` (PATH_COMPLETION_DATE_CAIRO_V1, the producer's
+  rule; a shorter or longer window is refused), complete egx-actions-v1 coverage
+  spanning it, evidence published by the check's `as_of`, canonical
+  source/review UUIDs (reviews sorted, unique, not the source), and check
+  `as_of` not before the outcome's `evaluated_at`.
+
+ACTIONS_IN_PATH is never attestable. The record carries outcome/observation
+identities, strategy segment, assumptions version, outcome status and times,
+both rules, `corporate_action_status` CLEAR, `check_as_of`, `check_timing`
+(AT_EVALUATION / AFTER_EVALUATION), the embedded check and its canonical
+SHA-256, `check_recomputation` NOT_PERFORMED (the evidence document is not
+embedded), review ids CALLER_ASSERTED_UNVERIFIED, `price_adjustment`
+NOT_APPLIED, HYPOTHETICAL_FROM_SESSION_BARS, execution evidence NONE,
+performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
+`verify_outcome_action_attestation` rebuilds it from the embedded check and
+compares canonical bytes, so an edited, extended or re-pointed attestation is
+refused. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+stays open until the producer retains attestations (write-once, beside the
+outcomes) and a loader restricts metrics to attested outcomes.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -954,8 +995,8 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), passing loader selections from the outcome job
-into the producer gate and recording the check with retained outcomes (gap
+OUTCOME_JOB_NOT_SCHEDULED), retaining the pure outcome action attestation
+beside each checked outcome and restricting metrics to attested outcomes (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
