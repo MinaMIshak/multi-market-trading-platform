@@ -7,9 +7,9 @@
         --daily-raw-path <data_ingestions raw_path> [--daily-raw-path ...] \
         --calendar-observation <calendar_observations sha256> [--calendar-observation ...] \
         --assumptions-version <id> --entry-slippage-bps <n> \
-        --exit-slippage-bps <n> --cost-bps-per-side <n>
+        --exit-slippage-bps <n> --cost-bps-per-side <n> [--check-corporate-actions]
 
-Phase G/H collection entrypoint (decision-outcome-job-v2). It only wires
+Phase G/H collection entrypoint (decision-outcome-job-v3). It only wires
 existing pieces together; it adds no calendar, binding, evaluation, record or
 store logic:
 
@@ -31,6 +31,27 @@ store logic:
    retains terminal outcomes with the same clock under the caller's explicit
    ``OutcomeAssumptions`` (every value supplied; no default costs/slippage).
 
+Corporate actions (v3, opt-in ``--check-corporate-actions``). Without the flag
+the run is exactly v2 (no selections passed; corporate actions NOT_CHECKED;
+``action_evidence`` is None). With it, the job requests the retained
+egx-actions-v1 selection for every observation that can reach the producer's
+corporate-action gate (ACTION_REQUEST_SCOPE: recorded at or before the job
+clock, no retained outcome under these assumptions, daily evidence for its
+instrument received at or after detection and not after the clock), with
+``path_through`` = the Africa/Cairo date of that daily evidence's receipt
+(ACTION_PATH_THROUGH_RULE). That is the last date the producer's
+CALENDAR_THROUGH_RECEIPT_DATE_V1 window can offer, so it is never before the
+path-completion date the check later uses: coverage is required through the
+receipt date (stricter, never looser). The unchanged
+``load_egx_outcome_action_evidence_by_request`` selects point-in-time at the
+job clock; its selections are passed unchanged to the producer, whose gate
+retains a terminal outcome only on CLEAR and reports AWAITING_ACTION_EVIDENCE
+for a refused request. The job adds no selection, window or check logic of its
+own, and price is never adjusted. Retained decision-outcome-v1 records still
+do not carry the check, so the SYSTEM gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+stays open. More than the loader's MAX_REQUESTS requests refuse the run
+(ACTION_EVIDENCE stage) rather than checking a subset.
+
 decision-outcome-job-v1 read current, upserted ``market_sessions`` rows by
 date range; v2 replaces that with retained observations, so the calendar is
 labelled CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED and the chain
@@ -43,7 +64,10 @@ retained terminal outcome or is still waiting (PENDING_PATH,
 AWAITING_DAILY_EVIDENCE). REJECTIONS_PRESENT (exit 2) means the run completed
 but at least one observation was OBSERVATION_AFTER_CLOCK, BINDING_REJECTED or
 EVALUATION_REJECTED, so the host sees it rather than a silently smaller
-sample. Failures exit 1 with one fixed stage (INPUT, CALENDAR, DAILY_EVIDENCE,
+sample; with the check, ACTION_CHECK_REJECTED (the check failed closed) is
+also a rejection, while AWAITING_ACTION_EVIDENCE and ACTIONS_IN_PATH are
+reported per observation as waiting / not retained. Failures exit
+1 with one fixed stage (INPUT, CALENDAR, DAILY_EVIDENCE, ACTION_EVIDENCE,
 PRODUCTION) and the refusing module's reason; write-once outcomes retained
 earlier in a failed run stay, and a rerun is idempotent.
 
@@ -59,7 +83,12 @@ from decimal import Decimal
 import json
 import sys
 
+from app.decision_observation_store import (
+    DecisionObservationStoreError, _time, load_retained_decision_observations)
 from app.decision_outcome import OutcomeAssumptions
+from app.decision_outcome_action_evidence import (
+    REQUEST_STATUSES as ACTION_REQUEST_STATUSES, ActionEvidenceLoadError,
+    load_egx_outcome_action_evidence_by_request)
 from app.decision_outcome_calendar import (
     MAX_OBSERVATIONS, CalendarChainError, chain_egx_calendar_observations)
 from app.decision_outcome_calendar_loader import (
@@ -67,17 +96,23 @@ from app.decision_outcome_calendar_loader import (
 from app.decision_outcome_daily_evidence import DailyEvidenceLoadError, load_egx_daily_evidence
 from app.decision_outcome_producer import (
     DecisionOutcomeProductionError, produce_egx_decision_outcomes)
+from app.decision_outcome_store import DecisionOutcomeStoreError, load_retained_decision_outcomes
 from app.scanner_v2_card_report_job import (
     CardReportJobError, _absolute, _digest, _existing_database)
+from app.scanner_v2_egx_rank import CAIRO
 
-CONTRACT_VERSION = 'decision-outcome-job-v2'
+CONTRACT_VERSION = 'decision-outcome-job-v3'
 JOB_STATUSES = ('PRODUCED', 'REJECTIONS_PRESENT', 'FAILED')
-FAILURE_STAGES = ('INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'PRODUCTION')
+FAILURE_STAGES = ('INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'ACTION_EVIDENCE', 'PRODUCTION')
 # Reasons raised by this module; CALENDAR-stage failures carry the loader's
-# LOAD_REASONS or the chain's CHAIN_REASONS unchanged.
+# LOAD_REASONS or the chain's CHAIN_REASONS unchanged, ACTION_EVIDENCE-stage
+# failures the action-evidence loader's LOAD_REASONS unchanged.
 JOB_REASONS = ('CONFIG_INVALID',)
 EXIT_CODES = {'PRODUCED': 0, 'FAILED': 1, 'REJECTIONS_PRESENT': 2}
-REJECTED_ENTRY_STATUSES = ('OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED')
+REJECTED_ENTRY_STATUSES = ('OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED',
+                           'ACTION_CHECK_REJECTED')
+ACTION_REQUEST_SCOPE = 'OBSERVATIONS_REACHABLE_BY_PRODUCER_ACTION_GATE_V1'
+ACTION_PATH_THROUGH_RULE = 'DAILY_RECEIPT_DATE_CAIRO_V1'
 CALENDAR_SOURCE = 'CALENDAR_OBSERVATIONS_RETAINED'
 CALENDAR_RETENTION = 'WRITE_ONCE_RETAINED'
 SAFETY = {'fill_kind': 'HYPOTHETICAL_FROM_SESSION_BARS', 'execution_evidence': 'NONE',
@@ -114,7 +149,9 @@ def outcome_assumptions(*, assumptions_version, entry_slippage_bps, exit_slippag
 
 
 def _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
-            calendar_observations, assumptions, now):
+            calendar_observations, assumptions, now, check_corporate_actions):
+    if type(check_corporate_actions) is not bool:
+        raise OutcomeJobError('CONFIG_INVALID', 'check_corporate_actions must be a bool')
     if not all(_absolute(v) for v in (db_path, raw_root, observation_directory,
                                       outcome_directory)):
         raise OutcomeJobError('CONFIG_INVALID', 'absolute paths required')
@@ -133,29 +170,85 @@ def _config(db_path, raw_root, observation_directory, outcome_directory, daily_r
         raise OutcomeJobError('CONFIG_INVALID', 'timezone-aware job clock required')
 
 
+def _action_requests(observation_directory, outcome_directory, daily, assumptions, now):
+    """ACTION_REQUEST_SCOPE requests, in observation-store order.
+
+    Mirrors only the producer's own preconditions for reaching its gate; the
+    store loads are the producer's own and refuse with its reasons.
+    """
+    try:
+        observations = load_retained_decision_observations(observation_directory, market='EGX')
+    except DecisionObservationStoreError as exc:
+        raise DecisionOutcomeProductionError('OBSERVATIONS_UNAVAILABLE', exc.reason) from None
+    try:
+        held = load_retained_decision_outcomes(outcome_directory, market='EGX',
+                                               assumptions=assumptions)
+    except DecisionOutcomeStoreError as exc:
+        raise DecisionOutcomeProductionError('OUTCOMES_UNAVAILABLE', exc.reason) from None
+    held = {record['observation_identity'] for record in held}
+    requests = []
+    for identity, record in observations:
+        if identity in held or _time(record['recorded_at'], 'recorded_at') > now:
+            continue  # ALREADY_RETAINED / OBSERVATION_AFTER_CLOCK: never checked
+        evidence = daily.get(record['instrument_id'])
+        if (evidence is None or evidence.received_at < _time(record['detected_at'], 'detected_at')
+                or evidence.received_at > now):
+            continue  # AWAITING_DAILY_EVIDENCE, or the producer refuses the receipt
+        # ACTION_PATH_THROUGH_RULE: the last date the producer's window can offer.
+        requests.append((identity, record, evidence.received_at.astimezone(CAIRO).date()))
+    return tuple(requests)
+
+
+def _action_evidence(database, raw_root, requests, now):
+    """(selections, summary) from the unchanged by-request loader, or none when no request."""
+    summary = {'requested': True, 'request_scope': ACTION_REQUEST_SCOPE,
+               'path_through_rule': ACTION_PATH_THROUGH_RULE}
+    if not requests:
+        counts = dict.fromkeys(ACTION_REQUEST_STATUSES, 0)
+        return {}, {**summary, 'loader_called': False, 'schema_version': None, 'as_of': None,
+                    'request_counts': {'requests': 0, **counts}, 'sources': [],
+                    'database_writes': 'NONE'}
+    loaded = load_egx_outcome_action_evidence_by_request(database, raw_root, requests, as_of=now)
+    return loaded['selections'], {
+        **summary, 'loader_called': True,
+        **{key: loaded[key] for key in (
+            'schema_version', 'as_of', 'request_counts', 'sources', 'refusal_scope',
+            'refused_request_effect', 'evidence_selection', 'review_verification',
+            'reviewer_authority', 'price_adjustment', 'database_writes')}}
+
+
 def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
                                  outcome_directory, daily_raw_paths, calendar_observations,
-                                 assumptions, now=None):
+                                 assumptions, now=None, check_corporate_actions=False):
     """Load named retained evidence and retain terminal outcomes for EGX observations.
 
     ``calendar_observations`` is a tuple of exact ``calendar_observations``
-    digests. Returns a ``decision-outcome-job-v2`` result wrapping the
+    digests. Returns a ``decision-outcome-job-v3`` result wrapping the
     producer's result. Raises ``OutcomeJobError``/``CardReportJobError``
     (inputs), ``CalendarObservationLoadError``/``CalendarChainError``
-    (calendar), ``DailyEvidenceLoadError`` (daily evidence) or
+    (calendar), ``DailyEvidenceLoadError`` (daily evidence),
+    ``ActionEvidenceLoadError`` (action evidence, only when checking) or
     ``DecisionOutcomeProductionError`` (production). ``now`` is the single job
-    clock (default real UTC): the chain's ``as_of`` and the producer clock.
+    clock (default real UTC): the chain's ``as_of``, the action-evidence
+    ``as_of`` and the producer clock. ``check_corporate_actions`` (default
+    False: v2 behaviour) passes the retained action selections to the
+    producer's gate.
     """
     now = _utc_now() if now is None else now
     _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
-            calendar_observations, assumptions, now)
+            calendar_observations, assumptions, now, check_corporate_actions)
     database = _existing_database(db_path)
     calendar = load_egx_calendar_observations(database, calendar_observations)
     chained = chain_egx_calendar_observations(calendar['observations'], as_of=now)
     loaded = load_egx_daily_evidence(database, raw_root, daily_raw_paths)
+    actions, action_summary = None, None
+    if check_corporate_actions:
+        requests = _action_requests(observation_directory, outcome_directory, loaded['daily'],
+                                    assumptions, now)
+        actions, action_summary = _action_evidence(database, raw_root, requests, now)
     production = produce_egx_decision_outcomes(
         observation_directory, outcome_directory, daily=loaded['daily'],
-        sessions=chained['sessions'], assumptions=assumptions, now=now)
+        sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions)
     rejected = sum(production['status_counts'][s] for s in REJECTED_ENTRY_STATUSES)
     return {
         'schema_version': CONTRACT_VERSION,
@@ -169,7 +262,11 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
                            'sources': loaded['sources'],
                            'received_at_clock': loaded['received_at_clock'],
                            'market_membership': loaded['market_membership']},
+        # None when the check was not requested (v2 behaviour).
+        'action_evidence': action_summary,
         'production': production, **SAFETY,
+        # The producer's own label: NOT_CHECKED or CHECKED_BEFORE_RETENTION.
+        'corporate_actions': production['corporate_actions'],
     }
 
 
@@ -187,6 +284,7 @@ def main(argv=None):
         parser.add_argument(name, required=True)
     parser.add_argument('--daily-raw-path', action='append', required=True)
     parser.add_argument('--calendar-observation', action='append', required=True)
+    parser.add_argument('--check-corporate-actions', action='store_true')
     args = parser.parse_args(argv)
     try:
         assumptions = outcome_assumptions(
@@ -199,7 +297,7 @@ def main(argv=None):
             observation_directory=args.observation_dir, outcome_directory=args.outcome_dir,
             daily_raw_paths=tuple(args.daily_raw_path),
             calendar_observations=tuple(args.calendar_observation),
-            assumptions=assumptions)
+            assumptions=assumptions, check_corporate_actions=args.check_corporate_actions)
     except OutcomeJobError as exc:
         result = _failure(exc.stage, exc)
     except CardReportJobError as exc:
@@ -208,6 +306,8 @@ def main(argv=None):
         result = _failure('CALENDAR', exc)
     except DailyEvidenceLoadError as exc:
         result = _failure('DAILY_EVIDENCE', exc)
+    except ActionEvidenceLoadError as exc:
+        result = _failure('ACTION_EVIDENCE', exc)
     except DecisionOutcomeProductionError as exc:
         result = _failure('PRODUCTION', exc)
     print(json.dumps(result, sort_keys=True))

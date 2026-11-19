@@ -452,7 +452,7 @@ membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
 each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
 SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component.
 
-## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v2)
+## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v3)
 
 Status: host CLI entrypoint, pending host validation; not scheduled, no route,
 no provisioned directory. `python -m app.decision_outcome_job` takes
@@ -493,6 +493,31 @@ performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM
 declares the component and keeps gap OUTCOME_JOB_NOT_SCHEDULED. A host must
 name digests of observations that the scanner-v2 evidence retention job
 actually retained; a chain can cover only those sessions.
+
+v3 adds only an opt-in `--check-corporate-actions` (default off: the run is
+exactly v2, `action_evidence` is null, corporate actions NOT_CHECKED). With it
+the job builds one request per observation that can reach the producer's
+corporate-action gate (OBSERVATIONS_REACHABLE_BY_PRODUCER_ACTION_GATE_V1:
+recorded at or before the job clock, no retained outcome under the run's
+assumptions, daily evidence for its instrument received at or after detection
+and not after the clock) with `path_through` = the Africa/Cairo date of that
+receipt (DAILY_RECEIPT_DATE_CAIRO_V1, the last date the producer's
+CALENDAR_THROUGH_RECEIPT_DATE_V1 window can offer, so coverage is required
+through it: stricter than the path-completion date the check uses, never
+looser). The unchanged `load_egx_outcome_action_evidence_by_request` selects
+point-in-time at the job clock; its selections go unchanged to the producer,
+which retains a terminal outcome only on CLEAR. A refused request is
+AWAITING_ACTION_EVIDENCE and ACTIONS_IN_PATH is not retained (both exit 0);
+ACTION_CHECK_REJECTED is a rejection (exit 2); a whole-load refusal
+(CONFIG_INVALID, including more than MAX_REQUESTS requests, or
+DATABASE_UNAVAILABLE) fails the run at the new stage ACTION_EVIDENCE before
+production. No request means the loader is not called and the producer gets an
+empty mapping. The result's `action_evidence` summarises the loader's counts,
+per-request provenance and its database-write label (the unchanged
+ReferenceRepository may write its audit row for refused requests); top-level
+`corporate_actions` is the producer's label. Retained outcome records still do
+not carry the check, so SYSTEM keeps gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED.
+No price is adjusted. Pending host validation.
 
 ## Retained outcome calendar chain (`app.decision_outcome_calendar`, decision-outcome-calendar-chain-v1)
 

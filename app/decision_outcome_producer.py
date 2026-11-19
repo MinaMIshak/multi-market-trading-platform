@@ -56,7 +56,8 @@ CALLER_ASSERTED_UNVERIFIED and calendar admission NOT_ESTABLISHED, and the
 corporate-action check is unrecorded in retained outcomes, so no outcome or
 metric derived from this run is empirical evidence until those gaps close. Its
 only caller is the host job entrypoint ``app.decision_outcome_job`` (not
-scheduled; it does not pass ``actions`` yet); no route; both store
+scheduled; decision-outcome-job-v3 passes ``actions`` only with its opt-in
+``--check-corporate-actions``); no route; both store
 directories are explicit arguments. Outcomes are
 hypothetical results from session bars: not fills, not performance.
 PAPER/SHADOW only; LIVE_MONEY=false.

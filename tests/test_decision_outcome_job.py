@@ -1,9 +1,9 @@
-"""decision-outcome-job-v2: artificial retained inputs, disposable databases and directories only.
+"""decision-outcome-job-v3: artificial retained inputs, disposable databases and directories only.
 
 No scheduler, runtime producer, calendar admission, market coverage, fill,
 performance or edge evidence is implied by these tests.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 import re
 from types import SimpleNamespace
@@ -13,14 +13,17 @@ import pytest
 import app.decision_outcome_job as job
 import app.storage.repository as repository_module
 from app.decision_outcome import OutcomeAssumptions
+from app.decision_outcome_action_evidence import (
+    BY_REQUEST_CONTRACT_VERSION, MAX_REQUESTS, ActionEvidenceLoadError)
 from app.decision_outcome_calendar import (
     CHAIN_REASONS, MAX_OBSERVATIONS, CalendarChainError, chain_egx_calendar_observations)
 from app.decision_outcome_calendar_loader import (
     LOAD_REASONS, CalendarObservationLoadError, load_egx_calendar_observations)
 from app.decision_outcome_daily_evidence import DailyEvidenceLoadError
 from app.decision_outcome_job import (
-    CALENDAR_RETENTION, CALENDAR_SOURCE, CONTRACT_VERSION, EXIT_CODES, FAILURE_STAGES,
-    JOB_REASONS, JOB_STATUSES, OutcomeJobError, main, outcome_assumptions,
+    ACTION_PATH_THROUGH_RULE, ACTION_REQUEST_SCOPE, CALENDAR_RETENTION, CALENDAR_SOURCE,
+    CONTRACT_VERSION, EXIT_CODES, FAILURE_STAGES, JOB_REASONS, JOB_STATUSES,
+    REJECTED_ENTRY_STATUSES, OutcomeJobError, main, outcome_assumptions,
     run_egx_decision_outcome_job)
 from app.decision_outcome_producer import (
     PRODUCTION_REASONS, DecisionOutcomeProductionError, EgxDailyEvidence,
@@ -28,7 +31,8 @@ from app.decision_outcome_producer import (
 from app.decision_outcome_store import load_retained_decision_outcomes
 from app.scanner_v2_card_report_job import CardReportJobError
 from app.storage import Database, TradingRepository
-from tests.test_decision_outcome_producer import NOW, OTHER, decision, observe
+from tests.test_decision_outcome_corporate_actions import action, evidence as action_evidence
+from tests.test_decision_outcome_producer import NOW, OTHER, decision, observe, selection
 from tests.test_decision_outcome_session_bars import (
     INSTRUMENT, RECEIVED, ROWS, ZERO, session)
 
@@ -125,7 +129,7 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
     (identity, _), = observe(host.observations)
     before = calendar_rows(host)
     out = run_egx_decision_outcome_job(**kwargs(host))
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-job-v2'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-job-v3'
     assert out['status'] == 'PRODUCED' and out['status'] in JOB_STATUSES
     assert {k: out[k] for k in SAFETY} == SAFETY
     # The daily loader got exactly the named paths, the raw root and the database.
@@ -163,8 +167,10 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
         'market_membership': 'NOT_ESTABLISHED'}
     production = out['production']
     assert production['schema_version'] == 'decision-outcome-production-v2'
-    # The job does not pass action selections yet: the run is labelled unchecked.
-    assert production['corporate_actions'] == 'NOT_CHECKED'
+    # Without --check-corporate-actions no selections are passed (v2 behaviour):
+    # the run is labelled unchecked.
+    assert call['actions'] is None and out['action_evidence'] is None
+    assert production['corporate_actions'] == out['corporate_actions'] == 'NOT_CHECKED'
     assert production['action_selections_without_observation'] is None
     (entry,) = production['outcomes']
     assert entry['observation_identity'] == identity
@@ -286,6 +292,8 @@ def test_tampered_retained_calendar_is_refused(host, fake_daily):
         assumptions_version='fixture-zero', market='US', entry_slippage_bps=ZERO.entry_slippage_bps,
         exit_slippage_bps=ZERO.exit_slippage_bps, cost_bps_per_side=ZERO.cost_bps_per_side)),
     ('now', NOW.replace(tzinfo=None)), ('now', '2026-11-09T15:00:00Z'),
+    ('check_corporate_actions', None), ('check_corporate_actions', 1),
+    ('check_corporate_actions', 'true'),
 ])
 def test_invalid_configuration_reads_and_writes_nothing(host, fake_daily, field, value):
     with pytest.raises(OutcomeJobError) as info:
@@ -397,5 +405,176 @@ def test_cli_reports_fixed_failure_stage(host, fake_daily, capsys, monkeypatch):
     assert main(_cli(host)) == 1
     out = json.loads(capsys.readouterr().out)
     assert (out['stage'], out['reason']) == ('DAILY_EVIDENCE', 'INGESTION_UNAVAILABLE')
-    assert set(FAILURE_STAGES) == {'INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'PRODUCTION'}
+    assert set(FAILURE_STAGES) == {
+        'INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'ACTION_EVIDENCE', 'PRODUCTION'}
     assert snapshot(host.outcomes) == []
+
+
+# --- v3: opt-in corporate-action check ---------------------------------------
+
+ACTION_STATUSES = ('SELECTED', 'ACTIONS_UNAVAILABLE', 'ACTIONS_REJECTED')
+
+
+@pytest.fixture
+def fake_actions(monkeypatch):
+    """By-request loader stand-in: ``plan`` maps identity -> selection; others are refused."""
+    state = SimpleNamespace(calls=[], plan={}, error=None)
+
+    def fake(database, raw_root, requests, *, as_of):
+        state.calls.append((database, raw_root, requests, as_of))
+        if state.error is not None:
+            raise state.error
+        selections, sources = {}, []
+        for identity, _, _ in requests:
+            chosen = state.plan.get(identity)
+            if chosen is not None:
+                selections[identity] = chosen
+            sources.append({'observation_identity': identity,
+                            'status': 'ACTIONS_UNAVAILABLE' if chosen is None else 'SELECTED'})
+        counts = {s: sum(item['status'] == s for item in sources) for s in ACTION_STATUSES}
+        return {'schema_version': BY_REQUEST_CONTRACT_VERSION, 'as_of': '2026-11-09T15:00:00Z',
+                'selections': selections, 'sources': sources,
+                'request_counts': {'requests': len(sources), **counts},
+                'refusal_scope': 'PER_REQUEST_EVIDENCE_ONLY',
+                'refused_request_effect': 'NO_SELECTION_FOR_REQUEST',
+                'evidence_selection': 'REFERENCE_REPOSITORY_ACTIONS_POINT_IN_TIME',
+                'review_verification': 'REFERENCE_REPOSITORY_REQUIRE_REVIEW',
+                'reviewer_authority': 'NOT_ATTESTED', 'price_adjustment': 'NOT_APPLIED',
+                'database_writes': 'NONE'}
+
+    monkeypatch.setattr(job, 'load_egx_outcome_action_evidence_by_request', fake)
+    return state
+
+
+def test_check_requests_only_reachable_observations_and_retains_clear(
+        host, fake_daily, fake_actions, spy_producer):
+    observed = observe(host.observations, decision(), decision(symbol='OTHR', instrument=OTHER))
+    [(identity, record)] = [(i, r) for i, r in observed if r['symbol'] == 'TEST']
+    # Actions outside the window only (before data_as_of, after the path).
+    chosen = selection(action_evidence((action(3), action(12))))
+    fake_actions.plan = {identity: chosen}
+    out = run_egx_decision_outcome_job(**kwargs(host, check_corporate_actions=True))
+    [(database, raw_root, requests, as_of)] = fake_actions.calls
+    assert type(database) is Database and str(database.path) == str(host.db.path)
+    assert raw_root == str(host.raw_root) and as_of == NOW
+    # Only the observation whose instrument has daily evidence is requested, through
+    # the Cairo date of that receipt (2026-11-09T14:00Z is 16:00 Cairo, 2026-11-09).
+    assert requests == ((identity, record, date(2026, 11, 9)),)
+    # The loader's selections reach the producer unchanged.
+    [call] = spy_producer
+    assert call['actions'] == {identity: chosen} and call['now'] == NOW
+    production = out['production']
+    assert out['corporate_actions'] == production['corporate_actions'] == 'CHECKED_BEFORE_RETENTION'
+    entries = {entry['symbol']: entry for entry in production['outcomes']}
+    assert (entries['TEST']['status'], entries['TEST']['corporate_action_status']) == (
+        'RETAINED', 'CLEAR')
+    assert entries['OTHR']['status'] == 'AWAITING_DAILY_EVIDENCE'
+    assert out['status'] == 'PRODUCED'
+    summary = out['action_evidence']
+    assert summary['requested'] is summary['loader_called'] is True
+    assert summary['request_scope'] == ACTION_REQUEST_SCOPE
+    assert summary['path_through_rule'] == ACTION_PATH_THROUGH_RULE == 'DAILY_RECEIPT_DATE_CAIRO_V1'
+    assert summary['schema_version'] == BY_REQUEST_CONTRACT_VERSION
+    assert summary['request_counts'] == {
+        'requests': 1, 'SELECTED': 1, 'ACTIONS_UNAVAILABLE': 0, 'ACTIONS_REJECTED': 0}
+    assert summary['price_adjustment'] == 'NOT_APPLIED' and 'selections' not in summary
+    others = {k: v for k, v in SAFETY.items() if k != 'corporate_actions'}
+    assert {k: out[k] for k in others} == others
+    held = load_retained_decision_outcomes(str(host.outcomes), market='EGX', assumptions=ZERO)
+    assert [item['observation_identity'] for item in held] == [identity]
+    json.dumps(out, allow_nan=False)
+
+
+@pytest.mark.parametrize('chosen,status', [
+    (None, 'AWAITING_ACTION_EVIDENCE'),
+    # A dividend effective on Sunday 2026-11-08, inside the path.
+    (selection(action_evidence((action(8),))), 'ACTIONS_IN_PATH'),
+])
+def test_refused_or_in_path_evidence_retains_nothing(host, fake_daily, fake_actions, chosen,
+                                                     status):
+    (identity, _), = observe(host.observations)
+    if chosen is not None:
+        fake_actions.plan = {identity: chosen}
+    out = run_egx_decision_outcome_job(**kwargs(host, check_corporate_actions=True))
+    (entry,) = out['production']['outcomes']
+    # The hypothetical outcome stays visible; it is neither retained nor adjusted.
+    assert (entry['status'], entry['outcome_status'], entry['outcome_identity']) == (
+        status, 'CLOSED', None)
+    # Waiting for evidence / actions in path are not rejections of the run.
+    assert out['status'] == 'PRODUCED'
+    assert snapshot(host.outcomes) == []
+
+
+def test_failed_check_is_a_visible_rejection(host, fake_daily, fake_actions, capsys, monkeypatch):
+    (identity, _), = observe(host.observations)
+    # Coverage starting after the data_as_of date (2026-11-05): the check fails closed.
+    fake_actions.plan = {identity: selection(action_evidence(start=date(2026, 11, 6)))}
+    out = run_egx_decision_outcome_job(**kwargs(host, check_corporate_actions=True))
+    (entry,) = out['production']['outcomes']
+    assert entry['status'] == 'ACTION_CHECK_REJECTED'
+    assert 'ACTION_CHECK_REJECTED' in REJECTED_ENTRY_STATUSES
+    assert out['status'] == 'REJECTIONS_PRESENT'
+    assert snapshot(host.outcomes) == []
+    _clock(monkeypatch, NOW)
+    assert main(_cli(host) + ['--check-corporate-actions']) == EXIT_CODES['REJECTIONS_PRESENT']
+    capsys.readouterr()
+
+
+def test_no_reachable_observation_never_calls_the_loader(host, fake_daily, fake_actions,
+                                                         spy_producer):
+    observe(host.observations)
+    run_egx_decision_outcome_job(**kwargs(host))                  # retained, unchecked
+    out = run_egx_decision_outcome_job(
+        **kwargs(host, check_corporate_actions=True, now=NOW + timedelta(days=1)))
+    # An already retained outcome is never re-checked, so nothing is requested.
+    assert fake_actions.calls == []
+    assert spy_producer[-1]['actions'] == {}
+    summary = out['action_evidence']
+    assert summary['loader_called'] is False and summary['sources'] == []
+    assert summary['request_counts'] == {
+        'requests': 0, 'SELECTED': 0, 'ACTIONS_UNAVAILABLE': 0, 'ACTIONS_REJECTED': 0}
+    assert out['production']['status_counts']['ALREADY_RETAINED'] == 1
+    # Retained records do not carry the check (gap kept open).
+    assert out['production']['retained_outcome_corporate_actions'] == 'NOT_RECORDED_IN_OUTCOME'
+
+
+def test_action_evidence_refusal_fails_before_production(host, fake_daily, fake_actions,
+                                                        spy_producer, capsys, monkeypatch):
+    (identity, _), = observe(host.observations)
+    fake_actions.error = ActionEvidenceLoadError('DATABASE_UNAVAILABLE')
+    with pytest.raises(ActionEvidenceLoadError):
+        run_egx_decision_outcome_job(**kwargs(host, check_corporate_actions=True))
+    assert spy_producer == [] and snapshot(host.outcomes) == []
+    _clock(monkeypatch, NOW)
+    fake_actions.error = ActionEvidenceLoadError('CONFIG_INVALID', f'over {MAX_REQUESTS}')
+    assert main(_cli(host) + ['--check-corporate-actions']) == EXIT_CODES['FAILED']
+    out = json.loads(capsys.readouterr().out)
+    assert (out['status'], out['stage'], out['reason']) == (
+        'FAILED', 'ACTION_EVIDENCE', 'CONFIG_INVALID')
+    assert out['live_money'] is False and snapshot(host.outcomes) == []
+    # The CLI flag selects the check; without it the loader is never called.
+    fake_actions.error = None
+    fake_actions.plan = {identity: selection(action_evidence((action(3),)))}
+    calls = len(fake_actions.calls)
+    assert main(_cli(host) + ['--check-corporate-actions']) == EXIT_CODES['PRODUCED']
+    out = json.loads(capsys.readouterr().out)
+    assert out['corporate_actions'] == 'CHECKED_BEFORE_RETENTION'
+    assert out['production']['status_counts']['RETAINED'] == 1
+    assert len(fake_actions.calls) == calls + 1
+
+
+def test_real_loader_without_action_evidence_awaits_and_retains_nothing(host, fake_daily):
+    (identity, _), = observe(host.observations)
+    before = calendar_rows(host)
+    out = run_egx_decision_outcome_job(**kwargs(host, check_corporate_actions=True))
+    summary = out['action_evidence']
+    assert summary['schema_version'] == BY_REQUEST_CONTRACT_VERSION
+    assert summary['request_counts'] == {
+        'requests': 1, 'SELECTED': 0, 'ACTIONS_UNAVAILABLE': 1, 'ACTIONS_REJECTED': 0}
+    # The unchanged ReferenceRepository may record its audit row; labelled, not hidden.
+    assert summary['database_writes'] == 'REPOSITORY_AUDIT_ROWS_POSSIBLE_FOR_REFUSED_REQUESTS'
+    (entry,) = out['production']['outcomes']
+    assert entry['observation_identity'] == identity
+    assert (entry['status'], entry['reason']) == ('AWAITING_ACTION_EVIDENCE', 'NO_ACTION_EVIDENCE')
+    assert out['status'] == 'PRODUCED' and snapshot(host.outcomes) == []
+    assert calendar_rows(host) == before

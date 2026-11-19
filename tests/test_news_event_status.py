@@ -175,7 +175,7 @@ def test_declared_gaps_match_the_code():
                  "chain_egx_calendar_observations(calendar['observations'], as_of=now)",
                  'load_egx_daily_evidence(database, raw_root, daily_raw_paths)',
                  'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,',
-                 "sessions=chained['sessions'], assumptions=assumptions, now=now)"):
+                 "sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions)"):
         assert call in outcome_job, call
     assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
     assert not re.search(r'\b(get_market_session|TradingRepository|FROM market_sessions)\b',
@@ -216,7 +216,8 @@ def test_declared_gaps_match_the_code():
     assert "'promotion': 'NOT_AUTHORIZED'" in corporate_actions
     # The action-evidence loader only delegates selection to the unchanged
     # ReferenceRepository.actions: no SQL of its own, no check call, no price
-    # adjustment; nothing calls it yet (no caller outside the components).
+    # adjustment; its by-request form's only caller is the outcome job (a
+    # component; no caller outside the components, checked above).
     action_evidence = (ROOT / 'app' / 'decision_outcome_action_evidence.py').read_text(
         encoding='utf-8').split('"""', 2)[2]
     assert 'repository.actions(' in action_evidence
@@ -239,14 +240,23 @@ def test_declared_gaps_match_the_code():
         assert call in outcome_producer, call
     # decision-outcome-production-v2: the unchanged pure check gates retention
     # only when the caller supplies selections; otherwise the run says NOT_CHECKED.
-    # The retained outcome record does not carry the check, and the job passes no
-    # selections, so the gap stays open (asserted above).
+    # The retained outcome record does not carry the check, so the gap stays open
+    # (asserted above) even though decision-outcome-job-v3 can pass selections.
     assert ("'corporate_actions': 'NOT_CHECKED' if actions is None else "
             "'CHECKED_BEFORE_RETENTION'") in outcome_producer
     assert 'check_egx_outcome_corporate_actions(' in outcome_producer
     assert "'retained_outcome_corporate_actions': 'NOT_RECORDED_IN_OUTCOME'" in outcome_producer
     assert "'price_adjustment': 'NOT_APPLIED'" in outcome_producer
-    assert 'actions=' not in outcome_job
+    # decision-outcome-job-v3: only with the opt-in flag, the job requests the
+    # by-request selections at the single job clock and passes them unchanged to
+    # the producer; it never calls the check or the all-or-nothing v1 loader.
+    assert "CONTRACT_VERSION = 'decision-outcome-job-v3'" in outcome_job
+    assert 'actions, action_summary = None, None\n    if check_corporate_actions:' in outcome_job
+    assert ('load_egx_outcome_action_evidence_by_request(database, raw_root, requests, '
+            'as_of=now)') in outcome_job
+    assert 'load_egx_outcome_action_evidence(' not in outcome_job
+    assert 'check_egx_outcome_corporate_actions' not in outcome_job
+    assert len(re.findall(r'\bactions=', outcome_job)) == 1
     assert "'performance_claim': 'NONE'" in outcome_producer
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_producer
     assert "'live_money': False" in outcome_producer

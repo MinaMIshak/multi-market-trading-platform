@@ -39,9 +39,9 @@ resolved by choosing other evidence.
 
 The returned selections are inputs only: this module does not
 call the check, so no CLEAR / ACTIONS_IN_PATH result exists here, no price is
-adjusted, no outcome is evaluated, changed or retained, and the outcome
-evaluator, binding, producer, job and store are unchanged (still labelling
-corporate actions NOT_CHECKED).
+adjusted, and no outcome is evaluated, changed or retained here. The outcome
+evaluator, binding and store are unchanged; the producer's optional gate (not
+this module) performs the check, and retained outcome records do not carry it.
 
 Database: a missing file is refused before any connection (nothing created);
 this module issues no SQL of its own. On a successful load nothing is written.
@@ -51,9 +51,11 @@ unchanged ``ReferenceRepository`` may record its existing durable
 SOURCE_UNVALIDATED or REFERENCE_INTEGRITY); that is its established behaviour
 and is labelled, not suppressed. Review records are verified by
 ``ReferenceRepository.require_review`` (subject id, digest, provider and
-contract); reviewer authority itself is not attested. The loader has no
-caller, job, scheduler or route; only its ``OutcomeActionSelection`` type is
-accepted by the outcome producer's optional corporate-action gate.
+contract); reviewer authority itself is not attested. The by-request form's
+only caller is the host job ``app.decision_outcome_job`` (decision-outcome-job-v3,
+opt-in ``--check-corporate-actions``, not scheduled), which passes its
+selections unchanged to the outcome producer's optional corporate-action gate;
+the all-or-nothing v1 form has no caller; no scheduler or route.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
 from dataclasses import dataclass
