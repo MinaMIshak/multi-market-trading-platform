@@ -50,7 +50,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_store','decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v3'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
-    ('app.decision_outcome_job', 'decision-outcome-job-v3'),
+    ('app.decision_outcome_job', 'decision-outcome-job-v4'),
     ('app.decision_outcome_metrics', 'decision-outcome-metrics-v1'),
     ('app.decision_outcome_periods', 'decision-outcome-period-metrics-v1'),
     ('app.decision_outcome_sample', 'decision-outcome-sample-assessment-v1'),
@@ -103,11 +103,15 @@ EMPIRICAL_GAPS = (
     # (decision-outcome-attestation-partition-v1: ATTESTED_CLEAR / UNATTESTED /
     # ATTESTATION_INVALID, none dropped) exists. The producer can build and
     # retain attestations (decision-outcome-production-v3: opt-in
-    # attestation_directory, only after a CLEAR-gated retention), but the job
-    # never passes that directory and nothing calls the partition yet.
+    # attestation_directory, only after a CLEAR-gated retention), and
+    # decision-outcome-job-v4 can pass that directory (opt-in --attestation-dir,
+    # only with --check-corporate-actions; nothing runs it), but outcomes held
+    # before a checked run are never attested and nothing calls the partition
+    # for metrics yet.
     'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
-    # Attestation sidecar store library exists; no directory is provisioned and
-    # its only caller is the producer's opt-in step, which the job never enables.
+    # Attestation sidecar store library exists; no directory is provisioned. Its
+    # only caller is the producer's opt-in step, which the job enables only with
+    # an explicit --attestation-dir (not scheduled).
     'OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED',
     # Period segmentation code exists; no evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',

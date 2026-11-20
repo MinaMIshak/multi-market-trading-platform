@@ -7,9 +7,10 @@
         --daily-raw-path <data_ingestions raw_path> [--daily-raw-path ...] \
         --calendar-observation <calendar_observations sha256> [--calendar-observation ...] \
         --assumptions-version <id> --entry-slippage-bps <n> \
-        --exit-slippage-bps <n> --cost-bps-per-side <n> [--check-corporate-actions]
+        --exit-slippage-bps <n> --cost-bps-per-side <n> \
+        [--check-corporate-actions [--attestation-dir /abs/outcome-attestations]]
 
-Phase G/H collection entrypoint (decision-outcome-job-v3). It only wires
+Phase G/H collection entrypoint (decision-outcome-job-v4). It only wires
 existing pieces together; it adds no calendar, binding, evaluation, record or
 store logic:
 
@@ -52,6 +53,27 @@ do not carry the check, so the SYSTEM gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
 stays open. More than the loader's MAX_REQUESTS requests refuse the run
 (ACTION_EVIDENCE stage) rather than checking a subset.
 
+Attestation (v4, opt-in ``--attestation-dir``, accepted only together with
+``--check-corporate-actions``, absolute and distinct from both stores, else
+CONFIG_INVALID at INPUT before the database is opened). The directory is passed
+unchanged to the producer's decision-outcome-production-v3 attestation step:
+each outcome this run retains after a CLEAR check gets one write-once sidecar
+attestation built and retained by the unchanged builder and store with the
+same job clock. The job builds, reads and verifies no attestation itself. A
+missing or damaged sidecar refuses the run before any outcome or attestation is
+written (ATTESTATIONS_UNAVAILABLE, PRODUCTION stage; the action-evidence
+loader has already run and its labelled audit rows may exist); a sidecar store
+refusal aborts it (ATTESTATION_FAILED, PRODUCTION stage). A per-observation builder refusal
+(ATTESTATION_REJECTED) or held bytes differing from this run's
+(RETAINED_OUTCOME_DIFFERS) leaves a retained but UNATTESTED outcome and counts
+as a rejection (exit 2), so the host sees it. Outcomes already held when the
+run starts are neither re-checked nor attested, so they stay UNATTESTED (never
+clear). Without the flag the run is exactly v3 (``outcome_attestation``
+NOT_REQUESTED). The sidecar directory must be provisioned by a host, and
+nothing reads attestations for metrics yet, so the SYSTEM gaps
+OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stay open.
+
 decision-outcome-job-v1 read current, upserted ``market_sessions`` rows by
 date range; v2 replaces that with retained observations, so the calendar is
 labelled CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED and the chain
@@ -66,8 +88,9 @@ but at least one observation was OBSERVATION_AFTER_CLOCK, BINDING_REJECTED or
 EVALUATION_REJECTED, so the host sees it rather than a silently smaller
 sample; with the check, ACTION_CHECK_REJECTED (the check failed closed) is
 also a rejection, while AWAITING_ACTION_EVIDENCE and ACTIONS_IN_PATH are
-reported per observation as waiting / not retained. Failures exit
-1 with one fixed stage (INPUT, CALENDAR, DAILY_EVIDENCE, ACTION_EVIDENCE,
+reported per observation as waiting / not retained; with attestation,
+ATTESTATION_REJECTED and RETAINED_OUTCOME_DIFFERS are rejections too. Failures
+exit 1 with one fixed stage (INPUT, CALENDAR, DAILY_EVIDENCE, ACTION_EVIDENCE,
 PRODUCTION) and the refusing module's reason; write-once outcomes retained
 earlier in a failed run stay, and a rerun is idempotent.
 
@@ -81,6 +104,7 @@ import argparse
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
+import os
 import sys
 
 from app.decision_observation_store import (
@@ -101,7 +125,7 @@ from app.scanner_v2_card_report_job import (
     CardReportJobError, _absolute, _digest, _existing_database)
 from app.scanner_v2_egx_rank import CAIRO
 
-CONTRACT_VERSION = 'decision-outcome-job-v3'
+CONTRACT_VERSION = 'decision-outcome-job-v4'
 JOB_STATUSES = ('PRODUCED', 'REJECTIONS_PRESENT', 'FAILED')
 FAILURE_STAGES = ('INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'ACTION_EVIDENCE', 'PRODUCTION')
 # Reasons raised by this module; CALENDAR-stage failures carry the loader's
@@ -111,6 +135,9 @@ JOB_REASONS = ('CONFIG_INVALID',)
 EXIT_CODES = {'PRODUCED': 0, 'FAILED': 1, 'REJECTIONS_PRESENT': 2}
 REJECTED_ENTRY_STATUSES = ('OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED',
                            'ACTION_CHECK_REJECTED')
+# Producer attestation_status values that leave a retained outcome UNATTESTED
+# for a reason other than waiting (only counted when attestation is requested).
+REJECTED_ATTESTATION_STATUSES = ('ATTESTATION_REJECTED', 'RETAINED_OUTCOME_DIFFERS')
 ACTION_REQUEST_SCOPE = 'OBSERVATIONS_REACHABLE_BY_PRODUCER_ACTION_GATE_V1'
 ACTION_PATH_THROUGH_RULE = 'DAILY_RECEIPT_DATE_CAIRO_V1'
 CALENDAR_SOURCE = 'CALENDAR_OBSERVATIONS_RETAINED'
@@ -149,12 +176,24 @@ def outcome_assumptions(*, assumptions_version, entry_slippage_bps, exit_slippag
 
 
 def _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
-            calendar_observations, assumptions, now, check_corporate_actions):
+            calendar_observations, assumptions, now, check_corporate_actions,
+            attestation_directory):
     if type(check_corporate_actions) is not bool:
         raise OutcomeJobError('CONFIG_INVALID', 'check_corporate_actions must be a bool')
     if not all(_absolute(v) for v in (db_path, raw_root, observation_directory,
                                       outcome_directory)):
         raise OutcomeJobError('CONFIG_INVALID', 'absolute paths required')
+    if attestation_directory is not None:
+        # Only an outcome retained after a CLEAR check is attestable.
+        if not check_corporate_actions:
+            raise OutcomeJobError('CONFIG_INVALID',
+                                  'attestation directory requires check_corporate_actions')
+        if not _absolute(attestation_directory):
+            raise OutcomeJobError('CONFIG_INVALID', 'absolute attestation directory required')
+        if os.path.normpath(attestation_directory) in {
+                os.path.normpath(observation_directory), os.path.normpath(outcome_directory)}:
+            raise OutcomeJobError('CONFIG_INVALID',
+                                  'attestation directory must differ from both stores')
     if type(daily_raw_paths) is not tuple or not daily_raw_paths:
         raise OutcomeJobError('CONFIG_INVALID', 'daily raw paths required')
     if (type(calendar_observations) is not tuple
@@ -219,11 +258,12 @@ def _action_evidence(database, raw_root, requests, now):
 
 def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
                                  outcome_directory, daily_raw_paths, calendar_observations,
-                                 assumptions, now=None, check_corporate_actions=False):
+                                 assumptions, now=None, check_corporate_actions=False,
+                                 attestation_directory=None):
     """Load named retained evidence and retain terminal outcomes for EGX observations.
 
     ``calendar_observations`` is a tuple of exact ``calendar_observations``
-    digests. Returns a ``decision-outcome-job-v3`` result wrapping the
+    digests. Returns a ``decision-outcome-job-v4`` result wrapping the
     producer's result. Raises ``OutcomeJobError``/``CardReportJobError``
     (inputs), ``CalendarObservationLoadError``/``CalendarChainError``
     (calendar), ``DailyEvidenceLoadError`` (daily evidence),
@@ -232,11 +272,14 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
     clock (default real UTC): the chain's ``as_of``, the action-evidence
     ``as_of`` and the producer clock. ``check_corporate_actions`` (default
     False: v2 behaviour) passes the retained action selections to the
-    producer's gate.
+    producer's gate. ``attestation_directory`` (default None: v3 behaviour;
+    requires ``check_corporate_actions``) is passed unchanged to the
+    producer's opt-in attestation step.
     """
     now = _utc_now() if now is None else now
     _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
-            calendar_observations, assumptions, now, check_corporate_actions)
+            calendar_observations, assumptions, now, check_corporate_actions,
+            attestation_directory)
     database = _existing_database(db_path)
     calendar = load_egx_calendar_observations(database, calendar_observations)
     chained = chain_egx_calendar_observations(calendar['observations'], as_of=now)
@@ -248,8 +291,12 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
         actions, action_summary = _action_evidence(database, raw_root, requests, now)
     production = produce_egx_decision_outcomes(
         observation_directory, outcome_directory, daily=loaded['daily'],
-        sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions)
+        sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions,
+        attestation_directory=attestation_directory)
     rejected = sum(production['status_counts'][s] for s in REJECTED_ENTRY_STATUSES)
+    if production['attestation_counts'] is not None:
+        rejected += sum(production['attestation_counts'][s]
+                        for s in REJECTED_ATTESTATION_STATUSES)
     return {
         'schema_version': CONTRACT_VERSION,
         'status': 'PRODUCED' if rejected == 0 else 'REJECTIONS_PRESENT',
@@ -267,6 +314,8 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
         'production': production, **SAFETY,
         # The producer's own label: NOT_CHECKED or CHECKED_BEFORE_RETENTION.
         'corporate_actions': production['corporate_actions'],
+        # The producer's own label: NOT_REQUESTED or ATTESTED_AFTER_CLEAR_RETENTION.
+        'outcome_attestation': production['outcome_attestation'],
     }
 
 
@@ -285,6 +334,7 @@ def main(argv=None):
     parser.add_argument('--daily-raw-path', action='append', required=True)
     parser.add_argument('--calendar-observation', action='append', required=True)
     parser.add_argument('--check-corporate-actions', action='store_true')
+    parser.add_argument('--attestation-dir', default=None)
     args = parser.parse_args(argv)
     try:
         assumptions = outcome_assumptions(
@@ -297,7 +347,8 @@ def main(argv=None):
             observation_directory=args.observation_dir, outcome_directory=args.outcome_dir,
             daily_raw_paths=tuple(args.daily_raw_path),
             calendar_observations=tuple(args.calendar_observation),
-            assumptions=assumptions, check_corporate_actions=args.check_corporate_actions)
+            assumptions=assumptions, check_corporate_actions=args.check_corporate_actions,
+            attestation_directory=args.attestation_dir)
     except OutcomeJobError as exc:
         result = _failure(exc.stage, exc)
     except CardReportJobError as exc:

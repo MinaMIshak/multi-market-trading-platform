@@ -175,7 +175,8 @@ def test_declared_gaps_match_the_code():
                  "chain_egx_calendar_observations(calendar['observations'], as_of=now)",
                  'load_egx_daily_evidence(database, raw_root, daily_raw_paths)',
                  'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,',
-                 "sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions)"):
+                 "sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions,\n"
+                 "        attestation_directory=attestation_directory)"):
         assert call in outcome_job, call
     assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
     assert not re.search(r'\b(get_market_session|TradingRepository|FROM market_sessions)\b',
@@ -246,13 +247,14 @@ def test_declared_gaps_match_the_code():
     assert "'live_money': False" in attestation
     assert "'promotion': 'NOT_AUTHORIZED'" in attestation
     # Its only caller is the producer's opt-in attestation step
-    # (decision-outcome-production-v3, checked below); the job does not reference it.
+    # (decision-outcome-production-v3, checked below); the job does not reference
+    # it (job-v4 only passes the directory through).
     assert 'decision_outcome_action_attestation' not in (
         ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
     # The attestation sidecar store library exists, but no directory is
     # provisioned and its only caller is the producer's opt-in step, which the
-    # job never enables (the job does not reference the store or pass an
-    # attestation directory), so the corporate-action gap stays open. It retains
+    # job enables only with an explicit attestation directory (the job does not
+    # reference the store itself), so the corporate-action gap stays open. It retains
     # only re-verified attestations and never touches the outcome store or prices.
     assert 'OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED' in EMPIRICAL_GAPS
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_attestation_store*.py')] == [
@@ -311,18 +313,27 @@ def test_declared_gaps_match_the_code():
     # decision-outcome-production-v3: only with an opt-in attestation directory
     # (which requires selections), an outcome retained after a CLEAR check is
     # attested with the unchanged builder and sidecar store; held outcomes are
-    # not attested, and the job never passes the directory, so the gap stays open.
+    # not attested, and nothing reads attestations for metrics, so the gap stays open.
     for call in ('attest_outcome_corporate_actions(\n            outcome_identity, outcome,',
                  'retain_outcome_action_attestation(\n            attestation_directory,',
                  'load_retained_outcome_attestations(attestation_directory)'):
         assert call in outcome_producer, call
     assert "'attestation requires action selections'" in outcome_producer
     assert "'held_outcome_attestation': 'NOT_PERFORMED'" in outcome_producer
-    assert 'attestation_directory' not in outcome_job
+    # decision-outcome-job-v4: the job only passes an opt-in attestation
+    # directory through (refused without the check); it builds, retains, loads
+    # and verifies no attestation itself.
+    # Signature default, the producer call and the CLI call only.
+    assert len(re.findall(r'\battestation_directory=', outcome_job)) == 3
+    assert 'attestation_directory=None' in outcome_job
+    assert "'attestation directory requires check_corporate_actions'" in outcome_job
+    assert not re.search(r'\b(attest_outcome_corporate_actions|retain_outcome_action_attestation|'
+                         r'load_retained_outcome_attestations|verify_outcome_action_attestation|'
+                         r'partition_egx_attested_outcomes)\b', outcome_job)
     # decision-outcome-job-v3: only with the opt-in flag, the job requests the
     # by-request selections at the single job clock and passes them unchanged to
     # the producer; it never calls the check or the all-or-nothing v1 loader.
-    assert "CONTRACT_VERSION = 'decision-outcome-job-v3'" in outcome_job
+    assert "CONTRACT_VERSION = 'decision-outcome-job-v4'" in outcome_job
     assert 'actions, action_summary = None, None\n    if check_corporate_actions:' in outcome_job
     assert ('load_egx_outcome_action_evidence_by_request(database, raw_root, requests, '
             'as_of=now)') in outcome_job

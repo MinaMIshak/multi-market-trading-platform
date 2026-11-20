@@ -452,7 +452,7 @@ membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
 each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
 SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component.
 
-## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v3)
+## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v4)
 
 Status: host CLI entrypoint, pending host validation; not scheduled, no route,
 no provisioned directory. `python -m app.decision_outcome_job` takes
@@ -518,6 +518,27 @@ ReferenceRepository may write its audit row for refused requests); top-level
 `corporate_actions` is the producer's label. Retained outcome records still do
 not carry the check, so SYSTEM keeps gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED.
 No price is adjusted. Pending host validation.
+
+v4 adds only an opt-in `--attestation-dir` (`attestation_directory=`),
+accepted only together with `--check-corporate-actions`, absolute and distinct
+from the observation and outcome stores (else CONFIG_INVALID at stage INPUT,
+before the database is opened). Default off: the run is exactly v3
+(`outcome_attestation` NOT_REQUESTED). With it the directory is passed
+unchanged to the producer's decision-outcome-production-v3 attestation step:
+each outcome this run retains after a CLEAR check gets one write-once sidecar
+attestation (AT_EVALUATION, same job clock). The job itself builds, loads,
+verifies and partitions no attestation. A missing or damaged sidecar fails the
+run at stage PRODUCTION (ATTESTATIONS_UNAVAILABLE) before any outcome or
+attestation is written; a sidecar store refusal fails it at PRODUCTION
+(ATTESTATION_FAILED, earlier write-once records kept). ATTESTATION_REJECTED and
+RETAINED_OUTCOME_DIFFERS (outcome retained but UNATTESTED) count as rejections
+(exit 2). Outcomes already held when the run starts are neither re-checked nor
+attested and stay UNATTESTED (never clear). Top-level `outcome_attestation` is
+the producer's label. No directory is provisioned and nothing reads
+attestations for metrics, so SYSTEM keeps gaps
+OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED. Written by the file-only Claude paced
+executor without running tests; pending host validation.
 
 ## Retained outcome calendar chain (`app.decision_outcome_calendar`, decision-outcome-calendar-chain-v1)
 
@@ -709,8 +730,9 @@ shape the action-evidence loader returns; anything else CONFIG_INVALID).
 ## Producer attestation step (decision-outcome-production-v3)
 
 Status: library change written by the file-only Claude paced executor, tests
-NOT run in that cycle; pending host validation. The job does not pass the new
-argument. `produce_egx_decision_outcomes(..., actions=None,
+NOT run in that cycle; committed at 7a95d84. The job passes the new argument
+only with its opt-in `--attestation-dir` (decision-outcome-job-v4, above).
+`produce_egx_decision_outcomes(..., actions=None,
 attestation_directory=None)`:
 
 - Without `attestation_directory` the v2 behaviour is unchanged
@@ -740,7 +762,7 @@ attestation_directory=None)`:
 - The outcome record is unchanged (`retained_outcome_corporate_actions`
   NOT_RECORDED_IN_OUTCOME), no price is adjusted, labels SHADOW,
   LIVE_MONEY=false, NOT_AUTHORIZED. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
-  stays open: the job never enables this step and nothing calls the partition.
+  stays open: held outcomes are never attested and nothing calls the partition.
 
 ## Outcome action attestation (`app.decision_outcome_action_attestation`, decision-outcome-action-attestation-v1)
 
@@ -1080,9 +1102,9 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), an outcome-job option enabling the producer's
-attestation step (decision-outcome-production-v3) and attestation of outcomes
-held before a checked run, a provisioned
+OUTCOME_JOB_NOT_SCHEDULED), attestation of outcomes held before a checked run
+(the job's opt-in `--attestation-dir` attests only outcomes the run itself
+retains), a provisioned
 attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and a caller restricting metrics to attested outcomes via the partition (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
