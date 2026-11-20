@@ -269,6 +269,27 @@ def test_declared_gaps_match_the_code():
     for source in (ROOT / 'app' / 'decision_outcome_producer.py',
                    ROOT / 'app' / 'decision_outcome_job.py'):
         assert 'decision_outcome_attestation_store' not in source.read_text(encoding='utf-8')
+    # The attestation partition is a pure component: it re-verifies each loaded
+    # attestation with the unchanged verifier, reads no file or database, writes
+    # nothing and drops no outcome; nothing calls it (no caller outside the
+    # components, checked above), so the corporate-action gap stays open.
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_attested*.py')] == [
+        'decision_outcome_attested.py']
+    attested = (ROOT / 'app' / 'decision_outcome_attested.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'verify_outcome_action_attestation(\n                    found[1],' in attested
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_decision_outcome|retain_outcome_action_attestation|'
+                         r'check_egx_outcome_corporate_actions|load_retained_\w+)\b', attested)
+    assert "'unattested_meaning': 'NOT_CHECKED_NOT_CLEAR'" in attested
+    assert "'absence_is_proof': False" in attested
+    assert "'price_adjustment': 'NOT_APPLIED'" in attested
+    assert "'performance_claim': 'NONE'" in attested
+    assert "'live_money': False" in attested
+    assert "'promotion': 'NOT_AUTHORIZED'" in attested
+    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
+                   ROOT / 'app' / 'decision_outcome_job.py'):
+        assert 'decision_outcome_attested' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

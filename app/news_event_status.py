@@ -46,6 +46,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_action_evidence', 'decision-outcome-action-evidence-v1'),
     ('app.decision_outcome_action_attestation', 'decision-outcome-action-attestation-v1'),
     ('app.decision_outcome_attestation_store', 'decision-outcome-attestation-retention-v1'),
+    ('app.decision_outcome_attested', 'decision-outcome-attestation-partition-v1'),
     ('app.decision_outcome_store','decision-outcome-retention-v1'),
     ('app.decision_outcome_producer', 'decision-outcome-production-v2'),
     ('app.decision_outcome_daily_evidence', 'decision-outcome-daily-evidence-v1'),
@@ -97,8 +98,11 @@ EMPIRICAL_GAPS = (
     # gap stays open. A pure attestation record binding one retained outcome to
     # its CLEAR check exists (decision-outcome-action-attestation-v1), and a
     # write-once sidecar store library for those attestations exists
-    # (decision-outcome-attestation-retention-v1), but no producer builds or
-    # retains attestations and no loader filters outcomes by them yet.
+    # (decision-outcome-attestation-retention-v1), and a pure partition that
+    # re-verifies loaded attestations against their outcomes and observations
+    # (decision-outcome-attestation-partition-v1: ATTESTED_CLEAR / UNATTESTED /
+    # ATTESTATION_INVALID, none dropped) exists, but no producer builds or
+    # retains attestations and nothing calls the partition yet.
     'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
     # Attestation sidecar store library exists; no directory is provisioned and
     # nothing calls it.

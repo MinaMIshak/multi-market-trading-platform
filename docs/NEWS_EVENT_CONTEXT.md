@@ -773,6 +773,28 @@ observation, and a missing attestation means unattested, never clear. Gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open until the producer retains
 attestations and a loader restricts metrics to verified attested outcomes.
 
+## Outcome attestation partition (`app.decision_outcome_attested`, decision-outcome-attestation-partition-v1)
+
+`partition_egx_attested_outcomes(population, outcomes, attestations)` is the
+pure reader over what the unchanged loaders return (observation pairs, outcome
+records, attestation records). It re-reads every observation and outcome at its
+own content address (EGX only), re-binds every outcome to its population
+observation with the unchanged metrics check, re-reads every attestation with
+the unchanged store reader, and fails closed (`ValueError`) on duplicates, an
+outcome without its observation or two attestations for one outcome. Each
+outcome is then exactly one of ATTESTED_CLEAR (its attestation passes the
+unchanged `verify_outcome_action_attestation` against this outcome and
+observation), UNATTESTED (none supplied: NOT_CHECKED_NOT_CLEAR,
+`absence_is_proof` false) or ATTESTATION_INVALID (names the outcome but does not
+verify; visible, never attested). Counts always add up to the outcomes
+supplied; attestations naming an outcome not supplied are listed separately.
+`attested_clear_outcomes` returns fresh copies of only the ATTESTED_CLEAR
+records for `aggregate_decision_outcomes` with the same population, where every
+other record counts NOT_EVALUATED, so restricting to checked outcomes cannot
+hide a loss. The check is not re-run; no IO, write, caller or route. Gap
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open until a producer retains
+attestations and a caller uses this partition.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -1023,7 +1045,7 @@ retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
 OUTCOME_JOB_NOT_SCHEDULED), a producer retaining the outcome action
 attestation into the sidecar store beside each checked outcome, a provisioned
-attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and restricting metrics to attested outcomes (gap
+attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and a caller restricting metrics to attested outcomes via the partition (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
