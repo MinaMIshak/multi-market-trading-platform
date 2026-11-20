@@ -245,14 +245,15 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in attestation
     assert "'live_money': False" in attestation
     assert "'promotion': 'NOT_AUTHORIZED'" in attestation
-    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
-                   ROOT / 'app' / 'decision_outcome_job.py'):
-        assert 'decision_outcome_action_attestation' not in source.read_text(encoding='utf-8')
+    # Its only caller is the producer's opt-in attestation step
+    # (decision-outcome-production-v3, checked below); the job does not reference it.
+    assert 'decision_outcome_action_attestation' not in (
+        ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
     # The attestation sidecar store library exists, but no directory is
-    # provisioned and nothing calls it (no caller outside the component modules,
-    # checked above; the producer and job do not reference it), so the
-    # corporate-action gap stays open. It retains only re-verified attestations
-    # and never touches the outcome store or prices.
+    # provisioned and its only caller is the producer's opt-in step, which the
+    # job never enables (the job does not reference the store or pass an
+    # attestation directory), so the corporate-action gap stays open. It retains
+    # only re-verified attestations and never touches the outcome store or prices.
     assert 'OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED' in EMPIRICAL_GAPS
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_attestation_store*.py')] == [
         'decision_outcome_attestation_store.py']
@@ -266,9 +267,8 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in attestation_store
     assert "'live_money': False" in attestation_store
     assert "'promotion': 'NOT_AUTHORIZED'" in attestation_store
-    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
-                   ROOT / 'app' / 'decision_outcome_job.py'):
-        assert 'decision_outcome_attestation_store' not in source.read_text(encoding='utf-8')
+    assert 'decision_outcome_attestation_store' not in (
+        ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
     # The attestation partition is a pure component: it re-verifies each loaded
     # attestation with the unchanged verifier, reads no file or database, writes
     # nothing and drops no outcome; nothing calls it (no caller outside the
@@ -308,6 +308,17 @@ def test_declared_gaps_match_the_code():
     assert 'check_egx_outcome_corporate_actions(' in outcome_producer
     assert "'retained_outcome_corporate_actions': 'NOT_RECORDED_IN_OUTCOME'" in outcome_producer
     assert "'price_adjustment': 'NOT_APPLIED'" in outcome_producer
+    # decision-outcome-production-v3: only with an opt-in attestation directory
+    # (which requires selections), an outcome retained after a CLEAR check is
+    # attested with the unchanged builder and sidecar store; held outcomes are
+    # not attested, and the job never passes the directory, so the gap stays open.
+    for call in ('attest_outcome_corporate_actions(\n            outcome_identity, outcome,',
+                 'retain_outcome_action_attestation(\n            attestation_directory,',
+                 'load_retained_outcome_attestations(attestation_directory)'):
+        assert call in outcome_producer, call
+    assert "'attestation requires action selections'" in outcome_producer
+    assert "'held_outcome_attestation': 'NOT_PERFORMED'" in outcome_producer
+    assert 'attestation_directory' not in outcome_job
     # decision-outcome-job-v3: only with the opt-in flag, the job requests the
     # by-request selections at the single job clock and passes them unchanged to
     # the producer; it never calls the check or the all-or-nothing v1 loader.

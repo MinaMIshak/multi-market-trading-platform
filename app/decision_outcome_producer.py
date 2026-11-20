@@ -1,6 +1,6 @@
 """EGX decision-outcome producer over retained observations and daily evidence.
 
-Phase G/H collection step (decision-outcome-production-v2). For every EGX
+Phase G/H collection step (decision-outcome-production-v3). For every EGX
 decision-observation-v1 record in a host-provisioned observation store it
 composes the existing pieces unchanged; it adds no binding, evaluation, record
 or store logic:
@@ -32,14 +32,32 @@ or store logic:
    run is labelled corporate actions NOT_CHECKED;
 6. ``retain_decision_outcome`` for terminal outcomes (CLOSED, NO_ENTRY,
    UNEVALUABLE) with the same clock. PENDING_PATH is reported, never retained
-   (and not checked).
+   (and not checked);
+7. only when the caller also supplies ``attestation_directory`` (requires
+   ``actions``; a host-provisioned sidecar directory distinct from both
+   stores): for an outcome this run retained (store status RETAINED, or
+   ALREADY_RETAINED with exactly this run's bytes) after a CLEAR check, the
+   unchanged pure ``attest_outcome_corporate_actions`` binds that retained
+   outcome, its observation and the exact CLEAR report, and the unchanged
+   ``retain_outcome_action_attestation`` retains it write-once with the same
+   clock. The sidecar is loaded (structure only) before any outcome is
+   evaluated, so a damaged or missing sidecar refuses the run before any write
+   (ATTESTATIONS_UNAVAILABLE). An attestation the pure builder refuses is
+   reported per observation (ATTESTATION_REJECTED) and the outcome stays
+   unattested; a sidecar store refusal aborts the run (ATTESTATION_FAILED) with
+   earlier outcomes and attestations kept (write-once).
 
-v2 changes only this optional check (and its result fields/statuses). The
-retained decision-outcome-v1 record does not carry the check, so outcomes
-already in the store (ALREADY_RETAINED) and outcomes retained by an unchecked
-run are indistinguishable there: ``retained_outcome_corporate_actions`` is
-NOT_RECORDED_IN_OUTCOME and the SYSTEM gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
-stays open.
+v2 added only the optional check (and its result fields/statuses); v3
+(decision-outcome-production-v3) adds only the optional attestation step and
+its result fields. The retained decision-outcome-v1 record still does not carry
+the check (``retained_outcome_corporate_actions`` NOT_RECORDED_IN_OUTCOME):
+only a verified sidecar attestation tells a checked outcome apart. Outcomes
+already in the store when the run starts (ALREADY_RETAINED) are neither
+re-checked nor attested (``held_outcome_attestation`` NOT_PERFORMED), so an
+outcome retained by an unchecked run, or whose attestation failed, stays
+UNATTESTED (never clear) for the partition. The host job does not pass
+``attestation_directory`` yet, so the SYSTEM gap
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
 
 Per-observation results are visible, never dropped: AWAITING_DAILY_EVIDENCE
 (no rows supplied for the instrument, or rows received before detection),
@@ -57,8 +75,8 @@ corporate-action check is unrecorded in retained outcomes, so no outcome or
 metric derived from this run is empirical evidence until those gaps close. Its
 only caller is the host job entrypoint ``app.decision_outcome_job`` (not
 scheduled; decision-outcome-job-v3 passes ``actions`` only with its opt-in
-``--check-corporate-actions``); no route; both store
-directories are explicit arguments. Outcomes are
+``--check-corporate-actions`` and never ``attestation_directory``); no route;
+every store directory is an explicit argument. Outcomes are
 hypothetical results from session bars: not fills, not performance.
 PAPER/SHADOW only; LIVE_MONEY=false.
 """
@@ -71,7 +89,11 @@ from app.decision_observation import canonical_bytes
 from app.decision_observation_store import (
     DecisionObservationStoreError, _time, load_retained_decision_observations)
 from app.decision_outcome import OutcomeAssumptions, evaluate_decision_outcome
+from app.decision_outcome_action_attestation import attest_outcome_corporate_actions
 from app.decision_outcome_action_evidence import OutcomeActionSelection
+from app.decision_outcome_attestation_store import (
+    OutcomeAttestationStoreError, load_retained_outcome_attestations,
+    retain_outcome_action_attestation)
 from app.decision_outcome_corporate_actions import (
     WINDOW_RULE as ACTION_WINDOW_RULE, check_egx_outcome_corporate_actions)
 from app.decision_outcome_session_bars import bind_egx_outcome_session_bars
@@ -81,11 +103,15 @@ from app.decision_outcome_store import (
 from app.domain.models import MarketSession
 from app.scanner_v2_egx_rank import CAIRO
 
-CONTRACT_VERSION = 'decision-outcome-production-v2'
+CONTRACT_VERSION = 'decision-outcome-production-v3'
 CALENDAR_RULE = 'CALENDAR_THROUGH_RECEIPT_DATE_V1'
 ACTION_PATH_RULE = 'PATH_COMPLETION_DATE_CAIRO_V1'
 PRODUCTION_REASONS = (
-    'CONFIG_INVALID', 'OBSERVATIONS_UNAVAILABLE', 'OUTCOMES_UNAVAILABLE', 'RETENTION_FAILED')
+    'CONFIG_INVALID', 'OBSERVATIONS_UNAVAILABLE', 'OUTCOMES_UNAVAILABLE', 'RETENTION_FAILED',
+    'ATTESTATIONS_UNAVAILABLE', 'ATTESTATION_FAILED')
+# Per-entry attestation result (None when no attestation was attempted).
+ATTESTATION_STATUSES = (
+    'RETAINED', 'ALREADY_RETAINED', 'ATTESTATION_REJECTED', 'RETAINED_OUTCOME_DIFFERS')
 ENTRY_STATUSES = (
     'RETAINED', 'ALREADY_RETAINED', 'PENDING_PATH', 'AWAITING_DAILY_EVIDENCE',
     'OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED',
@@ -125,8 +151,16 @@ def _directory(value):
     return os.path.normpath(value)
 
 
-def _config(observation_directory, outcome_directory, daily, sessions, assumptions, actions, now):
-    if _directory(observation_directory) == _directory(outcome_directory):
+def _config(observation_directory, outcome_directory, daily, sessions, assumptions, actions,
+            attestation_directory, now):
+    stores = [_directory(observation_directory), _directory(outcome_directory)]
+    if attestation_directory is not None:
+        # Only a CLEAR check is attestable, so attestation requires the check.
+        if actions is None:
+            raise DecisionOutcomeProductionError(
+                'CONFIG_INVALID', 'attestation requires action selections')
+        stores.append(_directory(attestation_directory))
+    if len(set(stores)) != len(stores):
         raise DecisionOutcomeProductionError('CONFIG_INVALID', 'stores must be distinct')
     if type(assumptions) is not OutcomeAssumptions:
         raise DecisionOutcomeProductionError('CONFIG_INVALID', 'exact OutcomeAssumptions required')
@@ -173,6 +207,7 @@ def _entry(identity, record):
         'outcome_identity': None, 'outcome_status': None, 'outcome_reason': None,
         'path_complete_through_at': None, 'sessions_bound': None,
         'corporate_action_status': None, 'corporate_action_check': None,
+        'attestation_status': None, 'attestation_identity': None, 'attestation_detail': None,
     }
 
 
@@ -207,8 +242,35 @@ def _check_actions(entry, identity, record, bound, actions, now):
     return True
 
 
+def _attest(entry, identity, record, outcome, attestation_directory, now):
+    """Retain the attestation of an outcome this run retained after a CLEAR check."""
+    outcome_identity = entry['outcome_identity']
+    # A store ALREADY_RETAINED under another identity kept a different first
+    # outcome; this run's CLEAR check is for this run's path, not that record.
+    if outcome_identity != sha256(canonical_bytes(outcome)).hexdigest():
+        entry['attestation_status'] = 'RETAINED_OUTCOME_DIFFERS'
+        return
+    try:
+        attestation = attest_outcome_corporate_actions(
+            outcome_identity, outcome, (identity, record), entry['corporate_action_check'])
+    except ValueError as exc:
+        entry.update(attestation_status='ATTESTATION_REJECTED', attestation_detail=_detail(exc))
+        return
+    try:
+        retained = retain_outcome_action_attestation(
+            attestation_directory, attestation, (outcome_identity, outcome), (identity, record),
+            now=now)
+    except OutcomeAttestationStoreError as exc:
+        raise DecisionOutcomeProductionError(
+            'ATTESTATION_FAILED', f"{record['symbol']}: {exc.reason}") from None
+    if (retained.get('outcome_identity') != outcome_identity
+            or retained.get('status') not in ('RETAINED', 'ALREADY_RETAINED')):
+        raise DecisionOutcomeProductionError('ATTESTATION_FAILED', 'unexpected result')
+    entry.update(attestation_status=retained['status'], attestation_identity=retained['identity'])
+
+
 def _produce_one(entry, identity, record, outcome_directory, daily, sessions, assumptions,
-                 actions, now):
+                 actions, attestation_directory, now):
     if _time(record['recorded_at'], 'recorded_at') > now:
         entry['status'] = 'OBSERVATION_AFTER_CLOCK'
         return
@@ -252,10 +314,14 @@ def _produce_one(entry, identity, record, outcome_directory, daily, sessions, as
             or retained.get('status') not in ('RETAINED', 'ALREADY_RETAINED')):
         raise DecisionOutcomeProductionError('RETENTION_FAILED', 'unexpected result')
     entry.update(status=retained['status'], outcome_identity=retained['identity'])
+    if attestation_directory is not None:
+        # Reached only after a CLEAR check (attestation requires actions).
+        _attest(entry, identity, record, outcome, attestation_directory, now)
 
 
 def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, daily, sessions,
-                                  assumptions, now=None, actions=None):
+                                  assumptions, now=None, actions=None,
+                                  attestation_directory=None):
     """Evaluate and retain terminal outcomes for every retained EGX observation.
 
     ``daily`` maps canonical instrument UUID strings to ``EgxDailyEvidence``;
@@ -264,15 +330,17 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
     ``evaluated_at``, the outcome-store clock and the corporate-action check's
     ``as_of``. ``actions`` (optional) maps observation identities to
     ``OutcomeActionSelection``; when given, a terminal outcome is retained only
-    if the unchanged check reports CLEAR. Returns a
-    ``decision-outcome-production-v2`` result with one entry per observation.
-    Refusals raise ``DecisionOutcomeProductionError``.
+    if the unchanged check reports CLEAR. ``attestation_directory`` (optional,
+    requires ``actions``) is the host-provisioned sidecar where each outcome
+    this run retains after a CLEAR check gets its write-once attestation.
+    Returns a ``decision-outcome-production-v3`` result with one entry per
+    observation. Refusals raise ``DecisionOutcomeProductionError``.
     """
     now = datetime.now(timezone.utc) if now is None else now
     if not _aware(now):
         raise TypeError('now must be a timezone-aware datetime')
     assumptions = _config(observation_directory, outcome_directory, daily, sessions,
-                          assumptions, actions, now)
+                          assumptions, actions, attestation_directory, now)
     try:
         observations = load_retained_decision_observations(observation_directory, market='EGX')
     except DecisionObservationStoreError as exc:
@@ -282,6 +350,13 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
                                                assumptions=assumptions)
     except DecisionOutcomeStoreError as exc:
         raise DecisionOutcomeProductionError('OUTCOMES_UNAVAILABLE', exc.reason) from None
+    if attestation_directory is not None:
+        # Structure-only read before any evaluation: a missing or damaged
+        # sidecar refuses the run before any outcome is written.
+        try:
+            load_retained_outcome_attestations(attestation_directory)
+        except OutcomeAttestationStoreError as exc:
+            raise DecisionOutcomeProductionError('ATTESTATIONS_UNAVAILABLE', exc.reason) from None
     held = {record['observation_identity']: record for record in held}
     population = {identity for identity, _ in observations}
 
@@ -296,7 +371,7 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
                          path_complete_through_at=outcome['path_complete_through_at'])
         else:
             _produce_one(entry, identity, record, outcome_directory, daily, sessions,
-                         assumptions, actions, now)
+                         assumptions, actions, attestation_directory, now)
         entries.append(entry)
 
     return {
@@ -320,6 +395,16 @@ def produce_egx_decision_outcomes(observation_directory, outcome_directory, *, d
             None if actions is None else sum(i not in population for i in actions)),
         # decision-outcome-v1 records do not carry the check result.
         'retained_outcome_corporate_actions': 'NOT_RECORDED_IN_OUTCOME',
+        # decision-outcome-production-v3: optional sidecar attestation step.
+        'outcome_attestation': (
+            'NOT_REQUESTED' if attestation_directory is None
+            else 'ATTESTED_AFTER_CLEAR_RETENTION'),
+        'attestation_counts': (
+            None if attestation_directory is None
+            else {s: sum(e['attestation_status'] == s for e in entries)
+                  for s in ATTESTATION_STATUSES}),
+        # Outcomes held before this run are neither re-checked nor attested.
+        'held_outcome_attestation': 'NOT_PERFORMED',
         'price_adjustment': 'NOT_APPLIED',
         'fill_kind': 'HYPOTHETICAL_FROM_SESSION_BARS', 'execution_evidence': 'NONE',
         'performance_claim': 'NONE', 'mode': 'SHADOW', 'live_money': False,

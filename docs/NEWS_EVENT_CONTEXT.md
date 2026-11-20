@@ -706,6 +706,42 @@ shape the action-evidence loader returns; anything else CONFIG_INVALID).
   be told apart in the store. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
   therefore stays open.
 
+## Producer attestation step (decision-outcome-production-v3)
+
+Status: library change written by the file-only Claude paced executor, tests
+NOT run in that cycle; pending host validation. The job does not pass the new
+argument. `produce_egx_decision_outcomes(..., actions=None,
+attestation_directory=None)`:
+
+- Without `attestation_directory` the v2 behaviour is unchanged
+  (`outcome_attestation` NOT_REQUESTED, `attestation_counts` null, entry
+  attestation fields null).
+- `attestation_directory` requires `actions` (only CLEAR is attestable) and
+  must be an absolute directory distinct from the observation and outcome
+  stores (else CONFIG_INVALID). The sidecar is loaded (structure only) before
+  any evaluation; a missing or damaged sidecar refuses the run before any write
+  (ATTESTATIONS_UNAVAILABLE).
+- For an outcome this run retained after a CLEAR check (outcome-store status
+  RETAINED, or ALREADY_RETAINED with exactly this run's bytes), the unchanged
+  `attest_outcome_corporate_actions` binds the retained outcome, its
+  observation and the entry's exact CLEAR report, and the unchanged
+  `retain_outcome_action_attestation` retains it with the same clock (so
+  `check_timing` is AT_EVALUATION). Entry fields `attestation_status`
+  (RETAINED / ALREADY_RETAINED / ATTESTATION_REJECTED /
+  RETAINED_OUTCOME_DIFFERS), `attestation_identity`, `attestation_detail`;
+  run-level `attestation_counts`.
+- A builder refusal is per observation (ATTESTATION_REJECTED; the outcome stays
+  retained and UNATTESTED). A sidecar store refusal aborts the run
+  (ATTESTATION_FAILED); outcomes and attestations already written stay.
+- Outcomes held before the run starts are neither re-checked nor attested
+  (`held_outcome_attestation` NOT_PERFORMED). An outcome retained by an
+  unchecked run, or whose attestation failed, therefore stays UNATTESTED for
+  the partition (never clear) until a later unit attests held outcomes.
+- The outcome record is unchanged (`retained_outcome_corporate_actions`
+  NOT_RECORDED_IN_OUTCOME), no price is adjusted, labels SHADOW,
+  LIVE_MONEY=false, NOT_AUTHORIZED. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
+  stays open: the job never enables this step and nothing calls the partition.
+
 ## Outcome action attestation (`app.decision_outcome_action_attestation`, decision-outcome-action-attestation-v1)
 
 Status: pure library, pending host validation; nothing builds, retains or reads
@@ -745,7 +781,8 @@ performance claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.
 compares canonical bytes, so an edited, extended or re-pointed attestation is
 refused. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
 stays open until the producer retains attestations (write-once, beside the
-outcomes) and a loader restricts metrics to attested outcomes.
+outcomes; library step added in decision-outcome-production-v3, not enabled by
+the job) and a loader restricts metrics to attested outcomes.
 
 ## Outcome attestation store (`app.decision_outcome_attestation_store`, decision-outcome-attestation-retention-v1)
 
@@ -1043,8 +1080,9 @@ Host provisioning of the store directories, an ingestion producer for a lawful
 free source, wiring the section into the card report/page (which needs a
 retained coverage time and a concrete operational policy), a schedule invoking
 the observation job, a schedule invoking the outcome job (gap
-OUTCOME_JOB_NOT_SCHEDULED), a producer retaining the outcome action
-attestation into the sidecar store beside each checked outcome, a provisioned
+OUTCOME_JOB_NOT_SCHEDULED), an outcome-job option enabling the producer's
+attestation step (decision-outcome-production-v3) and attestation of outcomes
+held before a checked run, a provisioned
 attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and a caller restricting metrics to attested outcomes via the partition (gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
 retention, a registered operational

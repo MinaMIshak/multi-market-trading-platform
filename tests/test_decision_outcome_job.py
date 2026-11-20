@@ -166,7 +166,10 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
         'received_at_clock': 'INGESTION_MANIFEST_UNVERIFIED',
         'market_membership': 'NOT_ESTABLISHED'}
     production = out['production']
-    assert production['schema_version'] == 'decision-outcome-production-v2'
+    assert production['schema_version'] == 'decision-outcome-production-v3'
+    # The job never enables the producer's opt-in attestation step.
+    assert production['outcome_attestation'] == 'NOT_REQUESTED'
+    assert production['attestation_counts'] is None
     # Without --check-corporate-actions no selections are passed (v2 behaviour):
     # the run is labelled unchecked.
     assert call['actions'] is None and out['action_evidence'] is None

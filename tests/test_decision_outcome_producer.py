@@ -1,4 +1,4 @@
-"""decision-outcome-production-v2: retained observations + daily evidence -> retained outcomes."""
+"""decision-outcome-production-v3: retained observations + daily evidence -> retained outcomes."""
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal as D
 from hashlib import sha256
@@ -10,12 +10,16 @@ from app.decision_observation import canonical_bytes
 from app.decision_observation_store import (
     load_retained_decision_observations, retain_decision_observation)
 from app.decision_outcome import TOUCH, OutcomeAssumptions, evaluate_decision_outcome
+from app.decision_outcome_action_attestation import (
+    attest_outcome_corporate_actions, verify_outcome_action_attestation)
 from app.decision_outcome_action_evidence import OutcomeActionSelection
+from app.decision_outcome_attestation_store import load_retained_outcome_attestations
+from app.decision_outcome_attested import partition_egx_attested_outcomes
 from app.decision_outcome_corporate_actions import WINDOW_RULE, check_egx_outcome_corporate_actions
 from app.decision_outcome_metrics import aggregate_decision_outcomes
 from app.decision_outcome_producer import (
-    ACTION_PATH_RULE, AWAITING_REASONS, CALENDAR_RULE, CONTRACT_VERSION, ENTRY_STATUSES,
-    PRODUCTION_REASONS, DecisionOutcomeProductionError, EgxDailyEvidence,
+    ACTION_PATH_RULE, ATTESTATION_STATUSES, AWAITING_REASONS, CALENDAR_RULE, CONTRACT_VERSION,
+    ENTRY_STATUSES, PRODUCTION_REASONS, DecisionOutcomeProductionError, EgxDailyEvidence,
     produce_egx_decision_outcomes)
 from app.decision_outcome_session_bars import bind_egx_outcome_session_bars
 from app.decision_outcome_store import load_retained_decision_outcomes
@@ -72,12 +76,21 @@ def observe(directory, *decisions):
     return load_retained_decision_observations(str(directory), market='EGX')
 
 
-def produce(stores, daily=None, sessions=CAL, now=NOW, assumptions=ZERO, actions=None):
+@pytest.fixture
+def sidecar(tmp_path):
+    directory = tmp_path / 'attestations'
+    directory.mkdir(mode=0o700)
+    return directory
+
+
+def produce(stores, daily=None, sessions=CAL, now=NOW, assumptions=ZERO, actions=None,
+            attestations=None):
     observations, outcomes = stores
     daily = {str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED)} if daily is None else daily
+    kwargs = {} if attestations is None else {'attestation_directory': str(attestations)}
     return produce_egx_decision_outcomes(str(observations), str(outcomes), daily=daily,
                                          sessions=sessions, assumptions=assumptions, now=now,
-                                         actions=actions)
+                                         actions=actions, **kwargs)
 
 
 def selection(doc=None):
@@ -101,7 +114,7 @@ def refused(reason, call, *args, **kwargs):
 def test_terminal_outcome_is_evaluated_from_retained_evidence_and_retained(stores):
     (identity, record), = observe(stores[0])
     out = produce(stores)
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v2'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v3'
     assert out['market'] == 'EGX' and out['observations'] == 1
     assert out['produced_at'] == '2026-11-09T15:00:00Z'
     (entry,) = out['outcomes']
@@ -139,6 +152,12 @@ def test_result_is_labelled_and_claims_nothing(stores):
     assert out['corporate_action_path_rule'] is None
     assert out['action_selections_without_observation'] is None
     assert out['retained_outcome_corporate_actions'] == 'NOT_RECORDED_IN_OUTCOME'
+    # The v3 attestation step is opt-in and off by default.
+    assert out['outcome_attestation'] == 'NOT_REQUESTED'
+    assert out['attestation_counts'] is None
+    assert out['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert out['outcomes'][0]['attestation_status'] is None
+    assert out['outcomes'][0]['attestation_identity'] is None
     assert out['price_adjustment'] == 'NOT_APPLIED'
     assert out['outcomes'][0]['corporate_action_status'] is None
     assert out['outcomes'][0]['corporate_action_check'] is None
@@ -266,7 +285,7 @@ def test_clear_action_check_is_required_before_retention(stores):
     # Actions outside the window (before the data_as_of date, after the path) only.
     doc = action_evidence((action(3), action(12)))
     out = produce(stores, actions={identity: selection(doc)})
-    assert out['schema_version'] == 'decision-outcome-production-v2'
+    assert out['schema_version'] == 'decision-outcome-production-v3'
     assert out['corporate_actions'] == 'CHECKED_BEFORE_RETENTION'
     assert out['corporate_action_window_rule'] == WINDOW_RULE
     assert out['corporate_action_path_rule'] == ACTION_PATH_RULE == 'PATH_COMPLETION_DATE_CAIRO_V1'
@@ -366,6 +385,139 @@ def test_invalid_action_selections_are_refused(stores):
     for actions in ([selection()], {identity: (doc, SOURCE, REVIEWS)}, {1: selection()}):
         refused('CONFIG_INVALID', produce, stores, actions=actions)
     assert snapshot(stores[1]) == []
+
+
+def test_clear_retention_is_attested_in_the_sidecar(stores, sidecar):
+    (identity, record), = observe(stores[0])
+    doc = action_evidence((action(3), action(12)))
+    out = produce(stores, actions={identity: selection(doc)}, attestations=sidecar)
+    assert out['outcome_attestation'] == 'ATTESTED_AFTER_CLEAR_RETENTION'
+    assert out['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert tuple(out['attestation_counts']) == ATTESTATION_STATUSES
+    assert out['attestation_counts']['RETAINED'] == 1
+    assert sum(out['attestation_counts'].values()) == 1
+    (entry,) = out['outcomes']
+    assert (entry['status'], entry['corporate_action_status'], entry['attestation_status']) == (
+        'RETAINED', 'CLEAR', 'RETAINED')
+    assert entry['attestation_detail'] is None
+    (held,) = load_retained_decision_outcomes(str(stores[1]), market='EGX', assumptions=ZERO)
+    assert entry['outcome_identity'] == sha256(canonical_bytes(held)).hexdigest()
+    (attestation,) = load_retained_outcome_attestations(str(sidecar))
+    assert entry['attestation_identity'] == sha256(canonical_bytes(attestation)).hexdigest()
+    # Exactly the unchanged builder over the retained outcome, its observation and
+    # the entry's CLEAR report; it re-verifies against the retained records.
+    assert attestation == attest_outcome_corporate_actions(
+        entry['outcome_identity'], held, (identity, record), entry['corporate_action_check'])
+    assert verify_outcome_action_attestation(
+        attestation, entry['outcome_identity'], held, (identity, record)) == attestation
+    assert attestation['check_timing'] == 'AT_EVALUATION'
+    assert attestation['live_money'] is False and attestation['performance_claim'] == 'NONE'
+    population = load_retained_decision_observations(str(stores[0]), market='EGX')
+    partition = partition_egx_attested_outcomes(population, (held,), (attestation,))
+    assert partition['counts'] == {'ATTESTED_CLEAR': 1, 'UNATTESTED': 0, 'ATTESTATION_INVALID': 0}
+    # A rerun neither re-checks nor re-attests the held outcome.
+    before = snapshot(sidecar)
+    again = produce(stores, actions={identity: selection(doc)}, attestations=sidecar,
+                    now=NOW + timedelta(days=1))
+    (entry,) = again['outcomes']
+    assert entry['status'] == 'ALREADY_RETAINED' and entry['attestation_status'] is None
+    assert sum(again['attestation_counts'].values()) == 0
+    assert snapshot(sidecar) == before
+
+
+def test_attestation_is_opt_in_and_requires_the_check(stores, sidecar):
+    observations, outcomes = stores
+    (identity, _), = observe(observations)
+    actions = {identity: selection()}
+    error = refused('CONFIG_INVALID', produce, stores, attestations=sidecar)
+    assert 'requires action selections' in str(error)
+    for directory in (outcomes, observations):
+        refused('CONFIG_INVALID', produce, stores, actions=actions, attestations=directory)
+    refused('CONFIG_INVALID', produce_egx_decision_outcomes, str(observations), str(outcomes),
+            daily={str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED)}, sessions=CAL,
+            assumptions=ZERO, now=NOW, actions=actions, attestation_directory='relative')
+    assert snapshot(outcomes) == [] and snapshot(sidecar) == []
+    # Checked but not attested: the outcome is retained, the sidecar untouched.
+    out = produce(stores, actions=actions)
+    assert out['outcomes'][0]['status'] == 'RETAINED'
+    assert out['outcome_attestation'] == 'NOT_REQUESTED'
+    assert snapshot(sidecar) == []
+
+
+def test_outcomes_without_a_clear_check_in_this_run_are_not_attested(stores, sidecar):
+    (identity, _), = observe(stores[0])
+    out = produce(stores, actions={identity: selection(action_evidence((action(8),)))},
+                  attestations=sidecar)
+    (entry,) = out['outcomes']
+    assert entry['status'] == 'ACTIONS_IN_PATH' and entry['attestation_status'] is None
+    assert sum(out['attestation_counts'].values()) == 0
+    assert snapshot(sidecar) == [] and snapshot(stores[1]) == []
+    # An outcome retained by an unchecked run is held, so a later checked run
+    # attests nothing; it stays UNATTESTED (not clear) for the partition.
+    produce(stores)
+    later = produce(stores, actions={identity: selection()}, attestations=sidecar,
+                    now=NOW + timedelta(days=1))
+    (entry,) = later['outcomes']
+    assert entry['status'] == 'ALREADY_RETAINED' and entry['attestation_status'] is None
+    assert later['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert snapshot(sidecar) == []
+    held = load_retained_decision_outcomes(str(stores[1]), market='EGX', assumptions=ZERO)
+    population = load_retained_decision_observations(str(stores[0]), market='EGX')
+    partition = partition_egx_attested_outcomes(population, held, ())
+    assert partition['counts'] == {'ATTESTED_CLEAR': 0, 'UNATTESTED': 1, 'ATTESTATION_INVALID': 0}
+
+
+def test_unusable_sidecar_refuses_the_run_before_any_write(stores, sidecar):
+    (identity, _), = observe(stores[0])
+    actions = {identity: selection()}
+    (sidecar / 'unexpected.txt').write_bytes(b'x')
+    error = refused('ATTESTATIONS_UNAVAILABLE', produce, stores, actions=actions,
+                    attestations=sidecar)
+    assert error.detail == 'STORE_INVALID'
+    refused('ATTESTATIONS_UNAVAILABLE', produce, stores, actions=actions,
+            attestations=sidecar.parent / 'missing')
+    assert snapshot(stores[1]) == []
+
+
+def test_attestation_refusals_are_visible_and_never_hide_the_outcome(stores, sidecar, monkeypatch):
+    import app.decision_outcome_producer as producer
+    from app.decision_outcome_attestation_store import OutcomeAttestationStoreError
+    (identity, _), = observe(stores[0])
+    actions = {identity: selection()}
+
+    def busy(*args, **kwargs):
+        raise OutcomeAttestationStoreError('STORE_BUSY')
+
+    monkeypatch.setattr(producer, 'retain_outcome_action_attestation', busy)
+    error = refused('ATTESTATION_FAILED', produce, stores, actions=actions, attestations=sidecar)
+    assert 'STORE_BUSY' in error.detail
+    # The outcome retained before the refusal stays (write-once) and is unattested.
+    assert len(snapshot(stores[1])) == 1 and snapshot(sidecar) == []
+    monkeypatch.undo()
+
+    def reject(*args, **kwargs):
+        raise ValueError('fixture refusal')
+
+    monkeypatch.setattr(producer, 'attest_outcome_corporate_actions', reject)
+    observed = observe(stores[0], decision(symbol='OTHR', instrument=OTHER))
+    other = next(i for i, r in observed if r['symbol'] == 'OTHR')
+    other_rows = tuple(r.model_copy(update={'instrument_id': OTHER, 'canonical_symbol': 'OTHR'})
+                       for r in ROWS)
+    out = produce(stores, daily={str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED),
+                                 str(OTHER): EgxDailyEvidence(other_rows, RECEIVED)},
+                  actions={identity: selection(),
+                           other: selection(action_evidence(instrument=OTHER))},
+                  attestations=sidecar)
+    by_symbol = {e['symbol']: e for e in out['outcomes']}
+    # TEST was retained (unattested) by the aborted run: held, never attested.
+    assert (by_symbol['TEST']['status'], by_symbol['TEST']['attestation_status']) == (
+        'ALREADY_RETAINED', None)
+    entry = by_symbol['OTHR']
+    assert (entry['status'], entry['attestation_status']) == ('RETAINED', 'ATTESTATION_REJECTED')
+    assert entry['attestation_detail'] == 'fixture refusal'
+    assert entry['attestation_identity'] is None
+    assert out['attestation_counts']['ATTESTATION_REJECTED'] == 1
+    assert snapshot(sidecar) == []
 
 
 def test_production_is_deterministic_for_a_fixed_clock(tmp_path):
