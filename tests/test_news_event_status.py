@@ -320,6 +320,12 @@ def test_declared_gaps_match_the_code():
         assert call in outcome_producer, call
     assert "'attestation requires action selections'" in outcome_producer
     assert "'held_outcome_attestation': 'NOT_PERFORMED'" in outcome_producer
+    # decision-outcome-production-v4: held outcomes are re-checked and attested
+    # only with the opt-in attest_held_outcomes (requires an attestation
+    # directory); the job never passes it, so the gap stays open.
+    assert 'attest_held_outcomes=False' in outcome_producer
+    assert "'held-outcome attestation requires an attestation directory'" in outcome_producer
+    assert 'attest_held_outcomes' not in outcome_job
     # decision-outcome-job-v4: the job only passes an opt-in attestation
     # directory through (refused without the check); it builds, retains, loads
     # and verifies no attestation itself.

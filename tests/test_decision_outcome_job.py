@@ -170,7 +170,11 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
         'received_at_clock': 'INGESTION_MANIFEST_UNVERIFIED',
         'market_membership': 'NOT_ESTABLISHED'}
     production = out['production']
-    assert production['schema_version'] == 'decision-outcome-production-v3'
+    assert production['schema_version'] == 'decision-outcome-production-v4'
+    # The job never enables the producer's opt-in held-outcome re-check.
+    assert 'attest_held_outcomes' not in call
+    assert production['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert production['held_outcomes_rechecked'] is None
     # Without an attestation directory the producer's opt-in step stays off.
     assert call['attestation_directory'] is None
     assert production['outcome_attestation'] == out['outcome_attestation'] == 'NOT_REQUESTED'

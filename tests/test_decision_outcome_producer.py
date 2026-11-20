@@ -1,4 +1,4 @@
-"""decision-outcome-production-v3: retained observations + daily evidence -> retained outcomes."""
+"""decision-outcome-production-v4: retained observations + daily evidence -> retained outcomes."""
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal as D
 from hashlib import sha256
@@ -84,10 +84,12 @@ def sidecar(tmp_path):
 
 
 def produce(stores, daily=None, sessions=CAL, now=NOW, assumptions=ZERO, actions=None,
-            attestations=None):
+            attestations=None, held=None):
     observations, outcomes = stores
     daily = {str(INSTRUMENT): EgxDailyEvidence(ROWS, RECEIVED)} if daily is None else daily
     kwargs = {} if attestations is None else {'attestation_directory': str(attestations)}
+    if held is not None:
+        kwargs['attest_held_outcomes'] = held
     return produce_egx_decision_outcomes(str(observations), str(outcomes), daily=daily,
                                          sessions=sessions, assumptions=assumptions, now=now,
                                          actions=actions, **kwargs)
@@ -114,7 +116,7 @@ def refused(reason, call, *args, **kwargs):
 def test_terminal_outcome_is_evaluated_from_retained_evidence_and_retained(stores):
     (identity, record), = observe(stores[0])
     out = produce(stores)
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v3'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-production-v4'
     assert out['market'] == 'EGX' and out['observations'] == 1
     assert out['produced_at'] == '2026-11-09T15:00:00Z'
     (entry,) = out['outcomes']
@@ -156,6 +158,7 @@ def test_result_is_labelled_and_claims_nothing(stores):
     assert out['outcome_attestation'] == 'NOT_REQUESTED'
     assert out['attestation_counts'] is None
     assert out['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert out['held_outcomes_rechecked'] is None
     assert out['outcomes'][0]['attestation_status'] is None
     assert out['outcomes'][0]['attestation_identity'] is None
     assert out['price_adjustment'] == 'NOT_APPLIED'
@@ -285,7 +288,7 @@ def test_clear_action_check_is_required_before_retention(stores):
     # Actions outside the window (before the data_as_of date, after the path) only.
     doc = action_evidence((action(3), action(12)))
     out = produce(stores, actions={identity: selection(doc)})
-    assert out['schema_version'] == 'decision-outcome-production-v3'
+    assert out['schema_version'] == 'decision-outcome-production-v4'
     assert out['corporate_actions'] == 'CHECKED_BEFORE_RETENTION'
     assert out['corporate_action_window_rule'] == WINDOW_RULE
     assert out['corporate_action_path_rule'] == ACTION_PATH_RULE == 'PATH_COMPLETION_DATE_CAIRO_V1'
@@ -517,6 +520,118 @@ def test_attestation_refusals_are_visible_and_never_hide_the_outcome(stores, sid
     assert entry['attestation_detail'] == 'fixture refusal'
     assert entry['attestation_identity'] is None
     assert out['attestation_counts']['ATTESTATION_REJECTED'] == 1
+    assert snapshot(sidecar) == []
+
+
+LATER = NOW + timedelta(days=1)
+
+
+def test_held_outcome_is_rechecked_and_attested_after_evaluation(stores, sidecar):
+    (identity, record), = observe(stores[0])
+    produce(stores)  # unchecked run: the outcome is held but UNATTESTED
+    before = snapshot(stores[1])
+    (held,) = load_retained_decision_outcomes(str(stores[1]), market='EGX', assumptions=ZERO)
+    out = produce(stores, actions={identity: selection()}, attestations=sidecar, held=True,
+                  now=LATER)
+    assert out['schema_version'] == 'decision-outcome-production-v4'
+    assert out['held_outcome_attestation'] == 'HELD_RECHECK_AFTER_EVALUATION_V1'
+    assert out['held_outcomes_rechecked'] == 1
+    (entry,) = out['outcomes']
+    # Still the held record: never re-evaluated, re-retained or adjusted.
+    assert entry['status'] == 'ALREADY_RETAINED' and entry['sessions_bound'] is None
+    assert entry['outcome_identity'] == sha256(canonical_bytes(held)).hexdigest()
+    assert snapshot(stores[1]) == before
+    # The unchanged check over the held outcome's own path at the producer clock.
+    assert entry['corporate_action_status'] == 'CLEAR'
+    assert entry['corporate_action_check'] == check_egx_outcome_corporate_actions(
+        identity, record, action_evidence(), source_ingestion_id=SOURCE,
+        review_ingestion_ids=REVIEWS, path_through=date(2026, 11, 9), as_of=LATER)
+    assert entry['attestation_status'] == 'RETAINED'
+    assert out['attestation_counts']['RETAINED'] == 1
+    assert sum(out['attestation_counts'].values()) == 1
+    (attestation,) = load_retained_outcome_attestations(str(sidecar))
+    assert entry['attestation_identity'] == sha256(canonical_bytes(attestation)).hexdigest()
+    assert attestation == attest_outcome_corporate_actions(
+        entry['outcome_identity'], held, (identity, record), entry['corporate_action_check'])
+    assert verify_outcome_action_attestation(
+        attestation, entry['outcome_identity'], held, (identity, record)) == attestation
+    assert attestation['check_timing'] == 'AFTER_EVALUATION'
+    assert attestation['outcome_evaluated_at'] == held['evaluated_at']
+    population = load_retained_decision_observations(str(stores[0]), market='EGX')
+    partition = partition_egx_attested_outcomes(population, (held,), (attestation,))
+    assert partition['counts'] == {'ATTESTED_CLEAR': 1, 'UNATTESTED': 0, 'ATTESTATION_INVALID': 0}
+    # A later re-check of the same evidence keeps the first attestation.
+    sidecar_before = snapshot(sidecar)
+    again = produce(stores, actions={identity: selection()}, attestations=sidecar, held=True,
+                    now=LATER + timedelta(days=1))
+    assert again['outcomes'][0]['attestation_status'] == 'ALREADY_RETAINED'
+    assert snapshot(sidecar) == sidecar_before and snapshot(stores[1]) == before
+
+
+@pytest.mark.parametrize('case,status,why', [
+    ('no_selection', 'HELD_AWAITING_ACTION_EVIDENCE', None),
+    ('in_path', 'HELD_ACTIONS_IN_PATH', None),
+    ('short', 'HELD_CHECK_REJECTED', 'coverage'),   # coverage ends before the path date
+])
+def test_held_outcome_without_a_clear_recheck_stays_unattested(stores, sidecar, case, status,
+                                                                why):
+    (identity, _), = observe(stores[0])
+    produce(stores)
+    before = snapshot(stores[1])
+    docs = {'in_path': action_evidence((action(8),)),
+            'short': action_evidence(end=date(2026, 11, 8))}
+    actions = {identity: selection(docs[case])} if case in docs else {}
+    out = produce(stores, actions=actions, attestations=sidecar, held=True, now=LATER)
+    assert status in ATTESTATION_STATUSES
+    (entry,) = out['outcomes']
+    assert (entry['status'], entry['attestation_status']) == ('ALREADY_RETAINED', status)
+    assert entry['attestation_identity'] is None
+    assert out['attestation_counts'][status] == 1
+    assert out['held_outcomes_rechecked'] == 1
+    if status == 'HELD_ACTIONS_IN_PATH':
+        assert entry['corporate_action_status'] == 'ACTIONS_IN_PATH'
+        assert [a['event_id'] for a in entry['corporate_action_check']['actions_in_path']] == [
+            'ev-8']
+    else:
+        assert entry['corporate_action_status'] is None
+    if why is not None:
+        assert why in entry['attestation_detail']
+    # Held, never replaced, never attested: UNATTESTED (not clear) for the partition.
+    assert snapshot(sidecar) == [] and snapshot(stores[1]) == before
+    held = load_retained_decision_outcomes(str(stores[1]), market='EGX', assumptions=ZERO)
+    population = load_retained_decision_observations(str(stores[0]), market='EGX')
+    partition = partition_egx_attested_outcomes(population, held, ())
+    assert partition['counts'] == {'ATTESTED_CLEAR': 0, 'UNATTESTED': 1, 'ATTESTATION_INVALID': 0}
+
+
+def test_held_recheck_before_the_held_evaluation_is_refused(stores, sidecar):
+    (identity, _), = observe(stores[0])
+    produce(stores)
+    # A clock before the held outcome's evaluation cannot attest it.
+    out = produce(stores, actions={identity: selection()}, attestations=sidecar, held=True,
+                  now=NOW - timedelta(minutes=30))
+    (entry,) = out['outcomes']
+    assert entry['corporate_action_status'] == 'CLEAR'
+    assert entry['attestation_status'] == 'ATTESTATION_REJECTED'
+    assert 'before outcome evaluation' in entry['attestation_detail']
+    assert snapshot(sidecar) == []
+
+
+def test_held_outcome_attestation_is_opt_in(stores, sidecar):
+    (identity, _), = observe(stores[0])
+    produce(stores)
+    actions = {identity: selection()}
+    error = refused('CONFIG_INVALID', produce, stores, actions=actions, held=True)
+    assert 'requires an attestation directory' in str(error)
+    refused('CONFIG_INVALID', produce, stores, held=True)
+    refused('CONFIG_INVALID', produce, stores, actions=actions, attestations=sidecar, held=1)
+    assert snapshot(sidecar) == []
+    # Explicitly off is the v3 behaviour: the held outcome is neither re-checked nor attested.
+    out = produce(stores, actions=actions, attestations=sidecar, held=False, now=LATER)
+    (entry,) = out['outcomes']
+    assert entry['attestation_status'] is None and entry['corporate_action_status'] is None
+    assert out['held_outcome_attestation'] == 'NOT_PERFORMED'
+    assert out['held_outcomes_rechecked'] is None
     assert snapshot(sidecar) == []
 
 

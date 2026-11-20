@@ -533,7 +533,8 @@ attestation is written; a sidecar store refusal fails it at PRODUCTION
 (ATTESTATION_FAILED, earlier write-once records kept). ATTESTATION_REJECTED and
 RETAINED_OUTCOME_DIFFERS (outcome retained but UNATTESTED) count as rejections
 (exit 2). Outcomes already held when the run starts are neither re-checked nor
-attested and stay UNATTESTED (never clear). Top-level `outcome_attestation` is
+attested and stay UNATTESTED (never clear): the job never passes the producer's
+v4 opt-in `attest_held_outcomes` (see "Held-outcome re-check" below). Top-level `outcome_attestation` is
 the producer's label. No directory is provisioned and nothing reads
 attestations for metrics, so SYSTEM keeps gaps
 OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
@@ -755,14 +756,49 @@ attestation_directory=None)`:
 - A builder refusal is per observation (ATTESTATION_REJECTED; the outcome stays
   retained and UNATTESTED). A sidecar store refusal aborts the run
   (ATTESTATION_FAILED); outcomes and attestations already written stay.
-- Outcomes held before the run starts are neither re-checked nor attested
-  (`held_outcome_attestation` NOT_PERFORMED). An outcome retained by an
-  unchecked run, or whose attestation failed, therefore stays UNATTESTED for
-  the partition (never clear) until a later unit attests held outcomes.
+- Without the v4 opt-in below, outcomes held before the run starts are neither
+  re-checked nor attested (`held_outcome_attestation` NOT_PERFORMED). An
+  outcome retained by an unchecked run, or whose attestation failed, therefore
+  stays UNATTESTED for the partition (never clear).
 - The outcome record is unchanged (`retained_outcome_corporate_actions`
   NOT_RECORDED_IN_OUTCOME), no price is adjusted, labels SHADOW,
   LIVE_MONEY=false, NOT_AUTHORIZED. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
-  stays open: held outcomes are never attested and nothing calls the partition.
+  stays open: the job never attests held outcomes and nothing calls the partition.
+
+## Held-outcome re-check (decision-outcome-production-v4)
+
+Status: library change written by the file-only Claude paced executor; tests
+NOT run in that cycle, host validation required. The job does not pass the new
+argument (it requests no action selection for held outcomes), so job runs are
+unchanged apart from the embedded producer `schema_version`.
+`produce_egx_decision_outcomes(..., attestation_directory=None,
+attest_held_outcomes=False)`:
+
+- `attest_held_outcomes` must be a bool and `True` requires
+  `attestation_directory` (which requires `actions`), else CONFIG_INVALID.
+- Rule HELD_RECHECK_AFTER_EVALUATION_V1: for each observation whose outcome is
+  already in the store when the run starts, the unchanged
+  `check_egx_outcome_corporate_actions` runs over that held outcome's own path
+  (`path_through` = Africa/Cairo date of its `path_complete_through_at`,
+  PATH_COMPLETION_DATE_CAIRO_V1) with `as_of` = the producer clock. Only CLEAR
+  is attested, by the unchanged builder and sidecar store of v3
+  (`check_timing` AFTER_EVALUATION when the clock is later than the held
+  evaluation; an earlier clock is refused, ATTESTATION_REJECTED or
+  HELD_CHECK_REJECTED). A later re-check with the same evidence is
+  ALREADY_RETAINED (first attestation kept); different evidence is the store's
+  ATTESTATION_CONFLICT, which aborts the run (ATTESTATION_FAILED).
+- New per-entry `attestation_status` values HELD_AWAITING_ACTION_EVIDENCE (no
+  selection), HELD_ACTIONS_IN_PATH (full report in `corporate_action_check`)
+  and HELD_CHECK_REJECTED (fail-closed message in `attestation_detail`) leave
+  the held outcome UNATTESTED (never clear). Run-level
+  `held_outcome_attestation` is HELD_RECHECK_AFTER_EVALUATION_V1 (else
+  NOT_PERFORMED) and `held_outcomes_rechecked` the number of held entries
+  re-checked (else null).
+- A held outcome is never re-evaluated, re-retained, replaced or
+  price-adjusted; its entry status stays ALREADY_RETAINED and the outcome store
+  is not written. PAPER/SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. Gap
+  OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open (job wiring and a metrics
+  reader of verified attestations remain).
 
 ## Outcome action attestation (`app.decision_outcome_action_attestation`, decision-outcome-action-attestation-v1)
 
