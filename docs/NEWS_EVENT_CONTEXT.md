@@ -915,9 +915,33 @@ supplied; attestations naming an outcome not supplied are listed separately.
 `attested_clear_outcomes` returns fresh copies of only the ATTESTED_CLEAR
 records for `aggregate_decision_outcomes` with the same population, where every
 other record counts NOT_EVALUATED, so restricting to checked outcomes cannot
-hide a loss. The check is not re-run; no IO, write, caller or route. Gap
-OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open until a producer retains
-attestations and a caller uses this partition.
+hide a loss. The check is not re-run; no IO, write or route; its only caller is
+the pure checked-metrics component below. Gap
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open until a job runs that caller.
+
+## Checked outcome metrics (`app.decision_outcome_checked_metrics`, decision-outcome-checked-metrics-v1)
+
+Status: pure function, pending host validation; no job, route, scheduler or
+store read. `aggregate_egx_checked_decision_outcomes(population, outcomes,
+attestations, *, assumptions, as_of)` composes the unchanged components:
+
+1. `aggregate_decision_outcomes` over ALL supplied outcomes as an integrity
+   gate only (market, exact assumptions, binding, times by `as_of`); its
+   result is discarded (`unrestricted_metrics: NOT_REPORTED`);
+2. `partition_egx_attested_outcomes` over the same inputs;
+3. point-in-time rule CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1: an ATTESTED_CLEAR
+   outcome counts only if its attestation's `check_as_of` is at or before
+   `as_of`; a later check is ATTESTED_CLEAR_AFTER_AS_OF and is listed, not
+   counted, so a later attestation cannot change an earlier report (the
+   attestation's own retention time is not recorded and not checked);
+4. `aggregate_decision_outcomes` again with the SAME population and only the
+   counted outcomes, so every UNATTESTED, ATTESTATION_INVALID, late-attested or
+   missing outcome is NOT_EVALUATED there and cannot hide a loss.
+
+The report embeds the partition and the restricted metrics with sample size,
+labels population and attestation completeness CALLER_ASSERTED_UNVERIFIED and
+makes no performance claim. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays
+open: nothing runs this caller yet.
 
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 

@@ -274,8 +274,9 @@ def test_declared_gaps_match_the_code():
         ROOT / 'app' / 'decision_outcome_job.py').read_text(encoding='utf-8')
     # The attestation partition is a pure component: it re-verifies each loaded
     # attestation with the unchanged verifier, reads no file or database, writes
-    # nothing and drops no outcome; nothing calls it (no caller outside the
-    # components, checked above), so the corporate-action gap stays open.
+    # nothing and drops no outcome; its only caller is the pure checked-metrics
+    # component (no caller outside the components, checked above), which nothing
+    # runs, so the corporate-action gap stays open.
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_attested*.py')] == [
         'decision_outcome_attested.py']
     attested = (ROOT / 'app' / 'decision_outcome_attested.py').read_text(
@@ -293,6 +294,26 @@ def test_declared_gaps_match_the_code():
     for source in (ROOT / 'app' / 'decision_outcome_producer.py',
                    ROOT / 'app' / 'decision_outcome_job.py'):
         assert 'decision_outcome_attested' not in source.read_text(encoding='utf-8')
+    # The checked-metrics caller is pure: it composes the unchanged aggregate
+    # (integrity gate, then counted outcomes only) and partition, reads no file,
+    # store or database, writes nothing, and no job, producer or route calls it.
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_checked_metrics*.py')] == [
+        'decision_outcome_checked_metrics.py']
+    checked_metrics = (ROOT / 'app' / 'decision_outcome_checked_metrics.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'partition_egx_attested_outcomes(population, outcomes, attestations)' in checked_metrics
+    assert len(re.findall(r'\baggregate_decision_outcomes\(', checked_metrics)) == 2
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_\w+|check_egx_outcome_corporate_actions|load_\w+)\b',
+                         checked_metrics)
+    assert "'unrestricted_metrics': 'NOT_REPORTED'" in checked_metrics
+    assert "'absence_is_proof': False" in checked_metrics
+    assert "'performance_claim': 'NONE'" in checked_metrics
+    assert "'live_money': False" in checked_metrics
+    assert "'promotion': 'NOT_AUTHORIZED'" in checked_metrics
+    for source in (ROOT / 'app' / 'decision_outcome_producer.py',
+                   ROOT / 'app' / 'decision_outcome_job.py'):
+        assert 'decision_outcome_checked_metrics' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job
