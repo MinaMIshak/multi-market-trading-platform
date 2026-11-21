@@ -72,9 +72,11 @@ only a verified sidecar attestation tells a checked outcome apart. Without
 (``held_outcome_attestation`` NOT_PERFORMED), so an outcome retained by an
 unchecked run, or whose attestation failed, stays UNATTESTED (never clear) for
 the partition. The host job passes ``attestation_directory`` only with its
-opt-in ``--attestation-dir`` (decision-outcome-job-v4) and never passes
-``attest_held_outcomes`` (it requests no selection for held outcomes), and
-nothing reads attestations for metrics yet, so the SYSTEM gap
+opt-in ``--attestation-dir`` (decision-outcome-job-v4) and passes
+``attest_held_outcomes=True`` only with its opt-in ``--attest-held-outcomes``
+on top of that (decision-outcome-job-v5, which then also requests selections
+for held outcomes through their own path dates), and nothing reads
+attestations for metrics yet, so the SYSTEM gap
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open.
 
 Per-observation results are visible, never dropped: AWAITING_DAILY_EVIDENCE
@@ -92,9 +94,10 @@ CALLER_ASSERTED_UNVERIFIED and calendar admission NOT_ESTABLISHED, and the
 corporate-action check is unrecorded in retained outcomes, so no outcome or
 metric derived from this run is empirical evidence until those gaps close. Its
 only caller is the host job entrypoint ``app.decision_outcome_job`` (not
-scheduled; decision-outcome-job-v4 passes ``actions`` only with its opt-in
-``--check-corporate-actions`` and ``attestation_directory`` only with its
-opt-in ``--attestation-dir`` on top of that); no route;
+scheduled; decision-outcome-job-v5 passes ``actions`` only with its opt-in
+``--check-corporate-actions``, ``attestation_directory`` only with its
+opt-in ``--attestation-dir`` on top of that, and ``attest_held_outcomes=True``
+only with its opt-in ``--attest-held-outcomes`` on top of both); no route;
 every store directory is an explicit argument. Outcomes are
 hypothetical results from session bars: not fills, not performance.
 PAPER/SHADOW only; LIVE_MONEY=false.

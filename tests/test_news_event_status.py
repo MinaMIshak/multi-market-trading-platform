@@ -176,7 +176,8 @@ def test_declared_gaps_match_the_code():
                  'load_egx_daily_evidence(database, raw_root, daily_raw_paths)',
                  'produce_egx_decision_outcomes(\n        observation_directory, outcome_directory,',
                  "sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions,\n"
-                 "        attestation_directory=attestation_directory)"):
+                 "        attestation_directory=attestation_directory,\n"
+                 "        attest_held_outcomes=attest_held_outcomes)"):
         assert call in outcome_job, call
     assert not re.search(r'\b(INSERT|UPDATE|DELETE|initialize|save_market_session)\b', outcome_job)
     assert not re.search(r'\b(get_market_session|TradingRepository|FROM market_sessions)\b',
@@ -322,10 +323,17 @@ def test_declared_gaps_match_the_code():
     assert "'held_outcome_attestation': 'NOT_PERFORMED'" in outcome_producer
     # decision-outcome-production-v4: held outcomes are re-checked and attested
     # only with the opt-in attest_held_outcomes (requires an attestation
-    # directory); the job never passes it, so the gap stays open.
+    # directory). decision-outcome-job-v5 passes the flag through only with its
+    # opt-in --attest-held-outcomes (refused without an attestation directory)
+    # and nothing reads attestations for metrics, so the gap stays open.
     assert 'attest_held_outcomes=False' in outcome_producer
     assert "'held-outcome attestation requires an attestation directory'" in outcome_producer
-    assert 'attest_held_outcomes' not in outcome_job
+    # Signature default, the producer call and the CLI call only.
+    assert len(re.findall(r'\battest_held_outcomes=', outcome_job)) == 3
+    assert 'attest_held_outcomes=False' in outcome_job
+    assert 'attest_held_outcomes=attest_held_outcomes)' in outcome_job
+    assert "'held-outcome re-check requires an attestation directory'" in outcome_job
+    assert "HELD_PATH_THROUGH_RULE = 'HELD_PATH_COMPLETION_DATE_CAIRO_V1'" in outcome_job
     # decision-outcome-job-v4: the job only passes an opt-in attestation
     # directory through (refused without the check); it builds, retains, loads
     # and verifies no attestation itself.
@@ -339,7 +347,7 @@ def test_declared_gaps_match_the_code():
     # decision-outcome-job-v3: only with the opt-in flag, the job requests the
     # by-request selections at the single job clock and passes them unchanged to
     # the producer; it never calls the check or the all-or-nothing v1 loader.
-    assert "CONTRACT_VERSION = 'decision-outcome-job-v4'" in outcome_job
+    assert "CONTRACT_VERSION = 'decision-outcome-job-v5'" in outcome_job
     assert 'actions, action_summary = None, None\n    if check_corporate_actions:' in outcome_job
     assert ('load_egx_outcome_action_evidence_by_request(database, raw_root, requests, '
             'as_of=now)') in outcome_job

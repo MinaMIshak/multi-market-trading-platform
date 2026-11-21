@@ -1,4 +1,4 @@
-"""decision-outcome-job-v4: artificial retained inputs, disposable databases and directories only.
+"""decision-outcome-job-v5: artificial retained inputs, disposable databases and directories only.
 
 No scheduler, runtime producer, calendar admission, market coverage, fill,
 performance or edge evidence is implied by these tests.
@@ -26,14 +26,15 @@ from app.decision_outcome_calendar_loader import (
 from app.decision_outcome_daily_evidence import DailyEvidenceLoadError
 from app.decision_outcome_job import (
     ACTION_PATH_THROUGH_RULE, ACTION_REQUEST_SCOPE, CALENDAR_RETENTION, CALENDAR_SOURCE,
-    CONTRACT_VERSION, EXIT_CODES, FAILURE_STAGES, JOB_REASONS, JOB_STATUSES,
-    REJECTED_ATTESTATION_STATUSES, REJECTED_ENTRY_STATUSES, OutcomeJobError, main,
+    CONTRACT_VERSION, EXIT_CODES, FAILURE_STAGES, HELD_PATH_THROUGH_RULE, HELD_REQUEST_SCOPE,
+    JOB_REASONS, JOB_STATUSES, REJECTED_ATTESTATION_STATUSES, REJECTED_ENTRY_STATUSES, OutcomeJobError, main,
     outcome_assumptions, run_egx_decision_outcome_job)
 from app.decision_outcome_producer import (
     ATTESTATION_STATUSES, PRODUCTION_REASONS, DecisionOutcomeProductionError, EgxDailyEvidence,
     produce_egx_decision_outcomes)
 from app.decision_outcome_store import load_retained_decision_outcomes
 from app.scanner_v2_card_report_job import CardReportJobError
+from app.scanner_v2_egx_rank import CAIRO
 from app.storage import Database, TradingRepository
 from tests.test_decision_outcome_corporate_actions import action, evidence as action_evidence
 from tests.test_decision_outcome_producer import NOW, OTHER, decision, observe, selection
@@ -133,7 +134,7 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
     (identity, _), = observe(host.observations)
     before = calendar_rows(host)
     out = run_egx_decision_outcome_job(**kwargs(host))
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-job-v4'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-job-v5'
     assert out['status'] == 'PRODUCED' and out['status'] in JOB_STATUSES
     assert {k: out[k] for k in SAFETY} == SAFETY
     # The daily loader got exactly the named paths, the raw root and the database.
@@ -171,9 +172,10 @@ def test_job_wires_retained_calendar_daily_evidence_and_producer(host, fake_dail
         'market_membership': 'NOT_ESTABLISHED'}
     production = out['production']
     assert production['schema_version'] == 'decision-outcome-production-v4'
-    # The job never enables the producer's opt-in held-outcome re-check.
-    assert 'attest_held_outcomes' not in call
-    assert production['held_outcome_attestation'] == 'NOT_PERFORMED'
+    # By default the job keeps the producer's opt-in held-outcome re-check off.
+    assert call['attest_held_outcomes'] is False
+    assert production['held_outcome_attestation'] == out['held_outcome_attestation'] == (
+        'NOT_PERFORMED')
     assert production['held_outcomes_rechecked'] is None
     # Without an attestation directory the producer's opt-in step stays off.
     assert call['attestation_directory'] is None
@@ -308,6 +310,9 @@ def test_tampered_retained_calendar_is_refused(host, fake_daily):
     ('check_corporate_actions', 'true'),
     # An attestation directory without the check (default False) is refused.
     ('attestation_directory', '/abs/outcome-attestations'),
+    # The held-outcome re-check needs a bool and an attestation directory.
+    ('attest_held_outcomes', None), ('attest_held_outcomes', 1),
+    ('attest_held_outcomes', 'true'), ('attest_held_outcomes', True),
 ])
 def test_invalid_configuration_reads_and_writes_nothing(host, fake_daily, field, value):
     with pytest.raises(OutcomeJobError) as info:
@@ -675,6 +680,9 @@ def test_outcome_held_by_an_unchecked_run_stays_unattested(host, fake_daily, fak
                  now=NOW + timedelta(days=1)))
     assert out['production']['held_outcome_attestation'] == 'NOT_PERFORMED'
     assert out['production']['outcomes'][0]['attestation_status'] is None
+    # Without --attest-held-outcomes nothing is requested for the held outcome.
+    assert fake_actions.calls == []
+    assert out['action_evidence']['held_request_scope'] is None
     assert snapshot(sidecar) == []
     held = load_retained_decision_outcomes(str(host.outcomes), market='EGX', assumptions=ZERO)
     population = load_retained_decision_observations(str(host.observations), market='EGX')
@@ -731,4 +739,139 @@ def test_cli_attestation_failures_report_fixed_stages(host, fake_daily, fake_act
     assert main(base + ['--check-corporate-actions', '--attestation-dir', str(sidecar)]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out['outcome_attestation'] == 'ATTESTED_AFTER_CLEAR_RETENTION'
+    assert len(snapshot(host.outcomes)) == 1 and len(snapshot(sidecar)) == 1
+
+
+# --- v5: opt-in held-outcome re-check ----------------------------------------
+
+LATER = NOW + timedelta(days=1)
+
+
+def _held(host):
+    """The single held outcome and the Cairo date of its own path completion."""
+    (held,) = load_retained_decision_outcomes(str(host.outcomes), market='EGX', assumptions=ZERO)
+    completed = datetime.fromisoformat(held['path_complete_through_at'].replace('Z', '+00:00'))
+    return held, completed.astimezone(CAIRO).date()
+
+
+def _attest_held(host, sidecar, now=LATER):
+    return run_egx_decision_outcome_job(
+        **kwargs(host, check_corporate_actions=True, attestation_directory=str(sidecar),
+                 attest_held_outcomes=True, now=now))
+
+
+def test_held_recheck_is_refused_without_an_attestation_directory(host, fake_daily, fake_actions,
+                                                                  sidecar):
+    observe(host.observations)
+    cases = (dict(attest_held_outcomes=True),
+             dict(attest_held_outcomes=True, check_corporate_actions=True),
+             dict(attest_held_outcomes='yes', check_corporate_actions=True,
+                  attestation_directory=str(sidecar)))
+    for overrides in cases:
+        with pytest.raises(OutcomeJobError) as info:
+            run_egx_decision_outcome_job(**kwargs(host, **overrides))
+        assert (info.value.reason, info.value.stage) == ('CONFIG_INVALID', 'INPUT'), overrides
+    # Refused before anything is read or written.
+    assert fake_daily == [] and fake_actions.calls == []
+    assert snapshot(host.outcomes) == [] and snapshot(sidecar) == []
+
+
+def test_opt_in_held_recheck_attests_an_outcome_held_by_an_unchecked_run(
+        host, fake_daily, fake_actions, spy_producer, sidecar):
+    (identity, record), = observe(host.observations)
+    run_egx_decision_outcome_job(**kwargs(host))                  # retained, unchecked
+    held, path_date = _held(host)
+    # The held path ends on the 2026-11-09 session (same window as the producer's re-check).
+    assert path_date == date(2026, 11, 9)
+    before = snapshot(host.outcomes)
+    chosen = selection(action_evidence((action(3), action(12))))
+    fake_actions.plan = {identity: chosen}
+    out = _attest_held(host, sidecar)
+    # The held outcome is requested through its own path date at the single job clock.
+    [(database, _, requests, as_of)] = fake_actions.calls
+    assert type(database) is Database and as_of == LATER
+    assert requests == ((identity, record, path_date),)
+    # The selections and the flag reach the producer unchanged.
+    call = spy_producer[-1]
+    assert call['attest_held_outcomes'] is True and call['actions'] == {identity: chosen}
+    assert call['attestation_directory'] == str(sidecar) and call['now'] == LATER
+    summary = out['action_evidence']
+    assert summary['held_request_scope'] == HELD_REQUEST_SCOPE
+    assert summary['held_path_through_rule'] == HELD_PATH_THROUGH_RULE == (
+        'HELD_PATH_COMPLETION_DATE_CAIRO_V1')
+    production = out['production']
+    assert production['held_outcome_attestation'] == out['held_outcome_attestation'] == (
+        'HELD_RECHECK_AFTER_EVALUATION_V1')
+    assert production['held_outcomes_rechecked'] == 1
+    (entry,) = production['outcomes']
+    assert (entry['status'], entry['corporate_action_status'], entry['attestation_status']) == (
+        'ALREADY_RETAINED', 'CLEAR', 'RETAINED')
+    assert out['status'] == 'PRODUCED'
+    # The held outcome is never re-evaluated or rewritten; it is attested after evaluation.
+    assert snapshot(host.outcomes) == before
+    (attestation,) = load_retained_outcome_attestations(str(sidecar))
+    assert attestation['check_timing'] == 'AFTER_EVALUATION'
+    population = load_retained_decision_observations(str(host.observations), market='EGX')
+    partition = partition_egx_attested_outcomes(population, (held,), (attestation,))
+    assert partition['counts'] == {'ATTESTED_CLEAR': 1, 'UNATTESTED': 0, 'ATTESTATION_INVALID': 0}
+    assert production['price_adjustment'] == 'NOT_APPLIED'
+    assert out['live_money'] is False and out['performance_claim'] == 'NONE'
+    assert out['promotion'] == 'NOT_AUTHORIZED'
+    json.dumps(out, allow_nan=False)
+    # A later run requests the held outcome again and keeps the first attestation.
+    sidecar_before = snapshot(sidecar)
+    again = _attest_held(host, sidecar, now=LATER + timedelta(days=1))
+    assert len(fake_actions.calls) == 2
+    assert again['production']['outcomes'][0]['attestation_status'] == 'ALREADY_RETAINED'
+    assert again['status'] == 'PRODUCED'
+    assert snapshot(sidecar) == sidecar_before and snapshot(host.outcomes) == before
+
+
+@pytest.mark.parametrize('chosen,status,run_status', [
+    (None, 'HELD_AWAITING_ACTION_EVIDENCE', 'PRODUCED'),
+    # A dividend effective on Sunday 2026-11-08, inside the held path.
+    (selection(action_evidence((action(8),))), 'HELD_ACTIONS_IN_PATH', 'PRODUCED'),
+    # Coverage ending before the held path date: the check fails closed.
+    (selection(action_evidence(end=date(2026, 11, 8))), 'HELD_CHECK_REJECTED',
+     'REJECTIONS_PRESENT'),
+])
+def test_held_recheck_without_clear_stays_unattested(host, fake_daily, fake_actions, sidecar,
+                                                     chosen, status, run_status):
+    (identity, _), = observe(host.observations)
+    run_egx_decision_outcome_job(**kwargs(host))
+    before = snapshot(host.outcomes)
+    if chosen is not None:
+        fake_actions.plan = {identity: chosen}
+    out = _attest_held(host, sidecar)
+    (entry,) = out['production']['outcomes']
+    assert (entry['status'], entry['attestation_status']) == ('ALREADY_RETAINED', status)
+    assert out['production']['attestation_counts'][status] == 1
+    # Only a fail-closed check is a rejection; waiting / actions in path are visible.
+    assert out['status'] == run_status
+    assert (status in REJECTED_ATTESTATION_STATUSES) is (run_status == 'REJECTIONS_PRESENT')
+    # Held, never replaced, never attested: UNATTESTED (not clear) for the partition.
+    assert snapshot(sidecar) == [] and snapshot(host.outcomes) == before
+    held = load_retained_decision_outcomes(str(host.outcomes), market='EGX', assumptions=ZERO)
+    population = load_retained_decision_observations(str(host.observations), market='EGX')
+    assert partition_egx_attested_outcomes(population, held, ())['counts'] == {
+        'ATTESTED_CLEAR': 0, 'UNATTESTED': 1, 'ATTESTATION_INVALID': 0}
+
+
+def test_cli_held_recheck_flag(host, fake_daily, fake_actions, sidecar, capsys, monkeypatch):
+    (identity, _), = observe(host.observations)
+    run_egx_decision_outcome_job(**kwargs(host))                  # retained, unchecked
+    fake_actions.plan = {identity: selection(action_evidence((action(3),)))}
+    _clock(monkeypatch, LATER)
+    base = _cli(host) + ['--check-corporate-actions']
+    # Without an attestation directory: refused at INPUT before anything is read.
+    assert main(base + ['--attest-held-outcomes']) == EXIT_CODES['FAILED']
+    out = json.loads(capsys.readouterr().out)
+    assert (out['status'], out['stage'], out['reason']) == ('FAILED', 'INPUT', 'CONFIG_INVALID')
+    assert out['schema_version'] == CONTRACT_VERSION and out['live_money'] is False
+    assert fake_actions.calls == [] and snapshot(sidecar) == []
+    argv = base + ['--attestation-dir', str(sidecar), '--attest-held-outcomes']
+    assert main(argv) == EXIT_CODES['PRODUCED'] == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out['held_outcome_attestation'] == 'HELD_RECHECK_AFTER_EVALUATION_V1'
+    assert out['production']['outcomes'][0]['attestation_status'] == 'RETAINED'
     assert len(snapshot(host.outcomes)) == 1 and len(snapshot(sidecar)) == 1

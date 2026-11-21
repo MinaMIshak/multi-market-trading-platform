@@ -452,7 +452,7 @@ membership NOT_ESTABLISHED (the binding re-checks instrument and symbol against
 each EGX record), corporate actions NOT_CHECKED, performance claim NONE,
 SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component.
 
-## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v4)
+## Outcome host job (`app.decision_outcome_job`, decision-outcome-job-v5)
 
 Status: host CLI entrypoint, pending host validation; not scheduled, no route,
 no provisioned directory. `python -m app.decision_outcome_job` takes
@@ -532,14 +532,43 @@ run at stage PRODUCTION (ATTESTATIONS_UNAVAILABLE) before any outcome or
 attestation is written; a sidecar store refusal fails it at PRODUCTION
 (ATTESTATION_FAILED, earlier write-once records kept). ATTESTATION_REJECTED and
 RETAINED_OUTCOME_DIFFERS (outcome retained but UNATTESTED) count as rejections
-(exit 2). Outcomes already held when the run starts are neither re-checked nor
-attested and stay UNATTESTED (never clear): the job never passes the producer's
-v4 opt-in `attest_held_outcomes` (see "Held-outcome re-check" below). Top-level `outcome_attestation` is
-the producer's label. No directory is provisioned and nothing reads
-attestations for metrics, so SYSTEM keeps gaps
+(exit 2). Without v5's `--attest-held-outcomes`, outcomes already held when
+the run starts are neither re-checked nor attested and stay UNATTESTED (never
+clear). Top-level `outcome_attestation` is the producer's label. No directory
+is provisioned and nothing reads attestations for metrics, so SYSTEM keeps gaps
 OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
-OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED. Written by the file-only Claude paced
-executor without running tests; pending host validation.
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED. Committed at 163411b.
+
+v5 adds only an opt-in `--attest-held-outcomes` (`attest_held_outcomes=`,
+a bool), accepted only together with `--attestation-dir` (which itself requires
+`--check-corporate-actions`); otherwise CONFIG_INVALID at stage INPUT before
+the database is opened. Default off: the run is exactly v4
+(`held_outcome_attestation` NOT_PERFORMED; the producer gets
+`attest_held_outcomes=False`). With it the job also requests the retained
+egx-actions-v1 selection for every observation whose terminal outcome is
+already held under the run's assumptions
+(OUTCOMES_HELD_UNDER_THESE_ASSUMPTIONS_V1) with `path_through` = the
+Africa/Cairo date of that held outcome's own `path_complete_through_at`
+(HELD_PATH_COMPLETION_DATE_CAIRO_V1: exactly the window the producer's
+HELD_RECHECK_AFTER_EVALUATION_V1 re-check and the attestation builder require),
+through the same single by-request loader call at the job clock, and passes the
+flag unchanged to the producer (decision-outcome-production-v4). Only a CLEAR
+re-check is attested (check_timing AFTER_EVALUATION) by the unchanged builder
+and store; held outcomes are never re-evaluated, re-retained, replaced or
+price-adjusted (entry status stays ALREADY_RETAINED). HELD_AWAITING_ACTION_EVIDENCE
+and HELD_ACTIONS_IN_PATH stay UNATTESTED and are not rejections (exit 0);
+HELD_CHECK_REJECTED (the check failed closed) is a rejection (exit 2). The job
+reads no attestation, so every held outcome is requested on every such run;
+re-attesting an already attested outcome is the store's ALREADY_RETAINED. New
+plus held requests above the loader's MAX_REQUESTS, or a job clock whose Cairo
+date is before a held path date, fail the run at ACTION_EVIDENCE (the unchanged
+loader's CONFIG_INVALID) rather than checking a subset. `action_evidence` adds
+`held_request_scope` / `held_path_through_rule` (null when off); top-level
+`held_outcome_attestation` is the producer's label. Nothing reads attestations
+for metrics and nothing runs the job, so SYSTEM keeps gaps
+OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED, OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED
+and OUTCOME_JOB_NOT_SCHEDULED. Written by the file-only Claude paced executor
+without running tests; pending host validation.
 
 ## Retained outcome calendar chain (`app.decision_outcome_calendar`, decision-outcome-calendar-chain-v1)
 
@@ -763,14 +792,14 @@ attestation_directory=None)`:
 - The outcome record is unchanged (`retained_outcome_corporate_actions`
   NOT_RECORDED_IN_OUTCOME), no price is adjusted, labels SHADOW,
   LIVE_MONEY=false, NOT_AUTHORIZED. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED
-  stays open: the job never attests held outcomes and nothing calls the partition.
+  stays open: nothing calls the partition.
 
 ## Held-outcome re-check (decision-outcome-production-v4)
 
 Status: library change written by the file-only Claude paced executor; tests
-NOT run in that cycle, host validation required. The job does not pass the new
-argument (it requests no action selection for held outcomes), so job runs are
-unchanged apart from the embedded producer `schema_version`.
+NOT run in that cycle; committed at 25fc4bb. The job passes `True` only with its
+opt-in `--attest-held-outcomes` (decision-outcome-job-v5, above), which also
+requests action selections for held outcomes through their own path dates.
 `produce_egx_decision_outcomes(..., attestation_directory=None,
 attest_held_outcomes=False)`:
 
@@ -797,8 +826,8 @@ attest_held_outcomes=False)`:
 - A held outcome is never re-evaluated, re-retained, replaced or
   price-adjusted; its entry status stays ALREADY_RETAINED and the outcome store
   is not written. PAPER/SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. Gap
-  OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open (job wiring and a metrics
-  reader of verified attestations remain).
+  OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open (a metrics reader of
+  verified attestations remains).
 
 ## Outcome action attestation (`app.decision_outcome_action_attestation`, decision-outcome-action-attestation-v1)
 

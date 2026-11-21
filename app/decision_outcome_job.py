@@ -8,9 +8,10 @@
         --calendar-observation <calendar_observations sha256> [--calendar-observation ...] \
         --assumptions-version <id> --entry-slippage-bps <n> \
         --exit-slippage-bps <n> --cost-bps-per-side <n> \
-        [--check-corporate-actions [--attestation-dir /abs/outcome-attestations]]
+        [--check-corporate-actions [--attestation-dir /abs/outcome-attestations
+                                    [--attest-held-outcomes]]]
 
-Phase G/H collection entrypoint (decision-outcome-job-v4). It only wires
+Phase G/H collection entrypoint (decision-outcome-job-v5). It only wires
 existing pieces together; it adds no calendar, binding, evaluation, record or
 store logic:
 
@@ -66,13 +67,36 @@ loader has already run and its labelled audit rows may exist); a sidecar store
 refusal aborts it (ATTESTATION_FAILED, PRODUCTION stage). A per-observation builder refusal
 (ATTESTATION_REJECTED) or held bytes differing from this run's
 (RETAINED_OUTCOME_DIFFERS) leaves a retained but UNATTESTED outcome and counts
-as a rejection (exit 2), so the host sees it. Outcomes already held when the
-run starts are neither re-checked nor attested, so they stay UNATTESTED (never
-clear). Without the flag the run is exactly v3 (``outcome_attestation``
-NOT_REQUESTED). The sidecar directory must be provisioned by a host, and
-nothing reads attestations for metrics yet, so the SYSTEM gaps
-OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
+as a rejection (exit 2), so the host sees it. Without ``--attest-held-outcomes``
+outcomes already held when the run starts are neither re-checked nor attested,
+so they stay UNATTESTED (never clear). Without the flag the run is exactly v3
+(``outcome_attestation`` NOT_REQUESTED). The sidecar directory must be
+provisioned by a host, and nothing reads attestations for metrics yet, so the
+SYSTEM gaps OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and
 OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stay open.
+
+Held-outcome re-check (v5, opt-in ``--attest-held-outcomes``, accepted only
+together with ``--attestation-dir``, else CONFIG_INVALID at INPUT before the
+database is opened). The job additionally requests the retained egx-actions-v1
+selection for every observation whose terminal outcome is already held in the
+outcome store under these assumptions (HELD_REQUEST_SCOPE), with
+``path_through`` = the Africa/Cairo date of that held outcome's own
+``path_complete_through_at`` (HELD_PATH_THROUGH_RULE), which is exactly the
+window the producer's HELD_RECHECK_AFTER_EVALUATION_V1 re-check and the
+attestation builder require. The requests go to the same unchanged by-request
+loader call at the job clock, and the flag is passed unchanged to the
+producer's decision-outcome-production-v4 ``attest_held_outcomes``: only a
+CLEAR re-check is attested (check_timing AFTER_EVALUATION) by the unchanged
+builder and store. Held outcomes are never re-evaluated, re-retained or
+price-adjusted. HELD_AWAITING_ACTION_EVIDENCE and HELD_ACTIONS_IN_PATH are
+reported per observation (UNATTESTED, not rejections); HELD_CHECK_REJECTED (the
+check failed closed) counts as a rejection (exit 2). Every held outcome is
+requested on every such run (the job reads no attestation, so it cannot skip
+already attested ones; their re-attestation is ALREADY_RETAINED). Held and new
+requests together above the loader's MAX_REQUESTS, or a job clock whose Cairo
+date is before a held path date, refuse the run at ACTION_EVIDENCE (the
+unchanged loader's CONFIG_INVALID) rather than checking a subset. Without the
+flag the run is exactly v4 (``held_outcome_attestation`` NOT_PERFORMED).
 
 decision-outcome-job-v1 read current, upserted ``market_sessions`` rows by
 date range; v2 replaces that with retained observations, so the calendar is
@@ -89,7 +113,8 @@ EVALUATION_REJECTED, so the host sees it rather than a silently smaller
 sample; with the check, ACTION_CHECK_REJECTED (the check failed closed) is
 also a rejection, while AWAITING_ACTION_EVIDENCE and ACTIONS_IN_PATH are
 reported per observation as waiting / not retained; with attestation,
-ATTESTATION_REJECTED and RETAINED_OUTCOME_DIFFERS are rejections too. Failures
+ATTESTATION_REJECTED and RETAINED_OUTCOME_DIFFERS are rejections too, and with
+the held re-check so is HELD_CHECK_REJECTED. Failures
 exit 1 with one fixed stage (INPUT, CALENDAR, DAILY_EVIDENCE, ACTION_EVIDENCE,
 PRODUCTION) and the refusing module's reason; write-once outcomes retained
 earlier in a failed run stay, and a rerun is idempotent.
@@ -125,7 +150,7 @@ from app.scanner_v2_card_report_job import (
     CardReportJobError, _absolute, _digest, _existing_database)
 from app.scanner_v2_egx_rank import CAIRO
 
-CONTRACT_VERSION = 'decision-outcome-job-v4'
+CONTRACT_VERSION = 'decision-outcome-job-v5'
 JOB_STATUSES = ('PRODUCED', 'REJECTIONS_PRESENT', 'FAILED')
 FAILURE_STAGES = ('INPUT', 'CALENDAR', 'DAILY_EVIDENCE', 'ACTION_EVIDENCE', 'PRODUCTION')
 # Reasons raised by this module; CALENDAR-stage failures carry the loader's
@@ -136,10 +161,15 @@ EXIT_CODES = {'PRODUCED': 0, 'FAILED': 1, 'REJECTIONS_PRESENT': 2}
 REJECTED_ENTRY_STATUSES = ('OBSERVATION_AFTER_CLOCK', 'BINDING_REJECTED', 'EVALUATION_REJECTED',
                            'ACTION_CHECK_REJECTED')
 # Producer attestation_status values that leave a retained outcome UNATTESTED
-# for a reason other than waiting (only counted when attestation is requested).
-REJECTED_ATTESTATION_STATUSES = ('ATTESTATION_REJECTED', 'RETAINED_OUTCOME_DIFFERS')
+# for a reason other than waiting (only counted when attestation is requested;
+# HELD_CHECK_REJECTED occurs only with the opt-in held-outcome re-check).
+REJECTED_ATTESTATION_STATUSES = ('ATTESTATION_REJECTED', 'RETAINED_OUTCOME_DIFFERS',
+                                 'HELD_CHECK_REJECTED')
 ACTION_REQUEST_SCOPE = 'OBSERVATIONS_REACHABLE_BY_PRODUCER_ACTION_GATE_V1'
 ACTION_PATH_THROUGH_RULE = 'DAILY_RECEIPT_DATE_CAIRO_V1'
+# decision-outcome-job-v5: requests for outcomes already held (opt-in only).
+HELD_REQUEST_SCOPE = 'OUTCOMES_HELD_UNDER_THESE_ASSUMPTIONS_V1'
+HELD_PATH_THROUGH_RULE = 'HELD_PATH_COMPLETION_DATE_CAIRO_V1'
 CALENDAR_SOURCE = 'CALENDAR_OBSERVATIONS_RETAINED'
 CALENDAR_RETENTION = 'WRITE_ONCE_RETAINED'
 SAFETY = {'fill_kind': 'HYPOTHETICAL_FROM_SESSION_BARS', 'execution_evidence': 'NONE',
@@ -177,9 +207,15 @@ def outcome_assumptions(*, assumptions_version, entry_slippage_bps, exit_slippag
 
 def _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
             calendar_observations, assumptions, now, check_corporate_actions,
-            attestation_directory):
+            attestation_directory, attest_held_outcomes):
     if type(check_corporate_actions) is not bool:
         raise OutcomeJobError('CONFIG_INVALID', 'check_corporate_actions must be a bool')
+    if type(attest_held_outcomes) is not bool:
+        raise OutcomeJobError('CONFIG_INVALID', 'attest_held_outcomes must be a bool')
+    if attest_held_outcomes and attestation_directory is None:
+        # A held outcome is only re-checked in order to attest it.
+        raise OutcomeJobError('CONFIG_INVALID',
+                              'held-outcome re-check requires an attestation directory')
     if not all(_absolute(v) for v in (db_path, raw_root, observation_directory,
                                       outcome_directory)):
         raise OutcomeJobError('CONFIG_INVALID', 'absolute paths required')
@@ -209,11 +245,14 @@ def _config(db_path, raw_root, observation_directory, outcome_directory, daily_r
         raise OutcomeJobError('CONFIG_INVALID', 'timezone-aware job clock required')
 
 
-def _action_requests(observation_directory, outcome_directory, daily, assumptions, now):
-    """ACTION_REQUEST_SCOPE requests, in observation-store order.
+def _action_requests(observation_directory, outcome_directory, daily, assumptions, now,
+                     include_held):
+    """ACTION_REQUEST_SCOPE (and, opt-in, HELD_REQUEST_SCOPE) requests, in store order.
 
-    Mirrors only the producer's own preconditions for reaching its gate; the
-    store loads are the producer's own and refuse with its reasons.
+    Mirrors only the producer's own preconditions for reaching its gate (and,
+    with ``include_held``, its held re-check, which runs for every held outcome
+    whose observation is in the store); the store loads are the producer's own
+    and refuse with its reasons.
     """
     try:
         observations = load_retained_decision_observations(observation_directory, market='EGX')
@@ -224,11 +263,19 @@ def _action_requests(observation_directory, outcome_directory, daily, assumption
                                                assumptions=assumptions)
     except DecisionOutcomeStoreError as exc:
         raise DecisionOutcomeProductionError('OUTCOMES_UNAVAILABLE', exc.reason) from None
-    held = {record['observation_identity'] for record in held}
+    held = {outcome['observation_identity']: outcome for outcome in held}
     requests = []
     for identity, record in observations:
-        if identity in held or _time(record['recorded_at'], 'recorded_at') > now:
-            continue  # ALREADY_RETAINED / OBSERVATION_AFTER_CLOCK: never checked
+        if identity in held:
+            if include_held:
+                # HELD_PATH_THROUGH_RULE: the held outcome's own path-completion
+                # date, the exact window of the producer's held re-check.
+                completed = _time(held[identity]['path_complete_through_at'],
+                                  'path_complete_through_at')
+                requests.append((identity, record, completed.astimezone(CAIRO).date()))
+            continue  # ALREADY_RETAINED: never re-evaluated
+        if _time(record['recorded_at'], 'recorded_at') > now:
+            continue  # OBSERVATION_AFTER_CLOCK: never checked
         evidence = daily.get(record['instrument_id'])
         if (evidence is None or evidence.received_at < _time(record['detected_at'], 'detected_at')
                 or evidence.received_at > now):
@@ -238,10 +285,13 @@ def _action_requests(observation_directory, outcome_directory, daily, assumption
     return tuple(requests)
 
 
-def _action_evidence(database, raw_root, requests, now):
+def _action_evidence(database, raw_root, requests, now, include_held):
     """(selections, summary) from the unchanged by-request loader, or none when no request."""
     summary = {'requested': True, 'request_scope': ACTION_REQUEST_SCOPE,
-               'path_through_rule': ACTION_PATH_THROUGH_RULE}
+               'path_through_rule': ACTION_PATH_THROUGH_RULE,
+               # None unless the opt-in held-outcome re-check is requested.
+               'held_request_scope': HELD_REQUEST_SCOPE if include_held else None,
+               'held_path_through_rule': HELD_PATH_THROUGH_RULE if include_held else None}
     if not requests:
         counts = dict.fromkeys(ACTION_REQUEST_STATUSES, 0)
         return {}, {**summary, 'loader_called': False, 'schema_version': None, 'as_of': None,
@@ -259,11 +309,11 @@ def _action_evidence(database, raw_root, requests, now):
 def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
                                  outcome_directory, daily_raw_paths, calendar_observations,
                                  assumptions, now=None, check_corporate_actions=False,
-                                 attestation_directory=None):
+                                 attestation_directory=None, attest_held_outcomes=False):
     """Load named retained evidence and retain terminal outcomes for EGX observations.
 
     ``calendar_observations`` is a tuple of exact ``calendar_observations``
-    digests. Returns a ``decision-outcome-job-v4`` result wrapping the
+    digests. Returns a ``decision-outcome-job-v5`` result wrapping the
     producer's result. Raises ``OutcomeJobError``/``CardReportJobError``
     (inputs), ``CalendarObservationLoadError``/``CalendarChainError``
     (calendar), ``DailyEvidenceLoadError`` (daily evidence),
@@ -274,12 +324,15 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
     False: v2 behaviour) passes the retained action selections to the
     producer's gate. ``attestation_directory`` (default None: v3 behaviour;
     requires ``check_corporate_actions``) is passed unchanged to the
-    producer's opt-in attestation step.
+    producer's opt-in attestation step. ``attest_held_outcomes`` (default
+    False: v4 behaviour; requires ``attestation_directory``) also requests
+    selections for held outcomes over their own paths and passes the flag
+    unchanged to the producer's opt-in held-outcome re-check.
     """
     now = _utc_now() if now is None else now
     _config(db_path, raw_root, observation_directory, outcome_directory, daily_raw_paths,
             calendar_observations, assumptions, now, check_corporate_actions,
-            attestation_directory)
+            attestation_directory, attest_held_outcomes)
     database = _existing_database(db_path)
     calendar = load_egx_calendar_observations(database, calendar_observations)
     chained = chain_egx_calendar_observations(calendar['observations'], as_of=now)
@@ -287,12 +340,14 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
     actions, action_summary = None, None
     if check_corporate_actions:
         requests = _action_requests(observation_directory, outcome_directory, loaded['daily'],
-                                    assumptions, now)
-        actions, action_summary = _action_evidence(database, raw_root, requests, now)
+                                    assumptions, now, attest_held_outcomes)
+        actions, action_summary = _action_evidence(database, raw_root, requests, now,
+                                                   attest_held_outcomes)
     production = produce_egx_decision_outcomes(
         observation_directory, outcome_directory, daily=loaded['daily'],
         sessions=chained['sessions'], assumptions=assumptions, now=now, actions=actions,
-        attestation_directory=attestation_directory)
+        attestation_directory=attestation_directory,
+        attest_held_outcomes=attest_held_outcomes)
     rejected = sum(production['status_counts'][s] for s in REJECTED_ENTRY_STATUSES)
     if production['attestation_counts'] is not None:
         rejected += sum(production['attestation_counts'][s]
@@ -316,6 +371,8 @@ def run_egx_decision_outcome_job(*, db_path, raw_root, observation_directory,
         'corporate_actions': production['corporate_actions'],
         # The producer's own label: NOT_REQUESTED or ATTESTED_AFTER_CLEAR_RETENTION.
         'outcome_attestation': production['outcome_attestation'],
+        # The producer's own label: NOT_PERFORMED or HELD_RECHECK_AFTER_EVALUATION_V1.
+        'held_outcome_attestation': production['held_outcome_attestation'],
     }
 
 
@@ -335,6 +392,7 @@ def main(argv=None):
     parser.add_argument('--calendar-observation', action='append', required=True)
     parser.add_argument('--check-corporate-actions', action='store_true')
     parser.add_argument('--attestation-dir', default=None)
+    parser.add_argument('--attest-held-outcomes', action='store_true')
     args = parser.parse_args(argv)
     try:
         assumptions = outcome_assumptions(
@@ -348,7 +406,8 @@ def main(argv=None):
             daily_raw_paths=tuple(args.daily_raw_path),
             calendar_observations=tuple(args.calendar_observation),
             assumptions=assumptions, check_corporate_actions=args.check_corporate_actions,
-            attestation_directory=args.attestation_dir)
+            attestation_directory=args.attestation_dir,
+            attest_held_outcomes=args.attest_held_outcomes)
     except OutcomeJobError as exc:
         result = _failure(exc.stage, exc)
     except CardReportJobError as exc:
