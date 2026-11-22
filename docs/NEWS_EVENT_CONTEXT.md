@@ -990,6 +990,27 @@ holdout integrity CALLER_ASSERTED_UNVERIFIED, sample NOT_ASSESSED, no
 performance claim. No repository policy instance exists, so gap
 EVALUATION_PERIOD_POLICY_NOT_REGISTERED stays open.
 
+## Checked per-event-state metrics (`app.decision_outcome_checked_event_states`, decision-outcome-checked-event-state-metrics-v1)
+
+Status: pure library, pending host validation; no caller, job, route or
+scheduler (the metrics job does not call it).
+
+`aggregate_egx_checked_decision_outcomes_by_event_state(population, outcomes,
+attestations, *, assumptions, as_of)` composes two unchanged components:
+`select_egx_checked_outcomes` (integrity gate, re-verified partition and
+CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1) and `aggregate_decision_outcomes_by_event_state`
+(market EGX) over the SAME full population with only the selected outcomes.
+Inside every event state an unattested, invalidly attested, later-attested or
+missing outcome stays NOT_EVALUATED, so it cannot hide a loss or shrink a
+state's sample. State assignment uses only the event-context section retained
+in each observation at detection time; attached sections are checked by the
+unchanged event-state component (fail closed). All seven states are reported;
+attestation counts are whole-input only (`per_state_attestation_counts:
+NOT_REPORTED`). The state is inference (`absence_is_proof` false,
+`risk_interpretation` NOT_EVALUATED, `trading_effect` NONE); no cross-state
+headline, sample NOT_ASSESSED, no performance claim. No gap is closed or added;
+operational observations are currently all NOT_ATTACHED.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no

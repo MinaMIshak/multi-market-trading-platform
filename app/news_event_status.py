@@ -59,6 +59,8 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_checked_metrics', 'decision-outcome-checked-metrics-v1'),
     ('app.decision_outcome_metrics_job', 'decision-outcome-metrics-job-v1'),
     ('app.decision_outcome_checked_periods', 'decision-outcome-checked-period-metrics-v1'),
+    ('app.decision_outcome_checked_event_states',
+     'decision-outcome-checked-event-state-metrics-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
