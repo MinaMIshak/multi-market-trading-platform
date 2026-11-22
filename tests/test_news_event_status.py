@@ -314,6 +314,27 @@ def test_declared_gaps_match_the_code():
     for source in (ROOT / 'app' / 'decision_outcome_producer.py',
                    ROOT / 'app' / 'decision_outcome_job.py'):
         assert 'decision_outcome_checked_metrics' not in source.read_text(encoding='utf-8')
+    # decision-outcome-metrics-job-v1: the only caller of the checked-metrics
+    # component is a read-only host job entrypoint. It loads the three stores
+    # with the unchanged loaders, writes nothing, opens no database and is not
+    # scheduled (no caller outside the components, checked above), so both
+    # gaps stay open.
+    assert 'OUTCOME_METRICS_JOB_NOT_SCHEDULED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_metrics_job*.py')] == [
+        'decision_outcome_metrics_job.py']
+    metrics_job = (ROOT / 'app' / 'decision_outcome_metrics_job.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    for call in ("load_retained_decision_observations(observation_directory, market='EGX')",
+                 'load_retained_outcome_attestations(attestation_directory)',
+                 'aggregate_egx_checked_decision_outcomes(\n            tuple(population),'):
+        assert call in metrics_job, call
+    assert not re.search(r'\b(connect|sqlite3|Database|_existing_database|INSERT|UPDATE|DELETE|'
+                         r'retain_\w+|produce_\w+|aggregate_decision_outcomes|'
+                         r'partition_egx_attested_outcomes|open)\b', metrics_job)
+    assert "'writes': 'NONE'" in metrics_job
+    assert "'performance_claim': 'NONE'" in metrics_job
+    assert "'live_money': False" in metrics_job
+    assert "'promotion': 'NOT_AUTHORIZED'" in metrics_job
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

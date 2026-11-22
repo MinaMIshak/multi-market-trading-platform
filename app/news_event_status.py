@@ -57,6 +57,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_event_states', 'decision-outcome-event-state-metrics-v1'),
     ('app.decision_outcome_data_age', 'decision-outcome-data-age-metrics-v1'),
     ('app.decision_outcome_checked_metrics', 'decision-outcome-checked-metrics-v1'),
+    ('app.decision_outcome_metrics_job', 'decision-outcome-metrics-job-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
@@ -113,9 +114,14 @@ EMPIRICAL_GAPS = (
     # only with --attestation-dir; nothing runs it). A pure metrics caller of the
     # partition exists (decision-outcome-checked-metrics-v1: only outcomes
     # attested CLEAR with check_as_of by as_of are counted, the rest stay
-    # NOT_EVALUATED in the same population), but no job, route or scheduler
-    # runs it, so no reported metric is yet restricted to checked outcomes.
+    # NOT_EVALUATED in the same population), and a read-only host job entrypoint
+    # runs it over the three retained stores at one explicit as_of
+    # (decision-outcome-metrics-job-v1), but no store is provisioned and no
+    # scheduler runs the outcome or metrics jobs, so the gap stays open.
     'OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED',
+    # Read-only metrics job entrypoint exists (writes nothing); no scheduler or
+    # cron entry in the repository runs it and no route serves its report.
+    'OUTCOME_METRICS_JOB_NOT_SCHEDULED',
     # Attestation sidecar store library exists; no directory is provisioned. Its
     # only caller is the producer's opt-in step, which the job enables only with
     # an explicit --attestation-dir (not scheduled).

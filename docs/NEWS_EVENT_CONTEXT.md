@@ -941,7 +941,33 @@ attestations, *, assumptions, as_of)` composes the unchanged components:
 The report embeds the partition and the restricted metrics with sample size,
 labels population and attestation completeness CALLER_ASSERTED_UNVERIFIED and
 makes no performance claim. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays
-open: nothing runs this caller yet.
+open: its only caller is the unscheduled read-only metrics job below.
+
+## Checked metrics host job (`app.decision_outcome_metrics_job`, decision-outcome-metrics-job-v1)
+
+Status: host CLI entrypoint, pending host validation; not scheduled, no route.
+
+    python -m app.decision_outcome_metrics_job --observation-dir /abs/obs \
+        --outcome-dir /abs/outcomes --attestation-dir /abs/attestations \
+        --as-of 2026-11-20T12:00:00Z --assumptions-version <id> \
+        --entry-slippage-bps <n> --exit-slippage-bps <n> --cost-bps-per-side <n>
+
+Read-only: it opens no database and writes no store or file. Three absolute,
+distinct directories and an explicit timezone-aware `--as-of` at or before the
+job clock are required (naive or future `as_of` is CONFIG_INVALID at INPUT);
+assumptions use the outcome job's own `outcome_assumptions` (no defaults). The
+unchanged loaders read every retained EGX observation, every outcome under
+exactly these assumptions and every attestation (any damaged or unexpected
+entry fails the run at STORES with the loader's reason). Point-in-time
+selection RECORDED_AND_EVALUATED_AT_OR_BEFORE_AS_OF_V1 keeps observations with
+`recorded_at <= as_of` and outcomes with `evaluated_at <= as_of`; excluded
+identities are listed, and an observation whose outcome was evaluated later
+stays in the population as NOT_EVALUATED. These are the records' own clocks,
+not retention times (RECORD_TIMES_NOT_RETENTION_TIMES). All attestations are
+passed to the unchanged `aggregate_egx_checked_decision_outcomes`, which
+applies its own check-time rule; an integrity refusal fails at METRICS
+(METRICS_REJECTED). Exit 0 REPORTED, 1 FAILED. SYSTEM gap
+OUTCOME_METRICS_JOB_NOT_SCHEDULED.
 
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
@@ -1194,8 +1220,10 @@ the observation job, a schedule invoking the outcome job (gap
 OUTCOME_JOB_NOT_SCHEDULED), attestation of outcomes held before a checked run
 (the job's opt-in `--attestation-dir` attests only outcomes the run itself
 retains), a provisioned
-attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED) and a caller restricting metrics to attested outcomes via the partition (gap
-OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED), a provisioned directory for outcome
+attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED), a
+schedule invoking the read-only checked metrics job (gaps
+OUTCOME_METRICS_JOB_NOT_SCHEDULED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED),
+a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
