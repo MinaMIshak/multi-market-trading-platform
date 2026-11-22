@@ -61,6 +61,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_checked_periods', 'decision-outcome-checked-period-metrics-v1'),
     ('app.decision_outcome_checked_event_states',
      'decision-outcome-checked-event-state-metrics-v1'),
+    ('app.decision_outcome_checked_data_age', 'decision-outcome-checked-data-age-metrics-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
@@ -136,7 +137,9 @@ EMPIRICAL_GAPS = (
     # Sample-assessment code exists; no sample policy is registered, and its
     # thresholds would be declared, not statistically validated.
     'SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED',
-    # Data-age segmentation code exists; no data-age bucket policy is registered.
+    # Data-age segmentation code exists (also over attested-CLEAR outcomes only:
+    # decision-outcome-checked-data-age-metrics-v1, pure, no caller); no
+    # data-age bucket policy is registered.
     'DATA_AGE_POLICY_NOT_REGISTERED',
 )
 

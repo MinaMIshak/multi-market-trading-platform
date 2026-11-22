@@ -1011,6 +1011,28 @@ NOT_REPORTED`). The state is inference (`absence_is_proof` false,
 headline, sample NOT_ASSESSED, no performance claim. No gap is closed or added;
 operational observations are currently all NOT_ATTACHED.
 
+## Checked per-data-age metrics (`app.decision_outcome_checked_data_age`, decision-outcome-checked-data-age-metrics-v1)
+
+Status: pure library, pending host validation; no caller, job, route or
+scheduler (the metrics job does not call it).
+
+`aggregate_egx_checked_decision_outcomes_by_data_age(population, outcomes,
+attestations, *, assumptions, as_of, policy)` composes two unchanged
+components: `select_egx_checked_outcomes` (integrity gate, re-verified partition
+and CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1) and
+`aggregate_decision_outcomes_by_data_age` (market EGX) over the SAME full
+population with only the selected outcomes, under the caller's EGX
+`DataAgePolicy` (validated by the data-age component: market, registration not
+after `as_of`, bounds). Inside every age bucket an unattested, invalidly
+attested, later-attested or missing outcome stays NOT_EVALUATED, so it cannot
+hide a loss or shrink a bucket's sample. Bucket assignment uses only the
+retained `detected_at - data_as_of` (wall clock, not session-aware), with the
+unchanged source-time order check. Every bucket is reported; attestation counts
+are whole-input only (`per_bucket_attestation_counts: NOT_REPORTED`).
+`age_interpretation` NOT_EVALUATED, `trading_effect` NONE, no cross-bucket
+headline, sample NOT_ASSESSED, no performance claim. No repository policy
+instance exists, so gap DATA_AGE_POLICY_NOT_REGISTERED stays open.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no

@@ -387,6 +387,33 @@ def test_declared_gaps_match_the_code():
                    ROOT / 'app' / 'decision_outcome_job.py',
                    ROOT / 'app' / 'decision_outcome_producer.py'):
         assert 'decision_outcome_checked_event_states' not in source.read_text(encoding='utf-8')
+    # decision-outcome-checked-data-age-metrics-v1: a pure composition of the
+    # unchanged checked selection and data-age segmentation; it reads no file,
+    # store or database, writes nothing, constructs no policy, interprets no age,
+    # and no job, producer or route calls it (no caller outside the components,
+    # checked above), so DATA_AGE_POLICY_NOT_REGISTERED and the gap stay open.
+    assert 'DATA_AGE_POLICY_NOT_REGISTERED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_checked_data_age*.py')] == [
+        'decision_outcome_checked_data_age.py']
+    checked_age = (ROOT / 'app' / 'decision_outcome_checked_data_age.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'select_egx_checked_outcomes(population, outcomes, attestations,' in checked_age
+    assert 'aggregate_decision_outcomes_by_data_age(\n        population, counted,' in checked_age
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_\w+|check_egx_outcome_corporate_actions|load_\w+|'
+                         r'aggregate_decision_outcomes|partition_egx_attested_outcomes|'
+                         r'DataAgePolicy|_data_age|_bucket)\b', checked_age)
+    assert "'cross_bucket_headline': 'NOT_COMPUTED'" in checked_age
+    assert "'age_interpretation': 'NOT_EVALUATED'" in checked_age
+    assert "'trading_effect': 'NONE'" in checked_age
+    assert "'unrestricted_metrics': 'NOT_REPORTED'" in checked_age
+    assert "'performance_claim': 'NONE'" in checked_age
+    assert "'live_money': False" in checked_age
+    assert "'promotion': 'NOT_AUTHORIZED'" in checked_age
+    for source in (ROOT / 'app' / 'decision_outcome_metrics_job.py',
+                   ROOT / 'app' / 'decision_outcome_job.py',
+                   ROOT / 'app' / 'decision_outcome_producer.py'):
+        assert 'decision_outcome_checked_data_age' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job
