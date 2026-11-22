@@ -335,6 +335,31 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in metrics_job
     assert "'live_money': False" in metrics_job
     assert "'promotion': 'NOT_AUTHORIZED'" in metrics_job
+    # decision-outcome-checked-period-metrics-v1: a pure composition of the
+    # unchanged checked selection and period segmentation; it reads no file,
+    # store or database, writes nothing, and no job (including the metrics job),
+    # producer or route calls it (no caller outside the components, checked
+    # above), so EVALUATION_PERIOD_POLICY_NOT_REGISTERED and the gap stay open.
+    assert 'EVALUATION_PERIOD_POLICY_NOT_REGISTERED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_checked_periods*.py')] == [
+        'decision_outcome_checked_periods.py']
+    checked_periods = (ROOT / 'app' / 'decision_outcome_checked_periods.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'select_egx_checked_outcomes(population, outcomes, attestations,' in checked_periods
+    assert 'aggregate_decision_outcomes_by_period(\n        population, counted,' in checked_periods
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_\w+|check_egx_outcome_corporate_actions|load_\w+|'
+                         r'aggregate_decision_outcomes|partition_egx_attested_outcomes|'
+                         r'EvaluationPeriodPolicy)\b', checked_periods)
+    assert "'cross_period_headline': 'NOT_COMPUTED'" in checked_periods
+    assert "'unrestricted_metrics': 'NOT_REPORTED'" in checked_periods
+    assert "'performance_claim': 'NONE'" in checked_periods
+    assert "'live_money': False" in checked_periods
+    assert "'promotion': 'NOT_AUTHORIZED'" in checked_periods
+    for source in (ROOT / 'app' / 'decision_outcome_metrics_job.py',
+                   ROOT / 'app' / 'decision_outcome_job.py',
+                   ROOT / 'app' / 'decision_outcome_producer.py'):
+        assert 'decision_outcome_checked_periods' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

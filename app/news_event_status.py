@@ -58,6 +58,7 @@ EMPIRICAL_COMPONENTS = (
     ('app.decision_outcome_data_age', 'decision-outcome-data-age-metrics-v1'),
     ('app.decision_outcome_checked_metrics', 'decision-outcome-checked-metrics-v1'),
     ('app.decision_outcome_metrics_job', 'decision-outcome-metrics-job-v1'),
+    ('app.decision_outcome_checked_periods', 'decision-outcome-checked-period-metrics-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory
@@ -126,7 +127,9 @@ EMPIRICAL_GAPS = (
     # only caller is the producer's opt-in step, which the job enables only with
     # an explicit --attestation-dir (not scheduled).
     'OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED',
-    # Period segmentation code exists; no evaluation-period policy is registered.
+    # Period segmentation code exists (also over attested-CLEAR outcomes only:
+    # decision-outcome-checked-period-metrics-v1, pure, no caller); no
+    # evaluation-period policy is registered.
     'EVALUATION_PERIOD_POLICY_NOT_REGISTERED',
     # Sample-assessment code exists; no sample policy is registered, and its
     # thresholds would be declared, not statistically validated.

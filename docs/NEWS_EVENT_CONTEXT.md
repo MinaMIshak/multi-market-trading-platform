@@ -969,6 +969,27 @@ applies its own check-time rule; an integrity refusal fails at METRICS
 (METRICS_REJECTED). Exit 0 REPORTED, 1 FAILED. SYSTEM gap
 OUTCOME_METRICS_JOB_NOT_SCHEDULED.
 
+## Checked per-period metrics (`app.decision_outcome_checked_periods`, decision-outcome-checked-period-metrics-v1)
+
+Status: pure library, pending host validation; no caller, job, route or
+scheduler (the metrics job does not call it).
+
+`aggregate_egx_checked_decision_outcomes_by_period(population, outcomes,
+attestations, *, assumptions, as_of, policy)` composes two unchanged
+components: `select_egx_checked_outcomes` (the integrity gate, re-verified
+partition and CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1 rule, extracted from
+`aggregate_egx_checked_decision_outcomes` without changing its report) and
+`aggregate_decision_outcomes_by_period` over the SAME full population with only
+the selected outcomes, under the caller's explicit `EvaluationPeriodPolicy`
+(market must be EGX). Inside every period and in UNASSIGNED, an unattested,
+invalidly attested, later-attested or missing outcome stays NOT_EVALUATED, so
+it cannot hide a loss or shrink a period's sample. Period assignment uses only
+`detected_at`. Attestation counts are reported for the whole input only
+(`per_period_attestation_counts: NOT_REPORTED`). No cross-period headline,
+holdout integrity CALLER_ASSERTED_UNVERIFIED, sample NOT_ASSESSED, no
+performance claim. No repository policy instance exists, so gap
+EVALUATION_PERIOD_POLICY_NOT_REGISTERED stays open.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no

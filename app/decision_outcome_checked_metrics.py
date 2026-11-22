@@ -48,14 +48,15 @@ COUNT_KEYS = ('ATTESTED_CLEAR_AT_OR_BEFORE_AS_OF', 'ATTESTED_CLEAR_AFTER_AS_OF',
               'ATTESTATION_INVALID')
 
 
-def aggregate_egx_checked_decision_outcomes(population, outcomes, attestations, *, assumptions,
-                                            as_of) -> dict:
-    """Return the JSON-ready decision-outcome-checked-metrics-v1 report; pure, fails closed.
+def select_egx_checked_outcomes(population, outcomes, attestations, *, assumptions,
+                                as_of) -> dict:
+    """Steps 1-3 above: integrity gate, re-verified partition and the CHECK_AS_OF rule.
 
-    ``population`` is the retained ``(identity, record)`` EGX observation pairs,
-    ``outcomes`` the retained terminal outcome records for ``assumptions`` and
-    ``attestations`` the loaded attestation records. Raises ``ValueError`` on
-    any integrity failure (nothing is silently dropped). Inputs are not mutated.
+    Returns ``as_of`` (normalised), ``partition``, ``counts`` (COUNT_KEYS),
+    ``counted`` (the outcomes to aggregate, sorted by observation identity) and
+    ``after`` (sorted outcome identities attested after ``as_of``). Shared by
+    the report below and the checked per-period segmentation so the selection
+    rule exists once. Pure; raises ``ValueError`` on any integrity failure.
     """
     # 1. Integrity gate over everything supplied; the result is never returned.
     aggregate_decision_outcomes(population, outcomes, market='EGX', assumptions=assumptions,
@@ -84,6 +85,22 @@ def aggregate_egx_checked_decision_outcomes(population, outcomes, attestations, 
             counts['ATTESTED_CLEAR_AT_OR_BEFORE_AS_OF'] + counts['ATTESTED_CLEAR_AFTER_AS_OF']):
         raise ValueError('attestation partition does not account for every outcome')
     counted = tuple(sorted(counted, key=lambda record: record['observation_identity']))
+    return {'as_of': as_of, 'partition': partition, 'counts': counts, 'counted': counted,
+            'after': sorted(after)}
+
+
+def aggregate_egx_checked_decision_outcomes(population, outcomes, attestations, *, assumptions,
+                                            as_of) -> dict:
+    """Return the JSON-ready decision-outcome-checked-metrics-v1 report; pure, fails closed.
+
+    ``population`` is the retained ``(identity, record)`` EGX observation pairs,
+    ``outcomes`` the retained terminal outcome records for ``assumptions`` and
+    ``attestations`` the loaded attestation records. Raises ``ValueError`` on
+    any integrity failure (nothing is silently dropped). Inputs are not mutated.
+    """
+    selection = select_egx_checked_outcomes(population, outcomes, attestations,
+                                            assumptions=assumptions, as_of=as_of)
+    as_of, partition, counted = selection['as_of'], selection['partition'], selection['counted']
 
     # 4. Same population, counted outcomes only: the rest are NOT_EVALUATED.
     metrics = aggregate_decision_outcomes(population, counted, market='EGX',
@@ -96,11 +113,11 @@ def aggregate_egx_checked_decision_outcomes(population, outcomes, attestations, 
         'attestation_time_rule': ATTESTATION_TIME_RULE,
         'outcomes_supplied': partition['outcomes_supplied'],
         'attestations_supplied': partition['attestations_supplied'],
-        'attestation_counts': counts,
+        'attestation_counts': selection['counts'],
         'outcomes_counted': len(counted),
         'outcomes_not_counted': partition['outcomes_supplied'] - len(counted),
         'not_counted_treatment': 'NOT_EVALUATED_IN_SAME_POPULATION_NEVER_DROPPED',
-        'attested_after_as_of': sorted(after),
+        'attested_after_as_of': selection['after'],
         'partition': partition,
         'metrics': metrics,
         'unrestricted_metrics': 'NOT_REPORTED',
