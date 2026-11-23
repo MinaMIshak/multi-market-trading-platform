@@ -414,6 +414,33 @@ def test_declared_gaps_match_the_code():
                    ROOT / 'app' / 'decision_outcome_job.py',
                    ROOT / 'app' / 'decision_outcome_producer.py'):
         assert 'decision_outcome_checked_data_age' not in source.read_text(encoding='utf-8')
+    # decision-outcome-checked-sample-assessment-v1: a pure composition of the
+    # unchanged checked selection and sample assessment; it reads no file, store
+    # or database, writes nothing, constructs no policy, and no job, producer or
+    # route calls it (no caller outside the components, checked above), so
+    # SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED and the gap stay open.
+    assert 'SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED' in EMPIRICAL_GAPS
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_checked_sample*.py')] == [
+        'decision_outcome_checked_sample.py']
+    checked_sample = (ROOT / 'app' / 'decision_outcome_checked_sample.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'select_egx_checked_outcomes(population, outcomes, attestations,' in checked_sample
+    assert 'assess_decision_outcome_sample(\n        population, counted,' in checked_sample
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|ReferenceRepository|'
+                         r'retain_\w+|check_egx_outcome_corporate_actions|load_\w+|'
+                         r'aggregate_decision_outcomes|partition_egx_attested_outcomes|'
+                         r'SampleAssessmentPolicy|_assess|_revalidated)\b', checked_sample)
+    assert "'cross_segment_headline': 'NOT_COMPUTED'" in checked_sample
+    assert "'statistical_significance': 'NOT_ASSESSED'" in checked_sample
+    assert "'empirical_validation': 'NOT_VALIDATED'" in checked_sample
+    assert "'unrestricted_assessment': 'NOT_REPORTED'" in checked_sample
+    assert "'performance_claim': 'NONE'" in checked_sample
+    assert "'live_money': False" in checked_sample
+    assert "'promotion': 'NOT_AUTHORIZED'" in checked_sample
+    for source in (ROOT / 'app' / 'decision_outcome_metrics_job.py',
+                   ROOT / 'app' / 'decision_outcome_job.py',
+                   ROOT / 'app' / 'decision_outcome_producer.py'):
+        assert 'decision_outcome_checked_sample' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

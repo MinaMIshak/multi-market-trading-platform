@@ -1033,6 +1033,32 @@ are whole-input only (`per_bucket_attestation_counts: NOT_REPORTED`).
 headline, sample NOT_ASSESSED, no performance claim. No repository policy
 instance exists, so gap DATA_AGE_POLICY_NOT_REGISTERED stays open.
 
+## Checked sample assessment (`app.decision_outcome_checked_sample`, decision-outcome-checked-sample-assessment-v1)
+
+Status: pure library, pending host validation; no caller, job, route or
+scheduler (the metrics job does not call it).
+
+`assess_egx_checked_decision_outcome_sample(population, outcomes,
+attestations, *, assumptions, as_of, policy)` composes two unchanged
+components: `select_egx_checked_outcomes` (integrity gate, re-verified partition
+and CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1) and `assess_decision_outcome_sample`
+(market EGX) over the SAME full population with only the selected outcomes,
+under the caller's EGX `SampleAssessmentPolicy` (revalidated by the sample
+component: exact type, market, registration not after `as_of`). In every
+strategy id/version/config segment an unattested, invalidly attested,
+later-attested or missing outcome stays NOT_EVALUATED: it is not CLOSED and it
+counts as missing data, so an unchecked outcome can never help a segment reach
+MEETS_DECLARED_MINIMUM (a segment that would meet the minimum on the unchecked
+outcome alone is BELOW_DECLARED_MINIMUM here). The embedded
+`sample_assessment_report` is exactly the unchanged component's output,
+including per-segment `registration` (thresholds fixed after the first
+detection stay visible). Attestation counts are whole-input only
+(`per_segment_attestation_counts: NOT_REPORTED`); `unrestricted_assessment`
+NOT_REPORTED. Thresholds remain DECLARED_UNVALIDATED: `statistical_significance`
+NOT_ASSESSED, `empirical_validation` NOT_VALIDATED, no cross-segment headline,
+no performance claim, `promotion` NOT_AUTHORIZED. No repository policy instance
+exists, so gap SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED stays open.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
