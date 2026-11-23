@@ -6,11 +6,11 @@
         --attestation-dir /abs/outcome-attestations \
         --as-of 2026-11-20T12:00:00Z \
         --assumptions-version <id> --entry-slippage-bps <n> \
-        --exit-slippage-bps <n> --cost-bps-per-side <n>
+        --exit-slippage-bps <n> --cost-bps-per-side <n> [--by-event-state]
 
-Phase G/H/K reporting entrypoint (decision-outcome-metrics-job-v1). It is
+Phase G/H/I/K reporting entrypoint (decision-outcome-metrics-job-v2). It is
 read-only and only wires existing pieces together; it adds no metric, partition,
-attestation or outcome logic:
+attestation, segmentation or outcome logic:
 
 1. the three host-provisioned directories must be absolute and distinct, and
    ``as_of`` must be an explicit timezone-aware instant at or before the job
@@ -32,7 +32,19 @@ attestation or outcome logic:
    all passed through: the caller applies its own CHECK_AS_OF rule, and an
    attestation whose outcome was not supplied is listed by the partition;
 4. the unchanged pure ``aggregate_egx_checked_decision_outcomes`` computes the
-   report; any integrity refusal fails the run (METRICS stage).
+   report; any integrity refusal fails the run (METRICS stage);
+5. opt-in (``--by-event-state``; v2): the unchanged pure
+   ``aggregate_egx_checked_decision_outcomes_by_event_state`` is run over
+   exactly the same selected population, supplied outcomes and loaded
+   attestations at the same ``as_of`` and embedded as ``event_state_report``.
+   It needs no registered policy. Any refusal fails the whole run (METRICS
+   stage); no partial report is emitted. Without the flag the field is
+   EVENT_STATE_NOT_REQUESTED and the rest of the result is unchanged from v1.
+   The event state is the detection-time inference retained in each
+   observation (producer observations are NOT_ATTACHED); it is not an observed
+   market fact, interprets no risk and has no cross-state headline. Period,
+   data-age and sample reports need caller-supplied policies and are not
+   offered here (no policy is registered).
 
 The job writes nothing (no store, file or database; no database is opened),
 schedules nothing and is not scheduled: SYSTEM keeps the gap
@@ -58,12 +70,15 @@ from app.decision_observation_store import (
 from app.decision_outcome import OutcomeAssumptions
 from app.decision_outcome_attestation_store import (
     OutcomeAttestationStoreError, load_retained_outcome_attestations)
+from app.decision_outcome_checked_event_states import (
+    aggregate_egx_checked_decision_outcomes_by_event_state)
 from app.decision_outcome_checked_metrics import aggregate_egx_checked_decision_outcomes
 from app.decision_outcome_job import OutcomeJobError, outcome_assumptions
 from app.decision_outcome_store import DecisionOutcomeStoreError, load_retained_decision_outcomes
 from app.scanner_v2_card_report_job import _absolute
 
-CONTRACT_VERSION = 'decision-outcome-metrics-job-v1'
+CONTRACT_VERSION = 'decision-outcome-metrics-job-v2'
+EVENT_STATE_NOT_REQUESTED = 'NOT_REQUESTED'
 JOB_STATUSES = ('REPORTED', 'FAILED')
 FAILURE_STAGES = ('INPUT', 'STORES', 'METRICS')
 # Reasons raised by this module; STORES-stage failures carry the refusing
@@ -111,7 +126,9 @@ def parse_as_of(text):
 
 
 def _config(observation_directory, outcome_directory, attestation_directory, assumptions,
-            as_of, now):
+            as_of, now, by_event_state):
+    if type(by_event_state) is not bool:
+        raise MetricsJobError('CONFIG_INVALID', 'by_event_state must be a bool')
     directories = (observation_directory, outcome_directory, attestation_directory)
     if not all(_absolute(v) for v in directories):
         raise MetricsJobError('CONFIG_INVALID', 'absolute paths required')
@@ -128,19 +145,22 @@ def _config(observation_directory, outcome_directory, attestation_directory, ass
 
 
 def run_egx_decision_outcome_metrics_job(*, observation_directory, outcome_directory,
-                                         attestation_directory, assumptions, as_of, now=None):
+                                         attestation_directory, assumptions, as_of, now=None,
+                                         by_event_state=False):
     """Load the retained stores and report attested-CLEAR-only metrics at ``as_of``.
 
-    Returns a ``decision-outcome-metrics-job-v1`` result wrapping the unchanged
-    decision-outcome-checked-metrics-v1 report. Raises ``MetricsJobError``
-    (inputs, metrics) or the store loaders' ``DecisionObservationStoreError`` /
-    ``DecisionOutcomeStoreError`` / ``OutcomeAttestationStoreError``. ``now``
-    is the job clock (default real UTC), used only to refuse a future
-    ``as_of``. Writes nothing.
+    Returns a ``decision-outcome-metrics-job-v2`` result wrapping the unchanged
+    decision-outcome-checked-metrics-v1 report and, only when ``by_event_state``
+    is True, the unchanged decision-outcome-checked-event-state-metrics-v1
+    report over the same inputs (else EVENT_STATE_NOT_REQUESTED). Raises
+    ``MetricsJobError`` (inputs, metrics) or the store loaders'
+    ``DecisionObservationStoreError`` / ``DecisionOutcomeStoreError`` /
+    ``OutcomeAttestationStoreError``. ``now`` is the job clock (default real
+    UTC), used only to refuse a future ``as_of``. Writes nothing.
     """
     now = _utc_now() if now is None else now
     _config(observation_directory, outcome_directory, attestation_directory, assumptions,
-            as_of, now)
+            as_of, now, by_event_state)
     observations = load_retained_decision_observations(observation_directory, market='EGX')
     outcomes = load_retained_decision_outcomes(outcome_directory, market='EGX',
                                                assumptions=assumptions)
@@ -165,6 +185,11 @@ def run_egx_decision_outcome_metrics_job(*, observation_directory, outcome_direc
         report = aggregate_egx_checked_decision_outcomes(
             tuple(population), tuple(supplied), tuple(attestations),
             assumptions=assumptions, as_of=as_of)
+        # Same selected inputs and as_of as the report above; all or nothing.
+        event_state_report = (aggregate_egx_checked_decision_outcomes_by_event_state(
+            tuple(population), tuple(supplied), tuple(attestations),
+            assumptions=assumptions, as_of=as_of)
+            if by_event_state else EVENT_STATE_NOT_REQUESTED)
     except (ValueError, TypeError, RecursionError) as exc:
         raise MetricsJobError('METRICS_REJECTED', str(exc), stage='METRICS') from None
     return {
@@ -185,6 +210,7 @@ def run_egx_decision_outcome_metrics_job(*, observation_directory, outcome_direc
             'attestation_selection': ATTESTATION_SELECTION,
         },
         'report': report,
+        'event_state_report': event_state_report,
         **SAFETY,
     }
 
@@ -201,6 +227,7 @@ def main(argv=None):
                  '--assumptions-version', '--entry-slippage-bps', '--exit-slippage-bps',
                  '--cost-bps-per-side'):
         parser.add_argument(name, required=True)
+    parser.add_argument('--by-event-state', action='store_true')
     args = parser.parse_args(argv)
     try:
         assumptions = outcome_assumptions(
@@ -211,7 +238,7 @@ def main(argv=None):
         result = run_egx_decision_outcome_metrics_job(
             observation_directory=args.observation_dir, outcome_directory=args.outcome_dir,
             attestation_directory=args.attestation_dir, assumptions=assumptions,
-            as_of=parse_as_of(args.as_of))
+            as_of=parse_as_of(args.as_of), by_event_state=args.by_event_state)
     except MetricsJobError as exc:
         result = _failure(exc.stage, exc)
     except OutcomeJobError as exc:

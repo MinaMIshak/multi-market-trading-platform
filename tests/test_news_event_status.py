@@ -362,9 +362,10 @@ def test_declared_gaps_match_the_code():
         assert 'decision_outcome_checked_periods' not in source.read_text(encoding='utf-8')
     # decision-outcome-checked-event-state-metrics-v1: a pure composition of the
     # unchanged checked selection and event-state segmentation; it reads no file,
-    # store or database, writes nothing, interprets no risk, and no job, producer
-    # or route calls it (no caller outside the components, checked above), so
-    # no gap is closed or added.
+    # store or database, writes nothing and interprets no risk. Its only caller is
+    # the read-only metrics job's opt-in --by-event-state (decision-outcome-
+    # metrics-job-v2, over the same selected inputs; no other caller outside the
+    # components, checked above), so no gap is closed or added.
     assert [p.name for p in (ROOT / 'app').glob('decision_outcome_checked_event_states*.py')] == [
         'decision_outcome_checked_event_states.py']
     checked_states = (ROOT / 'app' / 'decision_outcome_checked_event_states.py').read_text(
@@ -383,10 +384,14 @@ def test_declared_gaps_match_the_code():
     assert "'performance_claim': 'NONE'" in checked_states
     assert "'live_money': False" in checked_states
     assert "'promotion': 'NOT_AUTHORIZED'" in checked_states
-    for source in (ROOT / 'app' / 'decision_outcome_metrics_job.py',
-                   ROOT / 'app' / 'decision_outcome_job.py',
+    for source in (ROOT / 'app' / 'decision_outcome_job.py',
                    ROOT / 'app' / 'decision_outcome_producer.py'):
         assert 'decision_outcome_checked_event_states' not in source.read_text(encoding='utf-8')
+    assert ('aggregate_egx_checked_decision_outcomes_by_event_state(\n'
+            '            tuple(population), tuple(supplied), tuple(attestations),\n'
+            '            assumptions=assumptions, as_of=as_of)\n'
+            '            if by_event_state else EVENT_STATE_NOT_REQUESTED)') in metrics_job
+    assert "EVENT_STATE_NOT_REQUESTED = 'NOT_REQUESTED'" in metrics_job
     # decision-outcome-checked-data-age-metrics-v1: a pure composition of the
     # unchanged checked selection and data-age segmentation; it reads no file,
     # store or database, writes nothing, constructs no policy, interprets no age,

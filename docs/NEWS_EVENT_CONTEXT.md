@@ -943,14 +943,27 @@ labels population and attestation completeness CALLER_ASSERTED_UNVERIFIED and
 makes no performance claim. Gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays
 open: its only caller is the unscheduled read-only metrics job below.
 
-## Checked metrics host job (`app.decision_outcome_metrics_job`, decision-outcome-metrics-job-v1)
+## Checked metrics host job (`app.decision_outcome_metrics_job`, decision-outcome-metrics-job-v2)
 
 Status: host CLI entrypoint, pending host validation; not scheduled, no route.
 
     python -m app.decision_outcome_metrics_job --observation-dir /abs/obs \
         --outcome-dir /abs/outcomes --attestation-dir /abs/attestations \
         --as-of 2026-11-20T12:00:00Z --assumptions-version <id> \
-        --entry-slippage-bps <n> --exit-slippage-bps <n> --cost-bps-per-side <n>
+        --entry-slippage-bps <n> --exit-slippage-bps <n> --cost-bps-per-side <n> \
+        [--by-event-state]
+
+v2 adds only the opt-in `--by-event-state`: the unchanged pure
+`aggregate_egx_checked_decision_outcomes_by_event_state` runs over exactly the
+same selected population, supplied outcomes and loaded attestations at the same
+`as_of`, and its report is embedded as `event_state_report` (otherwise
+`event_state_report: NOT_REQUESTED`; every other field is as in v1). It needs no
+registered policy. A refusal by either report fails the whole run at METRICS
+(METRICS_REJECTED); nothing partial is printed. The event state is the
+detection-time inference retained in each observation (producer observations
+are NOT_ATTACHED), not an observed market fact; no risk interpretation and no
+cross-state headline. Period, data-age and sample reports need caller-supplied
+policies and are not offered by the job (no policy is registered).
 
 Read-only: it opens no database and writes no store or file. Three absolute,
 distinct directories and an explicit timezone-aware `--as-of` at or before the
@@ -992,8 +1005,9 @@ EVALUATION_PERIOD_POLICY_NOT_REGISTERED stays open.
 
 ## Checked per-event-state metrics (`app.decision_outcome_checked_event_states`, decision-outcome-checked-event-state-metrics-v1)
 
-Status: pure library, pending host validation; no caller, job, route or
-scheduler (the metrics job does not call it).
+Status: pure library; its only caller is the read-only metrics job's opt-in
+`--by-event-state` (decision-outcome-metrics-job-v2, pending host validation);
+no route or scheduler.
 
 `aggregate_egx_checked_decision_outcomes_by_event_state(population, outcomes,
 attestations, *, assumptions, as_of)` composes two unchanged components:

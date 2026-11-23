@@ -1,4 +1,4 @@
-"""decision-outcome-metrics-job-v1: read-only checked metrics over retained stores."""
+"""decision-outcome-metrics-job-v2: read-only checked metrics over retained stores."""
 from datetime import datetime, timedelta, timezone
 import json
 
@@ -8,10 +8,15 @@ from app.decision_observation_store import load_retained_decision_observations
 from app.decision_outcome_action_attestation import attest_outcome_corporate_actions
 from app.decision_outcome_attestation_store import (
     STORE_REASONS as ATTESTATION_STORE_REASONS, retain_outcome_action_attestation)
+from app.decision_outcome_checked_event_states import (
+    aggregate_egx_checked_decision_outcomes_by_event_state)
 from app.decision_outcome_checked_metrics import aggregate_egx_checked_decision_outcomes
+from app.decision_outcome_event_states import NOT_ATTACHED
+from app.decision_outcome_metrics import NOT_EVALUATED
 from app.decision_outcome_metrics_job import (
-    ATTESTATION_SELECTION, CONTRACT_VERSION, EXIT_CODES, SELECTION_RULE, SELECTION_TIME_BASIS,
-    MetricsJobError, main, parse_as_of, run_egx_decision_outcome_metrics_job)
+    ATTESTATION_SELECTION, CONTRACT_VERSION, EVENT_STATE_NOT_REQUESTED, EXIT_CODES,
+    SELECTION_RULE, SELECTION_TIME_BASIS, MetricsJobError, main, parse_as_of,
+    run_egx_decision_outcome_metrics_job)
 from app.decision_outcome_store import load_retained_decision_outcomes
 from tests.test_decision_outcome_action_attestation import checked  # noqa: F401
 from tests.test_decision_outcome_producer import NOW
@@ -64,12 +69,18 @@ def snapshot(stores):
             for directory in stores[:3]]
 
 
-def cli(stores, as_of='2026-11-09T15:00:00Z', attestation_dir=None):
+def cli(stores, as_of='2026-11-09T15:00:00Z', attestation_dir=None, extra=()):
     observations, outcomes, attestations, _ = stores
     return main(['--observation-dir', str(observations), '--outcome-dir', str(outcomes),
                  '--attestation-dir', str(attestations if attestation_dir is None
                                           else attestation_dir),
-                 '--as-of', as_of, *CLI_ASSUMPTIONS])
+                 '--as-of', as_of, *CLI_ASSUMPTIONS, *extra])
+
+
+def state(event_state_report, name=NOT_ATTACHED):
+    (found,) = [s for s in event_state_report['event_state_metrics']['states']
+                if s['event_state'] == name]
+    return found
 
 
 def test_reports_unchanged_checked_metrics_and_writes_nothing(stores):
@@ -77,7 +88,9 @@ def test_reports_unchanged_checked_metrics_and_writes_nothing(stores):
     before = snapshot(stores)
     out = run(stores)
     assert snapshot(stores) == before
-    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-metrics-job-v1'
+    assert out['schema_version'] == CONTRACT_VERSION == 'decision-outcome-metrics-job-v2'
+    # Default run: the event-state report is not requested and not computed.
+    assert out['event_state_report'] == EVENT_STATE_NOT_REQUESTED == 'NOT_REQUESTED'
     assert out['status'] == 'REPORTED'
     assert out['as_of'] == out['job_clock'] == '2026-11-09T15:00:00Z'
     observation = stores[3][2]
@@ -188,6 +201,80 @@ def test_cli_input_refusals(stores, capsys):
     assert cli(stores, as_of='2999-01-01T00:00:00Z') == 1              # after the job clock
     out = json.loads(capsys.readouterr().out)
     assert (out['stage'], out['reason']) == ('INPUT', 'CONFIG_INVALID')
+
+
+def test_opt_in_event_state_report_is_the_unchanged_checked_component(stores):
+    attestation = attest(stores)
+    before = snapshot(stores)
+    out = run(stores, by_event_state=True)
+    assert snapshot(stores) == before
+    observation, outcome = stores[3][2], stores[3][1]
+    # Exactly the unchanged pure component over the same selected inputs and as_of.
+    assert out['event_state_report'] == aggregate_egx_checked_decision_outcomes_by_event_state(
+        (observation,), (outcome,), (attestation,), assumptions=ZERO, as_of=NOW)
+    # The main report and selection are unchanged by the flag.
+    default = run(stores)
+    assert {k: v for k, v in out.items() if k != 'event_state_report'} == {
+        k: v for k, v in default.items() if k != 'event_state_report'}
+    by_state = out['event_state_report']
+    assert by_state['attestation_counts'] == out['report']['attestation_counts']
+    assert by_state['outcomes_counted'] == out['report']['outcomes_counted'] == 1
+    (segment,) = state(by_state)['metrics']['segments']
+    assert segment['status_counts']['CLOSED'] == 1
+    assert by_state['cross_state_headline'] == 'NOT_COMPUTED'
+    assert by_state['absence_is_proof'] is False
+    assert by_state['risk_interpretation'] == 'NOT_EVALUATED'
+    assert by_state['trading_effect'] == 'NONE'
+    assert by_state['live_money'] is False and out['live_money'] is False
+    assert {key: out[key] for key in SAFETY} == SAFETY
+    json.dumps(out, allow_nan=False)
+    assert run(stores, by_event_state=True) == out
+
+
+def test_event_state_report_keeps_unattested_and_late_outcomes_not_evaluated(stores):
+    out = run(stores, by_event_state=True)                           # not attested
+    (segment,) = state(out['event_state_report'])['metrics']['segments']
+    assert segment['status_counts'][NOT_EVALUATED] == 1 and segment['closed'] == 0
+    attest(stores)
+    late = run(stores, as_of=BEFORE_EVALUATION, by_event_state=True)  # evaluated after as_of
+    assert late['selection']['outcomes_supplied'] == 0
+    (segment,) = state(late['event_state_report'])['metrics']['segments']
+    assert segment['status_counts'][NOT_EVALUATED] == 1
+    assert late['event_state_report']['outcomes_counted'] == 0
+
+
+def test_event_state_refusals_fail_the_whole_run(stores, monkeypatch, capsys):
+    attest(stores)
+    with pytest.raises(MetricsJobError) as info:
+        run(stores, by_event_state='yes')
+    assert (info.value.reason, info.value.stage) == ('CONFIG_INVALID', 'INPUT')
+
+    def refuse(*args, **kwargs):
+        raise ValueError('attached event-context section refused')
+    monkeypatch.setattr('app.decision_outcome_metrics_job.'
+                        'aggregate_egx_checked_decision_outcomes_by_event_state', refuse)
+    with pytest.raises(MetricsJobError) as info:
+        run(stores, by_event_state=True)
+    assert (info.value.reason, info.value.stage) == ('METRICS_REJECTED', 'METRICS')
+    # Not requested: the component is not called, so the default run still reports.
+    assert run(stores)['status'] == 'REPORTED'
+    assert cli(stores, extra=['--by-event-state']) == 1
+    out = json.loads(capsys.readouterr().out)
+    assert (out['status'], out['stage'], out['reason']) == (
+        'FAILED', 'METRICS', 'METRICS_REJECTED')
+    assert 'report' not in out and 'event_state_report' not in out
+
+
+def test_cli_by_event_state_reports_and_exits_zero(stores, capsys):
+    attest(stores)
+    assert cli(stores, extra=['--by-event-state']) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out['schema_version'] == 'decision-outcome-metrics-job-v2'
+    assert out['event_state_report']['contract_version'] == (
+        'decision-outcome-checked-event-state-metrics-v1')
+    assert out['event_state_report']['outcomes_counted'] == 1
+    assert cli(stores) == 0
+    assert json.loads(capsys.readouterr().out)['event_state_report'] == 'NOT_REQUESTED'
 
 
 def test_loaders_are_the_unchanged_store_loaders(stores):
