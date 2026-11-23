@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "milestone": "M4",
-  "phase": "NEWS_EVENT_CONTRACT",
+  "milestone": "M5",
+  "phase": "UNIVERSE_RUNTIME_ACTIVATION",
   "current_capability": "Offline Scanner v2 EGX slice from retained evidence to Trade Card, served read-only as JSON and HTML (host scanner_product PASS at 11c6978). No scheduled producer, so both answer NOT_CONFIGURED/UNAVAILABLE unless a host publishes a report. News/Event Context started: pure news-event-v1 contract and point-in-time selection rule (committed 46a663d), plus pure per-instrument news-event-context-v1 projection, retained byte codec, a write-once content-addressed store library and a separate pure Trade Card event-context section function (store and section pending host validation), plus a pure Phase G decision-observation-v1 record and write-once store without outcomes, and a pure decision-outcome-v1 evaluator over caller-supplied session bars with explicit cost/slippage assumptions, and pure per-market segmented aggregate metrics over those outcomes with sample size and NOT_EVALUATED counts, and pure per-period (DEVELOPMENT/VALIDATION/OUT_OF_SAMPLE/FORWARD_SHADOW) segmentation of those metrics under an explicit caller-supplied versioned policy, and a pure per-segment sample assessment against an explicit declared-unvalidated minimum policy (MEETS/BELOW_DECLARED_MINIMUM, no significance, validation or promotion), per-event-state segmentation (committed ee3b2cc), and per-data-age-bucket segmentation by retained detected_at - data_as_of under an explicit declared-unvalidated bucket policy (wall clock, not session-aware; committed 1f70d8c), plus a decision-observation producer library that re-binds one retained EGX ranking and retains one NOT_ATTACHED observation per open-window decision, reporting closed-window decisions as WINDOW_CLOSED (committed b6b2d5b), plus a host CLI job entrypoint python -m app.decision_observation_job reusing the card-report job's input helpers and binding loader (exit 2 on late runs; not scheduled; committed 7cee0b5), plus a write-once terminal decision-outcome store library (CLOSED/NO_ENTRY/UNEVALUABLE only, first outcome per decision and assumptions kept, re-evaluations that differ are OUTCOME_CONFLICT; not provisioned, no caller; committed 3066a74), plus a pure EGX outcome session-bar binding from retained canonical daily rows and retained sessions to the evaluator's bars and completeness time (fail closed on any gap, quarantine or unestablished session; corporate actions NOT_CHECKED; committed 2ace20e), plus an EGX outcome producer library composing the unchanged observation/outcome loaders, session-bar binding, evaluator and outcome store over caller-supplied retained daily rows and sessions (per-observation statuses, none dropped; PENDING_PATH never retained; corporate actions NOT_CHECKED; no job or caller; committed 1f09e1a), plus a read-only EGX outcome daily-evidence loader that turns caller-named data_ingestions raw paths into the producer's daily input via the unchanged ingestion lookup, verified raw read and canonical pipeline (receipt time from the ingestion manifest, two ingestions for one instrument refused; committed 7e74731), plus a host CLI job entrypoint python -m app.decision_outcome_job wiring the unchanged get_market_session calendar read (explicit date range, gaps refused; current mutable rows, digest recorded), daily-evidence loader and outcome producer under explicit CLI assumptions (exit 2 when any observation is rejected; not scheduled; committed 3aed1df), plus a pure chain of write-once retained calendar observations into a contiguous outcome calendar (each re-validated by the unchanged projection at its own observation time; gaps/duplicates refused; committed 9313424), plus a read-only loader of caller-named calendar_observations rows into that chain's input (digest/BLOB/date/aware-time checks, never reads market_sessions, missing database refused; committed 71e5c3c), plus decision-outcome-job-v2 wiring that loader and chain into the outcome job (repeated --calendar-observation digests replace --calendar-from/--calendar-through; one job clock is the chain's as_of and the producer clock; market_sessions never read; gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS removed; committed 962f465), plus a pure EGX outcome-path corporate-action check of one retained observation against one reviewed egx-actions-v1 coverage document (CLEAR only inside complete declared coverage, else ACTIONS_IN_PATH or fail closed; no caller, gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept; committed fc903e4), plus a read-only loader of the ReferenceRepository.actions selection for that check (committed a27f241), plus an optional producer gate (decision-outcome-production-v2) that, when selections are supplied, retains a terminal outcome only if the unchanged check is CLEAR and reports ACTIONS_IN_PATH / AWAITING_ACTION_EVIDENCE / ACTION_CHECK_REJECTED per observation (never retained, never price-adjusted; retained outcomes do not record the check, gap kept; committed 72d0dab), plus a by-request action-evidence loader refusing missing coverage per observation (committed dd8b7d7), plus decision-outcome-job-v3 whose opt-in --check-corporate-actions passes those by-request selections to the producer gate (default run unchanged; new stage ACTION_EVIDENCE; not scheduled; committed 19d1334), plus a pure outcome action attestation (decision-outcome-action-attestation-v1) binding one retained terminal outcome to the exact CLEAR check over its whole path, so checked outcomes can be told apart without an outcome version bump (no caller, gap kept; committed 526fc30), plus a write-once sidecar attestation store library (decision-outcome-attestation-retention-v1; retains only re-verified attestations, one per outcome identity, check-time-only retries ALREADY_RETAINED, other differences ATTESTATION_CONFLICT; loader structure-only; not provisioned, no caller, gap kept; committed d5202f7), plus a pure attestation partition (decision-outcome-attestation-partition-v1) re-verifying loaded attestations against their retained outcomes and observations into ATTESTED_CLEAR / UNATTESTED / ATTESTATION_INVALID with none dropped, and attested_clear_outcomes for the unchanged aggregate (others count NOT_EVALUATED; no caller, gap kept; committed 10c4c5a), plus decision-outcome-production-v3 whose opt-in attestation_directory (requires action selections) retains one write-once sidecar attestation for each outcome the run retains after a CLEAR check (held outcomes not attested, refusals visible; gap kept; committed 7a95d84), plus decision-outcome-job-v4 whose opt-in --attestation-dir (only with --check-corporate-actions) passes that directory unchanged to the producer (attestation refusals exit 2; default run unchanged; not scheduled; committed 163411b), plus decision-outcome-production-v4 whose opt-in attest_held_outcomes (requires attestation_directory) re-checks each outcome already held in the store over its own path at the producer clock and attests only CLEAR (AFTER_EVALUATION; HELD_AWAITING_ACTION_EVIDENCE / HELD_ACTIONS_IN_PATH / HELD_CHECK_REJECTED stay UNATTESTED; held outcomes never re-evaluated or rewritten; committed 25fc4bb), plus decision-outcome-job-v5 whose opt-in --attest-held-outcomes (only with --attestation-dir) also requests action selections for held outcomes with path_through = Cairo date of each held path completion and passes the flag to the producer (HELD_CHECK_REJECTED exits 2; default run unchanged; not scheduled; committed ea97477), plus a pure checked-metrics caller (decision-outcome-checked-metrics-v1) that counts in the unchanged aggregate only outcomes the partition reports ATTESTED_CLEAR with check_as_of by as_of, others NOT_EVALUATED in the same population (committed ac41510), plus a read-only host CLI job entrypoint python -m app.decision_outcome_metrics_job (decision-outcome-metrics-job-v1) loading the three retained stores and running that caller at one explicit as_of with recorded/evaluated-by-as_of selection (writes nothing, not scheduled, gaps OUTCOME_METRICS_JOB_NOT_SCHEDULED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept; committed 8ab0d7e), plus a pure checked per-period composition (decision-outcome-checked-period-metrics-v1: shared select_egx_checked_outcomes then the unchanged period segmentation, others NOT_EVALUATED per period; no caller; committed cc08afb), plus a pure checked per-event-state composition (decision-outcome-checked-event-state-metrics-v1: same shared selection then the unchanged event-state segmentation, others NOT_EVALUATED per state; no caller; committed 8cfcfb3), plus a pure checked per-data-age composition (decision-outcome-checked-data-age-metrics-v1: same shared selection then the unchanged data-age segmentation under a caller-supplied EGX DataAgePolicy, others NOT_EVALUATED per bucket; no caller; committed 49b55f8), plus a pure checked sample assessment (decision-outcome-checked-sample-assessment-v1: same shared selection then the unchanged sample assessment under a caller-supplied EGX SampleAssessmentPolicy, unattested outcomes NOT_EVALUATED so they count as missing and never help a segment meet the declared minimum; no caller; committed 0719160), plus decision-outcome-metrics-job-v2 whose opt-in --by-event-state embeds the unchanged checked per-event-state report over the same selected inputs (default NOT_REQUESTED; still read-only, not scheduled; committed d021909), plus a pure read-side gate for canonical retained bytes of a REPORTED metrics-job v2 result (decision-outcome-metrics-report-reader-v1: digest, strict JSON, exact fields, fixed safety labels, selection/report/event-state consistency; recomputes nothing; no publisher, loader, route or caller; pending host validation), plus code-declared SYSTEM stages for News/Event and empirical validation (NEWS_CONTEXT_OFFLINE_ONLY, EMPIRICAL_COLLECTION_NOT_ACTIVE, counts UNKNOWN; pending host validation); no provider, provisioned store, route or card field. Admission labels unchanged; no runtime activation.",
   "starting_head": "e9fe289d5718943e785dd1196b5a6388b5511889",
   "head": "11c6978ef53b09a44fd4dc4bd5c1f40809b8c678",
@@ -122,7 +122,7 @@
   "tests": "320 passed, 95 subtests in affected storage/calendar/Scanner v2/checkpoint suites (15.13s). Four isolated mutation checks detected removed guards. Broader suite in progress; two known sandbox socket tests explicitly deselected and required on authorized host.",
   "deployment": "Published pointer observed at 1124598ff424b1fe8d4befc5bf19be7156d0305c, published 2026-11-04T06:42:19.551228+00:00. This is snapshot build provenance, not a serving-process health check. SIG-v1 not cut over this cycle; release acceptance pending.",
   "scheduler": "Observed authorized November 4 logs: EGX CHAIN_DONE at 06:42:19Z, US CHAIN_DONE at 04:27:32Z, final publish exit=0. Published heartbeat missing. Installed crontab inspection denied; installed interpreter/configuration unverified this cycle. Worktree virtualenv left unchanged.",
-  "next_action": "Host: validate and commit the retained metrics report gate (decision-outcome-metrics-report-reader-v1: pure read_retained_egx_metrics_report over canonical bytes of a REPORTED decision-outcome-metrics-job-v2 result; no publisher, loader, route or caller; app/decision_outcome_metrics_reader.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_metrics_reader.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier (committed at d021909): validate and commit metrics job v2 (decision-outcome-metrics-job-v2: opt-in --by-event-state embeds the unchanged checked per-event-state report over the same selected inputs, default NOT_REQUESTED; app/decision_outcome_metrics_job.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_metrics_job.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier (committed at 0719160): validate and commit the pure checked sample assessment unit (decision-outcome-checked-sample-assessment-v1: assess_egx_checked_decision_outcome_sample composes the unchanged select_egx_checked_outcomes with the unchanged assess_decision_outcome_sample; no caller; app/decision_outcome_checked_sample.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_checked_sample.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier (committed at 49b55f8): validate and commit the pure checked per-data-age metrics unit (decision-outcome-checked-data-age-metrics-v1; tests/test_decision_outcome_checked_data_age.py, tests/test_news_event_status.py). Earlier (committed at 8cfcfb3): validate and commit the pure checked per-event-state metrics unit (decision-outcome-checked-event-state-metrics-v1: aggregate_egx_checked_decision_outcomes_by_event_state composes the unchanged select_egx_checked_outcomes with the unchanged aggregate_decision_outcomes_by_event_state; no caller; app/decision_outcome_checked_event_states.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_checked_event_states.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier (committed at cc08afb): validate and commit the pure checked per-period metrics unit (decision-outcome-checked-period-metrics-v1: aggregate_egx_checked_decision_outcomes_by_period composes select_egx_checked_outcomes, extracted unchanged from the checked-metrics caller, with the unchanged aggregate_decision_outcomes_by_period; no caller; app/decision_outcome_checked_periods.py, app/decision_outcome_checked_metrics.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_checked_periods.py, tests/test_decision_outcome_checked_metrics.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier (committed at 8ab0d7e): validate and commit the read-only checked metrics job (decision-outcome-metrics-job-v1: python -m app.decision_outcome_metrics_job loads the three retained stores with the unchanged loaders, selects observations recorded and outcomes evaluated at or before one explicit aware as_of (not after the job clock; exclusions listed), calls the unchanged aggregate_egx_checked_decision_outcomes, writes nothing, not scheduled; app/decision_outcome_metrics_job.py, app/news_event_status.py (component + gap OUTCOME_METRICS_JOB_NOT_SCHEDULED), docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_metrics_job.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: see news_event_context.next. Earlier: confirm the pure checked-metrics caller committed at ac41510; it was: validate and commit the pure checked-metrics caller (decision-outcome-checked-metrics-v1: aggregate_egx_checked_decision_outcomes runs the unchanged aggregate over all outcomes as an integrity gate only, then counts only partition ATTESTED_CLEAR outcomes whose check_as_of <= as_of, others NOT_EVALUATED in the same population; app/decision_outcome_checked_metrics.py, app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_checked_metrics.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: a read-only host metrics job entrypoint loading observations, outcomes and attestations from explicit directories at one explicit as_of into that caller (writes nothing, not scheduled). Earlier: confirm outcome job v5 committed at ea97477; it was: validate and commit outcome job v5 (decision-outcome-job-v5 opt-in --attest-held-outcomes, only with --attestation-dir: held outcomes requested through their own Cairo path-completion dates HELD_PATH_COMPLETION_DATE_CAIRO_V1 via the unchanged by-request loader, flag passed unchanged to producer v4, HELD_CHECK_REJECTED is a rejection; app/decision_outcome_job.py, app/decision_outcome_producer.py (docstring only), app/news_event_status.py, docs/NEWS_EVENT_CONTEXT.md, PROGRESS.json; tests/test_decision_outcome_job.py, tests/test_news_event_status.py; written by Claude paced executor without running tests). Next product unit after that: a caller using partition_egx_attested_outcomes/attested_clear_outcomes so metrics read only ATTESTED_CLEAR outcomes (others NOT_EVALUATED), before gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED can be closed; still no schedule. Earlier: confirm producer v4 committed at 25fc4bb (tests/test_decision_outcome_producer.py, tests/test_decision_outcome_job.py, tests/test_news_event_status.py). Earlier: confirm outcome job v4 committed at 163411b. Earlier: confirm the producer attestation step committed at 7a95d84 (decision-outcome-production-v3; tests/test_decision_outcome_producer.py, tests/test_decision_outcome_job.py, tests/test_news_event_status.py). Earlier: confirm the pure outcome attestation partition unit at 10c4c5a (decision-outcome-attestation-partition-v1; tests/test_decision_outcome_attested.py, tests/test_news_event_status.py). Earlier: validate the pure outcome action attestation unit (decision-outcome-action-attestation-v1: sidecar record binding one retained terminal EGX outcome to the exact CLEAR corporate-action check over its whole path; no caller; tests/test_decision_outcome_action_attestation.py, tests/test_news_event_status.py; written by Claude paced executor without running tests); outcome-job corporate-action wiring (decision-outcome-job-v3) validated PASS 1037 and committed at 19d1334; confirm the by-request action-evidence loader unit at dd8b7d7 (decision-outcome-action-evidence-by-request-v1; tests/test_decision_outcome_action_evidence.py, tests/test_news_event_status.py); confirm the producer corporate-action gate unit at 72d0dab (decision-outcome-production-v2; tests/test_decision_outcome_producer.py, tests/test_decision_outcome_job.py, tests/test_news_event_status.py, plus tests/test_decision_outcome_corporate_actions.py and tests/test_decision_outcome_action_evidence.py); confirm the outcome-path action-evidence loader unit at a27f241 (decision-outcome-action-evidence-v1; tests/test_decision_outcome_action_evidence.py, tests/test_news_event_status.py; both must be collected); confirm the pure outcome-path corporate-action check unit at fc903e4 (decision-outcome-corporate-actions-v1; tests/test_decision_outcome_corporate_actions.py); confirm the outcome-job retained-calendar wiring unit at 962f465 (decision-outcome-job-v2; tests/test_decision_outcome_job.py, tests/test_news_event_status.py, plus tests/test_decision_outcome_calendar.py and tests/test_decision_outcome_calendar_loader.py); confirm the retained calendar loader unit at 71e5c3c (tests/test_decision_outcome_calendar_loader.py); confirm the retained calendar chain unit at 9313424 (tests/test_decision_outcome_calendar.py); confirm the EGX outcome host job unit at 3aed1df (tests/test_decision_outcome_job.py, tests/test_news_event_status.py); confirm the daily-evidence loader unit at 7e74731 (tests/test_decision_outcome_daily_evidence.py); confirm the EGX outcome producer unit at 1f09e1a (tests/test_decision_outcome_producer.py); confirm the session-bar binding unit at 2ace20e (tests/test_decision_outcome_session_bars.py); confirm the decision-outcome store unit at 3066a74 (tests/test_decision_outcome_store.py);confirm the decision-observation job unit at 7cee0b5 (tests/test_decision_observation_job.py, tests/test_news_event_status.py); confirm the decision-observation producer unit at b6b2d5b (tests/test_decision_observation_producer.py); confirm the data-age segmentation unit at 1f70d8c (tests/test_decision_outcome_data_age.py); confirm tests/test_decision_outcome_event_states.py is collected for the event-state unit at ee3b2cc; confirm the sample-assessment unit at 01cf6ec (tests/test_decision_outcome_sample.py); confirm the time-period segmentation unit at ef6e8da (tests/test_decision_outcome_periods.py); then confirm the SYSTEM status unit at 9a54b24 (tests/test_news_event_status.py, tests/test_scanner_v2_system_status.py) and confirm the aggregate-metrics unit at 6b4c808 (tests/test_news_event_status.py and tests/test_decision_outcome_metrics.py must be collected alongside tests/test_decision_outcome.py, tests/test_decision_observation_store.py, tests/test_decision_observation.py, tests/test_news_event.py, tests/test_news_event_context.py, tests/test_news_event_record.py, tests/test_news_event_store.py and tests/test_news_event_card.py). Repository: next News/Event unit per news_event_context.next. Delivery: supervisor commit bridge and exact origin sync after validation. Prioritize authorized-host SIG-v1 provisioning and exact-release full/socket/spare-port acceptance when executable. Before v12 host adoption, demonstrate copied-state compatibility and database rollback; release-pointer rollback alone is insufficient. At safe delivery checkpoint, implement trusted retained schedule-admission evidence before binding calendar and identity observations. Runtime/API/lifecycle activation remains gated.",
+  "next_action": "Host: validate and commit the schema-13 EGX universe foundation WIP (see universe_runtime_activation.egx_universe_foundation_wip; written by file-only Claude paced executor without running tests). Then P0: Authoritative Universe + Runtime Activation. Continue to close EGX authoritative point-in-time universe membership (current baseline/explicit ranking scopes are not authoritative membership), then implement an explicit US new-listing/IPO admission path that does not require a full 30-session liquidity history while preserving authoritative listing evidence. After universe correctness, provision retained runtime stores, schedule the existing Paper/Shadow pipeline, demonstrate one full end-to-end run, then complete checked-metrics report publisher/protected loader/SYSTEM visibility. Do not add unrelated empirical metrics. LIVE_MONEY remains disabled.",
   "hard_blocker": null,
   "live_money": false,
   "news_event_context": {
@@ -130,265 +130,569 @@
     "contract": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event: news-event-v1 NewsEvent on the existing Contract base with separate source facts (source/event ids, revision, retained artifact SHA-256, aware published_at <= observed_at, event time REPORTED/UNKNOWN), inferred association (MATCHED only via exact source identifier with symbol, canonical UUID and mapping evidence; AMBIGUOUS lists >=2 candidates and names none; UNRESOLVED/IDENTITY_UNAVAILABLE carry nothing; no fuzzy basis; market must match), derived classification (15 categories, UNKNOWN iff UNCLASSIFIED) and fixed risk_interpretation NOT_EVALUATED, trading_effect NONE, SHADOW, LIVE_MONEY=false. dedup_key per market/source/event; identity per exact revision. select_point_in_time returns, for one market, the latest revision observed at or before an aware decision_time, collapses duplicates, fails closed on available same-revision conflicts in any order, ignores later records entirely and orders deterministically. No IO, provider, storage, route, Trade Card field or caller; TradeDecision.event_risk unchanged (UNKNOWN).",
-      "files": ["app/news_event.py", "tests/test_news_event.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event.py",
+        "tests/test_news_event.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in that cycle. Committed at 46a663d by the host; the trusted profile must collect tests/test_news_event.py."
     },
     "context_projection": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event_context: news-event-context-v1 EventContext for one canonical instrument UUID at one aware decision_time, computed purely from select_point_in_time output plus an explicit versioned EventContextPolicy (lookback_seconds, max_coverage_age_seconds) and coverage_as_of (None -> UNAVAILABLE; after decision_time -> rejected). Precedence UNAVAILABLE > STALE > EVENT_FOUND > AMBIGUOUS > UNKNOWN (unattributed market events in window) > NO_EVENT_FOUND; validator recomputes status. Lists sorted relevant/ambiguous event identities, unattributed count, relevant categories; fixed INFERRED association, absence_is_proof false, NOT_EVALUATED, trading_effect NONE, SHADOW, LIVE_MONEY=false. Not attached to TradeDecision/Trade Card; event_risk unchanged (UNKNOWN); no IO, route or caller.",
-      "files": ["app/news_event_context.py", "tests/test_news_event_context.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event_context.py",
+        "tests/test_news_event_context.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_news_event_context.py."
     },
     "record_codec": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event_record: pure byte codec for retained news-event-v1 records. encode_news_event returns canonical bytes (sorted keys, compact, ASCII, no NaN, <=256 KiB) of an exact revalidated NewsEvent; their SHA-256 equals NewsEvent.identity (content address). read_retained_news_event fails closed (RetainedNewsEventError) unless bytes are bounded, match the producer digest, are strict JSON (no duplicate keys/NaN, object), validate as exact news-event-v1 and re-encode identically. Offsets preserved; select_point_in_time unchanged. No IO, store, provider, route or caller.",
-      "files": ["app/news_event_record.py", "tests/test_news_event_record.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event_record.py",
+        "tests/test_news_event_record.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_news_event_record.py."
     },
     "store": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event_store: write-once content-addressed <identity>.json store (codec bytes, 0444) in a host-provisioned absolute, non-symlink, non-group/world-writable directory; reuses publisher temp/fsync/link and loader no-follow bounded-read helpers. retain_news_event: codec round trip before any write, exclusive non-blocking lock (STORE_BUSY), full fail-closed scan (STORE_INVALID on damaged/symlink/directory/unexpected entries; leftover .publish-*.tmp tolerated), ALREADY_RETAINED for exact retry, observed_at must be within 5 minutes at or before the store clock (OBSERVED_IN_FUTURE / OBSERVATION_BACKDATED, so availability cannot be backdated), REVISION_CONFLICT for a different same-revision record, later revisions kept beside originals, MAX_RECORDS 10000, post-write verification. load_retained_news_events returns one market's records ordered by identity or fails closed; select_point_in_time unchanged. No provider, scheduler, route or caller; TradeDecision.event_risk unchanged (UNKNOWN).",
-      "files": ["app/news_event_store.py", "tests/test_news_event_store.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event_store.py",
+        "tests/test_news_event_store.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_news_event_store.py."
     },
     "card_section": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event_card.card_event_context(decision, context): pure trade-card-event-context-v1 section binding one exact revalidated EventContext to one exact revalidated TradeDecision. Fails closed on market or canonical instrument UUID mismatch and unless context decision_time is the same instant as the candidate detection time (later contexts could carry post-decision news). Labelled NEWS_EVENT_INFERENCE, observed_market_fact false, INFERRED; exposes status, news_event_as_of (coverage time), coverage, freshness NOT_CONFIGURED/STALE/WITHIN_POLICY, policy, categories, relevant/ambiguous event identities, unattributed count and canonical context SHA-256; fixed absence_is_proof false, NOT_EVALUATED, trading_effect/plan_effect NONE, SHADOW, LIVE_MONEY=false, trade_decision_event_risk UNKNOWN. Does not call or change trade_card, the plan, event_risk or card report bytes; no IO, route, page or caller.",
-      "files": ["app/news_event_card.py", "tests/test_news_event_card.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event_card.py",
+        "tests/test_news_event_card.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Host scanner_product run at fe3a6f7 (2026-11-12T10:53:52Z): 1 failed, 697 passed; the single failure was a test expectation (UTC timestamp compared via isoformat '+00:00' while the section correctly carries the context's pydantic JSON form 'Z'). Test fixed by file-only Claude paced executor to pin the retained JSON form; implementation unchanged. Re-run NOT performed in this cycle; host re-validation required."
     },
     "decision_observation": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_observation.decision_observation(decision, context, *, recorded_at): pure decision-observation-v1 record for one exact revalidated TradeDecision retaining decision id, market, symbol, canonical instrument UUID, strategy id/version/config, candidate state and SHA-256, detected/data/available/fresh_until times, exact plan terms, risk per share and provenance; optional EventContext embedded as the exact card_event_context section plus canonical SHA-256 (else NOT_ATTACHED). recorded_at must be aware, >= detection and < fresh_until, valid_until and flat_by, so recording cannot be conditioned on outcomes; clock labelled CALLER_SUPPLIED_UNVERIFIED. Fixed NOT_OBSERVED outcome, PENDING_OUTCOME, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. canonical_bytes deterministic. No IO, store, route or caller; trade_card, plan and event_risk unchanged.",
-      "files": ["app/decision_observation.py", "tests/test_decision_observation.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_observation.py",
+        "tests/test_decision_observation.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_observation.py."
     },
     "observation_store": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_observation_store: write-once content-addressed <sha256>.json store of canonical decision-observation-v1 bytes (0444), reusing news_event_store directory/lock/write-once helpers and loader no-follow bounded reads. retain_decision_observation builds the record via unchanged decision_observation with recorded_at = store clock (window enforced at retention), validates bytes through read_retained_decision_observation before any write, keeps one record per decision (retry differing only in recorded_at -> ALREADY_RETAINED with the first record; other differences -> OBSERVATION_CONFLICT), fails closed on damaged/unexpected entries or two records for one decision (STORE_INVALID). Reader checks strict canonical JSON, digest, exact field set, fixed safety values, hex ids, market, risk_per_share = entry_reference - stop > 0, aware timestamps within the recording window and attached section digest/decision binding; it does not rebuild TradeDecision. load_retained_decision_observations returns (identity, record) per market ordered by identity. No producer, scheduler, route, outcome or caller.",
-      "files": ["app/decision_observation_store.py", "tests/test_decision_observation_store.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_observation_store.py",
+        "tests/test_decision_observation_store.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_observation_store.py."
     },
     "outcome_evaluator": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome.evaluate_decision_outcome(identity, record, bars, *, assumptions, path_complete_through_at, evaluated_at): pure decision-outcome-v1 for one retained decision-observation-v1 record, re-verified against its content address via read_retained_decision_observation. Bars are exact PaperReplayBar sessions of the same instrument UUID/symbol, beginning at/after detection, available by path_complete_through_at (<= evaluated_at), strictly ascending; violations raise ValueError. Explicit versioned OutcomeAssumptions per market (entry/exit slippage and cost bps, DECLARED_UNVALIDATED). Rules decision-outcome-rules-v1: TOUCH_V1 first in-window zone touch, EGX next-session gap rules, stop before target, fill-session target only if filled at open or close >= target, gap stop at open, gap target capped, time exit at close of max_holding_sessions-th session, flat_by after fill UNEVALUABLE. Statuses CLOSED/NO_ENTRY/PENDING_PATH/UNEVALUABLE with registered reasons; metrics gross/net R in planned risk per share, cost, MAE/MFE (conservative), holding sessions; HYPOTHETICAL_FROM_SESSION_BARS, execution_evidence NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false. Path completeness, raw price basis and clock labelled caller-asserted; corporate actions NOT_CHECKED. Not reusing simulate_paper_replay because it needs a positive M5 risk admission decisions do not have. No IO, store, route, caller or aggregate metrics.",
-      "files": ["app/decision_outcome.py", "tests/test_decision_outcome.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome.py",
+        "tests/test_decision_outcome.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_outcome.py."
     },
     "aggregate_metrics": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_metrics.aggregate_decision_outcomes(population, outcomes, *, market, assumptions, as_of): pure decision-outcome-metrics-v1 for one market and one exact OutcomeAssumptions. Population (identity, record) pairs re-verified via read_retained_decision_observation, same market, recorded by as_of, unique identity/decision. Outcomes must match field set, contract/rules version and rules, fixed safety labels, exact assumptions, a population identity (one each) and its record's decision/instrument/strategy/config/detection/trigger, be evaluated by as_of and be structurally consistent; numbers not recomputed. Population without an outcome counts NOT_EVALUATED (losses cannot vanish silently). Per-segment (strategy id/version/config) only, no cross-segment headline: sample size, status/reason/exit counts, wins/losses/flat, hit rate, mean win/loss, payoff, expectancy net/gross R, total, max drawdown R (1R per decision by exit date), mean MAE/MFE, holding, missing-data rate, detection range; listed definitions, input-order independent, population/outcome digests, sample NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false. No IO, store, route or caller.",
-      "files": ["app/decision_outcome_metrics.py", "tests/test_decision_outcome_metrics.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_metrics.py",
+        "tests/test_decision_outcome_metrics.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_outcome_metrics.py."
     },
     "period_segmentation": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_periods.aggregate_decision_outcomes_by_period(population, outcomes, *, market, assumptions, as_of, policy): pure decision-outcome-period-metrics-v1. Explicit versioned EvaluationPeriodPolicy (decision-outcome-period-policy-v1; market, aware registered_at with CALLER_SUPPLIED_UNVERIFIED clock, 1-4 half-open aware periods labelled DEVELOPMENT < VALIDATION < OUT_OF_SAMPLE < FORWARD_SHADOW, unique, chronological, non-overlapping; FORWARD_SHADOW must start at/after registration; registration not after as_of; model_construct bypass revalidated). Whole input validated once by unchanged aggregate_decision_outcomes; records assigned by detected_at only (not exit/evaluation time); each period gets its own unchanged decision-outcome-metrics-v1 result; records outside every period reported as UNASSIGNED counts plus identity digest; per-period end_reached_by_as_of and REGISTERED_AT_OR_BEFORE_START/REGISTERED_AFTER_START; holdout integrity CALLER_ASSERTED_UNVERIFIED; cross_period_headline NOT_COMPUTED, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false. SYSTEM declares the component and replaces gap TIME_PERIOD_SEGMENTATION_NOT_IMPLEMENTED with EVALUATION_PERIOD_POLICY_NOT_REGISTERED. No IO, store, route, caller or registered policy.",
-      "files": ["app/decision_outcome_periods.py", "tests/test_decision_outcome_periods.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_periods.py",
+        "tests/test_decision_outcome_periods.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_outcome_periods.py and tests/test_news_event_status.py."
     },
     "sample_assessment": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_sample.assess_decision_outcome_sample(population, outcomes, *, market, assumptions, as_of, policy): pure decision-outcome-sample-assessment-v1. Explicit versioned SampleAssessmentPolicy (decision-outcome-sample-policy-v1; market, aware registered_at not after as_of, CALLER_SUPPLIED_UNVERIFIED clock, min_closed_outcomes 1..10000, exact Decimal max_missing_data_rate in [0,1], basis DECLARED_UNVALIDATED; model_construct bypass revalidated). Metrics computed by unchanged aggregate_decision_outcomes and embedded unchanged; per strategy id/version/config segment MEETS_DECLARED_MINIMUM or BELOW_DECLARED_MINIMUM with reasons CLOSED_OUTCOMES_BELOW_POLICY_MINIMUM / MISSING_DATA_RATE_ABOVE_POLICY_MAXIMUM (inclusive thresholds; NOT_EVALUATED counts as missing so omitting a loss cannot improve the state) and REGISTERED_AT_OR_BEFORE_FIRST_DETECTION / REGISTERED_AFTER_FIRST_DETECTION. statistical_significance NOT_ASSESSED, empirical_validation NOT_VALIDATED, cross_segment_headline NOT_COMPUTED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and replaces gap SAMPLE_SUFFICIENCY_POLICY_NOT_DEFINED with SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED; SYSTEM sample_assessment stays NOT_ASSESSED. No IO, store, route, caller or registered policy.",
-      "files": ["app/decision_outcome_sample.py", "tests/test_decision_outcome_sample.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_sample.py",
+        "tests/test_decision_outcome_sample.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_outcome_sample.py and tests/test_news_event_status.py."
     },
     "event_state_segmentation": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_event_states.aggregate_decision_outcomes_by_event_state(population, outcomes, *, market, assumptions, as_of): pure decision-outcome-event-state-metrics-v1. Whole input validated once by unchanged aggregate_decision_outcomes; records partitioned by retained event-context state only (NOT_ATTACHED or the attached trade-card-event-context-v1 section's event_context_status), never by outcome/exit/evaluation time; each of the 7 states always reported in fixed order with its own unchanged decision-outcome-metrics-v1 aggregate and state_counts; cross_state_headline NOT_COMPUTED. Attached sections fail closed unless card-section contract version, NEWS_EVENT_INFERENCE layer, observed_market_fact false, trading_effect NONE, record market and instrument, decision time equal to the detection instant and a registered EventContext status. absence_is_proof false, risk_interpretation NOT_EVALUATED, trading_effect NONE, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component (no gap closed or added). No IO, store, route or caller; no operational record carries an attached section yet.",
-      "files": ["app/decision_outcome_event_states.py", "tests/test_decision_outcome_event_states.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_event_states.py",
+        "tests/test_decision_outcome_event_states.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Committed at ee3b2cc by the host; host scanner_product reported PASS (805 passed, 2026-11-14T19:53:49Z) at ee3b2cc, up from 717. Per-file collection of tests/test_decision_outcome_event_states.py is not confirmed from that log tail."
     },
     "data_age_segmentation": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_data_age.aggregate_decision_outcomes_by_data_age(population, outcomes, *, market, assumptions, as_of, policy): pure decision-outcome-data-age-metrics-v1 (Phase I data quality/freshness). Explicit versioned DataAgePolicy (decision-outcome-data-age-policy-v1; market, aware registered_at not after as_of, CALLER_SUPPLIED_UNVERIFIED clock, 1-8 strictly ascending integer inclusive upper bounds in (0, 366 days], basis DECLARED_UNVALIDATED; model_construct bypass revalidated). Whole input validated once by unchanged aggregate_decision_outcomes; records assigned by retained detected_at - data_as_of (wall clock, labelled NOT_SESSION_AWARE), never outcome/exit/evaluation time; fails closed unless data_as_of <= available_at <= detected_at < fresh_until; every bucket AGE_LE_<b1>S .. AGE_GT_<bn>S always reported in fixed order with its own unchanged decision-outcome-metrics-v1 aggregate and bucket_counts; cross_bucket_headline NOT_COMPUTED; policy_registration vs first detection; age_interpretation NOT_EVALUATED, trading_effect NONE, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and adds gap DATA_AGE_POLICY_NOT_REGISTERED. No IO, store, route, caller or registered policy.",
-      "files": ["app/decision_outcome_data_age.py", "tests/test_decision_outcome_data_age.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_data_age.py",
+        "tests/test_decision_outcome_data_age.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 1f70d8c by the host. No host validation result for 1f70d8c is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_data_age.py and tests/test_news_event_status.py."
     },
     "observation_producer": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_observation_producer.produce_egx_decision_observations(directory, artifact, *, expected_sha256, evidence, now=None): decision-observation-production-v1. Re-derives exact TradeDecisions from one retained EGX-RANK-v1 artifact + RetainedEgxRankBinding via unchanged bind_retained_egx_rank_report with the card report's coverage checks (no caller-assembled decisions). Each decision whose recording window is open at the producer clock (detection <= now < fresh_until/valid_until/flat_by) is retained via unchanged retain_decision_observation with recorded_at = producer clock and no EventContext (NOT_ATTACHED); closed-window decisions are listed individually as WINDOW_CLOSED, never back-filled; exclusion counts copied. Reasons CONFIG_INVALID, BINDING_REJECTED, CLOCK_BEFORE_GENERATION, RETENTION_FAILED (store reason in detail); earlier write-once records in a failed run remain; reruns idempotent (ALREADY_RETAINED). Fixed outcome NOT_OBSERVED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and replaces gap DECISION_OBSERVATION_PRODUCER_NOT_IMPLEMENTED with DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED. No job entrypoint, scheduler, route or caller; store not provisioned.",
-      "files": ["app/decision_observation_producer.py", "tests/test_decision_observation_producer.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_observation_producer.py",
+        "tests/test_decision_observation_producer.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at b6b2d5b by the host. No host validation result for b6b2d5b is recorded in this checkpoint; the trusted profile must collect tests/test_decision_observation_producer.py and tests/test_news_event_status.py."
     },
     "observation_job": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_observation_job.run_egx_decision_observation_job / python -m app.decision_observation_job: decision-observation-job-v1 host CLI entrypoint with exactly the card-report job's arguments (--output-dir names the observation store). Reuses the card-report job's unchanged config check and _existing_database/_identity/_read_ranking helpers (as scanner_v2_evidence_retention_job already does), builds the binding with the unchanged load_retained_egx_rank_binding and the same arguments as the card-report job, then calls the unchanged produce_egx_decision_observations with its own clock. Statuses PRODUCED (exit 0), WINDOW_CLOSED_PRESENT (exit 2, late run visible), FAILED (exit 1; stage INPUT/EVIDENCE/PRODUCTION with fixed reason). performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and replaces gap DECISION_OBSERVATION_JOB_NOT_IMPLEMENTED with DECISION_OBSERVATION_JOB_NOT_SCHEDULED; scheduled stays NOT_SCHEDULED_IN_REPOSITORY, status EMPIRICAL_COLLECTION_NOT_ACTIVE. Producer docstring updated to name its only caller; producer code unchanged. No scheduler, cron, route or provisioned store.",
-      "files": ["app/decision_observation_job.py", "tests/test_decision_observation_job.py", "app/decision_observation_producer.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_observation_job.py",
+        "tests/test_decision_observation_job.py",
+        "app/decision_observation_producer.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 7cee0b5 by the host. No host validation result for 7cee0b5 is recorded in this checkpoint; the trusted profile must collect tests/test_decision_observation_job.py and tests/test_news_event_status.py."
     },
     "outcome_store": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_store: decision-outcome-retention-v1 write-once content-addressed <sha256>.json store (0444) of terminal decision-outcome-v1 results, reusing news_event_store directory/lock/write-once helpers and loader no-follow bounded reads. retain_decision_outcome(directory, observation, outcome, *, now): observation (identity, record) re-verified via read_retained_decision_observation and recorded by the store clock; outcome checked by the unchanged decision_outcome_metrics._check_outcome against it (field set, fixed safety labels, current rules, exact canonical OutcomeAssumptions of the record's market, binding, evaluated by the store clock, registered status/reason, metrics iff CLOSED); only CLOSED/NO_ENTRY/UNEVALUABLE retained (PENDING_PATH -> OUTCOME_NOT_FINAL); one outcome per (decision, exact assumptions): retry differing only in path_complete_through_at/evaluated_at/bars_supplied -> ALREADY_RETAINED with the first record, any other difference -> OUTCOME_CONFLICT (a held loss or missing-data UNEVALUABLE cannot be replaced); damaged/unexpected entries, planted non-terminal records or duplicates -> STORE_INVALID. Reader checks structure only (observation binding re-checked by aggregate_decision_outcomes). load_retained_decision_outcomes(directory, *, market, assumptions) returns one market's outcomes under one exact assumptions set ordered by observation identity. HYPOTHETICAL_FROM_SESSION_BARS, execution_evidence NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and replaces gap OUTCOME_RETENTION_NOT_IMPLEMENTED with OUTCOME_STORE_NOT_PROVISIONED. decision_outcome and decision_outcome_metrics unchanged. No producer, scheduler, route, caller or provisioned directory.",
-      "files": ["app/decision_outcome_store.py", "tests/test_decision_outcome_store.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_store.py",
+        "tests/test_decision_outcome_store.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 3066a74 by the host. No host validation result for 3066a74 is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_store.py and tests/test_news_event_status.py."
     },
     "outcome_session_bars": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_session_bars.bind_egx_outcome_session_bars(identity, record, rows, sessions, *, received_at): pure decision-outcome-session-bars-v1 binding of retained evidence into the unchanged evaluator's inputs for one retained EGX observation (re-read from exact bytes). Inputs: exact CanonicalDailyBar rows of one canonical daily artifact (uniform instrument/symbol/provider/snapshot/raw digest, matching the record), a contiguous retained MarketSession window (Africa/Cairo) and the caller-asserted receipt time of the daily bytes. path_complete_through_at = later of receipt and in-path session verification times; calendar must start on/before the detection date and end on the completion date. Each session opening at/after detection must be WEEKEND (EGX policy)/HOLIDAY without hours or bar, VERIFIED and closed by completion with exactly one VALID_EXECUTABLE bar received after close, or (final day, not VERIFIED) not closed at completion with no bar (pending_session). Missing/quarantined bars, bars on non-session days or after the calendar, duplicates, mixed artifacts, UNKNOWN/DATA_PENDING states, sessions closed after receipt, receipt before detection and naive clocks fail closed; gaps are never skipped; pre-detection rows are look-back and ignored. Bars: session_id XCAI:<date>, source_id raw digest, provenance_id <provider>:<snapshot>:row-<n>, AVAILABLE_AT_PATH_COMPLETION_V1. Report labels receipt clock CALLER_ASSERTED_UNVERIFIED, calendar admission NOT_ESTABLISHED, corporate_actions NOT_CHECKED, outcome NOT_EVALUATED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and replaces gap SESSION_BAR_SOURCE_FOR_OUTCOMES_NOT_BOUND with OUTCOME_PRODUCER_NOT_IMPLEMENTED. decision_outcome unchanged. No loader, producer, store, route, scheduler or caller.",
-      "files": ["app/decision_outcome_session_bars.py", "tests/test_decision_outcome_session_bars.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_session_bars.py",
+        "tests/test_decision_outcome_session_bars.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 2ace20e by the host. No host validation result for 2ace20e is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_session_bars.py and tests/test_news_event_status.py."
     },
     "outcome_producer": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_producer.produce_egx_decision_outcomes(observation_directory, outcome_directory, *, daily, sessions, assumptions, now=None): decision-outcome-production-v1. Composes unchanged pieces only: load_retained_decision_observations(EGX) -> load_retained_decision_outcomes (one exact OutcomeAssumptions; already-retained observations reported ALREADY_RETAINED and not re-evaluated, retained_outcome_reevaluation NOT_PERFORMED) -> bind_egx_outcome_session_bars with caller-supplied EgxDailyEvidence(rows, received_at) per instrument UUID and the retained session tuple trimmed by CALENDAR_THROUGH_RECEIPT_DATE_V1 (Cairo detection date through receipt date) -> evaluate_decision_outcome (evaluated_at = producer clock) -> retain_decision_outcome (same clock, terminal only). Per-observation statuses RETAINED, ALREADY_RETAINED, PENDING_PATH (never retained), AWAITING_DAILY_EVIDENCE (NO_DAILY_EVIDENCE/RECEIVED_BEFORE_DETECTION), OBSERVATION_AFTER_CLOCK, BINDING_REJECTED, EVALUATION_REJECTED (fail-closed message in detail); none dropped, so missing outcomes stay NOT_EVALUATED in the aggregate. Run refusals CONFIG_INVALID (relative/identical dirs, non-EGX or inexact assumptions, inexact sessions/daily mapping, naive or future receipt), OBSERVATIONS_UNAVAILABLE, OUTCOMES_UNAVAILABLE, RETENTION_FAILED. Labels CALLER_ASSERTED_UNVERIFIED receipt clock, calendar admission NOT_ESTABLISHED, corporate_actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS, execution_evidence NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component, replaces gap OUTCOME_PRODUCER_NOT_IMPLEMENTED with OUTCOME_JOB_NOT_IMPLEMENTED and adds OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED. Binding/store docstrings updated to name the caller; their code unchanged. No job entrypoint, database read, scheduler, route or provisioned directory.",
-      "files": ["app/decision_outcome_producer.py", "tests/test_decision_outcome_producer.py", "app/decision_outcome_session_bars.py", "app/decision_outcome_store.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_producer.py",
+        "tests/test_decision_outcome_producer.py",
+        "app/decision_outcome_session_bars.py",
+        "app/decision_outcome_store.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 1f09e1a by the host. No host validation result for 1f09e1a is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_producer.py and tests/test_news_event_status.py."
     },
     "outcome_daily_evidence": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_daily_evidence.load_egx_daily_evidence(database, raw_root, raw_paths): decision-outcome-daily-evidence-v1 read-only loader building the outcome producer's daily input (instrument UUID -> EgxDailyEvidence) from a caller-supplied tuple of exact data_ingestions raw paths (nothing searched for, defaulted or chosen as latest). Each path: unchanged get_manifest_by_raw_path; DAILY_BARS/D1, RECEIVED or VALIDATED, source URI present, ingestor metadata consistent (canonical lowercase UUID, symbol = manifest symbol, snapshot = manifest date, requested start <= end <= snapshot); bytes verified by ImmutableRawStore.read_verified and canonicalized by the unchanged DailyCanonicalPipeline.canonicalize_ingestion; rows must lie within requested dates; quarantined rows passed through (binding rejects them on a path); received_at = ingestion manifest receipt time (INGESTION_MANIFEST_UNVERIFIED). Whole-load refusals CONFIG_INVALID, DATABASE_UNAVAILABLE, INGESTION_UNAVAILABLE, INGESTION_REJECTED, ARTIFACT_UNREADABLE, CANONICALIZATION_REJECTED, DUPLICATE_INSTRUMENT (two named ingestions for one instrument refused, never resolved by preference). Returns provenance per path; market_membership NOT_ESTABLISHED, corporate_actions NOT_CHECKED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. Database never written. SYSTEM declares the component; gap OUTCOME_JOB_NOT_IMPLEMENTED unchanged. No job, scheduler, route or caller.",
-      "files": ["app/decision_outcome_daily_evidence.py", "tests/test_decision_outcome_daily_evidence.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_daily_evidence.py",
+        "tests/test_decision_outcome_daily_evidence.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 7e74731 by the host. No host validation result for 7e74731 is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_daily_evidence.py and tests/test_news_event_status.py."
     },
     "outcome_job": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_job.run_egx_decision_outcome_job / python -m app.decision_outcome_job: decision-outcome-job-v1 host CLI entrypoint. Arguments --db-path, --raw-root, --observation-dir, --outcome-dir, repeated --daily-raw-path, --calendar-from/--calendar-through (1..400 days) and explicit --assumptions-version/--entry-slippage-bps/--exit-slippage-bps/--cost-bps-per-side (exact EGX OutcomeAssumptions from decimal strings; no defaults). Opens the existing database with the card-report job's unchanged _existing_database, reads every calendar date with the unchanged TradingRepository.get_market_session (missing date CALENDAR_INCOMPLETE; date/timezone mismatch or unparsable row CALENDAR_ROW_REJECTED; nothing skipped or filled), loads daily evidence with the unchanged load_egx_daily_evidence and calls the unchanged produce_egx_decision_outcomes. market_sessions rows are mutable (upserted), so the calendar is labelled MARKET_SESSIONS_CURRENT_ROWS / MUTABLE_NOT_RETAINED with the SHA-256 of the exact session JSON read. Statuses PRODUCED (exit 0; waiting PENDING_PATH/AWAITING_DAILY_EVIDENCE allowed), REJECTIONS_PRESENT (exit 2; any OBSERVATION_AFTER_CLOCK/BINDING_REJECTED/EVALUATION_REJECTED), FAILED (exit 1; stage INPUT/CALENDAR/DAILY_EVIDENCE/PRODUCTION). Daily-evidence provenance returned; corporate_actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS, execution_evidence NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component, replaces gap OUTCOME_JOB_NOT_IMPLEMENTED with OUTCOME_JOB_NOT_SCHEDULED and adds OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS. Producer/loader docstrings name the caller; their code unchanged. No scheduler, cron, route or provisioned directory.",
-      "files": ["app/decision_outcome_job.py", "tests/test_decision_outcome_job.py", "app/decision_outcome_producer.py", "app/decision_outcome_daily_evidence.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_job.py",
+        "tests/test_decision_outcome_job.py",
+        "app/decision_outcome_producer.py",
+        "app/decision_outcome_daily_evidence.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_decision_outcome_job.py and tests/test_news_event_status.py."
     },
     "outcome_calendar_chain": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_calendar.chain_egx_calendar_observations(observations, *, as_of): pure decision-outcome-calendar-chain-v1. Takes a tuple of RetainedCalendarObservation (artifact_sha256, session, exact artifact bytes, aware observed_at: the write-once calendar_observations columns) and returns a contiguous MarketSession tuple for the unchanged outcome producer/binding plus a report. Each observation re-validated by the unchanged project_egx_calendar with decision_time = its own observed_at (OBSERVATION_REJECTED on digest/contiguity/weekend/hours/verification/after-next-open failures); ordered by session (input order irrelevant); DUPLICATE_SESSION refused, never resolved by preference; next_session must equal the next observation's session (CHAIN_NOT_CONTIGUOUS); observed after as_of -> OBSERVED_AFTER_CLOCK; >400 days CHAIN_TOO_LONG; bad types CONFIG_INVALID. UNKNOWN schedule rows superseded by the later VERIFIED row, changed hours listed in schedule_revisions; last observation's UNKNOWN row kept as the final pending day. Report: sessions_sha256 (same formula as the job's calendar digest), per-observation provenance, CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED, admission NOT_ESTABLISHED, outcome NOT_EVALUATED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS kept because the outcome job does not use it yet. No IO, database read, loader, job wiring, scheduler, route or caller.",
-      "files": ["app/decision_outcome_calendar.py", "tests/test_decision_outcome_calendar.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_calendar.py",
+        "tests/test_decision_outcome_calendar.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 9313424 by the host. No host validation result for 9313424 is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_calendar.py and tests/test_news_event_status.py."
     },
     "outcome_calendar_loader": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_calendar_loader.load_egx_calendar_observations(database, artifact_digests): decision-outcome-calendar-observations-v1 read-only loader returning the unchanged chain's RetainedCalendarObservation tuple for a caller-named tuple of 1..400 unique lowercase SHA-256 digests (nothing searched, ranged, defaulted or chosen as latest). Reads only calendar_observations (never market_sessions) in one connection; missing database file refused before connecting (nothing created). Each row must exist (OBSERVATION_UNAVAILABLE); artifact must be a BLOB of 1..64 KiB hashing to the named digest, session an exact ISO date and observed_at an offset-bearing ISO timestamp (OBSERVATION_REJECTED); SQLite/OS errors DATABASE_UNAVAILABLE; bad input CONFIG_INVALID; whole load refused on any failure. Caller order kept (chain orders/validates); per-digest provenance (stored observed_at text, byte length); labels CALLER_NAMED_DIGESTS, CALENDAR_OBSERVATIONS_RETAINED/WRITE_ONCE_RETAINED, REPOSITORY_CLOCK_UNVERIFIED, NOT_PERFORMED_BY_LOADER, admission NOT_ESTABLISHED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS kept because the outcome job does not use it yet. No job wiring, scheduler, route or caller; chain and repository unchanged.",
-      "files": ["app/decision_outcome_calendar_loader.py", "tests/test_decision_outcome_calendar_loader.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_calendar_loader.py",
+        "tests/test_decision_outcome_calendar_loader.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 71e5c3c by the host. No host validation result for 71e5c3c is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_calendar_loader.py and tests/test_news_event_status.py."
     },
     "outcome_job_retained_calendar": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_job bumped to decision-outcome-job-v2: the job no longer reads mutable market_sessions rows (TradingRepository.get_market_session, --calendar-from/--calendar-through, CALENDAR_INCOMPLETE/CALENDAR_ROW_REJECTED and MAX_CALENDAR_DAYS removed). It takes repeated --calendar-observation digests (1..400 unique lowercase SHA-256, else CONFIG_INVALID at INPUT), samples one aware job clock (now, default real UTC; naive refused) and calls the unchanged load_egx_calendar_observations(database, calendar_observations) then chain_egx_calendar_observations(..., as_of=now) before the unchanged daily loader, and passes chained sessions and the same now to the unchanged producer. Loader/chain refusals propagate with their own reasons and main reports them as stage CALENDAR (exit 1) before daily evidence is read. Result calendar: loader schema, CALLER_NAMED_DIGESTS, per-digest sources, REPOSITORY_CLOCK_UNVERIFIED, full chain report (sessions_sha256, as_of, observations, schedule_revisions), CALENDAR_OBSERVATIONS_RETAINED / WRITE_ONCE_RETAINED, admission NOT_ESTABLISHED. Safety labels unchanged (corporate actions NOT_CHECKED, HYPOTHETICAL_FROM_SESSION_BARS, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED). SYSTEM declares decision-outcome-job-v2 and removes gap OUTCOME_CALENDAR_FROM_MUTABLE_SESSIONS; OUTCOME_JOB_NOT_SCHEDULED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept. Chain/loader docstrings name the job as only caller; their code unchanged. Tests retain three calendar observations through the unchanged TradingRepository.retain_calendar_observation with a patched repository clock, and show later market_sessions upserts/deletes cannot change the outcome, missing links/unknown/tampered/late observations refuse before daily evidence, order independence and one shared clock in the CLI. No scheduler, cron, route or provisioned directory.",
-      "files": ["app/decision_outcome_job.py", "tests/test_decision_outcome_job.py", "app/decision_outcome_calendar.py", "app/decision_outcome_calendar_loader.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_job.py",
+        "tests/test_decision_outcome_job.py",
+        "app/decision_outcome_calendar.py",
+        "app/decision_outcome_calendar_loader.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 962f465 by the host. No host validation result for 962f465 is recorded in this checkpoint; the trusted profile must collect tests/test_decision_outcome_job.py and tests/test_news_event_status.py (and still tests/test_decision_outcome_calendar.py, tests/test_decision_outcome_calendar_loader.py)."
     },
     "outcome_corporate_actions_check": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_corporate_actions.check_egx_outcome_corporate_actions(identity, record, evidence, *, source_ingestion_id, review_ingestion_ids, path_through, as_of): pure decision-outcome-corporate-actions-v1 check of one retained EGX decision-observation-v1 record (re-read from exact bytes) against one exact egx-actions-v1 ActionEvidence document (the complete, bounded, reviewed coverage the existing ReferenceRepository.actions selects point-in-time; revalidated, so model_construct bypass is rejected). Window DATA_AS_OF_DATE_THROUGH_PATH_DATE_INCLUSIVE_V1 (Cairo data_as_of date through path_through, inclusive, which errs toward ACTIONS_IN_PATH). Fails closed on edited/non-EGX record, instrument mismatch, coverage not spanning the window, evidence published after as_of, path date before detection or after as_of, non-canonical/duplicate source/review UUIDs or review equal to source, naive clocks. Result CLEAR (clear_basis COMPLETE_DECLARED_COVERAGE) or ACTIONS_IN_PATH listing every in-window action of any type in date order with its declared adjustment effect; price_adjustment NOT_APPLIED, outcome NOT_EVALUATED, review ids CALLER_ASSERTED_UNVERIFIED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept because no loader, producer, job, evaluator or store uses it yet (all unchanged, still NOT_CHECKED). No IO, route, scheduler or caller.",
-      "files": ["app/decision_outcome_corporate_actions.py", "tests/test_decision_outcome_corporate_actions.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_corporate_actions.py",
+        "tests/test_decision_outcome_corporate_actions.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor. Host scanner_product run at HEAD 962f465 with this WIP (2026-11-17T18:49Z): 1 failed, 993 passed; the failure was a test defect: test_provenance_ids_fail_closed used SOURCE.upper() where SOURCE = str(UUID(int=101)) has no hex letters, so the 'non-canonical' id was actually canonical. Fixed in a follow-up paced cycle by using a hex-letter id (UUID(int=0xabc)) for upper-case, brace, hyphen-less, URN and non-canonical-review cases plus a positive canonical-hex acceptance test; production code unchanged. Fix NOT run in that cycle; host re-validation required."
     },
     "outcome_action_evidence_loader": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_action_evidence.load_egx_outcome_action_evidence(database, raw_root, requests, *, as_of): decision-outcome-action-evidence-v1 loader supplying the corporate-action check's evidence/source/review inputs. requests = tuple of 1..1000 caller-named (observation identity, retained record, path_through) triples, unique identities; each record re-read by the check's own _record (content address, EGX); window = the check's WINDOW_RULE (Cairo data_as_of date through path_through), path_through between detection date and as_of date (CONFIG_INVALID). Selection delegated only to the unchanged ReferenceRepository.actions(instrument_id, start, end, as_of) (exactly one validated, reviewed egx-actions-v1 document received/completed/published by as_of spanning the window); missing/partial/overlapping/unreviewed/damaged -> ACTIONS_UNAVAILABLE, never resolved by preference; returned document/source/review ids re-checked (ACTIONS_REJECTED). Missing database file refused before connecting (DATABASE_UNAVAILABLE, nothing created); no SQL of its own; no writes on success; on refusal the unchanged repository may record its existing data_quality_issues audit row (labelled, not suppressed). Returns per-identity OutcomeActionSelection(evidence, source_ingestion_id, review_ingestion_ids) plus per-request provenance in caller order; labels NOT_PERFORMED_BY_LOADER check, REFERENCE_REPOSITORY_REQUIRE_REVIEW, reviewer authority NOT_ATTESTED, price_adjustment NOT_APPLIED, outcome NOT_EVALUATED, database_writes NONE_ON_SUCCESS, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. Does not call the check. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept (no producer/job/evaluator/store uses it). Check, repository, producer, job and store unchanged. No job wiring, scheduler, route or caller.",
-      "files": ["app/decision_outcome_action_evidence.py", "tests/test_decision_outcome_action_evidence.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_action_evidence.py",
+        "tests/test_decision_outcome_action_evidence.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at a27f241 by the host. No host validation result for a27f241 is recorded in this checkpoint (last recorded scanner_product PASS: 1012 passed at fc903e4); the trusted profile must collect tests/test_decision_outcome_action_evidence.py and tests/test_news_event_status.py (tests use a real initialized temporary Database and ReferenceRepository.ingest with the real receipt clock, so as_of follows datetime.now)."
     },
     "outcome_producer_action_gate": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_producer bumped to decision-outcome-production-v2: optional actions mapping (observation identity -> exact OutcomeActionSelection from the action-evidence loader; else CONFIG_INVALID). Without it v1 behaviour is unchanged and the run says corporate_actions NOT_CHECKED. With it, each terminal outcome is passed before retention to the unchanged pure check_egx_outcome_corporate_actions with path_through = Cairo date of the binding's path_complete_through_at (PATH_COMPLETION_DATE_CAIRO_V1) and as_of = producer clock; only CLEAR is retained. New per-observation statuses ACTIONS_IN_PATH (full check report kept in the entry), AWAITING_ACTION_EVIDENCE/NO_ACTION_EVIDENCE and ACTION_CHECK_REJECTED are never retained, so the unchanged aggregate counts them NOT_EVALUATED; PENDING_PATH not checked; hypothetical outcome status stays visible. Result adds corporate_action_window_rule, corporate_action_path_rule, action_selections_without_observation, retained_outcome_corporate_actions NOT_RECORDED_IN_OUTCOME and price_adjustment NOT_APPLIED; CHECKED_BEFORE_RETENTION when selections supplied. Check, loader, binding, evaluator, store and job code unchanged (the job passes no actions). SYSTEM declares decision-outcome-production-v2; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept (job does not supply selections and retained decision-outcome-v1 records do not carry the check).",
-      "files": ["app/decision_outcome_producer.py", "tests/test_decision_outcome_producer.py", "tests/test_decision_outcome_job.py", "app/decision_outcome_corporate_actions.py (docstring only)", "app/decision_outcome_action_evidence.py (docstring only)", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_producer.py",
+        "tests/test_decision_outcome_producer.py",
+        "tests/test_decision_outcome_job.py",
+        "app/decision_outcome_corporate_actions.py (docstring only)",
+        "app/decision_outcome_action_evidence.py (docstring only)",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at 72d0dab by the host. No host validation result for 72d0dab is recorded in this checkpoint; host validation required: tests/test_decision_outcome_producer.py (new gate tests reuse fixtures from tests/test_decision_outcome_corporate_actions.py and tests/test_decision_outcome_session_bars.py), tests/test_decision_outcome_job.py (schema now v2) and tests/test_news_event_status.py."
     },
     "outcome_action_evidence_by_request": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_action_evidence.load_egx_outcome_action_evidence_by_request (decision-outcome-action-evidence-by-request-v1): same arguments, request checks and unchanged ReferenceRepository.actions selection as v1, but ACTIONS_UNAVAILABLE/ACTIONS_REJECTED are reported on that request's own sources entry (status, detail, identity/window kept, selection fields None) and the request gets no selection (so the producer gate reports AWAITING_ACTION_EVIDENCE for it); CONFIG_INVALID (all requests checked before the database opens) and DATABASE_UNAVAILABLE (missing file, SQLite error) still refuse the whole load. request_counts per status; database_writes NONE or REPOSITORY_AUDIT_ROWS_POSSIBLE_FOR_REFUSED_REQUESTS; refusal_scope PER_REQUEST_EVIDENCE_ONLY; other labels as v1. v1 function refactored into shared helpers (_checked, _request_entry, _source) with unchanged output. Resolves half of the job-wiring design issue (one missing document no longer blocks all observations); the path_through choice remains open. No caller; job, producer, check, repository and SYSTEM declarations unchanged; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_action_evidence.py", "tests/test_decision_outcome_action_evidence.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_action_evidence.py",
+        "tests/test_decision_outcome_action_evidence.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; committed at dd8b7d7 by the host. Host validation required: tests/test_decision_outcome_action_evidence.py (6 new by-request tests plus the unchanged v1 tests) and tests/test_news_event_status.py (source-level guards over the module)."
     },
     "outcome_job_corporate_action_wiring": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "decision-outcome-job-v3: opt-in --check-corporate-actions (check_corporate_actions=True) builds ACTION_REQUEST_SCOPE requests (observations recorded at or before the job clock, no retained outcome under these assumptions, daily evidence received at/after detection and not after the clock) with path_through = Cairo date of that daily evidence's receipt (ACTION_PATH_THROUGH_RULE, never before the producer's check date), calls the unchanged load_egx_outcome_action_evidence_by_request at the single job clock and passes its selections unchanged to the producer gate (actions=). Default run is v2 behaviour (action_evidence None, NOT_CHECKED). New failure stage ACTION_EVIDENCE; ACTION_CHECK_REJECTED counts as a rejection (exit 2). No check, selection or price logic in the job; retained outcomes still do not record the check, so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED stays open; not scheduled.",
-      "files": ["app/decision_outcome_job.py", "app/decision_outcome_producer.py", "app/decision_outcome_action_evidence.py", "app/news_event_status.py", "tests/test_decision_outcome_job.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_job.py",
+        "app/decision_outcome_producer.py",
+        "app/decision_outcome_action_evidence.py",
+        "app/news_event_status.py",
+        "tests/test_decision_outcome_job.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Host scanner_product at dd8b7d7 + this WIP (2026-11-19T01:14:10Z): 1 failed, 1036 passed; the single failure was tests/test_news_event_status.py::test_declared_gaps_match_the_code still pinning the v2 producer call (no actions=) and asserting 'actions=' not in the job. Test updated by file-only Claude paced executor to pin the v3 wiring (by-request loader at as_of=now inside the opt-in branch, exactly one actions= argument, no check call and no v1 loader call in the job); loader docstring de-staled. Host scanner_product re-run with the fix (head dd8b7d7 + WIP, 2026-11-19T07:17:10Z): PASS, 1037 passed; committed at 19d1334."
     },
     "outcome_action_attestation": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_action_attestation (decision-outcome-action-attestation-v1): pure sidecar record making checked outcomes distinguishable without changing decision-outcome-v1, the outcome store or the aggregate. attest_outcome_corporate_actions(outcome_identity, outcome, observation, check) re-reads the terminal outcome via the unchanged read_retained_decision_outcome at its content address, re-binds it to the EGX observation (re-read from exact bytes) with the unchanged _check_outcome, and structurally re-checks one exact CLEAR decision-outcome-corporate-actions-v1 report: exact field sets, fixed safety labels, no actions, COMPLETE_DECLARED_COVERAGE, same observation/decision/symbol/instrument, window DATA_AS_OF_DATE_THROUGH_PATH_DATE_INCLUSIVE_V1 from the Cairo data_as_of date to exactly the Cairo date of the outcome's path_complete_through_at (PATH_COMPLETION_DATE_CAIRO_V1; shorter/longer refused), coverage spanning it, evidence published by check as_of, canonical sorted unique reviews distinct from source, check as_of not before evaluated_at. ACTIONS_IN_PATH never attestable. Record: identities, segment, assumptions version, outcome status/times, rules, CLEAR, check_as_of, check_timing AT_EVALUATION/AFTER_EVALUATION, embedded check + canonical SHA-256, check_recomputation NOT_PERFORMED, review ids CALLER_ASSERTED_UNVERIFIED, price_adjustment NOT_APPLIED, HYPOTHETICAL_FROM_SESSION_BARS, execution_evidence NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. verify_outcome_action_attestation rebuilds from the embedded check and compares canonical bytes. SYSTEM declares the component; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept (nothing builds, retains or reads attestations). No IO, store, producer/job wiring, route or scheduler.",
-      "files": ["app/decision_outcome_action_attestation.py", "tests/test_decision_outcome_action_attestation.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_action_attestation.py",
+        "tests/test_decision_outcome_action_attestation.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_action_attestation.py (fixture is a real CLEAR-gated producer run reusing tests/test_decision_outcome_producer.py, tests/test_decision_outcome_corporate_actions.py and tests/test_decision_outcome_session_bars.py helpers) and tests/test_news_event_status.py (new source-level guard; component declaration). Committed at 526fc30 by the host; the host validation result for that commit is not recorded in the context this checkpoint was written from."
     },
     "outcome_attestation_store": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_attestation_store (decision-outcome-attestation-retention-v1): write-once content-addressed SIDECAR store for decision-outcome-action-attestation-v1 records in a separate host-provisioned directory (reuses news_event_store _open_directory/_write_once and the card-report loader's bounded no-follow read, same layout/lock/post-write verification as the outcome store). retain_outcome_action_attestation(directory, attestation, outcome_pair, observation_pair, *, now) re-derives the record with the unchanged verify_outcome_action_attestation and refuses a check as_of after the store clock before any write (RECORD_REJECTED); one attestation per outcome identity: exact retries and retries differing only in check time (check_as_of, check_timing, embedded check as_of, check_sha256) are ALREADY_RETAINED with the first record, any other difference is ATTESTATION_CONFLICT. read_retained_outcome_attestation / load_retained_outcome_attestations check structure only (field set, fixed safety labels, terminal outcome status, check-timing consistency, embedded check field set/labels/digest/as_of/identity fields); two attestations for one outcome, outcome records or unexpected entries in the directory fail closed (STORE_INVALID). A loaded attestation is not evidence until re-verified against its retained outcome and observation; a missing attestation means unattested, never clear. Result labels store_clock CALLER_SUPPLIED_UNVERIFIED, NOT_APPLIED, HYPOTHETICAL_FROM_SESSION_BARS, NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component and new gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept. No producer/job wiring, provider, scheduler, route or caller; decision-outcome-v1, the outcome store, attestation module and aggregate unchanged.",
-      "files": ["app/decision_outcome_attestation_store.py", "tests/test_decision_outcome_attestation_store.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_attestation_store.py",
+        "tests/test_decision_outcome_attestation_store.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_attestation_store.py (reuses the real CLEAR-gated producer fixture 'checked' and 'report' from tests/test_decision_outcome_action_attestation.py) and tests/test_news_event_status.py (new component declaration, new gap, new source-level guard)."
     },
     "outcome_attestation_partition": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_attested: pure decision-outcome-attestation-partition-v1 reader over the unchanged loaders' output. partition_egx_attested_outcomes(population, outcomes, attestations) re-reads every observation and outcome at its content address (EGX only), re-binds each outcome to its population observation with the unchanged metrics check, re-reads each attestation with the unchanged store reader, fails closed on duplicates, an outcome without its observation or two attestations for one outcome, then labels each outcome ATTESTED_CLEAR (unchanged verify_outcome_action_attestation passes), UNATTESTED (NOT_CHECKED_NOT_CLEAR, absence_is_proof false) or ATTESTATION_INVALID (visible, never attested); counts always add up, attestations for outcomes not supplied are listed separately. attested_clear_outcomes returns fresh copies of only ATTESTED_CLEAR records for aggregate_decision_outcomes, where the rest count NOT_EVALUATED. Check not re-run; no IO, write, caller, route or scheduler; gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_attested.py", "tests/test_decision_outcome_attested.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_attested.py",
+        "tests/test_decision_outcome_attested.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_attested.py (reuses fixture 'checked' and 'report' from tests/test_decision_outcome_action_attestation.py) and tests/test_news_event_status.py (new component declaration and source-level guard). Committed at 10c4c5a by the host; the host validation result for that commit is not recorded in the context this checkpoint was written from."
     },
     "producer_attestation_step": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "decision-outcome-production-v3: produce_egx_decision_outcomes gains opt-in attestation_directory (requires actions; absolute and distinct from the observation and outcome stores, else CONFIG_INVALID). The sidecar is loaded structure-only before any evaluation (ATTESTATIONS_UNAVAILABLE refuses the run before any write). For an outcome this run retained after a CLEAR check (store RETAINED, or ALREADY_RETAINED with this run's exact bytes; otherwise RETAINED_OUTCOME_DIFFERS) the unchanged attest_outcome_corporate_actions binds retained outcome, observation and the entry's exact CLEAR report and the unchanged retain_outcome_action_attestation retains it with the same clock (AT_EVALUATION). Per-entry attestation_status/identity/detail, run-level attestation_counts, outcome_attestation NOT_REQUESTED/ATTESTED_AFTER_CLEAR_RETENTION, held_outcome_attestation NOT_PERFORMED. Builder refusal -> ATTESTATION_REJECTED per observation (outcome stays retained, UNATTESTED); sidecar store refusal -> run aborts ATTESTATION_FAILED (earlier writes kept). Outcomes held before the run are not re-checked or attested, so they stay UNATTESTED (never clear) for the partition. Default behaviour unchanged apart from the version and new null/NOT_REQUESTED fields. The job never passes attestation_directory; gaps OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED and OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED kept. No price adjustment, no route/scheduler; SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.",
-      "files": ["app/decision_outcome_producer.py", "tests/test_decision_outcome_producer.py", "tests/test_decision_outcome_job.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_producer.py",
+        "tests/test_decision_outcome_producer.py",
+        "tests/test_decision_outcome_job.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_producer.py (5 new tests incl. monkeypatched sidecar refusal and builder refusal), tests/test_decision_outcome_job.py (v3 schema, attestation NOT_REQUESTED), tests/test_news_event_status.py (v3 declaration; producer now allowed to reference the attestation builder/store, job still forbidden), plus regression of tests/test_decision_outcome_action_attestation.py, tests/test_decision_outcome_attestation_store.py and tests/test_decision_outcome_attested.py, which reuse producer fixtures. Committed at 7a95d84 by the host; the host validation result for that commit is not recorded in the context this checkpoint was written from."
     },
     "outcome_job_attestation_wiring": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "decision-outcome-job-v4: run_egx_decision_outcome_job gains opt-in attestation_directory (CLI --attestation-dir), accepted only with check_corporate_actions=True, absolute and distinct (normpath) from the observation and outcome stores, else OutcomeJobError CONFIG_INVALID at stage INPUT before the database is opened. The directory is passed unchanged to the producer's decision-outcome-production-v3 attestation step (the job builds, loads, verifies and partitions no attestation itself). ATTESTATION_REJECTED / RETAINED_OUTCOME_DIFFERS attestation statuses count as rejections (REJECTED_ATTESTATION_STATUSES; exit 2); ATTESTATIONS_UNAVAILABLE / ATTESTATION_FAILED fail at stage PRODUCTION. Result adds top-level outcome_attestation (producer label). Default run is exactly v3 (NOT_REQUESTED). Held outcomes are still never attested and nothing reads attestations for metrics, so gaps OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED and OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED are kept; not scheduled; no price adjustment; SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.",
-      "files": ["app/decision_outcome_job.py", "app/decision_outcome_producer.py (docstring only)", "app/news_event_status.py", "tests/test_decision_outcome_job.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_job.py",
+        "app/decision_outcome_producer.py (docstring only)",
+        "app/news_event_status.py",
+        "tests/test_decision_outcome_job.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_job.py (v4 schema; 5 new tests: config refusals, opt-in CLEAR retention with one sidecar attestation partitioning ATTESTED_CLEAR and idempotent rerun, held unchecked outcome stays UNATTESTED, monkeypatched builder refusal exits 2, CLI INPUT/PRODUCTION failure stages and successful opt-in CLI run; plus one new parametrized config case) and tests/test_news_event_status.py (v4 declaration; producer call pin now includes attestation_directory; job may only pass the directory through and must not reference attestation builder/store/loader/verifier/partition). Committed at 163411b by the host."
     },
     "producer_held_outcome_recheck": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "decision-outcome-production-v4: produce_egx_decision_outcomes gains opt-in attest_held_outcomes=False (bool; True requires attestation_directory, which requires actions, else CONFIG_INVALID). Rule HELD_RECHECK_AFTER_EVALUATION_V1: for each observation whose outcome is already held when the run starts, the unchanged check_egx_outcome_corporate_actions runs over that held outcome's own path (path_through = Cairo date of its path_complete_through_at) with as_of = producer clock (shared helper _action_report also used by the v2 gate); only CLEAR is attested by the unchanged v3 _attest builder/store path (check_timing AFTER_EVALUATION; a clock before the held evaluation is refused). New attestation statuses HELD_AWAITING_ACTION_EVIDENCE / HELD_ACTIONS_IN_PATH (report kept) / HELD_CHECK_REJECTED (detail kept) leave the held outcome UNATTESTED. Run fields held_outcome_attestation (NOT_PERFORMED or HELD_RECHECK_AFTER_EVALUATION_V1) and held_outcomes_rechecked (null when off). Held outcomes are never re-evaluated, re-retained, replaced or adjusted; entry status stays ALREADY_RETAINED. Default behaviour unchanged apart from the version and the new null field. The job never passes attest_held_outcomes (and requests no selection for held outcomes); gaps OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED and OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED kept. SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.",
-      "files": ["app/decision_outcome_producer.py", "app/news_event_status.py", "tests/test_decision_outcome_producer.py", "tests/test_decision_outcome_job.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_producer.py",
+        "app/news_event_status.py",
+        "tests/test_decision_outcome_producer.py",
+        "tests/test_decision_outcome_job.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_producer.py (v4 schema; 4 new tests: held CLEAR re-check attested AFTER_EVALUATION and partitioned ATTESTED_CLEAR with idempotent later re-check, parametrized HELD_AWAITING_ACTION_EVIDENCE / HELD_ACTIONS_IN_PATH / HELD_CHECK_REJECTED stay UNATTESTED with outcome store unchanged, clock before held evaluation -> ATTESTATION_REJECTED, opt-in config refusals and explicit False = v3 behaviour), tests/test_decision_outcome_job.py (production v4 schema; job never passes attest_held_outcomes), tests/test_news_event_status.py (v4 declaration; job must not reference attest_held_outcomes). Committed at 25fc4bb by the host; the host validation result for that commit is not recorded in the context this checkpoint was written from."
     },
     "outcome_job_held_recheck_wiring": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "decision-outcome-job-v5: run_egx_decision_outcome_job gains opt-in attest_held_outcomes=False (CLI --attest-held-outcomes; bool; True requires attestation_directory, which requires check_corporate_actions, else OutcomeJobError CONFIG_INVALID at stage INPUT before the database is opened). With it _action_requests also emits one request per observation whose terminal outcome is already held under the run's assumptions (HELD_REQUEST_SCOPE OUTCOMES_HELD_UNDER_THESE_ASSUMPTIONS_V1) with path_through = Africa/Cairo date of that held outcome's own path_complete_through_at (HELD_PATH_THROUGH_RULE HELD_PATH_COMPLETION_DATE_CAIRO_V1, the exact window of the producer's HELD_RECHECK_AFTER_EVALUATION_V1 re-check), through the same single unchanged load_egx_outcome_action_evidence_by_request call at the job clock, and the flag is passed unchanged to produce_egx_decision_outcomes. HELD_CHECK_REJECTED joins REJECTED_ATTESTATION_STATUSES (exit 2); HELD_AWAITING_ACTION_EVIDENCE / HELD_ACTIONS_IN_PATH are visible, not rejections. action_evidence adds held_request_scope / held_path_through_rule (null when off); result adds top-level held_outcome_attestation (producer label). The job reads no attestation, so every held outcome is requested on every such run (re-attestation ALREADY_RETAINED); new plus held requests above MAX_REQUESTS or a job clock Cairo date before a held path date fail at ACTION_EVIDENCE (loader CONFIG_INVALID). Default run is exactly v4 (producer gets attest_held_outcomes=False, NOT_PERFORMED). Held outcomes never re-evaluated, rewritten or price-adjusted. Nothing reads attestations for metrics and nothing schedules the job, so gaps OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED, OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED and OUTCOME_JOB_NOT_SCHEDULED are kept. SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.",
-      "files": ["app/decision_outcome_job.py", "app/decision_outcome_producer.py (docstring only)", "app/news_event_status.py", "tests/test_decision_outcome_job.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_job.py",
+        "app/decision_outcome_producer.py (docstring only)",
+        "app/news_event_status.py",
+        "tests/test_decision_outcome_job.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_job.py (v5 schema; default producer call pins attest_held_outcomes False; 4 new parametrized config cases; 6 new tests: config refusals without an attestation directory, opt-in held CLEAR re-check requested through 2026-11-09 and attested AFTER_EVALUATION with partition ATTESTED_CLEAR and idempotent later run, parametrized HELD_AWAITING_ACTION_EVIDENCE / HELD_ACTIONS_IN_PATH (exit 0) / HELD_CHECK_REJECTED (exit 2) staying UNATTESTED with the outcome store unchanged, CLI flag refusal and success; v4 held-unchecked test now also asserts no request without the flag) and tests/test_news_event_status.py (v5 declaration; producer call pin includes attest_held_outcomes; job may reference attest_held_outcomes= only in signature default, producer call and CLI call)."
     },
     "checked_outcome_metrics": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_checked_metrics (decision-outcome-checked-metrics-v1): first caller of the attestation partition for metrics; pure. aggregate_egx_checked_decision_outcomes(population, outcomes, attestations, *, assumptions, as_of) runs the unchanged aggregate_decision_outcomes over ALL supplied outcomes as an integrity gate only (result discarded; unrestricted_metrics NOT_REPORTED), then the unchanged partition_egx_attested_outcomes / attested_clear_outcomes, then point-in-time rule CHECK_AS_OF_AT_OR_BEFORE_AS_OF_V1 (an ATTESTED_CLEAR outcome counts only if its attestation check_as_of <= as_of; later checks are ATTESTED_CLEAR_AFTER_AS_OF, listed, not counted; attestation retention time not recorded and NOT checked), then the unchanged aggregate again with the SAME population and only counted outcomes, so UNATTESTED / ATTESTATION_INVALID / late-attested / missing outcomes are NOT_EVALUATED and cannot hide a loss. Report embeds partition and restricted metrics, attestation_counts summing to outcomes supplied, population/attestation completeness CALLER_ASSERTED_UNVERIFIED, check NOT_PERFORMED, NOT_APPLIED, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. SYSTEM declares the component; no job, route, scheduler or store read runs it, so gap OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED is kept.",
-      "files": ["app/decision_outcome_checked_metrics.py", "tests/test_decision_outcome_checked_metrics.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_checked_metrics.py",
+        "tests/test_decision_outcome_checked_metrics.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_checked_metrics.py (reuses fixture 'checked' and 'report' from tests/test_decision_outcome_action_attestation.py; attested counted, unattested and invalid NOT_EVALUATED, later check excluded at NOW and counted at LATER, fail-closed integrity, determinism) and tests/test_news_event_status.py (new component declaration and source-level guard)."
     },
     "checked_metrics_job": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_metrics_job (decision-outcome-metrics-job-v1): read-only host CLI entrypoint python -m app.decision_outcome_metrics_job --observation-dir --outcome-dir --attestation-dir --as-of <aware ISO> plus explicit outcome assumptions (outcome job's outcome_assumptions, no defaults). Requires three absolute distinct directories and an aware as_of at or before the job clock (naive/future CONFIG_INVALID at INPUT). Loads with the unchanged load_retained_decision_observations / load_retained_decision_outcomes / load_retained_outcome_attestations (any refusal: STORES stage with loader reason). Point-in-time selection RECORDED_AND_EVALUATED_AT_OR_BEFORE_AS_OF_V1 (observations recorded_at <= as_of, outcomes evaluated_at <= as_of; excluded identities listed; observation whose outcome was evaluated later stays in population as NOT_EVALUATED; record clocks, not retention times). All attestations passed to the unchanged aggregate_egx_checked_decision_outcomes (its CHECK_AS_OF rule applies); integrity refusal METRICS_REJECTED at METRICS. Opens no database, writes nothing (writes NONE), not scheduled, no route. Exit 0 REPORTED / 1 FAILED. SYSTEM declares the component and new gap OUTCOME_METRICS_JOB_NOT_SCHEDULED; OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_metrics_job.py", "tests/test_decision_outcome_metrics_job.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_metrics_job.py",
+        "tests/test_decision_outcome_metrics_job.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_metrics_job.py (reuses fixture 'checked' from tests/test_decision_outcome_action_attestation.py; report equals the pure caller, stores unchanged, unattested NOT_EVALUATED, late outcome and late observation excluded visibly, input refusals, CLI exit codes and store refusals) and tests/test_news_event_status.py (component declaration, new gap and source-level read-only guard). Committed at 8ab0d7e by the host."
     },
     "checked_period_metrics": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_checked_periods (decision-outcome-checked-period-metrics-v1): pure aggregate_egx_checked_decision_outcomes_by_period(population, outcomes, attestations, *, assumptions, as_of, policy) composes select_egx_checked_outcomes (steps 1-3 of decision-outcome-checked-metrics-v1 extracted as a shared helper; the checked report is unchanged) with the unchanged aggregate_decision_outcomes_by_period over the SAME population and only outcomes attested CLEAR with check_as_of <= as_of, under a caller-supplied EGX EvaluationPeriodPolicy. Unattested / invalid / later-attested / missing outcomes stay NOT_EVALUATED inside their period or UNASSIGNED. Whole-input attestation counts only (per_period_attestation_counts NOT_REPORTED), cross_period_headline NOT_COMPUTED, holdout CALLER_ASSERTED_UNVERIFIED, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. No caller (metrics job unchanged), no IO; SYSTEM declares the component; gaps EVALUATION_PERIOD_POLICY_NOT_REGISTERED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_checked_periods.py", "app/decision_outcome_checked_metrics.py", "tests/test_decision_outcome_checked_periods.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_checked_periods.py",
+        "app/decision_outcome_checked_metrics.py",
+        "tests/test_decision_outcome_checked_periods.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_checked_periods.py (new; reuses fixtures 'checked' and 'report' from tests/test_decision_outcome_action_attestation.py: attested outcome counted in its period and equal to the unchanged period component, unattested and invalid NOT_EVALUATED in period, later attestation excluded at NOW and counted at LATER, out-of-period observation UNASSIGNED not dropped, policy/integrity refusals, determinism), tests/test_decision_outcome_checked_metrics.py (refactor regression: report must be unchanged), tests/test_news_event_status.py (component declaration and source-level guard)."
     },
     "checked_event_state_metrics": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_checked_event_states (decision-outcome-checked-event-state-metrics-v1): pure aggregate_egx_checked_decision_outcomes_by_event_state(population, outcomes, attestations, *, assumptions, as_of) composes the unchanged select_egx_checked_outcomes with the unchanged aggregate_decision_outcomes_by_event_state (market EGX) over the SAME population and only outcomes attested CLEAR with check_as_of <= as_of. Unattested / invalid / later-attested / missing outcomes stay NOT_EVALUATED inside their event state; all seven states reported; assignment by the retained detection-time event-context section only (attached sections checked by the unchanged component). Whole-input attestation counts only (per_state_attestation_counts NOT_REPORTED), cross_state_headline NOT_COMPUTED, NEWS_EVENT_INFERENCE, absence_is_proof false, risk_interpretation NOT_EVALUATED, trading_effect NONE, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. No caller (metrics job unchanged), no IO; SYSTEM declares the component; no gap closed or added.",
-      "files": ["app/decision_outcome_checked_event_states.py", "tests/test_decision_outcome_checked_event_states.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_checked_event_states.py",
+        "tests/test_decision_outcome_checked_event_states.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in that cycle. Committed at 8cfcfb3 by the host; tests/test_decision_outcome_checked_event_states.py and tests/test_news_event_status.py must be collected by the trusted profile."
     },
     "checked_data_age_metrics": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_checked_data_age (decision-outcome-checked-data-age-metrics-v1): pure aggregate_egx_checked_decision_outcomes_by_data_age(population, outcomes, attestations, *, assumptions, as_of, policy) composes the unchanged select_egx_checked_outcomes with the unchanged aggregate_decision_outcomes_by_data_age (market EGX) over the SAME population and only outcomes attested CLEAR with check_as_of <= as_of, under a caller-supplied EGX DataAgePolicy (market, registration and bounds validated by the data-age component). Unattested / invalid / later-attested / missing outcomes stay NOT_EVALUATED inside their age bucket; every bucket reported; assignment by retained detected_at - data_as_of only (wall clock, not session-aware; source-time order check unchanged). Whole-input attestation counts only (per_bucket_attestation_counts NOT_REPORTED), cross_bucket_headline NOT_COMPUTED, age_interpretation NOT_EVALUATED, trading_effect NONE, NOT_ASSESSED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. No caller (metrics job unchanged), no IO; SYSTEM declares the component; gaps DATA_AGE_POLICY_NOT_REGISTERED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_checked_data_age.py", "tests/test_decision_outcome_checked_data_age.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_checked_data_age.py",
+        "tests/test_decision_outcome_checked_data_age.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in that cycle. Committed at 49b55f8 by the host; tests/test_decision_outcome_checked_data_age.py and tests/test_news_event_status.py must be collected by the trusted profile."
     },
     "checked_sample_assessment": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_checked_sample (decision-outcome-checked-sample-assessment-v1): pure assess_egx_checked_decision_outcome_sample(population, outcomes, attestations, *, assumptions, as_of, policy) composes the unchanged select_egx_checked_outcomes with the unchanged assess_decision_outcome_sample (market EGX) over the SAME population and only outcomes attested CLEAR with check_as_of <= as_of, under a caller-supplied EGX SampleAssessmentPolicy (type, market and registration revalidated by the sample component). Unattested / invalid / later-attested / missing outcomes stay NOT_EVALUATED in their segment, so they are not CLOSED and count as missing data: an unchecked outcome can never help a segment reach MEETS_DECLARED_MINIMUM (test: unrestricted MEETS, checked BELOW with both reasons). Embedded sample_assessment_report equals the unchanged component's output (per-segment registration visible). Whole-input attestation counts only (per_segment_attestation_counts NOT_REPORTED), unrestricted_assessment NOT_REPORTED, statistical_significance NOT_ASSESSED, empirical_validation NOT_VALIDATED, cross_segment_headline NOT_COMPUTED, performance_claim NONE, SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED. No caller (metrics job unchanged), no IO; SYSTEM declares the component; gaps SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED kept.",
-      "files": ["app/decision_outcome_checked_sample.py", "tests/test_decision_outcome_checked_sample.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_checked_sample.py",
+        "tests/test_decision_outcome_checked_sample.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Committed at 0719160 by the host. Written by file-only Claude paced executor; NOT run in that cycle. Host validation required: tests/test_decision_outcome_checked_sample.py (new; reuses fixtures 'checked' and 'report' from tests/test_decision_outcome_action_attestation.py: attested outcome MEETS and embedded report equals the unchanged sample component, unattested outcome BELOW with CLOSED_OUTCOMES_BELOW_POLICY_MINIMUM and MISSING_DATA_RATE_ABOVE_POLICY_MAXIMUM while the unrestricted assessment MEETS, invalid attestation BELOW, later attestation excluded at NOW and counted at LATER, policy market/type/registration and integrity refusals, registration after first detection visible, determinism) and tests/test_news_event_status.py (component declaration and source-level guard)."
     },
     "checked_metrics_job_event_states": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_metrics_job bumped to decision-outcome-metrics-job-v2: opt-in by_event_state (CLI --by-event-state, bool required, else CONFIG_INVALID at INPUT before any store read) runs the unchanged pure aggregate_egx_checked_decision_outcomes_by_event_state over exactly the same selected population, supplied outcomes and loaded attestations at the same as_of as the unchanged checked report, embedded as event_state_report; default run sets event_state_report NOT_REQUESTED and does not call the component; all other fields unchanged from v1. Either report's refusal fails the whole run (METRICS_REJECTED at METRICS; nothing partial printed). No policy needed or registered; period/data-age/sample reports not offered by the job. Still read-only (writes NONE), not scheduled, no route. SYSTEM declaration updated to v2 and the status-test guard now asserts the job is the event-state component's only caller; no gap closed or added.",
-      "files": ["app/decision_outcome_metrics_job.py", "tests/test_decision_outcome_metrics_job.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_metrics_job.py",
+        "tests/test_decision_outcome_metrics_job.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_metrics_job.py (v2 version and default NOT_REQUESTED; opt-in report equals the unchanged component and leaves the rest of the result identical to the default run; unattested and evaluated-after-as_of outcomes NOT_EVALUATED inside NOT_ATTACHED; non-bool flag CONFIG_INVALID; monkeypatched component refusal -> METRICS_REJECTED via API and CLI exit 1 with no report; CLI --by-event-state exit 0) and tests/test_news_event_status.py (declared v2 version, caller guard). Committed at d021909 by the host."
     },
     "checked_metrics_report_reader": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.decision_outcome_metrics_reader (decision-outcome-metrics-report-reader-v1): pure read-side gate read_retained_egx_metrics_report(payload, *, expected_sha256), first step toward a protected read-only SYSTEM view of a host-published checked metrics report (card-report pattern: gate, then publisher, protected loader, route). Accepts only bounded bytes (16 MiB) whose SHA-256 matches, strict ASCII JSON (no duplicate keys/NaN) equal to canonical_bytes of itself, holding a REPORTED decision-outcome-metrics-job-v2 result: exact top-level, selection, checked-report and event-state-report field sets; fixed safety and labels type-strict (JSON 0 is not False); normalised UTC as_of <= job_clock; selection labels and arithmetic (in population + recorded after = loaded, supplied + evaluated after = loaded; identities sorted unique hex); checked report consistent with the selection (outcomes supplied, attestations supplied = loaded, COUNT_KEYS summing to supplied, counted = ATTESTED_CLEAR_AT_OR_BEFORE_AS_OF, not counted = rest, attested-after identities = their count, partition counts) and embedded metrics of decision-outcome-metrics-v1 with same market/as_of, population_count = observations in population, outcome_count = counted, not_evaluated_count = difference; event_state_report NOT_REQUESTED or a checked event-state report whose selection fields and partition are byte-identical to the checked report's. FAILED results refused. Recomputes no metric/partition/attestation, reads no store, completeness stays CALLER_ASSERTED_UNVERIFIED, digest is not a signature. SYSTEM declares the component; no publisher, loader, route, page or caller; no stage or gap changed. SHADOW, LIVE_MONEY=false, NOT_AUTHORIZED.",
-      "files": ["app/decision_outcome_metrics_reader.py", "tests/test_decision_outcome_metrics_reader.py", "app/news_event_status.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/decision_outcome_metrics_reader.py",
+        "tests/test_decision_outcome_metrics_reader.py",
+        "app/news_event_status.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required: tests/test_decision_outcome_metrics_reader.py (new; reuses fixtures 'checked' from tests/test_decision_outcome_action_attestation.py and 'stores'/'_private_tmp' plus helpers attest/run from tests/test_decision_outcome_metrics_job.py: accepts exact canonical job results with and without --by-event-state and the unattested case unchanged; refuses digest mismatch, malformed digest, non-bytes/empty input, non-canonical bytes with matching digest, duplicate keys/NaN/non-object/non-ASCII, a FAILED job result, and 37 parametrized single-field drifts; does not mutate input) and tests/test_news_event_status.py (component declaration and source-level purity/no-caller guard)."
     },
     "system_status": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "app.news_event_status.feature_status(): import-free code-declared news-empirical-feature-status-v1 exposed as /api/system news_empirical and a SYSTEM 'News/Event and empirical validation' table. Separate stages for news and empirical: CODE_INSTALLED, NOT_CONFIGURED_IN_REPOSITORY, NOT_SCHEDULED_IN_REPOSITORY, producing/current NOT_OBSERVED, NOT_APPLICABLE/NOT_VALIDATED, NOT_AUTHORIZED. NEWS_CONTEXT_OFFLINE_ONLY / NEWS_SOURCE_NOT_CONFIGURED / EMPIRICAL_COLLECTION_NOT_ACTIVE (no sample-claiming label). Counts null (UNKNOWN, not zero); NOT_ASSESSED, NOT_COMPUTED headline, performance_claim NONE, event risk UNKNOWN. Tests check declared module versions against code constants, that no other app/ or tools/ source references a component (no caller/producer/route/scheduler), no environment lookup, no outcome store, no period segmentation and TradeDecision.event_risk Literal['UNKNOWN']; renderer escapes and degrades to UNKNOWN/NOT_INSTALLED.",
-      "files": ["app/news_event_status.py", "app/ui/system.py", "tests/test_news_event_status.py", "docs/NEWS_EVENT_CONTEXT.md", "PROGRESS.json"],
+      "files": [
+        "app/news_event_status.py",
+        "app/ui/system.py",
+        "tests/test_news_event_status.py",
+        "docs/NEWS_EVENT_CONTEXT.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_news_event_status.py."
     },
     "validation_coverage_concern": "Inferred from recorded counts only: scanner_product reported 698 passed at 2a41292, 93212fc, 2b3641c and 0db9aec, unchanged while tests/test_decision_observation.py, tests/test_decision_observation_store.py and tests/test_decision_outcome.py were added, so those files (and likely tests/test_decision_outcome_metrics.py and tests/test_news_event_status.py) may not be collected. The host should add them to the trusted profile and run them before treating these units as validated.",
@@ -548,7 +852,11 @@
     "retained_binding_composition": {
       "status": "VALIDATED_OFFLINE",
       "summary": "Pure composition of retained identity and calendar observations into EgxRankBinding; fresh_until = retained next-session open (FRESH_UNTIL_NEXT_SESSION_OPEN_V1); ranking generation must not precede latest retained evidence. Identity INTERNAL_SNAPSHOT_VERIFIED and calendar NOT_ESTABLISHED preserved; runtime_activation=false.",
-      "files": ["app/scanner_v2_retained_binding.py", "tests/test_scanner_v2_retained_binding.py", "docs/SCANNER_V2.md"],
+      "files": [
+        "app/scanner_v2_retained_binding.py",
+        "tests/test_scanner_v2_retained_binding.py",
+        "docs/SCANNER_V2.md"
+      ],
       "tests": "Committed at 220b5168a8dc1fd277f56d3a5fd2ebc9aaf43468; host scanner_core profile PASS (375 passed, diff_check_rc=0) per supervisor validation record 2026-11-06T18:22Z."
     },
     "card_report_projection": {
@@ -556,7 +864,12 @@
       "commit": "48f5b685dec7332b807853e5d82bebd3b90149d2",
       "host_validation_note": "Supervisor record: scanner_core PASS, 375 passed, at head 220b516 fingerprint 882869eb. The count equals the pre-change 375, so confirm the profile collects tests/test_scanner_v2_card_report.py.",
       "summary": "app.scanner_v2_card_report.project_egx_card_report: read-only scanner-v2-egx-card-report-v1 combining coverage, provenance, Trade Cards and card-state counts by re-running bind_retained_egx_rank_report and trade_card unchanged. Lifecycle evidence NOT_VERIFIED; fixed limitations; feature_status OFFLINE_PROJECTION_NOT_ACTIVATED; no IO/route/runtime caller.",
-      "files": ["app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report.py",
+        "tests/test_scanner_v2_card_report.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required.",
       "next": "Read-only API route serving this document from a host-retained artifact plus SYSTEM feature-status exposure."
     },
@@ -565,7 +878,13 @@
       "commit": "e47fa5a39d5e8638e3deb2614619ebd62855aa89",
       "host_validation_note": "Supervisor record: scanner_core PASS, 375 passed, at head 48f5b68 fingerprint b87136b6. The count is unchanged, so confirm the profile collects tests/test_scanner_v2_system_status.py.",
       "summary": "app.scanner_v2_card_report.feature_status: code-declared constants (OFFLINE_PROJECTION_NOT_ACTIVATED, EGX OFFLINE_PROJECTION_ONLY, US NOT_IMPLEMENTED, no route/producer, published_cards null, limitations, LIVE_MONEY=false). Exposed as /api/system scanner_v2 and rendered on SYSTEM page with escaping and UNKNOWN fallbacks. Not runtime/scan evidence.",
-      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report.py",
+        "app/ui/system.py",
+        "tests/test_scanner_v2_system_status.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required.",
       "next": "Read-only API route serving the card report from a host-retained artifact (requires a trusted retained-binding producer)."
     },
@@ -573,7 +892,12 @@
       "status": "COMMITTED",
       "commit": "2c17bbef4a1d8fd836a692e73b057e0fde66ac31",
       "summary": "read_retained_egx_card_report(bytes, expected_sha256): bounded exact-byte hash check, strict JSON, exact field sets, fixed safety/limitation/lifecycle values, recomputed coverage counts and class-to-exclusion mapping, provenance/retained-binding agreement and timestamp order, per-card binding to ranking hash/retained evidence IDs/fresh_until, plan geometry, recomputed risk per share and recomputed card state/counts. Raises RetainedCardReportError (ValueError). Does not re-derive decision digests or verify ranking bytes; feature_status unchanged (no route/producer).",
-      "files": ["app/scanner_v2_card_report_reader.py", "tests/test_scanner_v2_card_report_reader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report_reader.py",
+        "tests/test_scanner_v2_card_report_reader.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect the new test file.",
       "next": "Superseded by card_decision_rederivation below."
     },
@@ -582,7 +906,12 @@
       "commit": "c4303eea5f75a8968a39c144250474522018a3e1",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 2c17bbe (375 passed); no record for c4303ee was visible this cycle.",
       "summary": "Reader rebuilds each card's exact TradeDecision from typed retained fields (parsed datetimes/Decimals/UUID, null float references as EGX-RANK-v1 emits) via existing Candidate/DecisionSource/DecisionTerms/TradeDecision validators; requires identity == decision_id, strategy_candidate_sha256 == candidate_sha256 and unchanged trade_card(rebuilt, observed_at) == retained card. Non-string evidence ids now fail closed instead of escaping as TypeError. Avoids pydantic strict-JSON coercion entirely.",
-      "files": ["app/scanner_v2_card_report_reader.py", "tests/test_scanner_v2_card_report_reader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report_reader.py",
+        "tests/test_scanner_v2_card_report_reader.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required; the producer round-trip tests at VIEW/OPEN/NEXT_CLOSE are the key check that rebuilt projections equal producer cards.",
       "next": "Superseded by retained_card_report_loader below."
     },
@@ -591,7 +920,12 @@
       "commit": "8f3664b836faca115d3165551d56ef34f0fa7c23",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at c4303ee (375 passed); no record for 8f3664b was visible this cycle.",
       "summary": "app.scanner_v2_card_report_loader.load_retained_egx_card_report: reads EGX_SCANNER_V2_CARD_REPORT_DIR/current.json (strict scanner-v2-card-report-pointer-v1) and content-addressed <sha256>.json without following symlinks, regular files only, bounded reads, never writes; returns scanner-v2-card-report-response-v1 AVAILABLE only for reader-accepted bytes, else NOT_CONFIGURED/UNAVAILABLE with a fixed reason and no partial content. Reports load_freshness and cards_current_at_load without relabelling producer-time cards; load clock before report observed_at fails closed. No route, producer or caller; feature_status unchanged.",
-      "files": ["app/scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_loader.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report_loader.py",
+        "tests/test_scanner_v2_card_report_loader.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_loader.py.",
       "next": "Superseded by card_report_route below."
     },
@@ -600,7 +934,14 @@
       "commit": "a5a953f24b2356e82bdd26d1a8c09a683a67d3a6",
       "host_validation_note": "Supervisor scanner_core run at a5a953f (fingerprint a29459a9): 1 failed, 491 passed; the failure was a test defect fixed by reader_instrument_id_test_fix below. A later supervisor scanner_core run at the same head (fingerprint 989c1f46) recorded PASS, 492 passed.",
       "summary": "GET /api/scanner-v2/egx/card-report (app.main.scanner_v2_egx_card_report) returns exactly load_retained_egx_card_report() with the real UTC clock; no extra fields, IO or write method. feature_status api_route now names the path (SYSTEM shows it); status stays OFFLINE_PROJECTION_NOT_ACTIVATED, runtime_producer/published_cards null, runtime_activation false. Without a host-published directory the route answers NOT_CONFIGURED/UNAVAILABLE.",
-      "files": ["app/main.py", "app/scanner_v2_card_report.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/main.py",
+        "app/scanner_v2_card_report.py",
+        "tests/test_scanner_v2_card_report_route.py",
+        "tests/test_scanner_v2_system_status.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_route.py.",
       "next": "Superseded by reader_instrument_id_test_fix below."
     },
@@ -608,7 +949,10 @@
       "status": "COMMITTED",
       "commit": "224e0897b42482550c95dc6d2e645c9868ed680d",
       "summary": "Test-only fix. The uppercase_instrument_id tamper case did nothing because the fixture IDs are UUID(int=n), which contain only digits and dashes, so .upper() leaves them unchanged and the reader correctly accepted the unchanged card. Replaced it with noncanonical_instrument_id (a braced UUID form): uuid.UUID still parses it, so the rebuild succeeds and only the projection-equality gate can reject it. No reader/gate change; nothing weakened.",
-      "files": ["tests/test_scanner_v2_card_report_reader.py", "PROGRESS.json"],
+      "files": [
+        "tests/test_scanner_v2_card_report_reader.py",
+        "PROGRESS.json"
+      ],
       "tests": "Not run by the file-only Claude paced executor. The supervisor record says scanner_core PASS, 492 passed, at fingerprint 989c1f46. Host must re-validate the exact committed paths.",
       "housekeeping": "Untracked tests/test_scanner_v2_card_report_reader.py.bak.* files are editor backups and must NOT be committed; the host should delete them (the file-only executor cannot delete files).",
       "next": "Superseded by card_report_publisher below."
@@ -618,7 +962,12 @@
       "commit": "a2e4df7598364e3fb7da15e18bccdd11fd156a7a",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 224e089 (492 passed); no record for a2e4df7 was visible this cycle.",
       "summary": "app.scanner_v2_card_report_publisher.publish_egx_card_report: projects with existing project_egx_card_report at the producer clock, canonical bytes must pass read_retained_egx_card_report with byte-identical round trip before any write; protected non-symlink non-group/world-writable directory, exclusive non-blocking flock, current publication read via the loader path (damaged -> preserved/refused, clock or ranking regression refused, same digest idempotent); content-addressed 0444 report via temp+fsync+hard link without overwrite (identical bytes complete interrupted publication, else CONTENT_CONFLICT); atomic pointer replace, directory fsync and post-publication loader verification. Never deletes reports. No scheduler/runtime caller; feature_status unchanged.",
-      "files": ["app/scanner_v2_card_report_publisher.py", "tests/test_scanner_v2_card_report_publisher.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report_publisher.py",
+        "tests/test_scanner_v2_card_report_publisher.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_publisher.py.",
       "next": "Superseded by retained_evidence_loader below."
     },
@@ -627,7 +976,12 @@
       "commit": "0355b35e0918cdf334cc56679501ed5d0a4d0de1",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at a2e4df7 (492 passed); no record for 0355b35 was visible this cycle.",
       "summary": "app.scanner_v2_retained_evidence.load_retained_egx_rank_binding: checks ranking bytes against the manifest SHA-256 and reads session, aware generated_at and the sorted unique ticker scope (ranking_scope); reads the retained EGID observation via SecurityMasterRepository.get_admission_observation and binds it with bind_observed_egid_identities at observed_at=generated_at; reads the retained calendar via TradingRepository.get_calendar_observation at decision_time=generated_at; requires matching sessions and composes with compose_egx_rank_binding. Read methods only, no writes; evidence observed after ranking generation is rejected. Fixed RetainedEvidenceError reasons. No scheduler/runtime caller; feature_status unchanged.",
-      "files": ["app/scanner_v2_retained_evidence.py", "tests/test_scanner_v2_retained_evidence.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_retained_evidence.py",
+        "tests/test_scanner_v2_retained_evidence.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_retained_evidence.py.",
       "next": "Superseded by card_report_job below."
     },
@@ -636,7 +990,12 @@
       "commit": "319df8e5bdc2de10ef40d8da5aa36865442543d5",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 0355b35 (492 passed); no record for 319df8e was visible this cycle.",
       "summary": "app.scanner_v2_card_report_job.run_egx_card_report_job / python -m app.scanner_v2_card_report_job: explicit absolute paths and 64-hex digests only; existing regular non-symlink database (never created/initialized/upgraded); EGID manifest via DataIngestionRepository.get_manifest_by_raw_path (egid, SECURITY_MASTER, bounded) and bytes via ImmutableRawStore.read_verified; bounded no-follow ranking read; then unchanged load_retained_egx_rank_binding and publish_egx_card_report. Fixed CardReportJobError reasons; sqlite errors become DATABASE_UNAVAILABLE; CLI prints one scanner-v2-card-report-job-v1 JSON line (FAILED with stage INPUT/EVIDENCE/PUBLICATION) and exits 1 on failure. No scheduler/cron entry; feature_status unchanged.",
-      "files": ["app/scanner_v2_card_report_job.py", "tests/test_scanner_v2_card_report_job.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report_job.py",
+        "tests/test_scanner_v2_card_report_job.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_card_report_job.py.",
       "next": "Host-side: provision a protected EGX_SCANNER_V2_CARD_REPORT_DIR and a scheduled invocation after the EGX ranking publication with retained EGID observation and calendar observation for the session (both producers must run before ranking generation). Repository-side next: a retained-input resolver that derives the three inputs for a session from existing retained records instead of operator-supplied digests, or proceed to News/Event Context per milestone order once the slice is accepted. Update feature_status runtime_producer only with host evidence.",
       "superseded_next": "Superseded by producer_entrypoint_status below."
@@ -646,7 +1005,14 @@
       "commit": "4aa18e0390625b7cc7f090de32e8b19f806b7b6d",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 319df8e (494 passed); no record for 4aa18e0 was visible this cycle.",
       "summary": "feature_status() adds code-declared producer_entrypoint ('python -m app.scanner_v2_card_report_job') and producer_schedule ('NOT_SCHEDULED_IN_REPOSITORY'); SYSTEM renders both rows with NOT_INSTALLED/UNKNOWN fallbacks. status, runtime_producer (null), published_cards (null), runtime_activation (false), LIMITATIONS and report bytes unchanged. Test imports the declared module and asserts no app/ or tools/ scheduler/cron source names it.",
-      "files": ["app/scanner_v2_card_report.py", "app/scanner_v2_card_report_job.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report.py",
+        "app/scanner_v2_card_report_job.py",
+        "app/ui/system.py",
+        "tests/test_scanner_v2_system_status.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py, tests/test_scanner_v2_card_report_route.py).",
       "next": "Superseded by evidence_retention_job below."
     },
@@ -655,7 +1021,12 @@
       "commit": "ffedbdd9a03a787fe9a7fe44021b3c9da5b44c4e",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at 4aa18e0 (494 passed); no record for ffedbdd was visible this cycle.",
       "summary": "app.scanner_v2_evidence_retention_job.run_egx_evidence_retention_job / python -m app.scanner_v2_evidence_retention_job: explicit absolute paths, exact YYYY-MM-DD session/through and identity raw path; reuses the card-report job's _existing_database/_identity helpers (database never created/initialized/upgraded; egid SECURITY_MASTER manifest, read_verified bytes); then unchanged SecurityMasterRepository.retain_admission_observation(egid, session, manifest sha256) and TradingRepository.retain_calendar_observation(session, through). No caller clock; reruns keep first observations. Prints one scanner-v2-evidence-retention-job-v1 JSON line (RETAINED with calendar_sha256 for the card-report job, or FAILED with stage INPUT/IDENTITY/CALENDAR and fixed reason); exit 1 on failure. Must run before EGX ranking generation; the downstream loader's PIT gate is unchanged. No scheduler/cron entry, no SYSTEM field change.",
-      "files": ["app/scanner_v2_evidence_retention_job.py", "tests/test_scanner_v2_evidence_retention_job.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_evidence_retention_job.py",
+        "tests/test_scanner_v2_evidence_retention_job.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_retention_job.py.",
       "next": "Host-side: provision EGX_SCANNER_V2_CARD_REPORT_DIR; schedule the evidence-retention job after the EGID refresh/calendar update and before EGX ranking generation, then the card-report job after ranking publication, passing calendar_sha256 explicitly. Repository-side: once host acceptance exists, the vertical slice is complete enough to proceed to News/Event Context per milestone order; otherwise a small end-to-end offline test chaining retention -> card-report job on one disposable database (requires a real admission receipt fixture).",
       "superseded_next": "Superseded by evidence_retention_entrypoint_status below."
@@ -665,7 +1036,13 @@
       "commit": "acdc531503cc366c1994dd8e88c39b76d8e7b93c",
       "host_validation_note": "Latest supervisor validation record seen by the paced executor is scanner_core PASS at ffedbdd (495 passed); no record for acdc531 was visible this cycle.",
       "summary": "feature_status() adds code-declared evidence_retention_entrypoint ('python -m app.scanner_v2_evidence_retention_job') and evidence_retention_schedule ('NOT_SCHEDULED_IN_REPOSITORY'); SYSTEM renders both rows with NOT_INSTALLED/UNKNOWN fallbacks. The entrypoint test is parametrized over both declared job modules (import, callable main/runner, no app/ or tools/ scheduler/cron source names them). status, runtime_producer (null), published_cards (null), runtime_activation (false), LIMITATIONS and report bytes unchanged.",
-      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report.py",
+        "app/ui/system.py",
+        "tests/test_scanner_v2_system_status.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py, tests/test_scanner_v2_card_report_route.py).",
       "next": "Superseded by evidence_chain_test below."
     },
@@ -674,7 +1051,11 @@
       "commit": "8142c8f1387f34a7fc01dab547b5dc91648f77c7",
       "host_validation_note": "Committed, but execution is unconfirmed. scanner_core recorded 495 passed both before and after this four-test file was added, which suggests the profile does not collect it. See trade_card_page.validation_coverage_concern.",
       "summary": "Test-only: tests/test_scanner_v2_evidence_chain.py runs the unchanged security-master refresh runtime (artificial EGID records for the ranking fixture's five tickers, real committed admission receipt), run_egx_evidence_retention_job, run_egx_card_report_job and load_retained_egx_card_report on one disposable database. One shared controlled clock replaces raw_store.datetime and the ingestion/trading/security-master _utc_now helpers (refresh 2026-11-03T17:00Z < retention 2026-11-04T05:00Z < ranking generated 06:39:32Z < publication 07:00Z < next open 08:00Z). Covers provenance digests and uuid5 instrument ids in the served report, evidence_available_at = retention time, three cards for CANDIDATE/STRONG_CANDIDATE rows, read-only card job, rerun idempotence (including a retention rerun after generation), late-retained evidence rejected as IDENTITY_REJECTED with nothing published, and no retained evidence -> IDENTITY_OBSERVATION_UNAVAILABLE. No application code changed.",
-      "files": ["tests/test_scanner_v2_evidence_chain.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "tests/test_scanner_v2_evidence_chain.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the scanner_core profile must collect tests/test_scanner_v2_evidence_chain.py. If it fails, treat it as a possible real composition defect between the DB-round-tripped manifest and the admission receipt before assuming a test defect.",
       "next": "Host-side unchanged: provision EGX_SCANNER_V2_CARD_REPORT_DIR and schedule evidence retention before EGX ranking generation, then the card-report job after publication. Repository-side: once this chain test passes on the host, the offline Scanner v2 EGX slice (contract -> candidate -> card -> retained evidence -> publication -> route) is complete; next is News/Event Context per milestone order, unless host validation exposes a defect.",
       "superseded_next": "Superseded by us_adapter_gaps_status below."
@@ -684,7 +1065,13 @@
       "commit": "e5541953a8436abacb866293e34a409de3c8e6c8",
       "host_validation_note": "Latest supervisor record seen by the paced executor is scanner_core PASS, 496 passed, labelled head 8142c8f, fingerprint 76a719ff; the +1 count matches this unit's added status test.",
       "summary": "feature_status() keeps market_adapters.US=NOT_IMPLEMENTED and adds us_adapter_gaps (US_ADAPTER_GAPS): US_DECISION_ADAPTER_NOT_IMPLEMENTED, US_INSTRUMENT_IDENTITY_NOT_BOUND, US_CALENDAR_OBSERVATION_NOT_RETAINED, EGX_ADAPTER_RULES_NOT_REUSABLE_FOR_US. SYSTEM renders 'US adapter gaps' (escaped; UNKNOWN when missing/malformed/empty). A test checks each code against the repository (no US scanner_v2 module, no instrument_id/uuid in app/us_run.py, calendar retention uses project_egx_calendar only, EGX adapter pins EGX-RANK-v1 costs and Africa/Cairo). Code-declared only; no US scan/coverage claim; report bytes, LIMITATIONS, reader and route unchanged.",
-      "files": ["app/scanner_v2_card_report.py", "app/ui/system.py", "tests/test_scanner_v2_system_status.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/scanner_v2_card_report.py",
+        "app/ui/system.py",
+        "tests/test_scanner_v2_system_status.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required (tests/test_scanner_v2_system_status.py).",
       "next": "Superseded by trade_card_page below."
     },
@@ -693,7 +1080,19 @@
       "commit": "ef88b533972763647c77669f9eb84ffd11ef8997",
       "host_validation_note": "Latest supervisor record seen by the paced executor is scanner_core PASS, 504 passed, labelled head e554195, fingerprint 278aa38d. The +8 over 496 matches this unit's eight tests added to existing files, so attributing the record to this unit is inferred. It does not settle validation_coverage_concern.",
       "summary": "GET /scanner-v2/egx/cards (app.main.scanner_v2_egx_card_page) renders exactly the JSON route's loader response via app.ui.trade_card.render_card_report_page. Cards appear only for AVAILABLE; other outcomes show the fixed status/reason. Each card keeps producer-time labels under an At load CURRENT/NOT_CURRENT line from card_current_at, now shared with the loader's count. Shows coverage as ranking scope only, provenance, admission labels, limitations and lifecycle NOT_VERIFIED. feature_status gains card_page and SYSTEM links it; status, runtime_producer (null), published_cards (null), runtime_activation (false), report bytes, LIMITATIONS and reader unchanged.",
-      "files": ["app/main.py", "app/scanner_v2_card_report.py", "app/scanner_v2_card_report_loader.py", "app/ui/system.py", "app/ui/trade_card.py", "tests/test_scanner_v2_card_report_loader.py", "tests/test_scanner_v2_card_report_route.py", "tests/test_scanner_v2_system_status.py", "tests/test_trade_decision.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/main.py",
+        "app/scanner_v2_card_report.py",
+        "app/scanner_v2_card_report_loader.py",
+        "app/ui/system.py",
+        "app/ui/trade_card.py",
+        "tests/test_scanner_v2_card_report_loader.py",
+        "tests/test_scanner_v2_card_report_route.py",
+        "tests/test_scanner_v2_system_status.py",
+        "tests/test_trade_decision.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required. New tests were added to existing test files rather than a new file.",
       "validation_coverage_concern": "Inferred from recorded counts, not confirmed: scanner_core stayed at 492 across the publisher and retained-evidence units, and did not grow for the evidence-retention job or the four-test evidence chain. tests/test_scanner_v2_card_report_publisher.py, test_scanner_v2_retained_evidence.py, test_scanner_v2_card_report_job.py, test_scanner_v2_evidence_retention_job.py and test_scanner_v2_evidence_chain.py may never have run on the host. The host should add them to the profile and run them before treating the EGX slice as host-accepted.",
       "next": "Superseded by card_page_exclusions below."
@@ -703,7 +1102,12 @@
       "commit": "11c6978ef53b09a44fd4dc4bd5c1f40809b8c678",
       "host_validation_note": "Supervisor record: scanner_product PASS, 616 passed, diff_check_rc=0, at head 11c6978 (fingerprint 71e1a7ab). An earlier run at the same head failed test_render_escapes_and_degrades_to_unknown; the later PASS record supersedes it.",
       "summary": "render_card_report_page appends an escaped 'Excluded symbols: N of requested' table after the cards, built only from the accepted report's coverage rows and identity_exclusions: symbol, classification, fixed exclusion reason and identity exclusion (NONE_REPORTED when the report carries none, which is not identity verification). Omitted when nothing is excluded or no report was accepted. Report bytes, reader, loader, routes, feature_status and LIMITATIONS unchanged.",
-      "files": ["app/ui/trade_card.py", "tests/test_scanner_v2_card_report_route.py", "docs/SCANNER_V2.md", "PROGRESS.json"],
+      "files": [
+        "app/ui/trade_card.py",
+        "tests/test_scanner_v2_card_report_route.py",
+        "docs/SCANNER_V2.md",
+        "PROGRESS.json"
+      ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Three tests added to the existing tests/test_scanner_v2_card_report_route.py. Host validation required; scanner_core should grow by 3 if that file is collected.",
       "next": "Host: confirm or fix scanner_core collection, run the five test files named in trade_card_page.validation_coverage_concern and validate this unit; approve the page path in any host route allowlist. Repository: if those tests pass, the EGX slice is complete offline; then close US gaps (identity binding first) or begin News/Event Context per milestone order."
     },
@@ -738,6 +1142,41 @@
       "mutation_checks": "Four isolated copies each failed its targeted test when removing window completeness, stored-byte comparison, future-decision or row-identity checks. Working source never mutated.",
       "evidence": "/home/egx-agent/er1-autopilot/state/calendar-retention-{baseline.log,mutations.json,suite.log}",
       "production_schema": "Pending authorized-host copied-state upgrade/restore and prior-release compatibility evidence. Database.initialize rejects newer schemas; no production migration or rollback executed."
+    }
+  },
+  "universe_runtime_activation": {
+    "status": "ACTIVE",
+    "priority": "P0",
+    "egx_authoritative_universe": "REQUIRED",
+    "us_new_listing_admission": "REQUIRED",
+    "runtime_provisioning": "PENDING",
+    "scheduling": "PENDING",
+    "end_to_end_daily_run": "PENDING",
+    "metrics_report_lifecycle": "PARTIAL",
+    "live_money": false,
+    "updated_at": "2026-11-23T19:42:48.657640+00:00",
+    "egx_universe_foundation_wip": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Schema 13 (unvalidated WIP, completed by file-only Claude paced executor). canonical_instruments becomes durable identity storage: provider snapshot writes upsert identities and never delete ones absent from the new snapshot (they may be FK-referenced by immutable daily canonical artifacts). New security_master_current_members(provider, instrument_id) is replaced atomically in the same transaction by every snapshot write; list_equity_tickers (scan scope) reads only current members, so retained historical identities never widen scan scope. Upgrade from <13 backfills current members exactly from canonical_instruments (pre-13 writes deleted dropped rows), idempotent on retry. Retention gate denominator is the latest admitted receipt instrument_count, not the cumulative registry. Partial unique index: one egx-universe-v1 reference artifact per effective_date; ReferenceRepository.ingest now imports sqlite3 so a conflicting dated universe fails closed as 'conflicting reference evidence' (REFERENCE_CONFLICT) instead of NameError, and exact replay stays idempotent. Pure egx_security_classification (conservative SecurityClass, reviewed symbol-code overrides, subscription-right needs ticker+name agreement, conflicts UNKNOWN) and pure egx_universe_builder (candidate egx-universe-v1 from admitted instruments; indices dropped, specials ineligible, UNKNOWN fails closed). Builder output is NOT authoritative membership and still requires egx-source-review-v1; no caller, job or publication.",
+      "files": [
+        "app/storage/database.py",
+        "app/storage/security_master_repository.py",
+        "app/storage/reference_repository.py",
+        "app/data/security_master_refresh_job.py",
+        "app/data/egx_security_classification.py",
+        "app/data/egx_universe_builder.py",
+        "tests/test_security_master_admission_history.py",
+        "tests/test_security_master_refresh_runtime.py",
+        "tests/test_egx_universe_scan.py",
+        "tests/test_universe_unique_schema.py",
+        "tests/test_egx_security_classification.py",
+        "tests/test_egx_universe_builder.py",
+        "tests/test_quota.py",
+        "schema-pin tests (12 -> 13)"
+      ],
+      "tests": "NOT run by the file-only executor. Host must run the affected storage/security-master/reference/universe-scan suites and the full scanner_product profile.",
+      "host_validation_reconciliation": "Host scanner_product run 2026-11-23T20:54:57Z (fingerprint b99a144f...) reported 1 failed, 1244 passed: tests/test_quota.py::test_v7_upgrade_requires_permission_and_preserves_data still pinned schema_version 12 after a permitted v7 upgrade. Semantically stale schema pin (current SCHEMA_VERSION is 13); file-only executor updated the expectation to 13 with no production-code change. Re-validation by the trusted host is pending; not run by the executor.",
+      "production_schema": "v13 upgrade on copied production state (including backfill row count == pre-upgrade canonical_instruments count, and no duplicate dated universes) is pending authorized-host evidence; no production migration executed."
     }
   }
 }

@@ -311,4 +311,16 @@ def test_small_contraction_is_admitted(tmp_path):
     )
 
     assert result.instrument_count == 90
-    assert provider_instrument_count(database) == 90
+
+    # canonical_instruments is durable identity storage, not current
+    # provider-membership state. The ten identities absent from the later
+    # snapshot remain available for historical attribution.
+    assert provider_instrument_count(database) == 100
+
+    receipt = SecurityMasterRepository(database).get_admission(
+        provider=result.provider,
+        snapshot_date=result.snapshot_date,
+        artifact_sha256=result.artifact_sha256,
+    )
+    assert receipt["instrument_count"] == 90
+    assert receipt["previous_instrument_count"] == 100

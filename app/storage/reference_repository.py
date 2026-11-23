@@ -1,6 +1,7 @@
 """Append-only reference catalog using the existing raw and ingestion layers."""
 import hashlib
 import json
+import sqlite3
 from datetime import datetime, timezone
 from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
@@ -76,23 +77,112 @@ class ReferenceRepository:
                             (str(manifest.ingestion_id),))
             self.issue(manifest.ingestion_id, "REFERENCE_INVALID", {"contract": contract})
             raise ValueError("invalid reference evidence") from exc
+        reference_values = (
+            str(manifest.ingestion_id),
+            contract,
+            (
+                str(document.effective_date)
+                if isinstance(document, UniverseEvidence)
+                else None
+            ),
+            (
+                str(document.instrument_id)
+                if isinstance(document, ActionEvidence)
+                else None
+            ),
+            (
+                str(document.coverage_start)
+                if isinstance(document, ActionEvidence)
+                else None
+            ),
+            (
+                str(document.coverage_end)
+                if isinstance(document, ActionEvidence)
+                else None
+            ),
+            (
+                str(document.subject_ingestion_id)
+                if isinstance(document, ValidationEvidence)
+                else None
+            ),
+        )
+
         with self.database.connect() as con:
             con.execute("BEGIN IMMEDIATE")
+
+            try:
+                con.execute(
+                    "INSERT INTO reference_artifacts "
+                    "(ingestion_id,contract,effective_date,instrument_id,"
+                    "coverage_start,coverage_end,subject_ingestion_id) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    reference_values,
+                )
+
+            except sqlite3.IntegrityError as exc:
+                # Exact replay is intentionally idempotent. The immutable
+                # raw/ingestion layer returns the same ingestion identity,
+                # so the already-stored reference row must match exactly.
+                existing = con.execute(
+                    "SELECT ingestion_id,contract,effective_date,"
+                    "instrument_id,coverage_start,coverage_end,"
+                    "subject_ingestion_id "
+                    "FROM reference_artifacts "
+                    "WHERE ingestion_id=?",
+                    (str(manifest.ingestion_id),),
+                ).fetchone()
+
+                if (
+                    existing is None
+                    or tuple(existing) != reference_values
+                ):
+                    con.rollback()
+
+                    with self.database.connect() as issue_con:
+                        issue_con.execute(
+                            "UPDATE data_ingestions "
+                            "SET status='REJECTED' "
+                            "WHERE ingestion_id=? "
+                            "AND status!='VALIDATED'",
+                            (str(manifest.ingestion_id),),
+                        )
+
+                    self.issue(
+                        manifest.ingestion_id,
+                        "REFERENCE_CONFLICT",
+                        {
+                            "contract": contract,
+                            "effective_date": (
+                                str(document.effective_date)
+                                if isinstance(
+                                    document,
+                                    UniverseEvidence,
+                                )
+                                else None
+                            ),
+                        },
+                    )
+
+                    raise ValueError(
+                        "conflicting reference evidence"
+                    ) from exc
+
+            # Structural validation is distinct from source review /
+            # promotion.
             con.execute(
-                "INSERT OR IGNORE INTO reference_artifacts "
-                "(ingestion_id,contract,effective_date,instrument_id,coverage_start,coverage_end,subject_ingestion_id) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (str(manifest.ingestion_id), contract,
-                 str(document.effective_date) if isinstance(document, UniverseEvidence) else None,
-                 str(document.instrument_id) if isinstance(document, ActionEvidence) else None,
-                 str(document.coverage_start) if isinstance(document, ActionEvidence) else None,
-                 str(document.coverage_end) if isinstance(document, ActionEvidence) else None,
-                 str(document.subject_ingestion_id) if isinstance(document, ValidationEvidence) else None),
+                "UPDATE data_ingestions "
+                "SET status='VALIDATED', "
+                "completed_at=COALESCE(completed_at,?) "
+                "WHERE ingestion_id=? "
+                "AND status!='REJECTED'",
+                (
+                    datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                    str(manifest.ingestion_id),
+                ),
             )
-            # Structural validation is distinct from source review / promotion.
-            con.execute("UPDATE data_ingestions SET status='VALIDATED', "
-                        "completed_at=COALESCE(completed_at,?) WHERE ingestion_id=? AND status!='REJECTED'",
-                        (datetime.now(timezone.utc).isoformat(), str(manifest.ingestion_id)))
+
         return manifest
 
     def _load(self, row):

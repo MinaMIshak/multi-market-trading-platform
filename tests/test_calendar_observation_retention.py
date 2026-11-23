@@ -167,7 +167,7 @@ def test_explicit_upgrade_from_v11_adds_table_without_backfill(repo):
     with pytest.raises(RuntimeError, match='upgrade required'):
         repo.database.initialize()
     repo.database.initialize(allow_upgrade=True)
-    assert repo.database.schema_version() == 12
+    assert repo.database.schema_version() == 13
     assert count(repo) == 0
     assert repo.get_market_session(SESSION).status.value == 'VERIFIED'
 

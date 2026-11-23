@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 SCHEMA_SQL = """
@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS reference_artifacts (
 );
 CREATE INDEX IF NOT EXISTS idx_reference_date
 ON reference_artifacts(contract, effective_date);
+
+-- One authoritative candidate universe per exact market date.
+-- ReferenceRepository.universe() deliberately fails on ambiguity;
+-- enforce the same invariant at the writer boundary so concurrent
+-- publishers cannot create two dated universes.
+CREATE UNIQUE INDEX IF NOT EXISTS
+idx_reference_universe_effective_date_unique
+ON reference_artifacts(effective_date)
+WHERE contract = 'egx-universe-v1';
 CREATE INDEX IF NOT EXISTS idx_reference_instrument
 ON reference_artifacts(contract, instrument_id, coverage_start, coverage_end);
 CREATE INDEX IF NOT EXISTS idx_reference_subject
@@ -438,6 +447,19 @@ CREATE TABLE IF NOT EXISTS instrument_aliases (
         alias_type,
         normalized_value
     )
+);
+
+-- Current provider-snapshot membership (schema 13).
+-- canonical_instruments is durable identity storage and keeps identities
+-- absent from later snapshots for historical attribution; this table is
+-- replaced atomically by each provider snapshot write so current scan
+-- scope never widens to include identities a later snapshot dropped.
+CREATE TABLE IF NOT EXISTS security_master_current_members (
+    provider TEXT NOT NULL,
+    instrument_id TEXT NOT NULL
+        REFERENCES canonical_instruments (instrument_id)
+        ON DELETE RESTRICT,
+    PRIMARY KEY (provider, instrument_id)
 );
 
 CREATE INDEX IF NOT EXISTS
@@ -855,6 +877,23 @@ class Database:
             connection.executescript(
                 SCHEMA_SQL
             )
+
+            if existing_version < 13:
+                # Before schema 13 every provider snapshot write deleted the
+                # provider's canonical_instruments rows before inserting the
+                # new snapshot, so the stored rows are exactly the current
+                # membership. Record that fact once; never infer membership
+                # for any later state. Idempotent if a prior attempt failed.
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO security_master_current_members (
+                        provider,
+                        instrument_id
+                    )
+                    SELECT source_provider, instrument_id
+                    FROM canonical_instruments
+                    """
+                )
 
             if existing_version < SCHEMA_VERSION:
                 connection.execute(

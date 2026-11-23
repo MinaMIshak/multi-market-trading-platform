@@ -193,12 +193,31 @@ def test_historical_member_survives_later_removal(repo):
         assert con.execute('SELECT COUNT(*) FROM canonical_instruments').fetchone()[0] == 0
 
 
-def test_conflicting_universe_fails_without_latest_wins(repo):
+def test_conflicting_universe_fails_at_writer_boundary(repo):
     m = ready(repo)
-    other = ingest(repo, universe([]))
-    review(repo, other, 'egx-universe-v1')
-    with pytest.raises(ValueError, match='dated universe'):
-        load(repo, m)
+
+    with pytest.raises(
+        ValueError,
+        match='conflicting reference evidence',
+    ):
+        ingest(
+            repo,
+            universe([]),
+        )
+
+    # The original reviewed universe remains the only dated universe.
+    assert load(repo, m).rows[0].instrument_id == ID
+
+    with repo.database.connect() as con:
+        assert con.execute(
+            """
+            SELECT COUNT(*)
+            FROM reference_artifacts
+            WHERE contract='egx-universe-v1'
+              AND effective_date=?
+            """,
+            (str(DAY),),
+        ).fetchone()[0] == 1
 
 
 def test_future_receipt_cannot_repair_history(repo):
@@ -302,7 +321,7 @@ def test_schema_8_upgrade_is_explicit_additive_and_monotonic(tmp_path):
         assert not con.execute("SELECT 1 FROM sqlite_master WHERE name='reference_artifacts'").fetchone()
     db.initialize(allow_upgrade=True)
     db.initialize()
-    assert db.schema_version() == SCHEMA_VERSION == 12
+    assert db.schema_version() == SCHEMA_VERSION == 13
     with db.connect() as con:
         assert con.execute('SELECT value FROM sentinel').fetchone()[0] == 'preserved'
         assert con.execute('PRAGMA foreign_key_check').fetchall() == []

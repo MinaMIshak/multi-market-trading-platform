@@ -75,35 +75,26 @@ class SecurityMasterRepository:
             if manifest is not None:
                 self._record_admission(connection, provider, instruments, manifest)
 
-            old_ids = connection.execute(
-                """
-                SELECT instrument_id
-                FROM canonical_instruments
-                WHERE source_provider = ?
-                """,
-                (provider,),
-            ).fetchall()
-
-            for row in old_ids:
+            # canonical_instruments is durable identity storage,
+            # not dated provider-membership state. Historical identities
+            # may be referenced by immutable canonical market artifacts and
+            # must never be deleted during a provider refresh.
+            #
+            # Rebuild aliases only for identities present in the incoming
+            # snapshot. Identities absent from the snapshot remain available
+            # for historical attribution.
+            for instrument in instruments:
                 connection.execute(
                     """
                     DELETE FROM instrument_aliases
                     WHERE instrument_id = ?
                     """,
                     (
-                        row[
-                            "instrument_id"
-                        ],
+                        str(
+                            instrument.instrument_id
+                        ),
                     ),
                 )
-
-            connection.execute(
-                """
-                DELETE FROM canonical_instruments
-                WHERE source_provider = ?
-                """,
-                (provider,),
-            )
 
             for instrument in instruments:
                 connection.execute(
@@ -130,6 +121,23 @@ class SecurityMasterRepository:
                         ?, ?, ?, ?, ?, ?,
                         ?, ?, ?
                     )
+                    ON CONFLICT(instrument_id)
+                    DO UPDATE SET
+                        instrument_type = excluded.instrument_type,
+                        canonical_ticker = excluded.canonical_ticker,
+                        name_en = excluded.name_en,
+                        name_ar = excluded.name_ar,
+                        short_name_en = excluded.short_name_en,
+                        short_name_ar = excluded.short_name_ar,
+                        source_provider = excluded.source_provider,
+                        source_symbol_code = excluded.source_symbol_code,
+                        reuters_raw = excluded.reuters_raw,
+                        reuters_normalized = excluded.reuters_normalized,
+                        source_sha256 = excluded.source_sha256,
+                        source_market_date = excluded.source_market_date,
+                        normalization_notes_json =
+                            excluded.normalization_notes_json,
+                        updated_at = excluded.updated_at
                     """,
                     (
                         str(
@@ -273,6 +281,35 @@ class SecurityMasterRepository:
                         ),
                     )
 
+            # Current membership is replaced, not accumulated, in the same
+            # transaction as the identity upsert: identities absent from this
+            # snapshot stay in canonical_instruments for attribution only.
+            connection.execute(
+                """
+                DELETE FROM security_master_current_members
+                WHERE provider = ?
+                """,
+                (provider,),
+            )
+
+            for instrument in instruments:
+                connection.execute(
+                    """
+                    INSERT INTO security_master_current_members (
+                        provider,
+                        instrument_id
+                    )
+                    VALUES (?, ?)
+                    """,
+                    (
+                        provider,
+                        str(
+                            instrument
+                            .instrument_id
+                        ),
+                    ),
+                )
+
             connection.commit()
 
         except Exception:
@@ -281,6 +318,59 @@ class SecurityMasterRepository:
 
         finally:
             connection.close()
+
+    @staticmethod
+    def _latest_admitted_instrument_count(
+        connection,
+        provider,
+    ) -> int:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM security_master_admissions
+            WHERE provider = ?
+            ORDER BY snapshot_date DESC
+            LIMIT 1
+            """,
+            (
+                provider.strip().lower(),
+            ),
+        ).fetchone()
+
+        if row is None:
+            return 0
+
+        receipt = (
+            SecurityMasterRepository
+            ._decode_admission(row)
+        )
+
+        count = receipt.get(
+            "instrument_count"
+        )
+
+        if (
+            type(count) is not int
+            or count < 0
+        ):
+            raise ValueError(
+                "invalid previous security master admission"
+            )
+
+        return count
+
+    def latest_admitted_instrument_count(
+        self,
+        provider: str,
+    ) -> int:
+        with self.database.connect() as connection:
+            return (
+                self
+                ._latest_admitted_instrument_count(
+                    connection,
+                    provider,
+                )
+            )
 
     @staticmethod
     def _record_admission(connection, provider, instruments, manifest):
@@ -293,10 +383,13 @@ class SecurityMasterRepository:
         ).fetchone()[0]
         if latest is not None and latest > manifest.market_date.isoformat():
             raise ValueError('historical admission cannot replace newer snapshot')
-        previous = connection.execute(
-            'SELECT COUNT(*) FROM canonical_instruments WHERE source_provider = ?',
-            (provider,),
-        ).fetchone()[0]
+        previous = (
+            SecurityMasterRepository
+            ._latest_admitted_instrument_count(
+                connection,
+                provider,
+            )
+        )
         if (not any(i.instrument_type.value == 'EQUITY' for i in instruments)
                 or len(instruments) < previous * MIN_RETAINED_FRACTION):
             raise ValueError('incomplete admitted snapshot')
@@ -573,18 +666,22 @@ class SecurityMasterRepository:
     def list_equity_tickers(
         self,
     ) -> tuple[str, ...]:
-        """Distinct EQUITY canonical tickers across all provider snapshots.
+        """Distinct EQUITY canonical tickers in each provider's current snapshot.
 
         Multiple providers may each hold a row for the same real instrument;
         this is scope attribution only, never dated membership evidence.
+        Identities retained only for historical attribution (absent from the
+        provider's latest snapshot write) are excluded.
         """
         with self.database.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT DISTINCT canonical_ticker
-                FROM canonical_instruments
-                WHERE instrument_type = ?
-                ORDER BY canonical_ticker
+                SELECT DISTINCT i.canonical_ticker
+                FROM security_master_current_members AS m
+                JOIN canonical_instruments AS i
+                  ON i.instrument_id = m.instrument_id
+                WHERE i.instrument_type = ?
+                ORDER BY i.canonical_ticker
                 """,
                 ("EQUITY",),
             ).fetchall()

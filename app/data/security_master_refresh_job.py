@@ -116,7 +116,7 @@ class SecurityMasterRefreshJob:
         previous = (
             self
             .security_master_repository
-            .count_provider_instruments(
+            .latest_admitted_instrument_count(
                 provider
             )
         )

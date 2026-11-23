@@ -23,6 +23,10 @@ def make_db(tmp_path, tickers=("COMI", "EAST", "FWRY")):
             "INSERT INTO canonical_instruments (instrument_id, instrument_type, canonical_ticker, "
             "name_en, source_provider, source_symbol_code, source_sha256, normalization_notes_json, updated_at) "
             "VALUES ('idx', 'INDEX', 'EGX30', 'EGX30', 'egid', 'idx', 'x', '[]', '2026-09-26T00:00:00+00:00')")
+        # Schema 13: scan scope reads the current provider-snapshot membership.
+        con.execute(
+            "INSERT INTO security_master_current_members (provider, instrument_id) "
+            "SELECT source_provider, instrument_id FROM canonical_instruments")
     return db_path
 
 
