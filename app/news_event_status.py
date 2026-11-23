@@ -63,6 +63,9 @@ EMPIRICAL_COMPONENTS = (
      'decision-outcome-checked-event-state-metrics-v1'),
     ('app.decision_outcome_checked_data_age', 'decision-outcome-checked-data-age-metrics-v1'),
     ('app.decision_outcome_checked_sample', 'decision-outcome-checked-sample-assessment-v1'),
+    # Pure read-side gate for retained metrics-job result bytes; no publisher,
+    # loader, route or caller yet, so no stage or gap changes.
+    ('app.decision_outcome_metrics_reader', 'decision-outcome-metrics-report-reader-v1'),
 )
 
 # Repository-level declarations. The stores take an explicit directory

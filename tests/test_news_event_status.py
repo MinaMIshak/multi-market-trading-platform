@@ -446,6 +446,28 @@ def test_declared_gaps_match_the_code():
                    ROOT / 'app' / 'decision_outcome_job.py',
                    ROOT / 'app' / 'decision_outcome_producer.py'):
         assert 'decision_outcome_checked_sample' not in source.read_text(encoding='utf-8')
+    # decision-outcome-metrics-report-reader-v1: a pure read-side gate for
+    # retained metrics-job result bytes. It reads no file, store or database,
+    # writes nothing, recomputes no metric, and no publisher, loader, route or
+    # job calls it (no caller outside the components, checked above), so no
+    # stage or gap changes.
+    assert [p.name for p in (ROOT / 'app').glob('decision_outcome_metrics_reader*.py')] == [
+        'decision_outcome_metrics_reader.py']
+    metrics_reader = (ROOT / 'app' / 'decision_outcome_metrics_reader.py').read_text(
+        encoding='utf-8').split('"""', 2)[2]
+    assert 'def read_retained_egx_metrics_report(payload, *, expected_sha256):' in metrics_reader
+    assert "_require(canonical == payload, 'retained report is not canonical')" in metrics_reader
+    assert not re.search(r'\b(connect|sqlite3|open|INSERT|UPDATE|DELETE|load_\w+|retain_\w+|'
+                         r'run_egx_decision_outcome_metrics_job|aggregate_\w+|'
+                         r'partition_egx_attested_outcomes|select_egx_checked_outcomes)\b',
+                     metrics_reader)
+    assert "'live_money': False" in metrics_reader
+    assert "'promotion': 'NOT_AUTHORIZED'" in metrics_reader
+    for source in (ROOT / 'app' / 'decision_outcome_metrics_job.py',
+                   ROOT / 'app' / 'decision_outcome_job.py',
+                   ROOT / 'app' / 'decision_outcome_producer.py',
+                   ROOT / 'app' / 'ui' / 'system.py'):
+        assert 'decision_outcome_metrics_reader' not in source.read_text(encoding='utf-8')
     assert "'corporate_actions': 'NOT_CHECKED'" in outcome_job
     assert "'performance_claim': 'NONE'" in outcome_job
     assert "'promotion': 'NOT_AUTHORIZED'" in outcome_job

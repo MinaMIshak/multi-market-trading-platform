@@ -1073,6 +1073,35 @@ NOT_ASSESSED, `empirical_validation` NOT_VALIDATED, no cross-segment headline,
 no performance claim, `promotion` NOT_AUTHORIZED. No repository policy instance
 exists, so gap SAMPLE_ASSESSMENT_POLICY_NOT_REGISTERED stays open.
 
+## Retained metrics report gate (`app.decision_outcome_metrics_reader`, decision-outcome-metrics-report-reader-v1)
+
+Status: pure library, pending host validation; no publisher, loader, route,
+page or caller.
+
+First step toward a protected read-only SYSTEM view of a host-published checked
+metrics report, following the card-report pattern (pure gate, then publisher,
+protected loader, and a route only after the evidence path is protected).
+`read_retained_egx_metrics_report(payload, *, expected_sha256)` accepts only
+bounded bytes whose SHA-256 matches, that are strict JSON (no duplicate keys or
+NaN) and that equal `canonical_bytes` of themselves, holding a REPORTED
+decision-outcome-metrics-job-v2 result. It checks exact field sets and fixed
+labels (writes NONE, performance_claim NONE, SHADOW, LIVE_MONEY=false,
+NOT_AUTHORIZED; booleans must be real booleans), normalised UTC `as_of` at or
+before `job_clock`, the job's selection labels and arithmetic, and that the
+embedded checked report and metrics agree with the selection (outcomes and
+attestations supplied, attestation counts covering every outcome, counted =
+attested CLEAR by `as_of`, attested-after identities, population and outcome
+counts, same `as_of`). `event_state_report` must be NOT_REQUESTED or a checked
+event-state report whose selection fields and partition are byte-identical to
+the checked report's. A FAILED job result is refused. Any drift raises
+`RetainedMetricsReportError`; callers must treat it as UNAVAILABLE and show
+nothing partial.
+
+It does not recompute metrics, partitions or attestations, reads no store,
+cannot prove population or attestation completeness (still
+CALLER_ASSERTED_UNVERIFIED) and assesses no sample. A digest is an integrity check,
+not a signature. No stage or gap changes.
+
 ## Outcome store (`app.decision_outcome_store`, decision-outcome-retention-v1)
 
 Status: library only, pending host validation; no directory provisioned, no
@@ -1327,7 +1356,8 @@ retains), a provisioned
 attestation directory (gap OUTCOME_ATTESTATION_STORE_NOT_PROVISIONED), a
 schedule invoking the read-only checked metrics job (gaps
 OUTCOME_METRICS_JOB_NOT_SCHEDULED and OUTCOME_CORPORATE_ACTIONS_NOT_CHECKED),
-a provisioned directory for outcome
+a publisher, protected loader and read-only SYSTEM view for retained metrics
+reports (only the pure byte gate exists), a provisioned directory for outcome
 retention, a registered operational
 evaluation-period policy, regime segmentation, a registered
 sample-assessment policy, a registered data-age policy and session-aware data
