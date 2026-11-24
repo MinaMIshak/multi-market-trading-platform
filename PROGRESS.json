@@ -1177,6 +1177,16 @@
       "tests": "NOT run by the file-only executor. Host must run the affected storage/security-master/reference/universe-scan suites and the full scanner_product profile.",
       "host_validation_reconciliation": "Host scanner_product run 2026-11-23T20:54:57Z (fingerprint b99a144f...) reported 1 failed, 1244 passed: tests/test_quota.py::test_v7_upgrade_requires_permission_and_preserves_data still pinned schema_version 12 after a permitted v7 upgrade. Semantically stale schema pin (current SCHEMA_VERSION is 13); file-only executor updated the expectation to 13 with no production-code change. Re-validation by the trusted host is pending; not run by the executor.",
       "production_schema": "v13 upgrade on copied production state (including backfill row count == pre-upgrade canonical_instruments count, and no duplicate dated universes) is pending authorized-host evidence; no production migration executed."
+    },
+    "egx_universe_changes": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.data.egx_universe_changes.compare_egx_universes(previous, current): pure egx-universe-changes-v1 between two exact, revalidated egx-universe-v1 documents (model_construct bypass re-run; strictly increasing effective dates; identical canonical bytes refused). Keyed by canonical instrument_id: ADDED, ABSENT, SYMBOL_CHANGED (same identity, new symbol), ELIGIBILITY_CHANGED and SYMBOL_REASSIGNED (one symbol bound to different identities, never reported as a rename); deterministic, member-order independent; previous/current digests equal the publisher's retained payload SHA-256; result contract re-checks count consistency. Fixed labels: listing/delisting/symbol-change interpretation NOT_ESTABLISHED, intermediate_dates NOT_OBSERVED, source_review NOT_CHECKED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No IO, store, job, route or caller; publisher and builder unchanged.",
+      "files": [
+        "app/data/egx_universe_changes.py",
+        "tests/test_egx_universe_changes.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_egx_universe_changes.py."
     }
   }
 }
