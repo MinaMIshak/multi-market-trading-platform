@@ -1148,7 +1148,7 @@
     "status": "ACTIVE",
     "priority": "P0",
     "egx_authoritative_universe": "REQUIRED",
-    "us_new_listing_admission": "REQUIRED",
+    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder pending host validation; no retained baseline, caller or ranking)",
     "runtime_provisioning": "PENDING",
     "scheduling": "PENDING",
     "end_to_end_daily_run": "PENDING",
@@ -1197,6 +1197,16 @@
         "PROGRESS.json"
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_egx_universe_reviewed_changes.py."
+    },
+    "us_new_listing_admission": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Phase B first unit. app.us.new_listings.build_new_listing_admissions(baseline_master, current_master, scanner_rows, normal_universe, *, baseline_observed_at, current_observed_at, policy=None): pure US-NEW-LISTING-v1 separate NEW_LISTING population. Admission authority is the Nasdaq Trader directory only: symbols present (non-test) in the current parse_master output and absent from a baseline master observed within an explicit declared-unvalidated window (us-new-listing-policy-v1: 28-60 days, provisional avg dollar volume floor 1,000,000, max 100 members, max 1000 new-to-directory before failing closed as implausible). The TradingView scanner only refines (primary common on NASDAQ/NYSE/AMEX) and supplies provisional liquidity labelled UNVERIFIED for short histories; scanner-only tickers are never considered. Exclusions counted: ETF_IN_MASTER, NOT_COMMON_PRIMARY_IN_SCANNER, BELOW_NEW_LISTING_LIQUIDITY_FLOOR, BEYOND_MAX_MEMBERS. Deterministic transition: normal US-UNIVERSE-v1 membership wins (listed in in_normal_universe, never both), and new-listing status ends once the baseline contains the symbol. Fails closed on unnormalized/malformed masters, duplicate or non-Decimal scanner rows, wrong normal-universe version or duplicate members, naive clocks and out-of-window baselines. Labels: observation clock CALLER_SUPPLIED_UNVERIFIED, ipo_interpretation NOT_ESTABLISHED, trading_eligibility NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No IO, retained baseline store, us_run caller, ranking, route or scheduler; app.us.universe unchanged.",
+      "files": [
+        "app/us/new_listings.py",
+        "tests/test_us_new_listings.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listings.py."
     }
   }
 }
