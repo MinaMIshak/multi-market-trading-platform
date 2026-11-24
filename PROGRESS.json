@@ -1148,7 +1148,7 @@
     "status": "ACTIVE",
     "priority": "P0",
     "egx_authoritative_universe": "REQUIRED",
-    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder pending host validation; no retained baseline, caller or ranking)",
+    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader pending host validation; no caller, job or ranking)",
     "runtime_provisioning": "PENDING",
     "scheduling": "PENDING",
     "end_to_end_daily_run": "PENDING",
@@ -1207,6 +1207,16 @@
         "PROGRESS.json"
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listings.py."
+    },
+    "us_new_listing_retained_baseline": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Phase B second unit. app.us.new_listing_baseline.load_retained_directory_master(data_root, universe, *, as_of, max_retrieval_skew_seconds=900): read-only us-directory-baseline-v1 reconstructing the Nasdaq Trader master of one earlier retained US-UNIVERSE-v1 document from the bytes app.us_run.collect_universe already stored content-addressed (<data_root>/context/raw/nasdaqtrader/<sha256>.txt) and the provenance it recorded. Requires exactly one nasdaqtrader record per directory URL (other sources ignored), lowercase SHA-256 digests (no path traversal), regular non-symlink files whose bytes hash to the recorded digest, aware ISO retrieved_at not after as_of (no look-ahead), retrievals within the declared skew, and a re-parsed master size equal to the recorded master_symbols. Decodes exactly as collect_universe (utf-8, replace) and parses with the unchanged parse_master. observed_at = later retrieval, labelled RETAINED_PROVENANCE_RETRIEVED_AT_UNVERIFIED; membership_interpretation NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. Output feeds the unchanged build_new_listing_admissions as baseline_master/baseline_observed_at. No network, writes, job, route, scheduler or us_run caller; app.us.universe, app.us.new_listings and app.us_run unchanged.",
+      "files": [
+        "app/us/new_listing_baseline.py",
+        "tests/test_us_new_listing_baseline.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listing_baseline.py."
     }
   }
 }
