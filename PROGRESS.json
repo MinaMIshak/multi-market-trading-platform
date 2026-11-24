@@ -1187,6 +1187,16 @@
         "PROGRESS.json"
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_egx_universe_changes.py."
+    },
+    "egx_reviewed_universe_changes": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "app.data.egx_universe_reviewed_changes.load_reviewed_egx_universe_changes(references, *, previous_date, current_date, as_of): egx-reviewed-universe-changes-v1 composing the unchanged PIT reader ReferenceRepository.universe (exactly one dated egx-universe-v1 per date at an aware as_of, later receipt/completion/publication invisible, independent egx-source-review-v1 required) with the unchanged pure compare_egx_universes. Exact date/datetime/repository types, strictly increasing dates and current date not after as_of in Africa/Cairo checked before any read. Records per date the selected ingestion id, provider, retained raw SHA-256, the accepted review ingestion ids (sorted, unique, never the universe itself) and retained_bytes_canonical (true only when the retained bytes equal the publisher-canonical digest). Fixed labels selection_rule EXACT_DATED_REVIEWED_AT_AS_OF_V1, source_review REVIEWED_AT_AS_OF, listing/delisting/symbol-change interpretation NOT_ESTABLISHED, intermediate_dates NOT_OBSERVED, trading_effect NONE, SHADOW, LIVE_MONEY=false; the embedded egx-universe-changes-v1 keeps its own source_review NOT_CHECKED. Writes no evidence; the only durable side effect is the unchanged reader's idempotent data-quality issue on refusal. No network, publisher, review creation, job, route or caller; reader, publisher, builder and comparison unchanged.",
+      "files": [
+        "app/data/egx_universe_reviewed_changes.py",
+        "tests/test_egx_universe_reviewed_changes.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_egx_universe_reviewed_changes.py."
     }
   }
 }
