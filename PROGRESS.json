@@ -1148,7 +1148,7 @@
     "status": "ACTIVE",
     "priority": "P0",
     "egx_authoritative_universe": "REQUIRED",
-    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader pending host validation; no caller, job or ranking)",
+    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader committed e623b39; read-only us-retained-new-listing-v1 composition rebuilding every builder input from retained evidence pending host validation; no caller, job or ranking)",
     "runtime_provisioning": "PENDING",
     "scheduling": "PENDING",
     "end_to_end_daily_run": "PENDING",
@@ -1217,6 +1217,16 @@
         "PROGRESS.json"
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listing_baseline.py."
+    },
+    "us_new_listing_retained_admissions": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Phase B third unit. app.us.new_listing_retained.build_retained_new_listing_admissions(data_root, baseline_universe, current_universe, *, as_of, policy=None, max_retrieval_skew_seconds=900): read-only us-retained-new-listing-v1 rebuilding every input of the unchanged build_new_listing_admissions from bytes app.us_run.collect_universe already retained and the provenance it recorded in two US-UNIVERSE-v1 documents (full or the member-less us-ranking.json summary). Baseline and current masters via the unchanged load_retained_directory_master; current scanner rows from <data_root>/context/raw/tradingview_scanner/<sha256>.json (exactly one tradingview_scanner record for SCANNER_URL, lowercase digest, regular non-symlink file, byte hash, recorded scanner_rows count; unchanged parse_scanner); scanner retrieval not after as_of and within the declared skew of the current directory observation. The normal universe is re-run with the unchanged build_universe at the recorded size and refused unless version/size/eligible/scanner_rows/master_symbols/excluded/floor (and member tickers when recorded) are reproduced exactly. current_observed_at = latest current retrieval. Builder document returned unchanged under admissions; wrapper labels observation_clock RETAINED_PROVENANCE_RETRIEVED_AT_UNVERIFIED, ipo_interpretation/trading_eligibility NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No network, writes, job, route, scheduler or us_run caller; universe, new_listings, new_listing_baseline and us_run unchanged. Known gap: us-ranking.json is overwritten each run, so no retained history of earlier universe documents yet exists to serve as a baseline (raw bytes are retained, their provenance is not).",
+      "files": [
+        "app/us/new_listing_retained.py",
+        "tests/test_us_new_listing_retained.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listing_retained.py."
     }
   }
 }
