@@ -43,6 +43,10 @@ import sqlite3
 import sys
 import uuid
 
+# The host action invokes this file directly, without an installed package.
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from app.storage.database import SCHEMA_VERSION, Database
 
 CONTRACT = 'schema-13-rehearsal-v1'

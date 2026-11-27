@@ -1251,5 +1251,20 @@
       ],
       "tests": "Written by file-only Claude paced executor; NOT run. A later file-only closure cycle statically re-checked the module and tests against the reused helpers (news_event_store directory/lock/write-once, news_event_record _pairs/_constant, card-report loader _read_regular, provenance(), build_universe) and found no defect; no code change. Host validation at 909d057 then FAILED 1/1245: tests/test_news_event_status.py::test_declared_gaps_match_the_code rejected the direct app.news_event_record/app.news_event_store imports. A file-only fix cycle replaced them with local equivalents (MAX_BYTES 256 KiB, _pairs/_constant, _RECORD_NAME/_TEMP_NAME, _open_directory, _write_once raising UsUniverseStoreError directly; the _translated wrapper removed), behavior unchanged; tests/test_news_event_status.py and app.news_event_* untouched; NOT run. Host validation required, and the trusted profile must collect tests/test_us_universe_store.py (it imports helpers from tests/test_us_new_listing_retained.py)."
     }
+  },
+  "phase_a_execution_checkpoint": {
+    "head": "c484fce4b07af109e30d840dd588100a87ad04c7",
+    "status": "HOST_REHEARSAL_ENTRYPOINT_FIX_PENDING_REVIEW",
+    "host_evidence": "20261127T140533Z HOST_ACTION_RESULT: FAIL RC=1; report missing; direct script invocation raises ModuleNotFoundError: app. SOURCE_UNCHANGED=true. No schema acceptance established.",
+    "correction": "Direct script execution adds its repository root before importing app; module invocation and committed connection lifecycle unchanged. Regression executes full temporary-copy rehearsal outside repository without PYTHONPATH.",
+    "tests": "46 passed in affected rehearsal and security-master suites, including 8 rehearsal tests. Trusted validation of correction pending.",
+    "next_action": "Claude review, trusted scanner_product validation including rehearsal tests, supervisor commit/push; then request RUN_SCHEMA_V13_REHEARSAL and reconcile evidence before publisher acceptance work.",
+    "remaining": "Copy-only schema evidence, publisher retry/idempotency and no review creation, PIT refusal before separate independent review and success after valid review, explicit source authority/membership interpretation.",
+    "egx_current_counts": "Authoritative universe/data-ready/scanned/status counts unverified.",
+    "us_current_counts": "Universe/data-ready/scanned/candidates unverified; Phase B gated.",
+    "deployment": "No deployment or operational DB mutation performed.",
+    "scheduler": "Unchanged; current state unverified.",
+    "hard_blocker": null,
+    "live_money": false
   }
 }

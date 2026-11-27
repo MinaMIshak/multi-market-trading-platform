@@ -2,7 +2,10 @@
 from contextlib import closing
 import json
 import os
+from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 
 import pytest
 
@@ -122,6 +125,24 @@ def test_main_exit_codes(tmp_path, capsys):
     assert main(['--db', str(source), '--out', str(tmp_path / 'ok')]) == 1
     bad = _source(tmp_path / 'dup', duplicate_universe=True)
     assert main(['--db', str(bad), '--out', str(tmp_path / 'bad')]) == 2
+
+
+def test_direct_script_rehearsal_without_pythonpath(tmp_path):
+    source = _source(tmp_path)
+    before = source.read_bytes()
+    out = tmp_path / 'direct'
+    script = Path(__file__).resolve().parents[1] / 'tools/rehearse_schema_v13.py'
+    env = dict(os.environ)
+    env.pop('PYTHONPATH', None)
+    result = subprocess.run(
+        [sys.executable, str(script), '--db', str(source), '--out', str(out)],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads((out / REPORT_NAME).read_text())
+    assert report['status'] == 'PASS'
+    assert report['target'] == 'COPY_ONLY' and report['live_money'] is False
+    assert source.read_bytes() == before and _version(source) == 12
 
 
 @pytest.mark.parametrize('duplicate_universe', [False, True])
