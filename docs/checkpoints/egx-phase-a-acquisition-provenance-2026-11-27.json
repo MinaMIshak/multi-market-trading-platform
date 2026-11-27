@@ -1,0 +1,55 @@
+{
+  "contract": "egx-phase-a-acquisition-provenance-v1",
+  "head": "0f975150e75790a374b52c7574a98531b97536f5",
+  "evidence_class": "LOCAL_READ_ONLY_CHECK_NOT_TRUSTED_ACCEPTANCE",
+  "raw_path": "/home/egx-agent/research-data/paper-shadow-operational/data/raw/egid/security_master/undated/_all/market-watch-names.json",
+  "raw_sha256": "11990fc9608de1be1b08861fd364da8e6908ee215ee24989255f9f927c46c02e",
+  "raw_byte_size": 82816,
+  "row_count": 319,
+  "row_key_sets": [
+    [
+      "ARB_NAME",
+      "ENG_NAME",
+      "Reuters",
+      "SYMBOL_CODE",
+      "arb_shortname",
+      "eng_shortname"
+    ]
+  ],
+  "payload_interpretation": "All 319 records have only the six listed name/identifier fields. No explicit effective date, population coverage, suspension or listing status field is present. This does not prove the absence of supporting evidence elsewhere.",
+  "acquisition_code_findings": [
+    {
+      "path": "app/data/providers/egid.py",
+      "finding": "fetch_security_master preserves getAllMarketWatchNames payload and counts records; no upstream effective-date evidence is extracted."
+    },
+    {
+      "path": "app/data/security_master_refresh_cli.py",
+      "finding": "snapshot_date comes from caller --snapshot-date or current Cairo date. This is acquisition labeling, not independent evidence of effective membership. The docstring word reviewed is not a retained source-authority review."
+    },
+    {
+      "path": "app/data/security_master_ingestion.py",
+      "finding": "ingest stores caller snapshot_date as manifest market_date and metadata snapshot_date. Replaying undated retained bytes here cannot establish their historical effective date."
+    },
+    {
+      "path": "docs/EGX_SOURCE_EVALUATION_2026-09-30.md",
+      "finding": "Historical evaluation explicitly says no dated authoritative membership source was found; displayed market-watch coverage and use rights were unresolved. This is historical context, not current live-source verification."
+    }
+  ],
+  "isolated_harness_requirements": [
+    "Use a fresh disposable workspace, explicit paths, and no operational database defaults; preserve host rehearsal artifacts.",
+    "Run retained-input preflight before admission or publication. Missing effective-date evidence must refuse without substituting receipt time, file time, or a caller-selected date.",
+    "Require separately retained evidence for the upstream effective date and population scope; preflight passing alone does not prove source authority.",
+    "Once input is suitable, record exact admission and observation digests and actual observation time; compare publisher retry bytes, IDs, timestamps and row counts.",
+    "Count source-review artifacts before and after publishing and prove pre-review PIT refusal. Do not create an approved review in the publisher exercise.",
+    "Independent source review is a separate action binding exact subject identifiers and retained authority, coverage and permitted-use evidence. Post-review PIT success remains pending until that action is valid."
+  ],
+  "host_rehearsal": "Existing 20261127T141311Z PASS remains applicable; no schema change or repeat request.",
+  "latest_trusted_validation_head": "caa729fc47799b4d2c4b22aee2363b21e4185644",
+  "local_tests": "54 passed in 2.51s: retained input, publisher, builder, reviewed changes.",
+  "source_authority": "NOT_ESTABLISHED",
+  "membership_interpretation": "NOT_ESTABLISHED",
+  "publisher_exercised": false,
+  "review_created": false,
+  "production_db_mutated": false,
+  "live_money": false
+}
