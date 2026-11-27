@@ -1252,13 +1252,13 @@
     }
   },
   "phase_a_execution_checkpoint": {
-    "head": "d8ebd8320587b532bcc9c9dab886717a951a9263",
-    "status": "RETAINED_EGID_EFFECTIVE_DATE_GAP",
+    "head": "eecf7899da74937514165c8e40bf4be5c7aa5563",
+    "status": "RETAINED_INPUT_PREFLIGHT_PENDING_TRUSTED_VALIDATION",
     "host_evidence": "20261127T141311Z HOST_ACTION_RESULT PASS; retained REHEARSAL_REPORT.json reconciled. COPY_ONLY schema 9 -> 13; canonical identities 319 -> 319; backfill expected/retained 319, missing/unexpected 0; no duplicate universe dates; integrity ok; foreign-key violations 0; migration retry idempotent; source SHA-256 unchanged; production_db_mutated=false; live_money=false.",
     "acceptance_scope": "NEXT_PRODUCT_MILESTONE Phase-A checks 1-6, 13-14 supported by host rehearsal. Checks 7-12 remain open for trusted publisher/review/source-authority evidence. 319 is a schema reconciliation count, not verified exchange membership.",
-    "change": "Read-only retained-input suitability check verified exact EGID bytes against the rehearsal-copy manifest: SHA-256 11990fc9608de1be1b08861fd364da8e6908ee215ee24989255f9f927c46c02e, 82816 bytes, 319 parsed records. Manifest is RECEIVED with null market_date/completed_at. No dated admission, observation, publication or review created. Evidence: docs/checkpoints/egx-phase-a-retained-input-suitability-2026-11-27.json",
-    "tests": "Documentation/evidence only: JSON parsed, raw hash/size verified, copy hash unchanged. Latest trusted scanner_product PASS names ef79413 with fingerprint a68775c5e43372074b9e12dc0f5a2da16caf9ec23438ff4b4612a52abedaa5e0; this checkpoint awaits normal review/validation.",
-    "next_action": "Prepare a minimal offline retained-input suitability gate with regression coverage for missing effective date, incomplete manifest and digest mismatch, before any isolated publisher rehearsal. Separately locate retained provenance establishing effective date and source scope; never assign the receipt date as membership date. Phase A only.",
+    "change": "Added pure check_retained_egid_input preflight: retained digest/size, EGID security-master scope, explicit effective date, validated completion and PIT chronology. No receipt-date substitution, IO, admission, publication or review. Not wired to a rehearsal caller.",
+    "tests": "Local focused pytest: test_egx_universe_input, test_egx_universe_builder, test_egx_universe_publisher: 34 passed. Independent review and trusted validation pending. Latest host scanner_product PASS names d8ebd8320587b532bcc9c9dab886717a951a9263.",
+    "next_action": "Independent review and trusted validation of preflight; locate retained provenance establishing effective date and source scope before wiring isolated publisher rehearsal. Phase A only.",
     "remaining": "Located retained EGID input is byte-valid but undated and incomplete in the ingestion ledger. Publisher/review acceptance remains open. Source authority, permitted use and authoritative membership remain NOT_ESTABLISHED; no automatic review approval.",
     "egx_current_counts": "Authoritative universe/data-ready/scanned/status counts unverified.",
     "us_current_counts": "Universe/data-ready/scanned/candidates unverified; Phase B gated.",
