@@ -15,10 +15,25 @@ from tools.rehearse_schema_v13 import (
 
 
 def _source(tmp_path, *, downgrade=True, duplicate_universe=False, records=3):
+    """Model the host contract: runtime state -> independent snapshot -> COPY.
+
+    The runtime database (WAL, possibly still referenced by runtime
+    connections) is never mutated here; it is only read through SQLite's
+    backup API into a standalone snapshot owned by the test. Fixture
+    mutations (schema-12 downgrade, duplicate dated universes) are applied
+    to that snapshot only, and the snapshot is the rehearsal input.
+    """
     database, runtime = build(tmp_path / 'src')
     refresh(runtime, records=egid_records(records))
-    path = database.path
-    with closing(sqlite3.connect(path)) as con:
+    snapshot_dir = tmp_path / 'snapshot'
+    snapshot_dir.mkdir(parents=True)
+    snapshot = snapshot_dir / 'platform.db'
+    with closing(sqlite3.connect(database.path.as_uri() + '?mode=ro', uri=True)) as src:
+        with closing(sqlite3.connect(snapshot)) as dst:
+            src.backup(dst)
+    with closing(sqlite3.connect(snapshot)) as con:
+        # Standalone file with a single owner: rollback journal, no WAL sidecars.
+        con.execute('PRAGMA journal_mode=DELETE')
         if downgrade:
             con.execute('DROP TABLE security_master_current_members')
             con.execute('DROP INDEX idx_reference_universe_effective_date_unique')
@@ -29,8 +44,8 @@ def _source(tmp_path, *, downgrade=True, duplicate_universe=False, records=3):
                     "INSERT INTO reference_artifacts (ingestion_id, contract, effective_date)"
                     " VALUES (?, 'egx-universe-v1', '2026-11-03')", (ingestion_id,))
         con.commit()
-        con.execute('PRAGMA journal_mode=DELETE')
-    return path
+    assert not (snapshot_dir / 'platform.db-wal').exists()
+    return snapshot
 
 
 def _version(path):

@@ -1187,6 +1187,8 @@
         "PROGRESS.json"
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host must run tests/test_rehearse_schema_v13.py and the scanner_product profile.",
+      "fixture_fix": "Host report: all rehearsal tests failed in fixture preparation (sqlite3.OperationalError: database is locked) because _source() ran PRAGMA journal_mode=DELETE on the WAL runtime database still referenced by runtime connections. File-only executor reworked the fixture to the host contract runtime state -> independent SQLite snapshot -> rehearsal COPY: the runtime DB is only read (mode=ro) through the SQLite backup API into a standalone tmp snapshot; journal_mode=DELETE and schema-12 downgrade / duplicate-universe mutations apply only to that snapshot, which is the rehearse() input. No production Database or harness code changed. NOT run by the executor; host re-validation pending.",
+      "trusted_validation_gap": "OPEN. trusted_validator.sh scanner_product does not collect tests/test_rehearse_schema_v13.py. The validator lives outside the repository and outside the executor's readable/writable paths, so it was not changed in this cycle; the host must add this file (all five tests) explicitly to scanner_product.",
       "host_evidence": "PENDING. No rehearsal has been run against copied production state; the authorized host must run python -m tools.rehearse_schema_v13 --db <quiescent snapshot platform.db> --out <new dir> and retain the report."
     },
     "egx_universe_changes": {
