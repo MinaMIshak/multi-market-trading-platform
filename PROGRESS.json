@@ -1148,7 +1148,16 @@
     "status": "ACTIVE",
     "priority": "P0",
     "egx_authoritative_universe": "REQUIRED",
-    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader committed e623b39; read-only us-retained-new-listing-v1 composition committed 909d057; write-once us-universe-retention-v1 store of US-UNIVERSE-v1 summaries pending host validation; no caller, job, provisioned store or ranking)",
+    "us_new_listing_admission": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Phase B first unit. app.us.new_listings.build_new_listing_admissions(baseline_master, current_master, scanner_rows, normal_universe, *, baseline_observed_at, current_observed_at, policy=None): pure US-NEW-LISTING-v1 separate NEW_LISTING population. Admission authority is the Nasdaq Trader directory only: symbols present (non-test) in the current parse_master output and absent from a baseline master observed within an explicit declared-unvalidated window (us-new-listing-policy-v1: 28-60 days, provisional avg dollar volume floor 1,000,000, max 100 members, max 1000 new-to-directory before failing closed as implausible). The TradingView scanner only refines (primary common on NASDAQ/NYSE/AMEX) and supplies provisional liquidity labelled UNVERIFIED for short histories; scanner-only tickers are never considered. Exclusions counted: ETF_IN_MASTER, NOT_COMMON_PRIMARY_IN_SCANNER, BELOW_NEW_LISTING_LIQUIDITY_FLOOR, BEYOND_MAX_MEMBERS. Deterministic transition: normal US-UNIVERSE-v1 membership wins (listed in in_normal_universe, never both), and new-listing status ends once the baseline contains the symbol. Fails closed on unnormalized/malformed masters, duplicate or non-Decimal scanner rows, wrong normal-universe version or duplicate members, naive clocks and out-of-window baselines. Labels: observation clock CALLER_SUPPLIED_UNVERIFIED, ipo_interpretation NOT_ESTABLISHED, trading_eligibility NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No IO, retained baseline store, us_run caller, ranking, route or scheduler; app.us.universe unchanged.",
+      "files": [
+        "app/us/new_listings.py",
+        "tests/test_us_new_listings.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listings.py."
+    },
     "runtime_provisioning": "PENDING",
     "scheduling": "PENDING",
     "end_to_end_daily_run": "PENDING",
@@ -1211,16 +1220,6 @@
       ],
       "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_egx_universe_reviewed_changes.py."
     },
-    "us_new_listing_admission": {
-      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
-      "summary": "Phase B first unit. app.us.new_listings.build_new_listing_admissions(baseline_master, current_master, scanner_rows, normal_universe, *, baseline_observed_at, current_observed_at, policy=None): pure US-NEW-LISTING-v1 separate NEW_LISTING population. Admission authority is the Nasdaq Trader directory only: symbols present (non-test) in the current parse_master output and absent from a baseline master observed within an explicit declared-unvalidated window (us-new-listing-policy-v1: 28-60 days, provisional avg dollar volume floor 1,000,000, max 100 members, max 1000 new-to-directory before failing closed as implausible). The TradingView scanner only refines (primary common on NASDAQ/NYSE/AMEX) and supplies provisional liquidity labelled UNVERIFIED for short histories; scanner-only tickers are never considered. Exclusions counted: ETF_IN_MASTER, NOT_COMMON_PRIMARY_IN_SCANNER, BELOW_NEW_LISTING_LIQUIDITY_FLOOR, BEYOND_MAX_MEMBERS. Deterministic transition: normal US-UNIVERSE-v1 membership wins (listed in in_normal_universe, never both), and new-listing status ends once the baseline contains the symbol. Fails closed on unnormalized/malformed masters, duplicate or non-Decimal scanner rows, wrong normal-universe version or duplicate members, naive clocks and out-of-window baselines. Labels: observation clock CALLER_SUPPLIED_UNVERIFIED, ipo_interpretation NOT_ESTABLISHED, trading_eligibility NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No IO, retained baseline store, us_run caller, ranking, route or scheduler; app.us.universe unchanged.",
-      "files": [
-        "app/us/new_listings.py",
-        "tests/test_us_new_listings.py",
-        "PROGRESS.json"
-      ],
-      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listings.py."
-    },
     "us_new_listing_retained_baseline": {
       "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
       "summary": "Phase B second unit. app.us.new_listing_baseline.load_retained_directory_master(data_root, universe, *, as_of, max_retrieval_skew_seconds=900): read-only us-directory-baseline-v1 reconstructing the Nasdaq Trader master of one earlier retained US-UNIVERSE-v1 document from the bytes app.us_run.collect_universe already stored content-addressed (<data_root>/context/raw/nasdaqtrader/<sha256>.txt) and the provenance it recorded. Requires exactly one nasdaqtrader record per directory URL (other sources ignored), lowercase SHA-256 digests (no path traversal), regular non-symlink files whose bytes hash to the recorded digest, aware ISO retrieved_at not after as_of (no look-ahead), retrievals within the declared skew, and a re-parsed master size equal to the recorded master_symbols. Decodes exactly as collect_universe (utf-8, replace) and parses with the unchanged parse_master. observed_at = later retrieval, labelled RETAINED_PROVENANCE_RETRIEVED_AT_UNVERIFIED; membership_interpretation NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. Output feeds the unchanged build_new_listing_admissions as baseline_master/baseline_observed_at. No network, writes, job, route, scheduler or us_run caller; app.us.universe, app.us.new_listings and app.us_run unchanged.",
@@ -1253,14 +1252,14 @@
     }
   },
   "phase_a_execution_checkpoint": {
-    "head": "f1051d929d5c00214afed44e1b055f0d824fcf1b",
-    "status": "SCHEMA_REHEARSAL_ACCEPTED_PUBLISHER_RETRY_REGRESSION_PENDING_TRUSTED_VALIDATION",
+    "head": "e746ff7bc04806022748e4b160236483523e2e40",
+    "status": "SEPARATE_REVIEW_PIT_REGRESSION_PENDING_TRUSTED_VALIDATION",
     "host_evidence": "20261127T141311Z HOST_ACTION_RESULT PASS; retained REHEARSAL_REPORT.json reconciled. COPY_ONLY schema 9 -> 13; canonical identities 319 -> 319; backfill expected/retained 319, missing/unexpected 0; no duplicate universe dates; integrity ok; foreign-key violations 0; migration retry idempotent; source SHA-256 unchanged; production_db_mutated=false; live_money=false.",
     "acceptance_scope": "NEXT_PRODUCT_MILESTONE Phase-A checks 1-6, 13-14 supported by host rehearsal. Checks 7-12 remain open for trusted publisher/review/source-authority evidence. 319 is a schema reconciliation count, not verified exchange membership.",
-    "change": "Strengthened existing exact publisher retry regression: compare complete logical database dump and retained file paths/bytes before and after retry; verify payload digest and no source-review artifact. Production code unchanged.",
-    "tests": "39 passed in 3.30s: publisher, builder, reviewed changes and schema rehearsal suites. Local test fixtures only; not operational or authoritative market evidence. Trusted validation of this change pending.",
-    "next_action": "Claude review and trusted scanner_product validation of publisher retry regression, then supervisor commit/push. Continue Phase A with separate independent review/PIT acceptance and explicit source-authority interpretation; do not rerun or re-fix completed schema rehearsal without new evidence.",
-    "remaining": "Publisher/review acceptance evidence on retained inputs; separate independent review; PIT refusal before review and success only after valid review; authoritative source/membership interpretation. Existing host validation file names c484fce, not current f1051d9; do not claim it validates this change.",
+    "change": "Added publisher-to-separate-review lifecycle regression with three mismatched review bindings. PIT refuses before review, after mismatched review, and at the pre-review cutoff even after valid review receipt; succeeds with exactly the valid review ID afterward. Synthetic isolated fixtures only; no source approval or operational mutation.",
+    "tests": "22 focused tests passed; 34 affected publisher/builder/reviewed-changes tests passed in 2.20s. git diff --check passed. Initial test launch attempts unavailable (python absent, system python3 lacks pytest); repository .venv used successfully. An attempted broader command referenced nonexistent tests/test_schema_rehearsal.py and collected no tests; corrected affected suite passed.",
+    "next_action": "Claude review and trusted scanner_product validation of this regression, then supervisor commit/push. Continue Phase A retained-input publisher/review evidence and explicit source authority/membership interpretation. No Phase B.",
+    "remaining": "Real retained-input publisher retry and independent review/PIT acceptance plus source-authority/membership interpretation remain open. Synthetic tests establish contract behavior only. Latest trusted scanner_product PASS names f1051d9 with working-tree fingerprint; Claude approved prior retry changes now committed at e746ff7. Neither validates this new regression.",
     "egx_current_counts": "Authoritative universe/data-ready/scanned/status counts unverified.",
     "us_current_counts": "Universe/data-ready/scanned/candidates unverified; Phase B gated.",
     "deployment": "No deployment or operational DB mutation performed.",

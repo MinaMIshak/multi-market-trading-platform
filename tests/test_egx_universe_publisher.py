@@ -483,3 +483,61 @@ def test_bad_sha_format_fails_before_lookup(
             snapshot_date=DAY,
             artifact_sha256="ABC",
         )
+
+
+@pytest.mark.parametrize("mismatch", ["subject_sha256", "subject_provider", "subject_ingestion_id"])
+def test_published_universe_requires_separate_exact_review(runtime, mismatch):
+    """Fixture lifecycle evidence only; this does not approve a real source."""
+    database, security_master, references = runtime
+    seed_admission(database)
+    publication = publish_egx_universe(
+        security_master=security_master,
+        references=references,
+        snapshot_date=DAY,
+        artifact_sha256=ARTIFACT_SHA,
+    )
+    before_review = datetime.now(timezone.utc)
+    with pytest.raises(ValueError, match="validation evidence unavailable"):
+        references.universe(market_date=DAY, as_of=before_review)
+
+    review = dict(
+        contract="egx-source-review-v1",
+        subject_ingestion_id=publication.ingestion_id,
+        subject_sha256=publication.universe_sha256,
+        subject_provider=PUBLISHER_PROVIDER,
+        subject_contract="egx-universe-v1",
+        reviewed_at=before_review.isoformat(),
+        reviewer="independent-fixture-reviewer",
+        evidence_uri="fixture://not-authoritative-source-evidence",
+        methodology="Synthetic binding check only; exchange membership not established",
+        approved=True,
+    )
+    wrong = dict(review)
+    wrong[mismatch] = {
+        "subject_sha256": "b" * 64,
+        "subject_provider": "different-provider",
+        "subject_ingestion_id": str(uuid4()),
+    }[mismatch]
+    references.ingest(
+        provider="fixture-reviewer", payload=canonical_json(wrong).encode(),
+        source_uri="fixture://mismatched-review", contract=review["contract"],
+    )
+    with pytest.raises(ValueError, match="validation evidence unavailable"):
+        references.universe(market_date=DAY, as_of=datetime.now(timezone.utc))
+
+    # Review is a separate ingestion, never a publisher side effect.
+    valid = references.ingest(
+        provider="fixture-reviewer", payload=canonical_json(review).encode(),
+        source_uri="fixture://separate-review", contract=review["contract"],
+    )
+    # Later receipt must not retroactively authorize the earlier PIT query.
+    with pytest.raises(ValueError, match="validation evidence unavailable"):
+        references.universe(market_date=DAY, as_of=before_review)
+    row, document, review_ids = references.universe(
+        market_date=DAY, as_of=datetime.now(timezone.utc),
+    )
+    assert row["ingestion_id"] == publication.ingestion_id
+    assert review_ids == (str(valid.ingestion_id),)
+    assert str(valid.ingestion_id) != publication.ingestion_id
+    assert len(document.members) == publication.member_count
+    assert publication.live_money is False
