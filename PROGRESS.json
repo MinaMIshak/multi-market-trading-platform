@@ -1148,7 +1148,7 @@
     "status": "ACTIVE",
     "priority": "P0",
     "egx_authoritative_universe": "REQUIRED",
-    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader committed e623b39; read-only us-retained-new-listing-v1 composition rebuilding every builder input from retained evidence pending host validation; no caller, job or ranking)",
+    "us_new_listing_admission": "PARTIAL (pure US-NEW-LISTING-v1 population builder committed 1ca7540; read-only us-directory-baseline-v1 retained-baseline loader committed e623b39; read-only us-retained-new-listing-v1 composition committed 909d057; write-once us-universe-retention-v1 store of US-UNIVERSE-v1 summaries pending host validation; no caller, job, provisioned store or ranking)",
     "runtime_provisioning": "PENDING",
     "scheduling": "PENDING",
     "end_to_end_daily_run": "PENDING",
@@ -1226,7 +1226,17 @@
         "tests/test_us_new_listing_retained.py",
         "PROGRESS.json"
       ],
-      "tests": "Written by file-only Claude paced executor; NOT run in this cycle. Host validation required, and the trusted profile must collect tests/test_us_new_listing_retained.py."
+      "tests": "Written by file-only Claude paced executor; committed at 909d057 by the host. No host validation result for 909d057 is recorded in this checkpoint; the trusted profile must collect tests/test_us_new_listing_retained.py."
+    },
+    "us_universe_retention_store": {
+      "status": "IMPLEMENTED_PENDING_HOST_VALIDATION",
+      "summary": "Phase B fourth unit; closes the known gap that us-ranking.json is overwritten so no earlier universe provenance survives. app.us.universe_store: us-universe-retention-v1 write-once content-addressed <sha256>.json store (canonical sorted/compact/ASCII bytes, 0444) of member-less US-UNIVERSE-v1 summaries (exactly the universe object us_run publishes; members dropped, members_retained false), with self-contained directory-safety/write-once/strict-JSON helpers (no app.news_event_* dependency, per the tests/test_news_event_status.py boundary) reusing only the card-report loader's no-follow bounded read and the card-report publisher's temp-file/unlink/fsync helpers. Reader read_retained_us_universe: bounded bytes, digest, strict JSON (no duplicate keys/NaN), exact field set, US-UNIVERSE-v1, int counts (bool refused), eligible + excluded == scanner_rows, floor null iff nothing eligible else integer string, exactly one provenance record for each Nasdaq Trader directory URL and the TradingView scanner URL (lowercase SHA-256, aware retrieved_at, only last_modified/etag/date as extra string headers), canonical re-encode. retain_us_universe(directory, universe, *, now): validate before any write, exclusive non-blocking lock (STORE_BUSY), full fail-closed scan (STORE_INVALID; leftover .publish-*.tmp tolerated), exact retry ALREADY_RETAINED, every retrieved_at at or before the store clock (OBSERVED_IN_FUTURE) and within declared-unvalidated MAX_OBSERVATION_LAG 6h (OBSERVATION_BACKDATED), different summary with identical provenance and size PROVENANCE_CONFLICT, MAX_RECORDS 10000, post-write verification. load_retained_us_universes returns RetainedUsUniverse(identity, observed_at = latest retrieved_at labelled RETAINED_PROVENANCE_RETRIEVED_AT_UNVERIFIED, summary) ordered by (observed_at, identity); retained summaries feed the unchanged build_retained_new_listing_admissions (test proves identical result to direct summaries). Raw bytes are not read at retention; the unchanged loaders re-verify them at use. membership_interpretation/trading_eligibility NOT_ESTABLISHED, trading_effect NONE, SHADOW, LIVE_MONEY=false. No network, database, caller, us_run change, baseline selection, job, scheduler, route or provisioned directory.",
+      "files": [
+        "app/us/universe_store.py",
+        "tests/test_us_universe_store.py",
+        "PROGRESS.json"
+      ],
+      "tests": "Written by file-only Claude paced executor; NOT run. A later file-only closure cycle statically re-checked the module and tests against the reused helpers (news_event_store directory/lock/write-once, news_event_record _pairs/_constant, card-report loader _read_regular, provenance(), build_universe) and found no defect; no code change. Host validation at 909d057 then FAILED 1/1245: tests/test_news_event_status.py::test_declared_gaps_match_the_code rejected the direct app.news_event_record/app.news_event_store imports. A file-only fix cycle replaced them with local equivalents (MAX_BYTES 256 KiB, _pairs/_constant, _RECORD_NAME/_TEMP_NAME, _open_directory, _write_once raising UsUniverseStoreError directly; the _translated wrapper removed), behavior unchanged; tests/test_news_event_status.py and app.news_event_* untouched; NOT run. Host validation required, and the trusted profile must collect tests/test_us_universe_store.py (it imports helpers from tests/test_us_new_listing_retained.py)."
     }
   }
 }
