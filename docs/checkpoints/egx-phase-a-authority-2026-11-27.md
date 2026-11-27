@@ -82,3 +82,27 @@ protocol. Continue repository-side retained-input rehearsal preparation as
 needed, then use the normal review/trusted-validation/commit workflow.
 Deployment and scheduler are unchanged; no operational DB mutation is authorized
 by this checkpoint. No Phase B work is included.
+
+## Publisher-input preflight at ef79413
+
+Local read-only inspection of the retained schema rehearsal copy is recorded in
+`egx-phase-a-publisher-input-preflight-2026-11-27.json`. Its SHA-256 before and
+after inspection matches the host report's post-upgrade copy hash. The copy has
+319 canonical identities but **zero admissions and zero observations**. Its
+three reference artifacts comprise one actions document and two existing source
+reviews; there is no universe artifact. Those existing reviews are not evidence
+of a publisher-created review or of approval for a new universe.
+
+Consequently this copy cannot supply the exact publisher prerequisites. Do not
+fabricate historical admissions or observation times from migrated identities.
+Next prepare an isolated admission from an exact retained upstream artifact and
+manifest, checking date/provenance suitability first; any new post-commit
+observation must use its actual clock. Then exercise retry and pre-review PIT
+refusal. Source authority must still be assessed independently before approving
+a separate review. No additional host action name is authorized.
+
+At ef79413 the 34 focused publisher/builder/reviewed-changes tests passed locally
+in 2.39s. The latest trusted scanner_product PASS names db32f01 with fingerprint
+`b873873632305f0f8c0af6b740a9bbe2d4094eab2143cd6377cce65bfd51ef1d`.
+This preflight is local evidence awaiting review, not trusted publisher acceptance.
+No code, operational database, deployment or scheduler was changed.

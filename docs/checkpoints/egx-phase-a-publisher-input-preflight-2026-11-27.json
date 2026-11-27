@@ -1,0 +1,27 @@
+{
+  "contract": "egx-phase-a-publisher-input-preflight-v1",
+  "head": "ef79413fa56fa3bc044149a2110352eba9f46a32",
+  "checked_at": "2026-11-27T14:23:24.193820+00:00",
+  "source": "/home/egx-agent/er1-autopilot/state/EVIDENCE/EGX_PHASE_A/schema_v13_rehearsal/20261127T141311Z/platform-rehearsal.db",
+  "open_mode": "READ_ONLY_QUERY_ONLY",
+  "source_sha256_before": "95d3bf61b6e8d03b42347a789abd135cc7121148aa693af7c55e56d53b87e93c",
+  "source_sha256_after": "95d3bf61b6e8d03b42347a789abd135cc7121148aa693af7c55e56d53b87e93c",
+  "source_unchanged": true,
+  "counts": {
+    "canonical_instruments": 319,
+    "security_master_admissions": 0,
+    "security_master_observations": 0,
+    "reference_artifacts": 3
+  },
+  "reference_contract_counts": {
+    "egx-actions-v1": 1,
+    "egx-source-review-v1": 2
+  },
+  "status": "REQUIRED_RETAINED_INPUTS_ABSENT",
+  "publisher_exercised": false,
+  "review_created": false,
+  "source_authority": "NOT_ESTABLISHED",
+  "membership_interpretation": "NOT_ESTABLISHED",
+  "production_db_mutated": false,
+  "live_money": false
+}
