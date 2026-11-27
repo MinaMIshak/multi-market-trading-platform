@@ -33,7 +33,7 @@ Exit codes: 0 PASS, 2 FAIL (report written), 1 refused/error (no report).
 from __future__ import annotations
 
 import argparse
-from contextlib import closing
+from contextlib import ExitStack, closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -121,9 +121,25 @@ def _count(values):
     return None if values is None else len(values)
 
 
+class _RehearsalDatabase(Database):
+    """Own initialization connections without changing production transactions."""
+
+    def __init__(self, path, connections):
+        super().__init__(path)
+        self._connections = connections
+
+    def connect(self):
+        connection = super().connect()
+        self._connections.enter_context(closing(connection))
+        return connection
+
+
 def _upgrade(path, *, allow_upgrade):
     try:
-        Database(path).initialize(allow_upgrade=allow_upgrade)
+        # initialize's connection context commits/rolls back but does not close.
+        # Close even on failure before inspection or switching WAL to DELETE.
+        with ExitStack() as connections:
+            _RehearsalDatabase(path, connections).initialize(allow_upgrade=allow_upgrade)
     except (RuntimeError, sqlite3.Error) as exc:
         return {'status': 'FAILED', 'error': f'{type(exc).__name__}: {exc}'}
     return {'status': 'COMPLETED', 'error': None}

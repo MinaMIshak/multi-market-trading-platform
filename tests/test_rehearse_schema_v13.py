@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from app.storage.database import SCHEMA_VERSION
+from app.storage.database import SCHEMA_VERSION, Database
 from tests.test_security_master_admission_history import refresh
 from tests.test_security_master_refresh_runtime import build, egid_records
 from tools.rehearse_schema_v13 import (
@@ -122,3 +122,38 @@ def test_main_exit_codes(tmp_path, capsys):
     assert main(['--db', str(source), '--out', str(tmp_path / 'ok')]) == 1
     bad = _source(tmp_path / 'dup', duplicate_universe=True)
     assert main(['--db', str(bad), '--out', str(tmp_path / 'bad')]) == 2
+
+
+@pytest.mark.parametrize('duplicate_universe', [False, True])
+def test_initialization_connections_close_before_inspection(
+        tmp_path, monkeypatch, duplicate_universe):
+    from tools import rehearse_schema_v13 as harness
+
+    source = _source(tmp_path, duplicate_universe=duplicate_universe)
+    before = source.read_bytes()
+    connections = []
+    original_connect = Database.connect
+    original_inspect = harness._inspect
+
+    def retained_connect(database):
+        connection = original_connect(database)
+        # Strong references prevent garbage collection from hiding leaked handles.
+        connections.append(connection)
+        return connection
+
+    def inspect_after_close(path):
+        for connection in connections:
+            with pytest.raises(sqlite3.ProgrammingError, match='closed database'):
+                connection.execute('SELECT 1')
+        return original_inspect(path)
+
+    monkeypatch.setattr(Database, 'connect', retained_connect)
+    monkeypatch.setattr(harness, '_inspect', inspect_after_close)
+    out = tmp_path / 'rehearsal'
+    report = rehearse(db=source, out=out)
+    assert len(connections) == 2  # upgrade and exact retry, including failure paths
+    assert report['status'] == ('FAIL' if duplicate_universe else 'PASS')
+    assert source.read_bytes() == before
+    assert sorted(item.name for item in out.iterdir()) == sorted([COPY_NAME, REPORT_NAME])
+    with closing(sqlite3.connect(out / COPY_NAME)) as con:
+        assert con.execute('PRAGMA journal_mode').fetchone()[0] == 'delete'
