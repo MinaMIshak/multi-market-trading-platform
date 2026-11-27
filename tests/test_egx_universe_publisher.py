@@ -374,6 +374,7 @@ def test_publish_exact_candidate_without_review(
 
 def test_exact_retry_is_byte_idempotent(
     runtime,
+    tmp_path,
 ):
     database, security_master, references = (
         runtime
@@ -390,12 +391,38 @@ def test_exact_retry_is_byte_idempotent(
         artifact_sha256=ARTIFACT_SHA,
     )
 
+    # Compare logical database state, not SQLite/WAL container bytes.
+    with database.connect() as con:
+        before_database = tuple(con.iterdump())
+    before_raw = {
+        path.relative_to(tmp_path / "raw"): path.read_bytes()
+        for path in (tmp_path / "raw").rglob("*")
+        if path.is_file()
+    }
+    assert before_raw
+    assert any(
+        hashlib.sha256(payload).hexdigest() == first.universe_sha256
+        for payload in before_raw.values()
+    )
+
     second = publish_egx_universe(
         security_master=security_master,
         references=references,
         snapshot_date=DAY,
         artifact_sha256=ARTIFACT_SHA,
     )
+
+    with database.connect() as con:
+        assert tuple(con.iterdump()) == before_database
+        assert con.execute(
+            "SELECT COUNT(*) FROM reference_artifacts "
+            "WHERE contract='egx-source-review-v1'"
+        ).fetchone()[0] == 0
+    assert {
+        path.relative_to(tmp_path / "raw"): path.read_bytes()
+        for path in (tmp_path / "raw").rglob("*")
+        if path.is_file()
+    } == before_raw
 
     assert first == second
 
