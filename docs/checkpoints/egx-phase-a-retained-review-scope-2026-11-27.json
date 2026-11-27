@@ -1,0 +1,42 @@
+{
+  "contract": "egx-phase-a-retained-review-scope-v1",
+  "head": "caa729fc47799b4d2c4b22aee2363b21e4185644",
+  "checked_at": "2026-11-27T14:35:02.996785+00:00",
+  "evidence_scope": "LOCAL_READ_ONLY_CHECK_NOT_TRUSTED_ACCEPTANCE",
+  "manifest_source": "docs/checkpoints/egx-phase-a-retained-input-suitability-2026-11-27.json",
+  "manifest_reloaded_from_database": false,
+  "raw_path": "/home/egx-agent/research-data/paper-shadow-operational/data/raw/egid/security_master/undated/_all/market-watch-names.json",
+  "raw_sha256": "11990fc9608de1be1b08861fd364da8e6908ee215ee24989255f9f927c46c02e",
+  "raw_byte_size": 82816,
+  "preflight_status": "REFUSED",
+  "preflight_reason": "effective date not established",
+  "reviews": [
+    {
+      "path": "/home/egx-agent/research-data/paper-shadow-operational/data/raw/human_reviewer_mina/security_master/undated/_all/egx-source-review-v1-b4f0a2a9a273cdb2eab28972f020b9f1b47134ce35fe9ca56e069328389e2bcc.json",
+      "sha256": "b4f0a2a9a273cdb2eab28972f020b9f1b47134ce35fe9ca56e069328389e2bcc",
+      "subject_ingestion_id": "8e52cebd-e7be-4158-bdea-08f1fbbe95de",
+      "subject_sha256": "35cf74c593e6ae14a43b4685aa6db46de7197bbb79333eee2e1899a7bd0343fb",
+      "subject_provider": "tradingview_tvdatafeed_egx",
+      "subject_contract": "egx-daily-semantic-v1",
+      "approved": true,
+      "covers_egid_universe": false
+    },
+    {
+      "path": "/home/egx-agent/research-data/paper-shadow-operational/data/raw/human_reviewer_mina/security_master/undated/_all/egx-source-review-v1-f89206fc65a64eb53af100e15cbbc44f3f41b5aa865ac8259bfeba883db0e7b3.json",
+      "sha256": "f89206fc65a64eb53af100e15cbbc44f3f41b5aa865ac8259bfeba883db0e7b3",
+      "subject_ingestion_id": "5dec3bd1-8592-4abb-8e1b-dab0ec44d31b",
+      "subject_sha256": "1a3c099fd45e266b29621d7c47f68b1f6fa25e15e1d71a7548a59de0413bed5b",
+      "subject_provider": "human_reviewed_cib_ir_egx_relay",
+      "subject_contract": "egx-actions-v1",
+      "approved": true,
+      "covers_egid_universe": false
+    }
+  ],
+  "interpretation": "The two inspected reviews bind daily semantics and corporate actions, not EGID or egx-universe-v1. They cannot satisfy independent review for a new universe. This inspection does not claim exhaustive absence of other evidence.",
+  "source_authority": "NOT_ESTABLISHED",
+  "membership_interpretation": "NOT_ESTABLISHED",
+  "publisher_exercised": false,
+  "review_created": false,
+  "production_db_mutated": false,
+  "live_money": false
+}

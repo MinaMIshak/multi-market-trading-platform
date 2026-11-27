@@ -1252,13 +1252,13 @@
     }
   },
   "phase_a_execution_checkpoint": {
-    "head": "8089216d74e3c41aef7b650127f81516981f8c4f",
-    "status": "RETAINED_INPUT_BOUNDARY_TESTS_PENDING_TRUSTED_VALIDATION",
+    "head": "caa729fc47799b4d2c4b22aee2363b21e4185644",
+    "status": "RETAINED_REVIEW_SCOPE_RECONCILED_PENDING_TRUSTED_VALIDATION",
     "host_evidence": "20261127T141311Z HOST_ACTION_RESULT PASS; retained REHEARSAL_REPORT.json reconciled. COPY_ONLY schema 9 -> 13; canonical identities 319 -> 319; backfill expected/retained 319, missing/unexpected 0; no duplicate universe dates; integrity ok; foreign-key violations 0; migration retry idempotent; source SHA-256 unchanged; production_db_mutated=false; live_money=false.",
     "acceptance_scope": "NEXT_PRODUCT_MILESTONE Phase-A checks 1-6, 13-14 supported by host rehearsal. Checks 7-12 remain open for trusted publisher/review/source-authority evidence. 319 is a schema reconciliation count, not verified exchange membership.",
-    "change": "Added review-recommended tests for wrong asset type, non-null granularity, non-bytes input, same-day effective date and both sides of Cairo midnight. No runtime change.",
-    "tests": "Local focused input/builder/publisher/reviewed-changes suite: 54 passed in 2.48s. Initial invocation had a nonexistent filename; corrected run passed. Independent review and trusted validation pending. Latest host scanner_product PASS names eecf7899da74937514165c8e40bf4be5c7aa5563.",
-    "next_action": "Independent review, trusted validation and commit of boundary tests; then locate retained provenance establishing effective date, scope and authority before isolated publisher rehearsal. Phase A only.",
+    "change": "Recorded exact SHA-256 and subject bindings for the two retained human reviews: daily semantics and actions only, neither approves EGID membership or a new universe. Executed existing preflight on retained EGID bytes using the previously recorded manifest; refused effective date not established. No runtime change.",
+    "tests": "Local input/builder/publisher/reviewed-changes suite: 54 passed in 2.56s. Latest trusted scanner_product PASS names 8089216d74e3c41aef7b650127f81516981f8c4f; Claude approved the preceding boundary-test change. This evidence-only change awaits independent review and trusted validation.",
+    "next_action": "Review and commit retained-review-scope checkpoint; then inspect retained acquisition/bootstrap provenance for an explicit effective date, population scope and source authority. If no usable retained input exists, prepare a fail-closed isolated acquisition/admission harness; do not backdate receipt into effective membership or approve a review automatically. Phase A only.",
     "remaining": "Located retained EGID input is byte-valid but undated and incomplete in the ingestion ledger. Publisher/review acceptance remains open. Source authority, permitted use and authoritative membership remain NOT_ESTABLISHED; no automatic review approval.",
     "egx_current_counts": "Authoritative universe/data-ready/scanned/status counts unverified.",
     "us_current_counts": "Universe/data-ready/scanned/candidates unverified; Phase B gated.",
