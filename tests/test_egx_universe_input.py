@@ -32,7 +32,10 @@ def test_returns_recorded_date_not_receipt_date():
     ({"raw": b"altered"}, "digest or size mismatch"),
     ({"changes": {"byte_size": 1}}, "digest or size mismatch"),
     ({"changes": {"provider": "other"}}, "EGID security-master"),
+    ({"changes": {"asset_type": "DAILY_BARS"}}, "EGID security-master"),
     ({"changes": {"symbol": "COMI"}}, "whole security-master"),
+    ({"changes": {"granularity": "D1"}}, "whole security-master"),
+    ({"raw": bytearray(RAW)}, "retained bytes required"),
     ({"completed_at": NOW.replace(tzinfo=None)}, "aware completion"),
     ({"as_of": NOW.replace(tzinfo=None)}, "aware as_of"),
     ({"completed_at": NOW - timedelta(seconds=1)}, "chronology"),
@@ -42,3 +45,20 @@ def test_returns_recorded_date_not_receipt_date():
 def test_refuses_unusable_retained_input(kwargs, match):
     with pytest.raises(ValueError, match=match):
         check(**kwargs)
+
+
+@pytest.mark.parametrize("received_at,effective_date", [
+    (NOW, date(2026, 11, 27)),
+    # Cairo is already November 27 while the UTC receipt date is November 26.
+    (datetime(2026, 11, 26, 23, tzinfo=timezone.utc), date(2026, 11, 27)),
+])
+def test_accepts_effective_date_on_cairo_receipt_day(received_at, effective_date):
+    assert check(changes={"received_at": received_at, "market_date": effective_date}) == effective_date
+
+
+def test_refuses_effective_date_before_cairo_day_has_started():
+    with pytest.raises(ValueError, match="effective date after receipt"):
+        check(changes={
+            "received_at": datetime(2026, 11, 26, 21, 59, tzinfo=timezone.utc),
+            "market_date": date(2026, 11, 27),
+        })

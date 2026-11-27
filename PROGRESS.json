@@ -1252,13 +1252,13 @@
     }
   },
   "phase_a_execution_checkpoint": {
-    "head": "eecf7899da74937514165c8e40bf4be5c7aa5563",
-    "status": "RETAINED_INPUT_PREFLIGHT_PENDING_TRUSTED_VALIDATION",
+    "head": "8089216d74e3c41aef7b650127f81516981f8c4f",
+    "status": "RETAINED_INPUT_BOUNDARY_TESTS_PENDING_TRUSTED_VALIDATION",
     "host_evidence": "20261127T141311Z HOST_ACTION_RESULT PASS; retained REHEARSAL_REPORT.json reconciled. COPY_ONLY schema 9 -> 13; canonical identities 319 -> 319; backfill expected/retained 319, missing/unexpected 0; no duplicate universe dates; integrity ok; foreign-key violations 0; migration retry idempotent; source SHA-256 unchanged; production_db_mutated=false; live_money=false.",
     "acceptance_scope": "NEXT_PRODUCT_MILESTONE Phase-A checks 1-6, 13-14 supported by host rehearsal. Checks 7-12 remain open for trusted publisher/review/source-authority evidence. 319 is a schema reconciliation count, not verified exchange membership.",
-    "change": "Added pure check_retained_egid_input preflight: retained digest/size, EGID security-master scope, explicit effective date, validated completion and PIT chronology. No receipt-date substitution, IO, admission, publication or review. Not wired to a rehearsal caller.",
-    "tests": "Local focused pytest: test_egx_universe_input, test_egx_universe_builder, test_egx_universe_publisher: 34 passed. Independent review and trusted validation pending. Latest host scanner_product PASS names d8ebd8320587b532bcc9c9dab886717a951a9263.",
-    "next_action": "Independent review and trusted validation of preflight; locate retained provenance establishing effective date and source scope before wiring isolated publisher rehearsal. Phase A only.",
+    "change": "Added review-recommended tests for wrong asset type, non-null granularity, non-bytes input, same-day effective date and both sides of Cairo midnight. No runtime change.",
+    "tests": "Local focused input/builder/publisher/reviewed-changes suite: 54 passed in 2.48s. Initial invocation had a nonexistent filename; corrected run passed. Independent review and trusted validation pending. Latest host scanner_product PASS names eecf7899da74937514165c8e40bf4be5c7aa5563.",
+    "next_action": "Independent review, trusted validation and commit of boundary tests; then locate retained provenance establishing effective date, scope and authority before isolated publisher rehearsal. Phase A only.",
     "remaining": "Located retained EGID input is byte-valid but undated and incomplete in the ingestion ledger. Publisher/review acceptance remains open. Source authority, permitted use and authoritative membership remain NOT_ESTABLISHED; no automatic review approval.",
     "egx_current_counts": "Authoritative universe/data-ready/scanned/status counts unverified.",
     "us_current_counts": "Universe/data-ready/scanned/candidates unverified; Phase B gated.",
